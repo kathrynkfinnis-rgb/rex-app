@@ -1,7 +1,8 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
-import { Sparkles, MapPin, Book, Film, Tv } from "lucide-react";
+import { MapPin, Book, Film, Tv } from "lucide-react";
+import { TRexLogo } from "@/components/TRexLogo";
 
 export const Route = createFileRoute("/")({
   ssr: false,
@@ -37,7 +38,7 @@ function Landing() {
 
       <div className="relative mx-auto flex min-h-screen max-w-md flex-col px-6 pb-10 pt-16">
         <div className="flex items-center gap-2 text-sm font-semibold uppercase tracking-widest text-primary">
-          <Sparkles className="h-4 w-4" /> Reco
+          <TRexLogo className="h-5 w-5" /> T. Rex
         </div>
 
         <h1 className="mt-10 font-display text-5xl leading-[1.05] text-foreground">

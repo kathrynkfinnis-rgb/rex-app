@@ -4,7 +4,7 @@ import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { CATEGORIES, type ItemType } from "@/lib/categories";
 import { RecommendationCard, type FeedRow } from "@/components/RecommendationCard";
-import { Sparkles } from "lucide-react";
+import { TRexLogo } from "@/components/TRexLogo";
 import { cn } from "@/lib/utils";
 
 export const Route = createFileRoute("/_authenticated/feed")({
@@ -41,7 +41,7 @@ function FeedPage() {
         <div className="flex items-center justify-between">
           <div>
             <div className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-widest text-primary">
-              <Sparkles className="h-3 w-3" /> Reco
+              <TRexLogo className="h-4 w-4" /> T. Rex
             </div>
             <h1 className="mt-0.5 font-display text-3xl">Your feed</h1>
           </div>
