@@ -9,7 +9,7 @@ import { LogOut, Smartphone } from "lucide-react";
 export const Route = createFileRoute("/_authenticated/me")({
   head: () => ({
     meta: [
-      { title: "Your profile — Reco" },
+      { title: "Your profile — T. Rex" },
       { name: "description", content: "Your recommendations and settings." },
     ],
   }),
@@ -79,7 +79,7 @@ function MePage() {
           <div className="flex items-start gap-3">
             <Smartphone className="mt-0.5 h-5 w-5 text-primary" />
             <div>
-              <p className="font-semibold">Install Reco on your iPhone</p>
+              <p className="font-semibold">Install T. Rex on your iPhone</p>
               <p className="mt-1 text-sm text-muted-foreground">
                 Tap the Share icon in Safari, then <em>Add to Home Screen</em>. You'll get an app icon and notifications when friends post.
               </p>

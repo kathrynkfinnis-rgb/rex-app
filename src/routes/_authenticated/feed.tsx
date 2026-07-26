@@ -10,7 +10,7 @@ import { cn } from "@/lib/utils";
 export const Route = createFileRoute("/_authenticated/feed")({
   head: () => ({
     meta: [
-      { title: "Your feed — Reco" },
+      { title: "Your feed — T. Rex" },
       { name: "description", content: "The latest recommendations from your friends." },
     ],
   }),

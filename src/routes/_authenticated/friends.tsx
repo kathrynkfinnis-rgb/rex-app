@@ -10,8 +10,8 @@ import { UserPlus, Check, X, Search } from "lucide-react";
 export const Route = createFileRoute("/_authenticated/friends")({
   head: () => ({
     meta: [
-      { title: "Friends — Reco" },
-      { name: "description", content: "Manage your friends on Reco." },
+      { title: "Friends — T. Rex" },
+      { name: "description", content: "Manage your friends on T. Rex." },
     ],
   }),
   component: FriendsPage,

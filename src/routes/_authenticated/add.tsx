@@ -13,7 +13,7 @@ import { cn } from "@/lib/utils";
 export const Route = createFileRoute("/_authenticated/add")({
   head: () => ({
     meta: [
-      { title: "Add a recommendation — Reco" },
+      { title: "Add a recommendation — T. Rex" },
       { name: "description", content: "Recommend a place, book, movie, or show." },
     ],
   }),
