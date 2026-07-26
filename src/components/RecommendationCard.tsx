@@ -1,5 +1,5 @@
 import { Link } from "@tanstack/react-router";
-import { Star } from "lucide-react";
+import { CrownRatingDisplay } from "@/components/CrownRating";
 import { categoryMeta, type ItemType } from "@/lib/categories";
 import { formatDistanceToNow } from "date-fns";
 
@@ -50,14 +50,8 @@ export function RecommendationCard({ rec }: { rec: FeedRow }) {
             <span className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider ${cat.tokenClass}`}>
               <Icon className="h-3 w-3" /> {cat.label}
             </span>
-            <div className="flex items-center gap-0.5">
-              {Array.from({ length: 5 }).map((_, i) => (
-                <Star
-                  key={i}
-                  className={`h-3.5 w-3.5 ${i < rec.rating ? "fill-primary text-primary" : "text-muted-foreground/30"}`}
-                />
-              ))}
-            </div>
+            <CrownRatingDisplay value={rec.rating} size="xs" showNumber />
+
           </div>
           <h3 className="mt-1 truncate font-display text-xl leading-tight">{item.title}</h3>
           {item.subtitle && (

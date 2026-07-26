@@ -7,7 +7,8 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { toast } from "sonner";
-import { ArrowLeft, Sparkles } from "lucide-react";
+import { ArrowLeft } from "lucide-react";
+import { TRexLogo } from "@/components/TRexLogo";
 
 const searchSchema = z.object({
   mode: z.enum(["signin", "signup"]).default("signin").catch("signin"),
@@ -18,8 +19,8 @@ export const Route = createFileRoute("/auth")({
   validateSearch: searchSchema,
   head: () => ({
     meta: [
-      { title: "Sign in — Reco" },
-      { name: "description", content: "Sign in or create your Reco account." },
+      { title: "Sign in — T. Rex" },
+      { name: "description", content: "Sign in or create your T. Rex account." },
     ],
   }),
   component: AuthPage,
@@ -96,7 +97,7 @@ function AuthPage() {
           <ArrowLeft className="h-4 w-4" /> Back
         </Link>
         <div className="mt-6 flex items-center gap-2 text-sm font-semibold uppercase tracking-widest text-primary">
-          <Sparkles className="h-4 w-4" /> Reco
+          <TRexLogo className="h-5 w-5" /> T. Rex
         </div>
         <h1 className="mt-4 font-display text-4xl leading-tight">
           {mode === "signup" ? "Start recommending" : "Welcome back"}
