@@ -7,7 +7,8 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { toast } from "sonner";
-import { ArrowLeft, Star, MapPin } from "lucide-react";
+import { ArrowLeft, MapPin } from "lucide-react";
+import { CrownRatingInput } from "@/components/CrownRating";
 import { cn } from "@/lib/utils";
 
 export const Route = createFileRoute("/_authenticated/add")({
@@ -27,7 +28,7 @@ function AddPage() {
   const [subtitle, setSubtitle] = useState("");
   const [address, setAddress] = useState("");
   const [note, setNote] = useState("");
-  const [rating, setRating] = useState(5);
+  const [rating, setRating] = useState(10);
   const [saving, setSaving] = useState(false);
   const [locating, setLocating] = useState(false);
   const [coords, setCoords] = useState<{ lat: number; lng: number } | null>(null);
@@ -188,25 +189,9 @@ function AddPage() {
 
         <div className="space-y-2">
           <Label>Your rating</Label>
-          <div className="flex gap-1">
-            {[1, 2, 3, 4, 5].map((n) => (
-              <button
-                key={n}
-                type="button"
-                onClick={() => setRating(n)}
-                className="p-1"
-                aria-label={`${n} star${n > 1 ? "s" : ""}`}
-              >
-                <Star
-                  className={cn(
-                    "h-9 w-9 transition-colors",
-                    n <= rating ? "fill-primary text-primary" : "text-muted-foreground/30",
-                  )}
-                />
-              </button>
-            ))}
-          </div>
+          <CrownRatingInput value={rating} onChange={setRating} />
         </div>
+
 
         <div className="space-y-1.5">
           <Label htmlFor="note">Why do you recommend it?</Label>
