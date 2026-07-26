@@ -1,24 +1,85 @@
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
+import { useEffect, useState } from "react";
+import { supabase } from "@/integrations/supabase/client";
+import { Sparkles, MapPin, Book, Film, Tv } from "lucide-react";
 
-// No head() here: the home route inherits title/description/og/twitter from
-// __root.tsx, and ships no og:image so serve-time hosting can inject the
-// project's social preview (explicit og:image or latest screenshot).
 export const Route = createFileRoute("/")({
-  component: Index,
+  ssr: false,
+  head: () => ({
+    meta: [
+      { title: "Reco — recommendations from friends you trust" },
+      { name: "description", content: "The little shared book of restaurants, books, movies and shows your friends actually love." },
+      { property: "og:title", content: "Reco — recommendations from friends you trust" },
+      { property: "og:description", content: "The little shared book of restaurants, books, movies and shows your friends actually love." },
+    ],
+  }),
+  component: Landing,
 });
 
-// IMPORTANT: Replace this placeholder. See ./README.md for routing conventions.
-function Index() {
+function Landing() {
+  const navigate = useNavigate();
+  const [checking, setChecking] = useState(true);
+  useEffect(() => {
+    supabase.auth.getUser().then(({ data }) => {
+      if (data.user) navigate({ to: "/feed", replace: true });
+      else setChecking(false);
+    });
+  }, [navigate]);
+
+  if (checking) {
+    return <div className="min-h-screen bg-background" />;
+  }
+
   return (
-    <div
-      className="flex min-h-screen items-center justify-center"
-      style={{ backgroundColor: "#fcfbf8" }}
-    >
-      <img
-        data-lovable-blank-page-placeholder="REMOVE_THIS"
-        src="https://cdn.gpteng.co/blank-app-v1.svg"
-        alt="Your app will live here!"
-      />
-    </div>
+    <main className="relative min-h-screen overflow-hidden bg-background">
+      <div className="pointer-events-none absolute -right-24 -top-24 h-72 w-72 rounded-full bg-primary/15 blur-3xl" />
+      <div className="pointer-events-none absolute -left-24 top-1/2 h-72 w-72 rounded-full bg-accent/20 blur-3xl" />
+
+      <div className="relative mx-auto flex min-h-screen max-w-md flex-col px-6 pb-10 pt-16">
+        <div className="flex items-center gap-2 text-sm font-semibold uppercase tracking-widest text-primary">
+          <Sparkles className="h-4 w-4" /> Reco
+        </div>
+
+        <h1 className="mt-10 font-display text-5xl leading-[1.05] text-foreground">
+          The little shared book of things your friends&nbsp;
+          <em className="text-primary">actually</em> love.
+        </h1>
+        <p className="mt-5 text-lg leading-relaxed text-muted-foreground">
+          Save the restaurant, the book, the movie, the show. Your friends see it,
+          you see theirs. That's it. No algorithm, no strangers.
+        </p>
+
+        <div className="mt-8 grid grid-cols-4 gap-2">
+          {[
+            { i: MapPin, l: "Places" },
+            { i: Book, l: "Books" },
+            { i: Film, l: "Movies" },
+            { i: Tv, l: "TV" },
+          ].map(({ i: Icon, l }) => (
+            <div key={l} className="flex flex-col items-center gap-1.5 rounded-2xl bg-card p-3 ring-1 ring-border">
+              <Icon className="h-5 w-5 text-primary" />
+              <span className="text-xs font-medium">{l}</span>
+            </div>
+          ))}
+        </div>
+
+        <div className="mt-auto space-y-3 pt-12">
+          <Link
+            to="/auth"
+            search={{ mode: "signup" as const }}
+            className="flex h-14 items-center justify-center rounded-full bg-primary text-base font-semibold text-primary-foreground shadow-lg shadow-primary/30 transition-transform active:scale-[0.98]"
+          >
+            Get started
+          </Link>
+          <Link
+            to="/auth"
+            search={{ mode: "signin" as const }}
+            className="flex h-14 items-center justify-center rounded-full border border-border bg-card text-base font-semibold text-foreground"
+          >
+            I already have an account
+          </Link>
+        </div>
+      </div>
+    </main>
   );
 }
