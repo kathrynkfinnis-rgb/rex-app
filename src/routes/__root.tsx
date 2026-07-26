@@ -82,7 +82,7 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
       { name: "theme-color", content: "#c26a44" },
       { name: "apple-mobile-web-app-capable", content: "yes" },
       { name: "apple-mobile-web-app-status-bar-style", content: "default" },
-      { name: "apple-mobile-web-app-title", content: "Reco" },
+      { name: "apple-mobile-web-app-title", content: "T. Rex" },
       { title: "T. Rex — recommendations from friends you trust" },
       { name: "description", content: "A shared little book of the restaurants, books, movies and shows your friends actually love." },
       { property: "og:title", content: "T. Rex — recommendations from friends you trust" },
