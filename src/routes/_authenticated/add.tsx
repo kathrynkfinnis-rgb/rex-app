@@ -123,6 +123,7 @@ function AddPage() {
     );
   }
 
+  const CatIcon = cat!.icon;
   return (
     <div>
       <header className="border-b border-border bg-background px-5 pb-4 pt-[calc(env(safe-area-inset-top)+1rem)]">
@@ -134,7 +135,7 @@ function AddPage() {
         </button>
         <div className="mt-3 flex items-center gap-3">
           <div className={cn("flex h-10 w-10 items-center justify-center rounded-xl", cat!.tokenClass)}>
-            <cat!.icon className="h-5 w-5" />
+            <CatIcon className="h-5 w-5" />
           </div>
           <h1 className="font-display text-3xl">Add a {cat!.label.toLowerCase()}</h1>
         </div>
