@@ -6,7 +6,8 @@ import { categoryMeta, type ItemType } from "@/lib/categories";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { toast } from "sonner";
-import { ArrowLeft, Star, MapPin, Check } from "lucide-react";
+import { ArrowLeft, MapPin, Check } from "lucide-react";
+import { CrownRatingDisplay, CrownRatingInput } from "@/components/CrownRating";
 import { cn } from "@/lib/utils";
 import { formatDistanceToNow } from "date-fns";
 
@@ -54,7 +55,7 @@ function ItemPage() {
     },
   });
 
-  const [rating, setRating] = useState(5);
+  const [rating, setRating] = useState(10);
   const [note, setNote] = useState("");
   const [posting, setPosting] = useState(false);
   const [checking, setChecking] = useState(false);
@@ -131,18 +132,8 @@ function ItemPage() {
         </div>
         {recs.length > 0 && (
           <div className="mt-4 flex items-center gap-2">
-            <div className="flex">
-              {Array.from({ length: 5 }).map((_, i) => (
-                <Star
-                  key={i}
-                  className={cn(
-                    "h-4 w-4",
-                    i < Math.round(avg) ? "fill-primary text-primary" : "text-muted-foreground/30",
-                  )}
-                />
-              ))}
-            </div>
-            <span className="text-sm font-medium">{avg.toFixed(1)}</span>
+            <CrownRatingDisplay value={avg} size="md" />
+            <span className="text-sm font-semibold tabular-nums">{avg.toFixed(1)}<span className="text-muted-foreground font-normal">/10</span></span>
             <span className="text-sm text-muted-foreground">· {recs.length} rec{recs.length === 1 ? "" : "s"}</span>
           </div>
         )}
@@ -159,18 +150,8 @@ function ItemPage() {
 
       <section className="p-5">
         <h2 className="font-display text-2xl">{myRec ? "Update your take" : "Your take"}</h2>
-        <div className="mt-3 flex gap-1">
-          {[1, 2, 3, 4, 5].map((n) => (
-            <button
-              key={n}
-              type="button"
-              onClick={() => setRating(n)}
-              className="p-0.5"
-              aria-label={`${n} stars`}
-            >
-              <Star className={cn("h-8 w-8", n <= rating ? "fill-primary text-primary" : "text-muted-foreground/30")} />
-            </button>
-          ))}
+        <div className="mt-3">
+          <CrownRatingInput value={rating} onChange={setRating} />
         </div>
         <Textarea
           value={note}
@@ -197,11 +178,8 @@ function ItemPage() {
                   </div>
                   <span className="font-medium">{r.profiles?.display_name || r.profiles?.username}</span>
                 </div>
-                <div className="flex">
-                  {Array.from({ length: 5 }).map((_, i) => (
-                    <Star key={i} className={cn("h-3.5 w-3.5", i < r.rating ? "fill-primary text-primary" : "text-muted-foreground/30")} />
-                  ))}
-                </div>
+                <CrownRatingDisplay value={r.rating} size="xs" />
+
               </div>
               {r.note && <p className="mt-2 text-sm leading-snug">&ldquo;{r.note}&rdquo;</p>}
               <p className="mt-1 text-[11px] text-muted-foreground">{formatDistanceToNow(new Date(r.created_at), { addSuffix: true })}</p>
