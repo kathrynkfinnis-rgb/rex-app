@@ -45,9 +45,9 @@ function AddPage() {
   const photoFn = useServerFn(getPlacePhotoUrl);
 
   async function handlePick(hit: AnyHit) {
-    setPicked(hit as SearchHit);
+    setPicked(hit);
     setTitle(hit.title);
-    setSubtitle(hit.subtitle ?? "");
+    setSubtitle(hit.external_source === "google_places" ? "" : hit.subtitle ?? "");
     if (hit.external_source === "google_places") {
       if (hit.address) setAddress(hit.address);
       if (typeof hit.lat === "number" && typeof hit.lng === "number") {
@@ -57,7 +57,7 @@ function AddPage() {
         try {
           const url = await photoFn({ data: { photoName: hit.photo_name, maxWidth: 800 } });
           if (url) {
-            setPicked((prev) => (prev ? ({ ...prev, image_url: url } as SearchHit) : prev));
+            setPicked((prev) => (prev ? { ...prev, image_url: url } : prev));
           }
         } catch {
           // photo is optional — ignore
