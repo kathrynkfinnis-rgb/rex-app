@@ -91,3 +91,20 @@ export const searchTv = createServerFn({ method: "GET" })
       genre: tmdbGenreName(r.genre_ids),
     }));
   });
+
+export const searchPodcasts = createServerFn({ method: "GET" })
+  .inputValidator((d: { q: string }) => querySchema.parse(d))
+  .handler(async ({ data }): Promise<SearchHit[]> => {
+    const url = `https://itunes.apple.com/search?media=podcast&entity=podcast&limit=15&term=${encodeURIComponent(data.q)}`;
+    const res = await fetch(url);
+    if (!res.ok) return [];
+    const json: any = await res.json();
+    return (json.results ?? []).map((r: any) => ({
+      external_id: String(r.collectionId ?? r.trackId),
+      external_source: "itunes_podcast" as const,
+      title: r.collectionName ?? r.trackName ?? "Untitled",
+      subtitle: r.artistName ?? null,
+      image_url: r.artworkUrl600 ?? r.artworkUrl100 ?? null,
+      genre: Array.isArray(r.genres) ? r.genres.find((g: string) => g && g !== "Podcasts") ?? r.primaryGenreName ?? null : r.primaryGenreName ?? null,
+    }));
+  });
