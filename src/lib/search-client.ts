@@ -5,7 +5,7 @@ import type { SearchHit } from "@/lib/search.functions";
 export async function searchBooksClient(q: string): Promise<SearchHit[]> {
   const term = q.trim();
   if (!term) return [];
-  const url = `https://openlibrary.org/search.json?q=${encodeURIComponent(term)}&limit=15&fields=key,title,author_name,first_publish_year,cover_i,edition_key`;
+  const url = `https://openlibrary.org/search.json?q=${encodeURIComponent(term)}&limit=15&fields=key,title,author_name,first_publish_year,cover_i,edition_key,subject`;
   const res = await fetch(url);
   if (!res.ok) return [];
   const json: any = await res.json();
@@ -17,12 +17,16 @@ export async function searchBooksClient(q: string): Promise<SearchHit[]> {
       const cover = d.cover_i ? `https://covers.openlibrary.org/b/id/${d.cover_i}-M.jpg` : null;
       const authors: string[] = d.author_name ?? [];
       const year = d.first_publish_year ? ` · ${d.first_publish_year}` : "";
+      const subjects: string[] = Array.isArray(d.subject) ? d.subject : [];
+      // Prefer a short, clean subject as the genre (skip long descriptive tags).
+      const genre = subjects.find((s) => typeof s === "string" && s.length <= 22) ?? subjects[0] ?? null;
       return {
         external_id: key.replace(/^\//, ""),
         external_source: "google_books", // reuse existing enum value; treated as generic book id
         title: d.title ?? "Untitled",
         subtitle: authors.length ? authors.join(", ") + year : year.replace(/^ · /, "") || null,
         image_url: cover,
+        genre: genre ? String(genre) : null,
       };
     })
     .filter((x): x is SearchHit => !!x);
