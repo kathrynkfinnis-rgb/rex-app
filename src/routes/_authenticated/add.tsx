@@ -10,6 +10,8 @@ import { toast } from "sonner";
 import { ArrowLeft, MapPin } from "lucide-react";
 import { CrownRatingInput } from "@/components/CrownRating";
 import { cn } from "@/lib/utils";
+import { SearchPicker } from "@/components/SearchPicker";
+import type { SearchHit } from "@/lib/search.functions";
 
 export const Route = createFileRoute("/_authenticated/add")({
   head: () => ({
@@ -32,8 +34,18 @@ function AddPage() {
   const [saving, setSaving] = useState(false);
   const [locating, setLocating] = useState(false);
   const [coords, setCoords] = useState<{ lat: number; lng: number } | null>(null);
+  const [picked, setPicked] = useState<SearchHit | null>(null);
+  const [manualMode, setManualMode] = useState(false);
 
   const cat = type ? categoryMeta(type) : null;
+  const needsSearch = type === "book" || type === "movie" || type === "tv";
+  const showForm = !needsSearch || picked || manualMode;
+
+  function handlePick(hit: SearchHit) {
+    setPicked(hit);
+    setTitle(hit.title);
+    setSubtitle(hit.subtitle ?? "");
+  }
 
   function useMyLocation() {
     if (!navigator.geolocation) {
@@ -63,30 +75,46 @@ function AddPage() {
       const uid = userRes.user?.id;
       if (!uid) throw new Error("Not signed in");
 
-      const { data: item, error: itemErr } = await supabase
-        .from("items")
-        .insert({
-          type,
-          title: title.trim(),
-          subtitle: subtitle.trim() || null,
-          address: type === "place" ? address.trim() || null : null,
-          lat: type === "place" ? coords?.lat ?? null : null,
-          lng: type === "place" ? coords?.lng ?? null : null,
-        })
-        .select()
-        .single();
-      if (itemErr) throw itemErr;
+      let itemId: string | undefined;
+      if (picked) {
+        const { data: existing } = await supabase
+          .from("items")
+          .select("id")
+          .eq("external_source", picked.external_source)
+          .eq("external_id", picked.external_id)
+          .maybeSingle();
+        itemId = existing?.id;
+      }
+      if (!itemId) {
+        const { data: item, error: itemErr } = await supabase
+          .from("items")
+          .insert({
+            type,
+            title: title.trim(),
+            subtitle: subtitle.trim() || null,
+            image_url: picked?.image_url ?? null,
+            external_id: picked?.external_id ?? null,
+            external_source: picked?.external_source ?? null,
+            address: type === "place" ? address.trim() || null : null,
+            lat: type === "place" ? coords?.lat ?? null : null,
+            lng: type === "place" ? coords?.lng ?? null : null,
+          })
+          .select("id")
+          .single();
+        if (itemErr) throw itemErr;
+        itemId = item.id;
+      }
 
       const { error: recErr } = await supabase.from("recommendations").insert({
         user_id: uid,
-        item_id: item.id,
+        item_id: itemId!,
         rating,
         note: note.trim() || null,
       });
       if (recErr) throw recErr;
 
       toast.success("Added to your feed");
-      navigate({ to: "/item/$id", params: { id: item.id } });
+      navigate({ to: "/item/$id", params: { id: itemId! } });
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Couldn't save");
     } finally {
@@ -143,26 +171,61 @@ function AddPage() {
       </header>
 
       <div className="space-y-5 p-5">
-        <div className="space-y-1.5">
-          <Label htmlFor="title">Title</Label>
-          <Input
-            id="title"
-            value={title}
-            onChange={(e) => setTitle(e.target.value)}
-            placeholder={type === "place" ? "e.g. Osteria Mozza" : type === "book" ? "e.g. The Overstory" : "Title"}
-            className="h-12 rounded-xl"
+        {needsSearch && !showForm && (
+          <SearchPicker
+            type={type as "book" | "movie" | "tv"}
+            onPick={handlePick}
+            onManual={() => setManualMode(true)}
           />
-        </div>
-        <div className="space-y-1.5">
-          <Label htmlFor="subtitle">{cat!.subtitleLabel}</Label>
-          <Input
-            id="subtitle"
-            value={subtitle}
-            onChange={(e) => setSubtitle(e.target.value)}
-            placeholder={cat!.subtitleLabel}
-            className="h-12 rounded-xl"
-          />
-        </div>
+        )}
+
+        {showForm && (
+          <>
+            {picked && (
+              <div className="flex items-center gap-3 rounded-2xl bg-card p-3 ring-1 ring-border">
+                {picked.image_url ? (
+                  <img src={picked.image_url} alt="" className="h-16 w-12 flex-none rounded-md object-cover ring-1 ring-border" />
+                ) : (
+                  <div className="h-16 w-12 flex-none rounded-md bg-muted" />
+                )}
+                <div className="min-w-0 flex-1">
+                  <div className="truncate font-medium">{picked.title}</div>
+                  {picked.subtitle && <div className="truncate text-sm text-muted-foreground">{picked.subtitle}</div>}
+                </div>
+                <button
+                  type="button"
+                  onClick={() => { setPicked(null); setTitle(""); setSubtitle(""); }}
+                  className="text-xs text-muted-foreground underline"
+                >
+                  Change
+                </button>
+              </div>
+            )}
+
+            {(!picked || type === "place") && (
+              <>
+                <div className="space-y-1.5">
+                  <Label htmlFor="title">Title</Label>
+                  <Input
+                    id="title"
+                    value={title}
+                    onChange={(e) => setTitle(e.target.value)}
+                    placeholder={type === "place" ? "e.g. Osteria Mozza" : type === "book" ? "e.g. The Overstory" : "Title"}
+                    className="h-12 rounded-xl"
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <Label htmlFor="subtitle">{cat!.subtitleLabel}</Label>
+                  <Input
+                    id="subtitle"
+                    value={subtitle}
+                    onChange={(e) => setSubtitle(e.target.value)}
+                    placeholder={cat!.subtitleLabel}
+                    className="h-12 rounded-xl"
+                  />
+                </div>
+              </>
+            )}
 
         {type === "place" && (
           <div className="space-y-1.5">
@@ -213,6 +276,8 @@ function AddPage() {
         >
           {saving ? "Saving…" : "Post recommendation"}
         </Button>
+          </>
+        )}
       </div>
     </div>
   );
