@@ -52,6 +52,8 @@ function AddPage() {
     setSubtitle(hit.external_source === "google_places" ? "" : hit.subtitle ?? "");
     if (hit.external_source === "google_places") {
       if (hit.address) setAddress(hit.address);
+      const guess = normalizePlaceSubcategory(hit.genre);
+      if (guess) setPlaceSub(guess);
       if (typeof hit.lat === "number" && typeof hit.lng === "number") {
         setCoords({ lat: hit.lat, lng: hit.lng });
       }
