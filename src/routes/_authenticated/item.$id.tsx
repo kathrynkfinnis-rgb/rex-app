@@ -177,9 +177,7 @@ function ItemPage() {
             <div key={r.id} className="rounded-2xl bg-card p-4 ring-1 ring-border">
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2">
-                  <div className="flex h-7 w-7 items-center justify-center rounded-full bg-secondary text-xs font-semibold">
-                    {(r.profiles?.display_name || r.profiles?.username || "?").slice(0, 1).toUpperCase()}
-                  </div>
+                  <UserAvatar url={r.profiles?.avatar_url} name={r.profiles?.display_name || r.profiles?.username} size="sm" />
                   <span className="font-medium">{r.profiles?.display_name || r.profiles?.username}</span>
                 </div>
                 <CrownRatingDisplay value={r.rating} size="xs" />
