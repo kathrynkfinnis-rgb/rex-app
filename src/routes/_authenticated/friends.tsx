@@ -85,13 +85,20 @@ function FriendsPage() {
 
   async function shareInvite() {
     const username = myProfile?.username;
-    const url = typeof window !== "undefined"
-      ? `${window.location.origin}/auth?mode=signup${username ? `&ref=${encodeURIComponent(username)}` : ""}`
+    const origin = typeof window !== "undefined" ? window.location.origin : "";
+    // If we're on a Lovable editor/preview host, use the published app URL so
+    // invitees land on the app rather than a "collaborate on this project" page.
+    const host = typeof window !== "undefined" ? window.location.hostname : "";
+    const isLovableInternal = /id-preview|lovableproject\.com$/i.test(host) || host.endsWith("lovable.dev");
+    const publicBase = isLovableInternal ? "https://pocket-app-pioneers.lovable.app" : origin;
+    const url = publicBase
+      ? `${publicBase}/auth?mode=signup${username ? `&ref=${encodeURIComponent(username)}` : ""}`
       : "";
     const text = username
       ? `Add me on REX 🦖 — I'm @${username}. Follow my recommendations for books, films, TV & places.`
       : `Join me on REX 🦖 — recommendations for books, films, TV & places from friends you trust.`;
     const full = `${text} ${url}`;
+
 
     // Try native share (often blocked inside iframes/previews without allow="web-share")
     if (typeof navigator !== "undefined" && (navigator as any).share) {
