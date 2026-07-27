@@ -35,7 +35,7 @@ export const Route = createFileRoute("/_authenticated/feed")({
 
 function FeedPage() {
   const [filter, setFilter] = useState<ItemType | "all">("all");
-  const [subFilter, setSubFilter] etc...] = useState<string | "all">("all");
+  const [subFilter, setSubFilter] = useState<string | "all">("all");
   const [rawQuery, setRawQuery] = useState("");
   const [query, setQuery] = useState("");
   const [searchScope, setSearchScope] = useState<SearchScope>("all");
