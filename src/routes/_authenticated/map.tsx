@@ -1,7 +1,11 @@
-import { createFileRoute, Link } from "@tanstack/react-router";
+import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { MapPin, Compass } from "lucide-react";
+import { ClientOnly } from "@tanstack/react-router";
+import { lazy, Suspense } from "react";
+
+const GoogleMap = lazy(() => import("@/components/GoogleMap").then((m) => ({ default: m.GoogleMap })));
 
 export const Route = createFileRoute("/_authenticated/map")({
   head: () => ({
@@ -14,6 +18,7 @@ export const Route = createFileRoute("/_authenticated/map")({
 });
 
 function MapPage() {
+  const navigate = useNavigate();
   const { data } = useQuery({
     queryKey: ["map-places"],
     queryFn: async () => {
@@ -38,31 +43,25 @@ function MapPage() {
         <p className="mt-1 text-sm text-muted-foreground">Restaurants and spots your friends recommend.</p>
       </header>
 
-      <div className="relative m-4 h-64 overflow-hidden rounded-2xl bg-gradient-to-br from-accent/20 via-primary/10 to-cat-place/20 ring-1 ring-border">
-        <div className="absolute inset-0 opacity-40" style={{
-          backgroundImage: "radial-gradient(circle at 20% 30%, hsla(0,0%,100%,.4) 1px, transparent 1px), radial-gradient(circle at 80% 60%, hsla(0,0%,100%,.4) 1px, transparent 1px)",
-          backgroundSize: "24px 24px, 32px 32px",
-        }} />
+      <div className="relative m-4 h-72 overflow-hidden rounded-2xl bg-muted ring-1 ring-border">
         {withLoc.length === 0 ? (
-          <div className="relative flex h-full flex-col items-center justify-center gap-2 text-center">
+          <div className="flex h-full flex-col items-center justify-center gap-2 text-center px-6">
             <Compass className="h-8 w-8 text-primary" />
             <p className="max-w-xs text-sm text-muted-foreground">
               A map view lights up here once you add place recommendations with a location.
             </p>
           </div>
         ) : (
-          <div className="relative flex h-full items-center justify-center">
-            {withLoc.slice(0, 5).map((p: any, i) => (
-              <MapPin
-                key={p.id}
-                className="absolute h-8 w-8 fill-primary text-primary-foreground drop-shadow"
-                style={{
-                  left: `${15 + ((i * 17) % 70)}%`,
-                  top: `${20 + ((i * 23) % 55)}%`,
-                }}
-              />
-            ))}
-          </div>
+          <ClientOnly fallback={<div className="h-full w-full animate-pulse bg-muted" />}>
+            {() => (
+              <Suspense fallback={<div className="h-full w-full animate-pulse bg-muted" />}>
+                <GoogleMap
+                  places={withLoc.map((p: any) => ({ id: p.id, title: p.title, lat: Number(p.lat), lng: Number(p.lng) }))}
+                  onSelect={(id) => navigate({ to: "/item/$id", params: { id } })}
+                />
+              </Suspense>
+            )}
+          </ClientOnly>
         )}
       </div>
 
