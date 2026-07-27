@@ -436,6 +436,43 @@ function ImportPage() {
           </div>
         )}
 
+        {tab === "imdb" && (
+          <div className="space-y-4">
+            <label className="flex cursor-pointer flex-col items-center justify-center gap-3 rounded-2xl border-2 border-dashed border-border bg-card p-6 text-center transition-colors hover:bg-muted/40">
+              {loading ? (
+                <Loader2 className="h-8 w-8 animate-spin text-primary" />
+              ) : (
+                <Upload className="h-8 w-8 text-muted-foreground" />
+              )}
+              <div className="font-medium">Upload your IMDb ratings CSV</div>
+              <div className="text-xs text-muted-foreground">
+                Export from{" "}
+                <a
+                  href="https://www.imdb.com/list/ratings"
+                  target="_blank"
+                  rel="noreferrer"
+                  className="underline"
+                >
+                  IMDb → Your Ratings
+                </a>{" "}
+                (or any IMDb list) — click <em>Export</em>, then upload the CSV here.
+              </div>
+              <input
+                type="file"
+                accept=".csv,text/csv"
+                className="hidden"
+                onChange={onImdbFile}
+                disabled={loading}
+              />
+            </label>
+            <p className="text-xs text-muted-foreground">
+              Movies and TV shows are auto-detected from the <em>Title Type</em> column, and your 1–10 IMDb rating carries straight over as crowns. Everything drops into the review queue — hit <em>Match</em> to pull in poster art and details before adding.
+            </p>
+          </div>
+        )}
+
+
+
         {tab === "docx" && (
           <label className="flex cursor-pointer flex-col items-center justify-center gap-3 rounded-2xl border-2 border-dashed border-border bg-card p-8 text-center transition-colors hover:bg-muted/40">
             {loading ? (
