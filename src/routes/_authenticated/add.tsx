@@ -171,26 +171,61 @@ function AddPage() {
       </header>
 
       <div className="space-y-5 p-5">
-        <div className="space-y-1.5">
-          <Label htmlFor="title">Title</Label>
-          <Input
-            id="title"
-            value={title}
-            onChange={(e) => setTitle(e.target.value)}
-            placeholder={type === "place" ? "e.g. Osteria Mozza" : type === "book" ? "e.g. The Overstory" : "Title"}
-            className="h-12 rounded-xl"
+        {needsSearch && !showForm && (
+          <SearchPicker
+            type={type as "book" | "movie" | "tv"}
+            onPick={handlePick}
+            onManual={() => setManualMode(true)}
           />
-        </div>
-        <div className="space-y-1.5">
-          <Label htmlFor="subtitle">{cat!.subtitleLabel}</Label>
-          <Input
-            id="subtitle"
-            value={subtitle}
-            onChange={(e) => setSubtitle(e.target.value)}
-            placeholder={cat!.subtitleLabel}
-            className="h-12 rounded-xl"
-          />
-        </div>
+        )}
+
+        {showForm && (
+          <>
+            {picked && (
+              <div className="flex items-center gap-3 rounded-2xl bg-card p-3 ring-1 ring-border">
+                {picked.image_url ? (
+                  <img src={picked.image_url} alt="" className="h-16 w-12 flex-none rounded-md object-cover ring-1 ring-border" />
+                ) : (
+                  <div className="h-16 w-12 flex-none rounded-md bg-muted" />
+                )}
+                <div className="min-w-0 flex-1">
+                  <div className="truncate font-medium">{picked.title}</div>
+                  {picked.subtitle && <div className="truncate text-sm text-muted-foreground">{picked.subtitle}</div>}
+                </div>
+                <button
+                  type="button"
+                  onClick={() => { setPicked(null); setTitle(""); setSubtitle(""); }}
+                  className="text-xs text-muted-foreground underline"
+                >
+                  Change
+                </button>
+              </div>
+            )}
+
+            {(!picked || type === "place") && (
+              <>
+                <div className="space-y-1.5">
+                  <Label htmlFor="title">Title</Label>
+                  <Input
+                    id="title"
+                    value={title}
+                    onChange={(e) => setTitle(e.target.value)}
+                    placeholder={type === "place" ? "e.g. Osteria Mozza" : type === "book" ? "e.g. The Overstory" : "Title"}
+                    className="h-12 rounded-xl"
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <Label htmlFor="subtitle">{cat!.subtitleLabel}</Label>
+                  <Input
+                    id="subtitle"
+                    value={subtitle}
+                    onChange={(e) => setSubtitle(e.target.value)}
+                    placeholder={cat!.subtitleLabel}
+                    className="h-12 rounded-xl"
+                  />
+                </div>
+              </>
+            )}
 
         {type === "place" && (
           <div className="space-y-1.5">
