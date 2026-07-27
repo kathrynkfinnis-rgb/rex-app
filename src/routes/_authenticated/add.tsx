@@ -20,7 +20,7 @@ export const Route = createFileRoute("/_authenticated/add")({
   head: () => ({
     meta: [
       { title: "Add a recommendation — REX" },
-      { name: "description", content: "Recommend a place, book, movie, or show." },
+      { name: "description", content: "Recommend a place, book, movie, show, or recipe." },
     ],
   }),
   component: AddPage,
@@ -41,7 +41,7 @@ function AddPage() {
   const [manualMode, setManualMode] = useState(false);
 
   const cat = type ? categoryMeta(type) : null;
-  const needsSearch = type !== null;
+  const needsSearch = type !== null && type !== "recipe";
   const showForm = !needsSearch || picked || manualMode;
   const photoFn = useServerFn(getPlacePhotoUrl);
 
