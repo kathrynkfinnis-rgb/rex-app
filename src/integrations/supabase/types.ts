@@ -44,6 +44,13 @@ export type Database = {
             referencedRelation: "items"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "check_ins_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
         ]
       }
       friendships: {
@@ -179,6 +186,13 @@ export type Database = {
             columns: ["item_id"]
             isOneToOne: false
             referencedRelation: "items"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "recommendations_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
             referencedColumns: ["id"]
           },
         ]
