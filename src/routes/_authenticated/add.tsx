@@ -10,8 +10,10 @@ import { toast } from "sonner";
 import { ArrowLeft, MapPin } from "lucide-react";
 import { CrownRatingInput } from "@/components/CrownRating";
 import { cn } from "@/lib/utils";
-import { SearchPicker } from "@/components/SearchPicker";
+import { SearchPicker, type AnyHit } from "@/components/SearchPicker";
 import type { SearchHit } from "@/lib/search.functions";
+import { getPlacePhotoUrl } from "@/lib/places.functions";
+import { useServerFn } from "@tanstack/react-start";
 
 export const Route = createFileRoute("/_authenticated/add")({
   head: () => ({
@@ -34,17 +36,34 @@ function AddPage() {
   const [saving, setSaving] = useState(false);
   const [locating, setLocating] = useState(false);
   const [coords, setCoords] = useState<{ lat: number; lng: number } | null>(null);
-  const [picked, setPicked] = useState<SearchHit | null>(null);
+  const [picked, setPicked] = useState<AnyHit | null>(null);
   const [manualMode, setManualMode] = useState(false);
 
   const cat = type ? categoryMeta(type) : null;
-  const needsSearch = type === "book" || type === "movie" || type === "tv";
+  const needsSearch = type !== null;
   const showForm = !needsSearch || picked || manualMode;
+  const photoFn = useServerFn(getPlacePhotoUrl);
 
-  function handlePick(hit: SearchHit) {
+  async function handlePick(hit: AnyHit) {
     setPicked(hit);
     setTitle(hit.title);
-    setSubtitle(hit.subtitle ?? "");
+    setSubtitle(hit.external_source === "google_places" ? "" : hit.subtitle ?? "");
+    if (hit.external_source === "google_places") {
+      if (hit.address) setAddress(hit.address);
+      if (typeof hit.lat === "number" && typeof hit.lng === "number") {
+        setCoords({ lat: hit.lat, lng: hit.lng });
+      }
+      if (hit.photo_name) {
+        try {
+          const url = await photoFn({ data: { photoName: hit.photo_name, maxWidth: 800 } });
+          if (url) {
+            setPicked((prev) => (prev ? { ...prev, image_url: url } : prev));
+          }
+        } catch {
+          // photo is optional — ignore
+        }
+      }
+    }
   }
 
   function useMyLocation() {
@@ -173,9 +192,10 @@ function AddPage() {
       <div className="space-y-5 p-5">
         {needsSearch && !showForm && (
           <SearchPicker
-            type={type as "book" | "movie" | "tv"}
+            type={type}
             onPick={handlePick}
             onManual={() => setManualMode(true)}
+            near={type === "place" ? coords : null}
           />
         )}
 
