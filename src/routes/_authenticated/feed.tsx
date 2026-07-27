@@ -388,6 +388,22 @@ function SubChip({ active, onClick, children }: { active: boolean; onClick: () =
   );
 }
 
+function ScopeChip({ active, onClick, children }: { active: boolean; onClick: () => void; children: React.ReactNode }) {
+  return (
+    <button
+      onClick={onClick}
+      className={cn(
+        "flex shrink-0 items-center gap-1.5 rounded-full border px-3 py-1.5 text-xs font-medium transition-colors",
+        active
+          ? "border-primary bg-primary text-primary-foreground"
+          : "border-border bg-card text-foreground hover:bg-muted/40",
+      )}
+    >
+      {children}
+    </button>
+  );
+}
+
 function SkeletonCard() {
 
   return <div className="h-40 animate-pulse rounded-2xl bg-muted" />;
