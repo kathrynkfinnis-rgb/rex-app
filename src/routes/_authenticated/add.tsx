@@ -41,7 +41,7 @@ function AddPage() {
   const [manualMode, setManualMode] = useState(false);
 
   const cat = type ? categoryMeta(type) : null;
-  const needsSearch = type !== null;
+  const needsSearch = type !== null && type !== "recipe";
   const showForm = !needsSearch || picked || manualMode;
   const photoFn = useServerFn(getPlacePhotoUrl);
 
