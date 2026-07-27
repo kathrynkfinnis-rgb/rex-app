@@ -9,6 +9,7 @@ import { toast } from "sonner";
 import { ArrowLeft, MapPin, Check } from "lucide-react";
 import { CrownRatingDisplay, CrownRatingInput } from "@/components/CrownRating";
 import { ItemEnrichment } from "@/components/ItemEnrichment";
+import { LikesComments } from "@/components/LikesComments";
 import { cn } from "@/lib/utils";
 import { formatDistanceToNow } from "date-fns";
 
@@ -186,6 +187,9 @@ function ItemPage() {
               </div>
               {r.note && <p className="mt-2 text-sm leading-snug">&ldquo;{r.note}&rdquo;</p>}
               <p className="mt-1 text-[11px] text-muted-foreground">{formatDistanceToNow(new Date(r.created_at), { addSuffix: true })}</p>
+              <div className="mt-2 border-t border-border pt-2">
+                <LikesComments recommendationId={r.id} />
+              </div>
             </div>
           ))}
         </div>
