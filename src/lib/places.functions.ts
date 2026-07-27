@@ -11,6 +11,7 @@ export type PlaceHit = {
   address: string | null;
   lat: number | null;
   lng: number | null;
+  genre: string | null;
 };
 
 const GATEWAY = "https://connector-gateway.lovable.dev/google_maps";
