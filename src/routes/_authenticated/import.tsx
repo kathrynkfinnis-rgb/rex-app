@@ -232,7 +232,64 @@ function ImportPage() {
       toast.error(e.message ?? "Couldn't read that list");
     } finally {
       setLoading(false);
+  }
+
+  function imdbTitleType(raw: string): "movie" | "tv" | null {
+    const t = raw.toLowerCase().trim();
+    if (!t) return null;
+    if (t.includes("tv") || t.includes("series") || t.includes("mini")) return "tv";
+    if (t === "movie" || t.includes("movie") || t === "video" || t === "short") return "movie";
+    return null;
+  }
+
+  async function onImdbFile(e: React.ChangeEvent<HTMLInputElement>) {
+    const f = e.target.files?.[0];
+    if (!f) return;
+    setLoading(true);
+    try {
+      const text = await f.text();
+      const lines = text.split(/\r?\n/).filter((l) => l.trim().length > 0);
+      if (lines.length < 2) throw new Error("File looks empty");
+      const header = parseCsvLine(lines[0]).map((h) => h.toLowerCase().replace(/^"|"$/g, "").trim());
+      const idxTitle = header.findIndex((h) => h === "title" || h === "original title" || h === "primary title");
+      const idxType = header.findIndex((h) => h === "title type" || h === "titletype");
+      const idxYear = header.findIndex((h) => h === "year");
+      const idxYourRating = header.findIndex((h) => h === "your rating");
+      if (idxTitle < 0) throw new Error("Couldn't find a Title column — is this the IMDb CSV export?");
+      const titles: {
+        title: string;
+        type: "movie" | "tv";
+        year?: string | null;
+        rating?: number | null;
+      }[] = [];
+      for (let i = 1; i < lines.length; i++) {
+        const cells = parseCsvLine(lines[i]);
+        const title = cells[idxTitle];
+        if (!title) continue;
+        const type = imdbTitleType(idxType >= 0 ? cells[idxType] ?? "" : "movie") ?? "movie";
+        const year = idxYear >= 0 ? cells[idxYear] || null : null;
+        const ratingStr = idxYourRating >= 0 ? cells[idxYourRating] : "";
+        const ratingNum = ratingStr ? Number(ratingStr) : NaN;
+        titles.push({
+          title: title.replace(/^"|"$/g, ""),
+          type,
+          year,
+          rating: Number.isFinite(ratingNum) && ratingNum > 0 ? ratingNum : null,
+        });
+      }
+      if (!titles.length) throw new Error("No titles found in that file");
+      const { inserted } = await importImdb({
+        data: { source: `imdb:${f.name}`, titles: titles.slice(0, 1000) },
+      });
+      toast.success(`Imported ${inserted} title${inserted === 1 ? "" : "s"} — review below`);
+      qc.invalidateQueries({ queryKey: ["import-staging"] });
+    } catch (err: any) {
+      toast.error(err.message ?? "Couldn't read that file");
+    } finally {
+      setLoading(false);
     }
+  }
+
   }
 
   async function onResolve(id: string) {
