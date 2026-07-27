@@ -17,6 +17,7 @@ import { Route as AuthenticatedMapRouteImport } from './routes/_authenticated/ma
 import { Route as AuthenticatedImportGoodreadsRouteImport } from './routes/_authenticated/import-goodreads'
 import { Route as AuthenticatedFriendsRouteImport } from './routes/_authenticated/friends'
 import { Route as AuthenticatedFeedRouteImport } from './routes/_authenticated/feed'
+import { Route as AuthenticatedCreatorsRouteImport } from './routes/_authenticated/creators'
 import { Route as AuthenticatedAddRouteImport } from './routes/_authenticated/add'
 import { Route as AuthenticatedItemIdRouteImport } from './routes/_authenticated/item.$id'
 
@@ -60,6 +61,11 @@ const AuthenticatedFeedRoute = AuthenticatedFeedRouteImport.update({
   path: '/feed',
   getParentRoute: () => AuthenticatedRouteRoute,
 } as any)
+const AuthenticatedCreatorsRoute = AuthenticatedCreatorsRouteImport.update({
+  id: '/creators',
+  path: '/creators',
+  getParentRoute: () => AuthenticatedRouteRoute,
+} as any)
 const AuthenticatedAddRoute = AuthenticatedAddRouteImport.update({
   id: '/add',
   path: '/add',
@@ -75,6 +81,7 @@ export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/auth': typeof AuthRoute
   '/add': typeof AuthenticatedAddRoute
+  '/creators': typeof AuthenticatedCreatorsRoute
   '/feed': typeof AuthenticatedFeedRoute
   '/friends': typeof AuthenticatedFriendsRoute
   '/import-goodreads': typeof AuthenticatedImportGoodreadsRoute
@@ -86,6 +93,7 @@ export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/auth': typeof AuthRoute
   '/add': typeof AuthenticatedAddRoute
+  '/creators': typeof AuthenticatedCreatorsRoute
   '/feed': typeof AuthenticatedFeedRoute
   '/friends': typeof AuthenticatedFriendsRoute
   '/import-goodreads': typeof AuthenticatedImportGoodreadsRoute
@@ -99,6 +107,7 @@ export interface FileRoutesById {
   '/_authenticated': typeof AuthenticatedRouteRouteWithChildren
   '/auth': typeof AuthRoute
   '/_authenticated/add': typeof AuthenticatedAddRoute
+  '/_authenticated/creators': typeof AuthenticatedCreatorsRoute
   '/_authenticated/feed': typeof AuthenticatedFeedRoute
   '/_authenticated/friends': typeof AuthenticatedFriendsRoute
   '/_authenticated/import-goodreads': typeof AuthenticatedImportGoodreadsRoute
@@ -112,6 +121,7 @@ export interface FileRouteTypes {
     | '/'
     | '/auth'
     | '/add'
+    | '/creators'
     | '/feed'
     | '/friends'
     | '/import-goodreads'
@@ -123,6 +133,7 @@ export interface FileRouteTypes {
     | '/'
     | '/auth'
     | '/add'
+    | '/creators'
     | '/feed'
     | '/friends'
     | '/import-goodreads'
@@ -135,6 +146,7 @@ export interface FileRouteTypes {
     | '/_authenticated'
     | '/auth'
     | '/_authenticated/add'
+    | '/_authenticated/creators'
     | '/_authenticated/feed'
     | '/_authenticated/friends'
     | '/_authenticated/import-goodreads'
@@ -207,6 +219,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedFeedRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
+    '/_authenticated/creators': {
+      id: '/_authenticated/creators'
+      path: '/creators'
+      fullPath: '/creators'
+      preLoaderRoute: typeof AuthenticatedCreatorsRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
     '/_authenticated/add': {
       id: '/_authenticated/add'
       path: '/add'
@@ -226,6 +245,7 @@ declare module '@tanstack/react-router' {
 
 interface AuthenticatedRouteRouteChildren {
   AuthenticatedAddRoute: typeof AuthenticatedAddRoute
+  AuthenticatedCreatorsRoute: typeof AuthenticatedCreatorsRoute
   AuthenticatedFeedRoute: typeof AuthenticatedFeedRoute
   AuthenticatedFriendsRoute: typeof AuthenticatedFriendsRoute
   AuthenticatedImportGoodreadsRoute: typeof AuthenticatedImportGoodreadsRoute
@@ -236,6 +256,7 @@ interface AuthenticatedRouteRouteChildren {
 
 const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
   AuthenticatedAddRoute: AuthenticatedAddRoute,
+  AuthenticatedCreatorsRoute: AuthenticatedCreatorsRoute,
   AuthenticatedFeedRoute: AuthenticatedFeedRoute,
   AuthenticatedFriendsRoute: AuthenticatedFriendsRoute,
   AuthenticatedImportGoodreadsRoute: AuthenticatedImportGoodreadsRoute,

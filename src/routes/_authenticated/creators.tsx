@@ -58,7 +58,9 @@ function CreatorsPage() {
 
   const follow = useMutation({
     mutationFn: async (creatorId: string) => {
-      const { error } = await supabase.from("creator_follows").insert({ creator_id: creatorId });
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error("Not signed in");
+      const { error } = await supabase.from("creator_follows").insert({ user_id: user.id, creator_id: creatorId });
       if (error) throw error;
     },
     onSuccess: () => {
