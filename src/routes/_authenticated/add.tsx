@@ -36,7 +36,7 @@ function AddPage() {
   const [saving, setSaving] = useState(false);
   const [locating, setLocating] = useState(false);
   const [coords, setCoords] = useState<{ lat: number; lng: number } | null>(null);
-  const [picked, setPicked] = useState<SearchHit | null>(null);
+  const [picked, setPicked] = useState<AnyHit | null>(null);
   const [manualMode, setManualMode] = useState(false);
 
   const cat = type ? categoryMeta(type) : null;
