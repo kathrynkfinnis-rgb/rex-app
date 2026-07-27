@@ -53,14 +53,12 @@ function MapPage() {
           </div>
         ) : (
           <ClientOnly fallback={<div className="h-full w-full animate-pulse bg-muted" />}>
-            {() => (
-              <Suspense fallback={<div className="h-full w-full animate-pulse bg-muted" />}>
-                <GoogleMap
-                  places={withLoc.map((p: any) => ({ id: p.id, title: p.title, lat: Number(p.lat), lng: Number(p.lng) }))}
-                  onSelect={(id) => navigate({ to: "/item/$id", params: { id } })}
-                />
-              </Suspense>
-            )}
+            <Suspense fallback={<div className="h-full w-full animate-pulse bg-muted" />}>
+              <GoogleMap
+                places={withLoc.map((p: any) => ({ id: p.id, title: p.title, lat: Number(p.lat), lng: Number(p.lng) }))}
+                onSelect={(id) => navigate({ to: "/item/$id", params: { id } })}
+              />
+            </Suspense>
           </ClientOnly>
         )}
       </div>
