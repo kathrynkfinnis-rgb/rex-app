@@ -278,7 +278,7 @@ function ImportPage() {
       </header>
 
       <div className="space-y-5 p-5">
-        <div className="grid grid-cols-3 gap-2 rounded-full bg-muted p-1">
+        <div className="grid grid-cols-4 gap-2 rounded-full bg-muted p-1">
           {TABS.map((t) => (
             <button
               key={t.id}
