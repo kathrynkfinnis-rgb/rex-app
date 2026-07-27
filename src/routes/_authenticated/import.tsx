@@ -42,7 +42,7 @@ export const Route = createFileRoute("/_authenticated/import")({
   component: ImportPage,
 });
 
-type Tab = "sheet" | "docx" | "paste" | "gmaps";
+type Tab = "sheet" | "docx" | "paste" | "gmaps" | "imdb";
 
 function ImportPage() {
   const navigate = useNavigate();
@@ -57,8 +57,10 @@ function ImportPage() {
   const extract = useServerFn(extractFromText);
   const fetchGmaps = useServerFn(fetchGoogleMapsList);
   const importGmaps = useServerFn(importGoogleMapsPlaces);
+  const importImdb = useServerFn(importImdbTitles);
   const resolve = useServerFn(resolveStagingRow);
   const approve = useServerFn(approveStagingRow);
+
 
   const { data: staging } = useQuery({
     queryKey: ["import-staging"],
