@@ -8,9 +8,9 @@ export const Route = createFileRoute("/")({
   ssr: false,
   head: () => ({
     meta: [
-      { title: "T. Rex — recommendations from friends you trust" },
+      { title: "REX — recommendations from friends you trust" },
       { name: "description", content: "The little shared book of restaurants, books, movies and shows your friends actually love." },
-      { property: "og:title", content: "T. Rex — recommendations from friends you trust" },
+      { property: "og:title", content: "REX — recommendations from friends you trust" },
       { property: "og:description", content: "The little shared book of restaurants, books, movies and shows your friends actually love." },
     ],
   }),
@@ -38,7 +38,7 @@ function Landing() {
 
       <div className="relative mx-auto flex min-h-screen max-w-md flex-col px-6 pb-10 pt-16">
         <div className="flex items-center gap-2 text-sm font-semibold uppercase tracking-widest text-primary">
-          <TRexLogo className="h-5 w-5" /> T. Rex
+          <TRexLogo className="h-5 w-5" /> REX
         </div>
 
         <h1 className="mt-10 font-display text-5xl leading-[1.05] text-foreground">

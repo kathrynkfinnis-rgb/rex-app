@@ -14,7 +14,7 @@ import { formatDistanceToNow } from "date-fns";
 export const Route = createFileRoute("/_authenticated/item/$id")({
   head: () => ({
     meta: [
-      { title: "Recommendation — T. Rex" },
+      { title: "Recommendation — REX" },
       { name: "description", content: "See friends' takes on this recommendation." },
     ],
   }),
