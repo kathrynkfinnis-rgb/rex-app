@@ -3,7 +3,7 @@ import { z } from "zod";
 
 export type SearchHit = {
   external_id: string;
-  external_source: "google_books" | "tmdb_movie" | "tmdb_tv";
+  external_source: "google_books" | "tmdb_movie" | "tmdb_tv" | "itunes_podcast";
   title: string;
   subtitle: string | null;
   image_url: string | null;
