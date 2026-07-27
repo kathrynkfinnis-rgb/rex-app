@@ -274,7 +274,7 @@ function SearchResults({ query, feed, scope }: { query: string; feed: FeedRow[];
 
   return (
     <div className="space-y-6 px-4 py-4">
-      {feedMatches.length > 0 && (
+      {scope !== "people" && feedMatches.length > 0 && (
         <Section title="In your feed">
           <div className="space-y-3">
             {feedMatches.map((rec) => <RecommendationCard key={rec.id} rec={rec} />)}
@@ -309,7 +309,7 @@ function SearchResults({ query, feed, scope }: { query: string; feed: FeedRow[];
         </Section>
       )}
 
-      {catalog.map(({ type, hits }) => hits.length > 0 && (
+      {visibleCatalog.map(({ type, hits }) => hits.length > 0 && (
         <CatalogSection key={type} type={type} hits={hits} />
       ))}
 
