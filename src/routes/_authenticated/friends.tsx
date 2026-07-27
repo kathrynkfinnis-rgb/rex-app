@@ -76,15 +76,42 @@ function FriendsPage() {
     const text = username
       ? `Add me on REX 🦖 — I'm @${username}. Follow my recommendations for books, films, TV & places.`
       : `Join me on REX 🦖 — recommendations for books, films, TV & places from friends you trust.`;
-    try {
-      if (navigator.share) {
-        await navigator.share({ title: "Join me on REX", text, url });
-      } else {
-        await navigator.clipboard.writeText(`${text} ${url}`);
-        toast.success("Invite link copied");
+    const full = `${text} ${url}`;
+
+    // Try native share (often blocked inside iframes/previews without allow="web-share")
+    if (typeof navigator !== "undefined" && (navigator as any).share) {
+      try {
+        await (navigator as any).share({ title: "Join me on REX", text, url });
+        return;
+      } catch (err: any) {
+        if (err?.name === "AbortError") return; // user cancelled the sheet
+        // otherwise fall through to clipboard
       }
+    }
+
+    // Clipboard fallback
+    try {
+      await navigator.clipboard.writeText(full);
+      toast.success("Invite link copied to clipboard");
+      return;
     } catch {
-      /* user cancelled */
+      // Legacy execCommand fallback (works in more iframe contexts)
+      try {
+        const ta = document.createElement("textarea");
+        ta.value = full;
+        ta.style.position = "fixed";
+        ta.style.opacity = "0";
+        document.body.appendChild(ta);
+        ta.focus();
+        ta.select();
+        const ok = document.execCommand("copy");
+        document.body.removeChild(ta);
+        if (ok) {
+          toast.success("Invite link copied to clipboard");
+          return;
+        }
+      } catch {}
+      toast.error(`Couldn't copy automatically. Link: ${url}`, { duration: 12000 });
     }
   }
 
