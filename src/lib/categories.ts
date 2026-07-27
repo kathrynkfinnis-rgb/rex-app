@@ -21,3 +21,29 @@ export const CATEGORIES: {
 export function categoryMeta(type: ItemType) {
   return CATEGORIES.find((c) => c.type === type)!;
 }
+
+export const PLACE_SUBCATEGORIES = [
+  "Restaurant",
+  "Bar",
+  "Café",
+  "Beauty",
+  "Accommodation",
+  "Shop",
+  "Activity",
+  "Other",
+] as const;
+export type PlaceSubcategory = (typeof PLACE_SUBCATEGORIES)[number];
+
+// Map Google Places primaryTypeDisplayName (or free text) to our subcategory.
+export function normalizePlaceSubcategory(input: string | null | undefined): PlaceSubcategory | null {
+  if (!input) return null;
+  const s = input.toLowerCase();
+  if (/(bar|pub|brewery|wine|cocktail|nightclub)/.test(s)) return "Bar";
+  if (/(caf[eé]|coffee|tea|bakery|patisserie)/.test(s)) return "Café";
+  if (/(restaurant|food|eatery|bistro|diner|steakhouse|pizzeria|ramen|sushi|kitchen)/.test(s)) return "Restaurant";
+  if (/(salon|spa|barber|beauty|nail|hair|massage)/.test(s)) return "Beauty";
+  if (/(hotel|hostel|inn|resort|motel|lodging|bed|guest house|guesthouse)/.test(s)) return "Accommodation";
+  if (/(shop|store|boutique|market|mall)/.test(s)) return "Shop";
+  if (/(gym|park|museum|gallery|cinema|theater|theatre|club|stadium|attraction)/.test(s)) return "Activity";
+  return "Other";
+}
