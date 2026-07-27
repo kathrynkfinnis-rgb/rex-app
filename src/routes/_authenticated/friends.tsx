@@ -40,10 +40,50 @@ function FriendsPage() {
     enabled: !!me,
   });
 
+  const { data: myProfile } = useQuery({
+    queryKey: ["me-profile-username", me?.id],
+    queryFn: async () => {
+      if (!me) return null;
+      const { data } = await supabase.from("profiles").select("username, display_name").eq("id", me.id).single();
+      return data;
+    },
+    enabled: !!me,
+  });
+
+  const { data: suggestions } = useQuery({
+    queryKey: ["suggested-friends"],
+    queryFn: async () => {
+      const { data, error } = await supabase.rpc("suggested_friends", { _limit: 10 });
+      if (error) throw error;
+      return data ?? [];
+    },
+    enabled: !!me,
+  });
+
   const uid = me?.id;
   const incoming = (friendships ?? []).filter((f: any) => f.addressee_id === uid && f.status === "pending");
   const outgoing = (friendships ?? []).filter((f: any) => f.requester_id === uid && f.status === "pending");
   const accepted = (friendships ?? []).filter((f: any) => f.status === "accepted");
+
+  async function shareInvite() {
+    const username = myProfile?.username;
+    const url = typeof window !== "undefined"
+      ? `${window.location.origin}/auth?mode=signup${username ? `&ref=${encodeURIComponent(username)}` : ""}`
+      : "";
+    const text = username
+      ? `Add me on REX 🦖 — I'm @${username}. Follow my recommendations for books, films, TV & places.`
+      : `Join me on REX 🦖 — recommendations for books, films, TV & places from friends you trust.`;
+    try {
+      if (navigator.share) {
+        await navigator.share({ title: "Join me on REX", text, url });
+      } else {
+        await navigator.clipboard.writeText(`${text} ${url}`);
+        toast.success("Invite link copied");
+      }
+    } catch {
+      /* user cancelled */
+    }
+  }
 
   async function doSearch() {
     if (!search.trim()) return;
