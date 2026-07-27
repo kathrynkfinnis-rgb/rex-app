@@ -39,7 +39,7 @@ export const Route = createFileRoute("/_authenticated/import")({
   component: ImportPage,
 });
 
-type Tab = "sheet" | "docx" | "paste";
+type Tab = "sheet" | "docx" | "paste" | "gmaps";
 
 function ImportPage() {
   const navigate = useNavigate();
