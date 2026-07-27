@@ -1,13 +1,18 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
+import { useServerFn } from "@tanstack/react-start";
 import { supabase } from "@/integrations/supabase/client";
-import { CATEGORIES, type ItemType } from "@/lib/categories";
+import { CATEGORIES, categoryMeta, type ItemType } from "@/lib/categories";
 import { RecommendationCard, type FeedRow } from "@/components/RecommendationCard";
 import { TRexLogo } from "@/components/TRexLogo";
 import { Button } from "@/components/ui/button";
-import { UserPlus, Mic, Plus } from "lucide-react";
+import { Input } from "@/components/ui/input";
+import { UserPlus, Mic, Plus, Search, X } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { searchProfiles } from "@/lib/friends.functions";
+import { searchBooks, searchMovies, searchTv, type SearchHit } from "@/lib/search.functions";
+import { searchPlaces, type PlaceHit } from "@/lib/places.functions";
 
 export const Route = createFileRoute("/_authenticated/feed")({
   head: () => ({
@@ -21,6 +26,16 @@ export const Route = createFileRoute("/_authenticated/feed")({
 
 function FeedPage() {
   const [filter, setFilter] = useState<ItemType | "all">("all");
+  const [rawQuery, setRawQuery] = useState("");
+  const [query, setQuery] = useState("");
+
+  // debounce search input
+  useEffect(() => {
+    const t = setTimeout(() => setQuery(rawQuery.trim()), 250);
+    return () => clearTimeout(t);
+  }, [rawQuery]);
+
+  const searching = query.length >= 2;
 
   const { data, isLoading } = useQuery({
     queryKey: ["feed", filter],
@@ -45,31 +60,221 @@ function FeedPage() {
             <div className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-widest text-primary">
               <TRexLogo className="h-4 w-4" /> REX
             </div>
-            <h1 className="mt-0.5 font-display text-3xl">Your feed</h1>
+            <h1 className="mt-0.5 font-display text-3xl">{searching ? "Search" : "Your feed"}</h1>
           </div>
         </div>
-        <div className="scrollbar-none mt-3 flex gap-2 overflow-x-auto -mx-5 px-5">
-          <Chip active={filter === "all"} onClick={() => setFilter("all")}>All</Chip>
-          {CATEGORIES.map((c) => (
-            <Chip key={c.type} active={filter === c.type} onClick={() => setFilter(c.type)}>
-              <c.icon className="h-3.5 w-3.5" />
-              {c.plural}
-            </Chip>
-          ))}
+        <div className="relative mt-3">
+          <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+          <Input
+            value={rawQuery}
+            onChange={(e) => setRawQuery(e.target.value)}
+            placeholder="Search recs, people, books, films, places…"
+            aria-label="Search"
+            className="h-11 rounded-full border-border bg-card pl-9 pr-9"
+          />
+          {rawQuery && (
+            <button
+              type="button"
+              onClick={() => setRawQuery("")}
+              aria-label="Clear search"
+              className="absolute right-2 top-1/2 flex h-7 w-7 -translate-y-1/2 items-center justify-center rounded-full text-muted-foreground hover:bg-muted"
+            >
+              <X className="h-4 w-4" />
+            </button>
+          )}
         </div>
+        {!searching && (
+          <div className="scrollbar-none mt-3 flex gap-2 overflow-x-auto -mx-5 px-5">
+            <Chip active={filter === "all"} onClick={() => setFilter("all")}>All</Chip>
+            {CATEGORIES.map((c) => (
+              <Chip key={c.type} active={filter === c.type} onClick={() => setFilter(c.type)}>
+                <c.icon className="h-3.5 w-3.5" />
+                {c.plural}
+              </Chip>
+            ))}
+          </div>
+        )}
       </header>
 
-      <div className="space-y-3 px-4 py-4">
-        {isLoading && (
-          <>
-            <SkeletonCard />
-            <SkeletonCard />
-          </>
-        )}
-        {!isLoading && (data?.length ?? 0) === 0 && <EmptyState />}
-        {data?.map((rec) => <RecommendationCard key={rec.id} rec={rec} />)}
-      </div>
+      {searching ? (
+        <SearchResults query={query} feed={data ?? []} />
+      ) : (
+        <div className="space-y-3 px-4 py-4">
+          {isLoading && (
+            <>
+              <SkeletonCard />
+              <SkeletonCard />
+            </>
+          )}
+          {!isLoading && (data?.length ?? 0) === 0 && <EmptyState />}
+          {data?.map((rec) => <RecommendationCard key={rec.id} rec={rec} />)}
+        </div>
+      )}
     </div>
+  );
+}
+
+function SearchResults({ query, feed }: { query: string; feed: FeedRow[] }) {
+  const profilesFn = useServerFn(searchProfiles);
+  const booksFn = useServerFn(searchBooks);
+  const moviesFn = useServerFn(searchMovies);
+  const tvFn = useServerFn(searchTv);
+  const placesFn = useServerFn(searchPlaces);
+
+  const feedMatches = useMemo(() => {
+    const q = query.toLowerCase();
+    return feed.filter((r) => {
+      const t = r.items?.title?.toLowerCase() ?? "";
+      const s = r.items?.subtitle?.toLowerCase() ?? "";
+      const n = r.note?.toLowerCase() ?? "";
+      const u = r.profiles?.username?.toLowerCase() ?? "";
+      const d = r.profiles?.display_name?.toLowerCase() ?? "";
+      const c = r.creators?.name?.toLowerCase() ?? "";
+      return t.includes(q) || s.includes(q) || n.includes(q) || u.includes(q) || d.includes(q) || c.includes(q);
+    }).slice(0, 10);
+  }, [feed, query]);
+
+  const people = useQuery({
+    queryKey: ["search-people", query],
+    queryFn: () => profilesFn({ data: { query, limit: 10 } }),
+    staleTime: 30_000,
+  });
+
+  const books = useQuery({
+    queryKey: ["search-books", query],
+    queryFn: () => booksFn({ data: { q: query } }),
+    staleTime: 60_000,
+  });
+  const movies = useQuery({
+    queryKey: ["search-movies", query],
+    queryFn: () => moviesFn({ data: { q: query } }),
+    staleTime: 60_000,
+  });
+  const tv = useQuery({
+    queryKey: ["search-tv", query],
+    queryFn: () => tvFn({ data: { q: query } }),
+    staleTime: 60_000,
+  });
+  const places = useQuery({
+    queryKey: ["search-places", query],
+    queryFn: () => placesFn({ data: { q: query, near: null } }),
+    staleTime: 60_000,
+  });
+
+  const catalog: { type: ItemType; hits: (SearchHit | PlaceHit)[] }[] = [
+    { type: "book", hits: (books.data ?? []).slice(0, 6) },
+    { type: "movie", hits: (movies.data ?? []).slice(0, 6) },
+    { type: "tv", hits: (tv.data ?? []).slice(0, 6) },
+    { type: "place", hits: (places.data ?? []).slice(0, 6) },
+  ];
+
+  const anyLoading = people.isLoading || books.isLoading || movies.isLoading || tv.isLoading || places.isLoading;
+  const nothing =
+    !anyLoading &&
+    feedMatches.length === 0 &&
+    (people.data?.length ?? 0) === 0 &&
+    catalog.every((c) => c.hits.length === 0);
+
+  return (
+    <div className="space-y-6 px-4 py-4">
+      {feedMatches.length > 0 && (
+        <Section title="In your feed">
+          <div className="space-y-3">
+            {feedMatches.map((rec) => <RecommendationCard key={rec.id} rec={rec} />)}
+          </div>
+        </Section>
+      )}
+
+      {(people.data?.length ?? 0) > 0 && (
+        <Section title="People">
+          <ul className="space-y-2">
+            {people.data!.map((p: any) => (
+              <li key={p.id}>
+                <Link
+                  to="/profile/$username"
+                  params={{ username: p.username }}
+                  className="flex items-center gap-3 rounded-2xl bg-card p-3 ring-1 ring-border transition-colors hover:bg-muted/60"
+                >
+                  <div
+                    className="flex h-10 w-10 items-center justify-center rounded-full bg-secondary text-sm font-semibold"
+                    style={p.avatar_url ? { backgroundImage: `url(${p.avatar_url})`, backgroundSize: "cover", backgroundPosition: "center" } : undefined}
+                  >
+                    {!p.avatar_url && (p.display_name || p.username || "?").slice(0, 1).toUpperCase()}
+                  </div>
+                  <div className="min-w-0">
+                    <p className="truncate font-medium">{p.display_name || p.username}</p>
+                    <p className="truncate text-xs text-muted-foreground">@{p.username}</p>
+                  </div>
+                </Link>
+              </li>
+            ))}
+          </ul>
+        </Section>
+      )}
+
+      {catalog.map(({ type, hits }) => hits.length > 0 && (
+        <CatalogSection key={type} type={type} hits={hits} />
+      ))}
+
+      {anyLoading && (
+        <p className="text-center text-sm text-muted-foreground">Searching…</p>
+      )}
+      {nothing && (
+        <div className="mt-6 rounded-2xl border border-dashed border-border bg-card p-6 text-center">
+          <p className="font-medium">No results for “{query}”</p>
+          <p className="mt-1 text-sm text-muted-foreground">Try a different spelling or add it yourself.</p>
+          <Button asChild variant="outline" className="mt-4 h-10 rounded-full">
+            <Link to="/add"><Plus className="mr-1.5 h-4 w-4" /> Add a rec</Link>
+          </Button>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function CatalogSection({ type, hits }: { type: ItemType; hits: (SearchHit | PlaceHit)[] }) {
+  const meta = categoryMeta(type);
+  const Icon = meta.icon;
+  return (
+    <Section title={
+      <span className="flex items-center gap-1.5">
+        <Icon className="h-3.5 w-3.5" /> {meta.plural}
+      </span>
+    }>
+      <ul className="space-y-2">
+        {hits.map((h) => (
+          <li key={`${h.external_source}-${h.external_id}`}>
+            <Link
+              to="/add"
+              className="flex items-center gap-3 rounded-2xl bg-card p-3 ring-1 ring-border transition-colors hover:bg-muted/60"
+            >
+              <div className="h-12 w-12 shrink-0 overflow-hidden rounded-lg bg-muted">
+                {h.image_url && (
+                  <img src={h.image_url} alt="" className="h-full w-full object-cover" loading="lazy" />
+                )}
+              </div>
+              <div className="min-w-0 flex-1">
+                <p className="truncate font-medium">{h.title}</p>
+                {h.subtitle && <p className="truncate text-xs text-muted-foreground">{h.subtitle}</p>}
+                {"address" in h && h.address && (
+                  <p className="truncate text-xs text-muted-foreground">{h.address}</p>
+                )}
+              </div>
+              <Plus className="h-4 w-4 shrink-0 text-muted-foreground" />
+            </Link>
+          </li>
+        ))}
+      </ul>
+    </Section>
+  );
+}
+
+function Section({ title, children }: { title: React.ReactNode; children: React.ReactNode }) {
+  return (
+    <section>
+      <h2 className="mb-2 text-xs font-semibold uppercase tracking-widest text-muted-foreground">{title}</h2>
+      {children}
+    </section>
   );
 }
 
