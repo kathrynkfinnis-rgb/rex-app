@@ -103,9 +103,30 @@ export function RecommendationCard({ rec }: { rec: FeedRow }) {
           <span>{formatDistanceToNow(new Date(rec.created_at), { addSuffix: true })}</span>
         </div>
       </Link>
-      <div className="border-t border-border">
-        <LikesComments recommendationId={rec.id} compact />
+      <div className="flex items-center justify-between border-t border-border px-4 py-2.5 text-xs text-muted-foreground">
+        {creator ? (
+          <span
+            className="inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[11px] font-semibold text-white"
+            style={{ backgroundColor: creator.color }}
+          >
+            <span>{creator.emoji ?? "🎙️"}</span>
+            {creator.name}
+          </span>
+        ) : author?.username ? (
+          <Link
+            to="/profile/$username"
+            params={{ username: author.username }}
+            className="flex items-center gap-2 rounded-full -ml-1 px-1 py-0.5 hover:bg-muted"
+          >
+            <span className="flex h-6 w-6 items-center justify-center rounded-full bg-secondary text-[11px] font-semibold text-secondary-foreground">
+              {(author.display_name || author.username).slice(0, 1).toUpperCase()}
+            </span>
+            <span className="font-medium text-foreground">
+              {author.display_name || author.username}
+            </span>
+          </Link>
+        ) : (
+          <span className="font-medium text-foreground">Someone</span>
+        )}
+        <span>{formatDistanceToNow(new Date(rec.created_at), { addSuffix: true })}</span>
       </div>
-    </article>
-  );
-}
