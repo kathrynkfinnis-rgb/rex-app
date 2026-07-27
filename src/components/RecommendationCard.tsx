@@ -25,6 +25,12 @@ export type FeedRow = {
     display_name: string | null;
     avatar_url: string | null;
   } | null;
+  creators?: {
+    slug: string;
+    name: string;
+    color: string;
+    emoji: string | null;
+  } | null;
 };
 
 export function RecommendationCard({ rec }: { rec: FeedRow }) {
