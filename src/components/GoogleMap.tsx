@@ -34,6 +34,7 @@ export function GoogleMap({ places, onSelect }: { places: Place[]; onSelect?: (i
   const mapRef = useRef<any>(null);
   const markersRef = useRef<any[]>([]);
   const [error, setError] = useState<string | null>(null);
+  const [ready, setReady] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -47,6 +48,7 @@ export function GoogleMap({ places, onSelect }: { places: Place[]; onSelect?: (i
           zoomControl: true,
           clickableIcons: false,
         });
+        setReady(true);
       })
       .catch((e) => setError(e.message));
     return () => {
@@ -55,7 +57,7 @@ export function GoogleMap({ places, onSelect }: { places: Place[]; onSelect?: (i
   }, []);
 
   useEffect(() => {
-    if (!mapRef.current || !window.google?.maps) return;
+    if (!ready || !mapRef.current || !window.google?.maps) return;
     markersRef.current.forEach((m) => m.setMap(null));
     markersRef.current = [];
     if (!places.length) return;
@@ -76,7 +78,7 @@ export function GoogleMap({ places, onSelect }: { places: Place[]; onSelect?: (i
     } else {
       mapRef.current.fitBounds(bounds, 48);
     }
-  }, [places, onSelect]);
+  }, [places, onSelect, ready]);
 
   if (error) {
     return (
