@@ -276,6 +276,8 @@ function AddPage() {
         >
           {saving ? "Saving…" : "Post recommendation"}
         </Button>
+          </>
+        )}
       </div>
     </div>
   );
