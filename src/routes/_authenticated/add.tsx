@@ -1,13 +1,14 @@
-import { createFileRoute, useNavigate } from "@tanstack/react-router";
+import { createFileRoute, useNavigate, Link } from "@tanstack/react-router";
 import { useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
+
 import { CATEGORIES, type ItemType, categoryMeta } from "@/lib/categories";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { toast } from "sonner";
-import { ArrowLeft, MapPin } from "lucide-react";
+import { ArrowLeft, MapPin, FileUp } from "lucide-react";
 import { CrownRatingInput } from "@/components/CrownRating";
 import { cn } from "@/lib/utils";
 import { SearchPicker, type AnyHit } from "@/components/SearchPicker";
@@ -167,6 +168,21 @@ function AddPage() {
               <span className="font-display text-2xl">{c.plural}</span>
             </button>
           ))}
+        </div>
+
+        <div className="px-4 pb-4">
+          <Link
+            to="/import"
+            className="flex items-center gap-3 rounded-2xl bg-card p-4 ring-1 ring-border transition-colors active:scale-[0.99]"
+          >
+            <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-primary/10 text-primary">
+              <FileUp className="h-6 w-6" />
+            </div>
+            <div className="min-w-0 flex-1">
+              <p className="font-display text-lg">Import a list</p>
+              <p className="text-sm text-muted-foreground">Pull recommendations from a Google Sheet or Word doc.</p>
+            </div>
+          </Link>
         </div>
       </div>
     );
