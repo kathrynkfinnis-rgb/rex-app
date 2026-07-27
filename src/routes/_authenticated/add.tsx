@@ -75,19 +75,35 @@ function AddPage() {
       const uid = userRes.user?.id;
       if (!uid) throw new Error("Not signed in");
 
-      const { data: item, error: itemErr } = await supabase
-        .from("items")
-        .insert({
-          type,
-          title: title.trim(),
-          subtitle: subtitle.trim() || null,
-          address: type === "place" ? address.trim() || null : null,
-          lat: type === "place" ? coords?.lat ?? null : null,
-          lng: type === "place" ? coords?.lng ?? null : null,
-        })
-        .select()
-        .single();
-      if (itemErr) throw itemErr;
+      let itemId: string | undefined;
+      if (picked) {
+        const { data: existing } = await supabase
+          .from("items")
+          .select("id")
+          .eq("external_source", picked.external_source)
+          .eq("external_id", picked.external_id)
+          .maybeSingle();
+        itemId = existing?.id;
+      }
+      if (!itemId) {
+        const { data: item, error: itemErr } = await supabase
+          .from("items")
+          .insert({
+            type,
+            title: title.trim(),
+            subtitle: subtitle.trim() || null,
+            image_url: picked?.image_url ?? null,
+            external_id: picked?.external_id ?? null,
+            external_source: picked?.external_source ?? null,
+            address: type === "place" ? address.trim() || null : null,
+            lat: type === "place" ? coords?.lat ?? null : null,
+            lng: type === "place" ? coords?.lng ?? null : null,
+          })
+          .select("id")
+          .single();
+        if (itemErr) throw itemErr;
+        itemId = item.id;
+      }
 
       const { error: recErr } = await supabase.from("recommendations").insert({
         user_id: uid,
