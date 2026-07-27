@@ -107,14 +107,14 @@ function AddPage() {
 
       const { error: recErr } = await supabase.from("recommendations").insert({
         user_id: uid,
-        item_id: item.id,
+        item_id: itemId!,
         rating,
         note: note.trim() || null,
       });
       if (recErr) throw recErr;
 
       toast.success("Added to your feed");
-      navigate({ to: "/item/$id", params: { id: item.id } });
+      navigate({ to: "/item/$id", params: { id: itemId! } });
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Couldn't save");
     } finally {
