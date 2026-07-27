@@ -2,8 +2,11 @@ import { useQuery } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { getItemEnrichment } from "@/lib/enrichment.functions";
 import { CrownRatingDisplay } from "@/components/CrownRating";
-import { ExternalLink, Star } from "lucide-react";
+import { ExternalLink, Star, ArrowUpRight } from "lucide-react";
 import { useState } from "react";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+
+type EnrichmentData = NonNullable<Awaited<ReturnType<typeof getItemEnrichment>>>;
 
 export function ItemEnrichment({ itemId }: { itemId: string }) {
   const fetchFn = useServerFn(getItemEnrichment);
