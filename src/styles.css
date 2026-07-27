@@ -97,6 +97,7 @@
   --cat-book: oklch(0.55 0.12 260);
   --cat-movie: oklch(0.6 0.15 25);
   --cat-tv: oklch(0.6 0.11 200);
+  --cat-recipe: oklch(0.66 0.15 55);
 }
 
 .dark {
