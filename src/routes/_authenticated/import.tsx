@@ -17,11 +17,14 @@ import {
   X,
   Sparkles,
   Search,
+  MapPin,
 } from "lucide-react";
 import mammoth from "mammoth";
 import {
   extractFromText,
   fetchSheetCsv,
+  fetchGoogleMapsList,
+  importGoogleMapsPlaces,
   resolveStagingRow,
   approveStagingRow,
 } from "@/lib/import.functions";
@@ -36,7 +39,7 @@ export const Route = createFileRoute("/_authenticated/import")({
   component: ImportPage,
 });
 
-type Tab = "sheet" | "docx" | "paste";
+type Tab = "sheet" | "docx" | "paste" | "gmaps";
 
 function ImportPage() {
   const navigate = useNavigate();
@@ -44,10 +47,13 @@ function ImportPage() {
   const [tab, setTab] = useState<Tab>("sheet");
   const [sheetUrl, setSheetUrl] = useState("");
   const [pasted, setPasted] = useState("");
+  const [gmapsUrl, setGmapsUrl] = useState("");
   const [loading, setLoading] = useState(false);
 
   const fetchSheet = useServerFn(fetchSheetCsv);
   const extract = useServerFn(extractFromText);
+  const fetchGmaps = useServerFn(fetchGoogleMapsList);
+  const importGmaps = useServerFn(importGoogleMapsPlaces);
   const resolve = useServerFn(resolveStagingRow);
   const approve = useServerFn(approveStagingRow);
 
@@ -112,6 +118,118 @@ function ImportPage() {
     }
   }
 
+  function parseCsvLine(line: string): string[] {
+    const out: string[] = [];
+    let cur = "";
+    let inQ = false;
+    for (let i = 0; i < line.length; i++) {
+      const c = line[i];
+      if (inQ) {
+        if (c === '"' && line[i + 1] === '"') { cur += '"'; i++; }
+        else if (c === '"') inQ = false;
+        else cur += c;
+      } else {
+        if (c === ",") { out.push(cur); cur = ""; }
+        else if (c === '"') inQ = true;
+        else cur += c;
+      }
+    }
+    out.push(cur);
+    return out.map((s) => s.trim());
+  }
+
+  function extractPlaceNameFromMapsUrl(url: string): string | null {
+    try {
+      const u = new URL(url);
+      const q = u.searchParams.get("q");
+      if (q) {
+        // Google Takeout saved-place URLs use q=Name, Address, City...
+        return decodeURIComponent(q.split(",")[0]).trim() || null;
+      }
+      const m = u.pathname.match(/\/maps\/place\/([^/]+)/);
+      if (m) return decodeURIComponent(m[1].replace(/\+/g, " ")).trim();
+    } catch {}
+    return null;
+  }
+
+  async function onGmapsFile(e: React.ChangeEvent<HTMLInputElement>) {
+    const f = e.target.files?.[0];
+    if (!f) return;
+    setLoading(true);
+    try {
+      const text = await f.text();
+      const places: { title: string; address?: string | null; note?: string | null }[] = [];
+      if (f.name.toLowerCase().endsWith(".json") || text.trim().startsWith("{")) {
+        // GeoJSON export from Takeout
+        const json = JSON.parse(text);
+        const features: any[] = json.features ?? [];
+        for (const ft of features) {
+          const props = ft.properties ?? {};
+          const loc = props.location ?? {};
+          const title = loc.name || props.name || props.title;
+          if (!title) continue;
+          places.push({
+            title: String(title),
+            address: loc.address ?? null,
+            note: props.Comment ?? props.comment ?? null,
+          });
+        }
+      } else {
+        // CSV: Title,Note,URL  (Google Takeout "Saved Places" / lists)
+        const lines = text.split(/\r?\n/).filter((l) => l.trim().length > 0);
+        if (!lines.length) throw new Error("Empty file");
+        const header = parseCsvLine(lines[0]).map((h) => h.toLowerCase());
+        const idxTitle = header.findIndex((h) => h === "title" || h === "name");
+        const idxNote = header.findIndex((h) => h === "note" || h === "comment");
+        const idxUrl = header.findIndex((h) => h === "url" || h === "link");
+        for (let i = 1; i < lines.length; i++) {
+          const cells = parseCsvLine(lines[i]);
+          let title = idxTitle >= 0 ? cells[idxTitle] : cells[0];
+          const note = idxNote >= 0 ? cells[idxNote] : null;
+          const url = idxUrl >= 0 ? cells[idxUrl] : null;
+          if ((!title || title.toLowerCase() === "url" || /^https?:/i.test(title)) && url) {
+            title = extractPlaceNameFromMapsUrl(url) ?? title;
+          }
+          if (!title) continue;
+          places.push({ title, address: null, note: note || null });
+        }
+      }
+      if (!places.length) throw new Error("No places found in that file");
+      const { inserted } = await importGmaps({ data: { source: `google_maps:${f.name}`, places: places.slice(0, 500) } });
+      toast.success(`Imported ${inserted} place${inserted === 1 ? "" : "s"} — review below`);
+      qc.invalidateQueries({ queryKey: ["import-staging"] });
+    } catch (err: any) {
+      toast.error(err.message ?? "Couldn't read that file");
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function onGmapsUrl() {
+    if (!gmapsUrl.trim()) return;
+    setLoading(true);
+    try {
+      const { titles } = await fetchGmaps({ data: { url: gmapsUrl.trim() } });
+      if (!titles.length) {
+        toast.error("Couldn't read that list — Google may be blocking it. Try Takeout export.");
+        return;
+      }
+      const { inserted } = await importGmaps({
+        data: {
+          source: "google_maps_url",
+          places: titles.map((t) => ({ title: t })),
+        },
+      });
+      toast.success(`Imported ${inserted} place${inserted === 1 ? "" : "s"} — review below`);
+      setGmapsUrl("");
+      qc.invalidateQueries({ queryKey: ["import-staging"] });
+    } catch (e: any) {
+      toast.error(e.message ?? "Couldn't read that list");
+    } finally {
+      setLoading(false);
+    }
+  }
+
   async function onResolve(id: string) {
     try {
       const { matched } = await resolve({ data: { id } });
@@ -138,9 +256,10 @@ function ImportPage() {
   }
 
   const TABS: { id: Tab; label: string; icon: typeof FileSpreadsheet }[] = [
-    { id: "sheet", label: "Google Sheet", icon: FileSpreadsheet },
-    { id: "docx", label: "Word / .docx", icon: FileText },
-    { id: "paste", label: "Paste text", icon: Sparkles },
+    { id: "sheet", label: "Sheet", icon: FileSpreadsheet },
+    { id: "gmaps", label: "Maps", icon: MapPin },
+    { id: "docx", label: ".docx", icon: FileText },
+    { id: "paste", label: "Paste", icon: Sparkles },
   ];
 
   return (
@@ -159,7 +278,7 @@ function ImportPage() {
       </header>
 
       <div className="space-y-5 p-5">
-        <div className="grid grid-cols-3 gap-2 rounded-full bg-muted p-1">
+        <div className="grid grid-cols-4 gap-2 rounded-full bg-muted p-1">
           {TABS.map((t) => (
             <button
               key={t.id}
@@ -193,6 +312,62 @@ function ImportPage() {
               {loading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
               Extract recommendations
             </Button>
+          </div>
+        )}
+
+        {tab === "gmaps" && (
+          <div className="space-y-4">
+            <label className="flex cursor-pointer flex-col items-center justify-center gap-3 rounded-2xl border-2 border-dashed border-border bg-card p-6 text-center transition-colors hover:bg-muted/40">
+              {loading ? (
+                <Loader2 className="h-8 w-8 animate-spin text-primary" />
+              ) : (
+                <Upload className="h-8 w-8 text-muted-foreground" />
+              )}
+              <div className="font-medium">Upload a Google Maps export</div>
+              <div className="text-xs text-muted-foreground">
+                CSV or JSON from{" "}
+                <a
+                  href="https://takeout.google.com/settings/takeout/custom/maps_your_places"
+                  target="_blank"
+                  rel="noreferrer"
+                  className="underline"
+                >
+                  Google Takeout → Saved Places / Lists
+                </a>
+              </div>
+              <input
+                type="file"
+                accept=".csv,.json,.geojson,text/csv,application/json"
+                className="hidden"
+                onChange={onGmapsFile}
+                disabled={loading}
+              />
+            </label>
+
+            <div className="space-y-3 rounded-2xl bg-card p-4 ring-1 ring-border">
+              <label className="text-sm font-medium">Or paste a shared Maps list link</label>
+              <Input
+                value={gmapsUrl}
+                onChange={(e) => setGmapsUrl(e.target.value)}
+                placeholder="https://maps.app.goo.gl/… or https://www.google.com/maps/…"
+                className="h-11"
+              />
+              <p className="text-xs text-muted-foreground">
+                Best-effort — Google sometimes blocks scraping. If it fails, use the Takeout export above.
+              </p>
+              <Button
+                onClick={onGmapsUrl}
+                disabled={loading || !gmapsUrl.trim()}
+                className="h-11 w-full rounded-full"
+              >
+                {loading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
+                Import from link
+              </Button>
+            </div>
+
+            <p className="text-xs text-muted-foreground">
+              Each place lands in the review queue. Hit <em>Match</em> to link it to Google Places (adds address, photo, and pin on the map), then <em>Add</em> to post it.
+            </p>
           </div>
         )}
 
