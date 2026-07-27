@@ -118,6 +118,118 @@ function ImportPage() {
     }
   }
 
+  function parseCsvLine(line: string): string[] {
+    const out: string[] = [];
+    let cur = "";
+    let inQ = false;
+    for (let i = 0; i < line.length; i++) {
+      const c = line[i];
+      if (inQ) {
+        if (c === '"' && line[i + 1] === '"') { cur += '"'; i++; }
+        else if (c === '"') inQ = false;
+        else cur += c;
+      } else {
+        if (c === ",") { out.push(cur); cur = ""; }
+        else if (c === '"') inQ = true;
+        else cur += c;
+      }
+    }
+    out.push(cur);
+    return out.map((s) => s.trim());
+  }
+
+  function extractPlaceNameFromMapsUrl(url: string): string | null {
+    try {
+      const u = new URL(url);
+      const q = u.searchParams.get("q");
+      if (q) {
+        // Google Takeout saved-place URLs use q=Name, Address, City...
+        return decodeURIComponent(q.split(",")[0]).trim() || null;
+      }
+      const m = u.pathname.match(/\/maps\/place\/([^/]+)/);
+      if (m) return decodeURIComponent(m[1].replace(/\+/g, " ")).trim();
+    } catch {}
+    return null;
+  }
+
+  async function onGmapsFile(e: React.ChangeEvent<HTMLInputElement>) {
+    const f = e.target.files?.[0];
+    if (!f) return;
+    setLoading(true);
+    try {
+      const text = await f.text();
+      const places: { title: string; address?: string | null; note?: string | null }[] = [];
+      if (f.name.toLowerCase().endsWith(".json") || text.trim().startsWith("{")) {
+        // GeoJSON export from Takeout
+        const json = JSON.parse(text);
+        const features: any[] = json.features ?? [];
+        for (const ft of features) {
+          const props = ft.properties ?? {};
+          const loc = props.location ?? {};
+          const title = loc.name || props.name || props.title;
+          if (!title) continue;
+          places.push({
+            title: String(title),
+            address: loc.address ?? null,
+            note: props.Comment ?? props.comment ?? null,
+          });
+        }
+      } else {
+        // CSV: Title,Note,URL  (Google Takeout "Saved Places" / lists)
+        const lines = text.split(/\r?\n/).filter((l) => l.trim().length > 0);
+        if (!lines.length) throw new Error("Empty file");
+        const header = parseCsvLine(lines[0]).map((h) => h.toLowerCase());
+        const idxTitle = header.findIndex((h) => h === "title" || h === "name");
+        const idxNote = header.findIndex((h) => h === "note" || h === "comment");
+        const idxUrl = header.findIndex((h) => h === "url" || h === "link");
+        for (let i = 1; i < lines.length; i++) {
+          const cells = parseCsvLine(lines[i]);
+          let title = idxTitle >= 0 ? cells[idxTitle] : cells[0];
+          const note = idxNote >= 0 ? cells[idxNote] : null;
+          const url = idxUrl >= 0 ? cells[idxUrl] : null;
+          if ((!title || title.toLowerCase() === "url" || /^https?:/i.test(title)) && url) {
+            title = extractPlaceNameFromMapsUrl(url) ?? title;
+          }
+          if (!title) continue;
+          places.push({ title, address: null, note: note || null });
+        }
+      }
+      if (!places.length) throw new Error("No places found in that file");
+      const { inserted } = await importGmaps({ data: { source: `google_maps:${f.name}`, places: places.slice(0, 500) } });
+      toast.success(`Imported ${inserted} place${inserted === 1 ? "" : "s"} — review below`);
+      qc.invalidateQueries({ queryKey: ["import-staging"] });
+    } catch (err: any) {
+      toast.error(err.message ?? "Couldn't read that file");
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function onGmapsUrl() {
+    if (!gmapsUrl.trim()) return;
+    setLoading(true);
+    try {
+      const { titles } = await fetchGmaps({ data: { url: gmapsUrl.trim() } });
+      if (!titles.length) {
+        toast.error("Couldn't read that list — Google may be blocking it. Try Takeout export.");
+        return;
+      }
+      const { inserted } = await importGmaps({
+        data: {
+          source: "google_maps_url",
+          places: titles.map((t) => ({ title: t })),
+        },
+      });
+      toast.success(`Imported ${inserted} place${inserted === 1 ? "" : "s"} — review below`);
+      setGmapsUrl("");
+      qc.invalidateQueries({ queryKey: ["import-staging"] });
+    } catch (e: any) {
+      toast.error(e.message ?? "Couldn't read that list");
+    } finally {
+      setLoading(false);
+    }
+  }
+
   async function onResolve(id: string) {
     try {
       const { matched } = await resolve({ data: { id } });
