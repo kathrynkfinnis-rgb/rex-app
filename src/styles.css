@@ -54,6 +54,7 @@
   --color-cat-book: var(--cat-book);
   --color-cat-movie: var(--cat-movie);
   --color-cat-tv: var(--cat-tv);
+  --color-cat-recipe: var(--cat-recipe);
 }
 
 :root {
