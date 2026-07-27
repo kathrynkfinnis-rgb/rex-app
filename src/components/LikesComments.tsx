@@ -5,6 +5,7 @@ import { Heart, MessageCircle, Send, Trash2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { formatDistanceToNow } from "date-fns";
 import { toast } from "sonner";
+import { UserAvatar } from "@/components/UserAvatar";
 
 type CommentRow = {
   id: string;

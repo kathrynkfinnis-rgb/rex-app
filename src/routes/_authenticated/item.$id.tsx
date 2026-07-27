@@ -10,6 +10,7 @@ import { ArrowLeft, MapPin, Check } from "lucide-react";
 import { CrownRatingDisplay, CrownRatingInput } from "@/components/CrownRating";
 import { ItemEnrichment } from "@/components/ItemEnrichment";
 import { LikesComments } from "@/components/LikesComments";
+import { UserAvatar } from "@/components/UserAvatar";
 import { cn } from "@/lib/utils";
 import { formatDistanceToNow } from "date-fns";
 
