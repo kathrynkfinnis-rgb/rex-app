@@ -10,6 +10,8 @@ import { toast } from "sonner";
 import { ArrowLeft, MapPin } from "lucide-react";
 import { CrownRatingInput } from "@/components/CrownRating";
 import { cn } from "@/lib/utils";
+import { SearchPicker } from "@/components/SearchPicker";
+import type { SearchHit } from "@/lib/search.functions";
 
 export const Route = createFileRoute("/_authenticated/add")({
   head: () => ({
