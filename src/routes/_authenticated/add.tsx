@@ -34,8 +34,18 @@ function AddPage() {
   const [saving, setSaving] = useState(false);
   const [locating, setLocating] = useState(false);
   const [coords, setCoords] = useState<{ lat: number; lng: number } | null>(null);
+  const [picked, setPicked] = useState<SearchHit | null>(null);
+  const [manualMode, setManualMode] = useState(false);
 
   const cat = type ? categoryMeta(type) : null;
+  const needsSearch = type === "book" || type === "movie" || type === "tv";
+  const showForm = !needsSearch || picked || manualMode;
+
+  function handlePick(hit: SearchHit) {
+    setPicked(hit);
+    setTitle(hit.title);
+    setSubtitle(hit.subtitle ?? "");
+  }
 
   function useMyLocation() {
     if (!navigator.geolocation) {
