@@ -284,6 +284,16 @@ export type Database = {
     }
     Functions: {
       are_friends: { Args: { _a: string; _b: string }; Returns: boolean }
+      suggested_friends: {
+        Args: { _limit?: number }
+        Returns: {
+          avatar_url: string
+          display_name: string
+          id: string
+          mutual_count: number
+          username: string
+        }[]
+      }
     }
     Enums: {
       friendship_status: "pending" | "accepted"
