@@ -1,5 +1,6 @@
 import { Link } from "@tanstack/react-router";
 import { CrownRatingDisplay } from "@/components/CrownRating";
+import { LikesComments } from "@/components/LikesComments";
 import { categoryMeta, type ItemType } from "@/lib/categories";
 import { formatDistanceToNow } from "date-fns";
 
@@ -74,6 +75,9 @@ export function RecommendationCard({ rec }: { rec: FeedRow }) {
           </span>
         </span>
         <span>{formatDistanceToNow(new Date(rec.created_at), { addSuffix: true })}</span>
+      </div>
+      <div className="border-t border-border">
+        <LikesComments recommendationId={rec.id} compact />
       </div>
     </Link>
   );
