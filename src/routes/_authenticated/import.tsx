@@ -315,6 +315,62 @@ function ImportPage() {
           </div>
         )}
 
+        {tab === "gmaps" && (
+          <div className="space-y-4">
+            <label className="flex cursor-pointer flex-col items-center justify-center gap-3 rounded-2xl border-2 border-dashed border-border bg-card p-6 text-center transition-colors hover:bg-muted/40">
+              {loading ? (
+                <Loader2 className="h-8 w-8 animate-spin text-primary" />
+              ) : (
+                <Upload className="h-8 w-8 text-muted-foreground" />
+              )}
+              <div className="font-medium">Upload a Google Maps export</div>
+              <div className="text-xs text-muted-foreground">
+                CSV or JSON from{" "}
+                <a
+                  href="https://takeout.google.com/settings/takeout/custom/maps_your_places"
+                  target="_blank"
+                  rel="noreferrer"
+                  className="underline"
+                >
+                  Google Takeout → Saved Places / Lists
+                </a>
+              </div>
+              <input
+                type="file"
+                accept=".csv,.json,.geojson,text/csv,application/json"
+                className="hidden"
+                onChange={onGmapsFile}
+                disabled={loading}
+              />
+            </label>
+
+            <div className="space-y-3 rounded-2xl bg-card p-4 ring-1 ring-border">
+              <label className="text-sm font-medium">Or paste a shared Maps list link</label>
+              <Input
+                value={gmapsUrl}
+                onChange={(e) => setGmapsUrl(e.target.value)}
+                placeholder="https://maps.app.goo.gl/… or https://www.google.com/maps/…"
+                className="h-11"
+              />
+              <p className="text-xs text-muted-foreground">
+                Best-effort — Google sometimes blocks scraping. If it fails, use the Takeout export above.
+              </p>
+              <Button
+                onClick={onGmapsUrl}
+                disabled={loading || !gmapsUrl.trim()}
+                className="h-11 w-full rounded-full"
+              >
+                {loading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
+                Import from link
+              </Button>
+            </div>
+
+            <p className="text-xs text-muted-foreground">
+              Each place lands in the review queue. Hit <em>Match</em> to link it to Google Places (adds address, photo, and pin on the map), then <em>Add</em> to post it.
+            </p>
+          </div>
+        )}
+
         {tab === "docx" && (
           <label className="flex cursor-pointer flex-col items-center justify-center gap-3 rounded-2xl border-2 border-dashed border-border bg-card p-8 text-center transition-colors hover:bg-muted/40">
             {loading ? (
