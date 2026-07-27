@@ -82,14 +82,24 @@ export function RecommendationCard({ rec }: { rec: FeedRow }) {
           </p>
         )}
         <div className="flex items-center justify-between border-t border-border px-4 py-2.5 text-xs text-muted-foreground">
-          <span className="flex items-center gap-2">
-            <span className="flex h-6 w-6 items-center justify-center rounded-full bg-secondary text-[11px] font-semibold text-secondary-foreground">
-              {(author?.display_name || author?.username || "?").slice(0, 1).toUpperCase()}
+          {creator ? (
+            <span
+              className="inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[11px] font-semibold text-white"
+              style={{ backgroundColor: creator.color }}
+            >
+              <span>{creator.emoji ?? "🎙️"}</span>
+              {creator.name}
             </span>
-            <span className="font-medium text-foreground">
-              {author?.display_name || author?.username || "Someone"}
+          ) : (
+            <span className="flex items-center gap-2">
+              <span className="flex h-6 w-6 items-center justify-center rounded-full bg-secondary text-[11px] font-semibold text-secondary-foreground">
+                {(author?.display_name || author?.username || "?").slice(0, 1).toUpperCase()}
+              </span>
+              <span className="font-medium text-foreground">
+                {author?.display_name || author?.username || "Someone"}
+              </span>
             </span>
-          </span>
+          )}
           <span>{formatDistanceToNow(new Date(rec.created_at), { addSuffix: true })}</span>
         </div>
       </Link>
