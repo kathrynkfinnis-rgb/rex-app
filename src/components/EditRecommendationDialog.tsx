@@ -14,23 +14,34 @@ import {
 } from "@/components/ui/alert-dialog";
 import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
+import { Label } from "@/components/ui/label";
 import { CrownRatingInput } from "@/components/CrownRating";
 import { Loader2, Trash2 } from "lucide-react";
 import { toast } from "sonner";
+import { PLACE_SUBCATEGORIES, type PlaceSubcategory, type ItemType } from "@/lib/categories";
+import { cn } from "@/lib/utils";
 
 export function EditRecommendationDialog({
   open,
   onOpenChange,
   recommendation,
+  item,
 }: {
   open: boolean;
   onOpenChange: (v: boolean) => void;
   recommendation: { id: string; rating: number; note: string | null };
+  item?: { id: string; type: ItemType; genre: string | null } | null;
 }) {
   const qc = useQueryClient();
   const [rating, setRating] = useState(recommendation.rating);
   const [note, setNote] = useState(recommendation.note ?? "");
+  const [placeSub, setPlaceSub] = useState<PlaceSubcategory | "">(
+    (item?.type === "place" && (PLACE_SUBCATEGORIES as readonly string[]).includes(item.genre ?? "")
+      ? (item!.genre as PlaceSubcategory)
+      : ""),
+  );
   const [confirmDelete, setConfirmDelete] = useState(false);
+  const isPlace = item?.type === "place";
 
   const save = useMutation({
     mutationFn: async () => {
@@ -39,6 +50,16 @@ export function EditRecommendationDialog({
         .update({ rating, note: note.trim() ? note.trim() : null })
         .eq("id", recommendation.id);
       if (error) throw error;
+      if (isPlace && item) {
+        const nextGenre = placeSub || null;
+        if ((item.genre ?? null) !== nextGenre) {
+          const { error: itemErr } = await supabase
+            .from("items")
+            .update({ genre: nextGenre })
+            .eq("id", item.id);
+          if (itemErr) throw itemErr;
+        }
+      }
     },
     onSuccess: () => {
       toast.success("Post updated");
@@ -77,6 +98,34 @@ export function EditRecommendationDialog({
               <label className="mb-2 block text-sm font-medium">Rating</label>
               <CrownRatingInput value={rating} onChange={setRating} size="md" />
             </div>
+            {isPlace && (
+              <div className="space-y-1.5">
+                <Label>Type of place</Label>
+                <div className="flex flex-wrap gap-2">
+                  {PLACE_SUBCATEGORIES.map((s) => {
+                    const active = placeSub === s;
+                    return (
+                      <button
+                        key={s}
+                        type="button"
+                        onClick={() => setPlaceSub(active ? "" : s)}
+                        className={cn(
+                          "rounded-full px-3 py-1.5 text-sm ring-1 transition-colors",
+                          active
+                            ? "bg-primary text-primary-foreground ring-primary"
+                            : "bg-card text-foreground ring-border hover:bg-muted",
+                        )}
+                      >
+                        {s}
+                      </button>
+                    );
+                  })}
+                </div>
+                <p className="text-xs text-muted-foreground">
+                  Changing this updates the place for everyone who saved it.
+                </p>
+              </div>
+            )}
             <div>
               <label className="mb-2 block text-sm font-medium">Note</label>
               <Textarea
