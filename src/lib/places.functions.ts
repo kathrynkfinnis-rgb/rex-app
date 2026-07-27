@@ -11,6 +11,7 @@ export type PlaceHit = {
   address: string | null;
   lat: number | null;
   lng: number | null;
+  genre: string | null;
 };
 
 const GATEWAY = "https://connector-gateway.lovable.dev/google_maps";
@@ -69,6 +70,7 @@ export const searchPlaces = createServerFn({ method: "POST" })
       address: p.formattedAddress ?? p.shortFormattedAddress ?? null,
       lat: typeof p.location?.latitude === "number" ? p.location.latitude : null,
       lng: typeof p.location?.longitude === "number" ? p.location.longitude : null,
+      genre: p.primaryTypeDisplayName?.text ?? null,
     }));
   });
 

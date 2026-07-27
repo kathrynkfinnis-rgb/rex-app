@@ -7,7 +7,27 @@ export type SearchHit = {
   title: string;
   subtitle: string | null;
   image_url: string | null;
+  genre: string | null;
 };
+
+// TMDB genre id → name (movies + TV).
+const TMDB_GENRES: Record<number, string> = {
+  28: "Action", 12: "Adventure", 16: "Animation", 35: "Comedy", 80: "Crime",
+  99: "Documentary", 18: "Drama", 10751: "Family", 14: "Fantasy", 36: "History",
+  27: "Horror", 10402: "Music", 9648: "Mystery", 10749: "Romance",
+  878: "Sci-Fi", 10770: "TV Movie", 53: "Thriller", 10752: "War", 37: "Western",
+  10759: "Action & Adventure", 10762: "Kids", 10763: "News", 10764: "Reality",
+  10765: "Sci-Fi & Fantasy", 10766: "Soap", 10767: "Talk", 10768: "War & Politics",
+};
+
+function tmdbGenreName(ids: unknown): string | null {
+  if (!Array.isArray(ids) || !ids.length) return null;
+  for (const id of ids) {
+    const name = TMDB_GENRES[Number(id)];
+    if (name) return name;
+  }
+  return null;
+}
 
 const querySchema = z.object({ q: z.string().min(1).max(120) });
 
@@ -22,12 +42,14 @@ export const searchBooks = createServerFn({ method: "GET" })
     return items.map((it) => {
       const v = it.volumeInfo ?? {};
       const img: string | undefined = v.imageLinks?.thumbnail ?? v.imageLinks?.smallThumbnail;
+      const cats: string[] = Array.isArray(v.categories) ? v.categories : [];
       return {
         external_id: it.id,
         external_source: "google_books" as const,
         title: v.title ?? "Untitled",
         subtitle: (v.authors ?? []).join(", ") || null,
         image_url: img ? img.replace(/^http:/, "https:") : null,
+        genre: cats[0] ? cats[0].split("/")[0].trim() : null,
       };
     });
   });
@@ -47,6 +69,7 @@ export const searchMovies = createServerFn({ method: "GET" })
       title: r.title ?? r.original_title ?? "Untitled",
       subtitle: r.release_date ? String(r.release_date).slice(0, 4) : null,
       image_url: r.poster_path ? `https://image.tmdb.org/t/p/w200${r.poster_path}` : null,
+      genre: tmdbGenreName(r.genre_ids),
     }));
   });
 
@@ -65,5 +88,6 @@ export const searchTv = createServerFn({ method: "GET" })
       title: r.name ?? r.original_name ?? "Untitled",
       subtitle: r.first_air_date ? String(r.first_air_date).slice(0, 4) : null,
       image_url: r.poster_path ? `https://image.tmdb.org/t/p/w200${r.poster_path}` : null,
+      genre: tmdbGenreName(r.genre_ids),
     }));
   });

@@ -18,6 +18,7 @@ export type FeedRow = {
     title: string;
     subtitle: string | null;
     image_url: string | null;
+    genre: string | null;
   } | null;
   profiles: {
     username: string;
@@ -48,10 +49,15 @@ export function RecommendationCard({ rec }: { rec: FeedRow }) {
             )}
           </div>
           <div className="min-w-0 flex-1">
-            <div className="flex items-center gap-2">
+            <div className="flex flex-wrap items-center gap-2">
               <span className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider ${cat.tokenClass}`}>
                 <Icon className="h-3 w-3" /> {cat.label}
               </span>
+              {item.genre && (
+                <span className="inline-flex items-center rounded-full bg-secondary/70 px-2 py-0.5 text-[10px] font-medium uppercase tracking-wider text-secondary-foreground">
+                  {item.genre}
+                </span>
+              )}
               <CrownRatingDisplay value={rec.rating} size="xs" showNumber />
             </div>
             <h3 className="mt-1 truncate font-display text-xl leading-tight">{item.title}</h3>
