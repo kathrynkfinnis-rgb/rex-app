@@ -69,6 +69,7 @@ export const searchMovies = createServerFn({ method: "GET" })
       title: r.title ?? r.original_title ?? "Untitled",
       subtitle: r.release_date ? String(r.release_date).slice(0, 4) : null,
       image_url: r.poster_path ? `https://image.tmdb.org/t/p/w200${r.poster_path}` : null,
+      genre: tmdbGenreName(r.genre_ids),
     }));
   });
 
