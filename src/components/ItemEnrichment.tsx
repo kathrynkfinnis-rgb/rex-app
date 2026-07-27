@@ -136,3 +136,79 @@ function formatCount(n: number): string {
   if (n >= 1_000) return (n / 1_000).toFixed(1) + "k";
   return String(n);
 }
+
+function sourceMeta(url: string, label: string): { name: string; accent: string } {
+  let host = "";
+  try { host = new URL(url).hostname.replace(/^www\./, ""); } catch {}
+  const l = (label + " " + host).toLowerCase();
+  if (l.includes("goodreads")) return { name: "Goodreads", accent: "bg-[#553B08] text-white" };
+  if (l.includes("imdb")) return { name: "IMDb", accent: "bg-[#F5C518] text-black" };
+  if (l.includes("tmdb") || l.includes("themoviedb")) return { name: "TMDB", accent: "bg-[#01B4E4] text-white" };
+  if (l.includes("openlibrary") || l.includes("open library")) return { name: "Open Library", accent: "bg-[#8B4513] text-white" };
+  if (l.includes("google.com/maps") || l.includes("google maps")) return { name: "Google Maps", accent: "bg-[#4285F4] text-white" };
+  if (l.includes("website")) return { name: "Website", accent: "bg-foreground text-background" };
+  return { name: host || label, accent: "bg-secondary text-foreground" };
+}
+
+function LinkPreview({ link, data }: { link: { url: string; label: string }; data: EnrichmentData }) {
+  const meta = sourceMeta(link.url, link.label);
+  const topReview = data.reviews[0];
+  const topFacts = data.facts.slice(0, 3);
+  return (
+    <Popover>
+      <PopoverTrigger asChild>
+        <button
+          type="button"
+          className="inline-flex items-center gap-1.5 rounded-full bg-secondary px-3 py-1.5 text-xs font-medium hover:bg-secondary/70 transition"
+        >
+          <span className={`inline-block h-2 w-2 rounded-full ${meta.accent}`} aria-hidden />
+          {link.label}
+        </button>
+      </PopoverTrigger>
+      <PopoverContent align="start" className="w-80 p-0 overflow-hidden">
+        <div className={`flex items-center justify-between px-4 py-2 ${meta.accent}`}>
+          <span className="text-xs font-semibold uppercase tracking-wider">{meta.name}</span>
+          {data.score && (
+            <span className="text-xs font-semibold tabular-nums">
+              {data.score.value.toFixed(1)}/{data.score.scale}
+            </span>
+          )}
+        </div>
+        <div className="p-4 space-y-3">
+          {data.score && (
+            <div className="flex items-center gap-2">
+              <CrownRatingDisplay value={data.score.value} size="sm" />
+              <span className="text-[11px] text-muted-foreground">
+                {data.score.label}{data.score.count ? ` · ${formatCount(data.score.count)}` : ""}
+              </span>
+            </div>
+          )}
+          {topFacts.length > 0 && (
+            <dl className="grid grid-cols-[max-content_1fr] gap-x-3 gap-y-1 text-xs">
+              {topFacts.map((f) => (
+                <div key={f.label} className="contents">
+                  <dt className="text-muted-foreground">{f.label}</dt>
+                  <dd className="font-medium truncate">{f.value}</dd>
+                </div>
+              ))}
+            </dl>
+          )}
+          {topReview && topReview.text && (
+            <blockquote className="rounded-lg bg-secondary/50 p-2.5 text-xs leading-snug">
+              <p className="line-clamp-3">&ldquo;{topReview.text}&rdquo;</p>
+              <footer className="mt-1 text-[10px] text-muted-foreground">— {topReview.author}</footer>
+            </blockquote>
+          )}
+          <a
+            href={link.url}
+            target="_blank"
+            rel="noreferrer"
+            className="inline-flex w-full items-center justify-center gap-1.5 rounded-lg bg-primary px-3 py-2 text-xs font-semibold text-primary-foreground hover:opacity-90"
+          >
+            Open on {meta.name} <ArrowUpRight className="h-3.5 w-3.5" />
+          </a>
+        </div>
+      </PopoverContent>
+    </Popover>
+  );
+}
