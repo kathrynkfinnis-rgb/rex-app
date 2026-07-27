@@ -185,7 +185,7 @@ function FeedPage() {
   );
 }
 
-function SearchResults({ query, feed }: { query: string; feed: FeedRow[] }) {
+function SearchResults({ query, feed, scope }: { query: string; feed: FeedRow[]; scope: SearchScope }) {
   const profilesFn = useServerFn(searchProfiles);
   const booksFn = useServerFn(searchBooks);
   const moviesFn = useServerFn(searchMovies);
