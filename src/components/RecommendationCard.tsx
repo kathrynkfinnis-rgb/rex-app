@@ -8,6 +8,7 @@ import { categoryMeta, type ItemType } from "@/lib/categories";
 import { supabase } from "@/integrations/supabase/client";
 import { formatDistanceToNow } from "date-fns";
 import { Pencil } from "lucide-react";
+import { UserAvatar } from "@/components/UserAvatar";
 
 
 export type FeedRow = {
@@ -127,9 +128,7 @@ export function RecommendationCard({ rec }: { rec: FeedRow }) {
             params={{ username: author.username }}
             className="flex items-center gap-2 rounded-full -ml-1 px-1 py-0.5 hover:bg-muted"
           >
-            <span className="flex h-6 w-6 items-center justify-center rounded-full bg-secondary text-[11px] font-semibold text-secondary-foreground">
-              {(author.display_name || author.username).slice(0, 1).toUpperCase()}
-            </span>
+            <UserAvatar url={author.avatar_url} name={author.display_name || author.username} size="xs" />
             <span className="font-medium text-foreground">
               {author.display_name || author.username}
             </span>
