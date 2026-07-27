@@ -1,10 +1,10 @@
-import { createFileRoute, useNavigate } from "@tanstack/react-router";
+import { createFileRoute, useNavigate, Link } from "@tanstack/react-router";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { RecommendationCard, type FeedRow } from "@/components/RecommendationCard";
 import { toast } from "sonner";
-import { LogOut, Smartphone } from "lucide-react";
+import { LogOut, Smartphone, BookOpen } from "lucide-react";
 
 export const Route = createFileRoute("/_authenticated/me")({
   head: () => ({
