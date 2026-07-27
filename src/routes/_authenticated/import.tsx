@@ -232,6 +232,7 @@ function ImportPage() {
       toast.error(e.message ?? "Couldn't read that list");
     } finally {
       setLoading(false);
+    }
   }
 
   function imdbTitleType(raw: string): "movie" | "tv" | null {
@@ -290,7 +291,7 @@ function ImportPage() {
     }
   }
 
-  }
+
 
   async function onResolve(id: string) {
     try {
