@@ -26,6 +26,7 @@ export const Route = createFileRoute("/_authenticated/feed")({
 
 function FeedPage() {
   const [filter, setFilter] = useState<ItemType | "all">("all");
+  const [subFilter, setSubFilter] = useState<string | "all">("all");
   const [rawQuery, setRawQuery] = useState("");
   const [query, setQuery] = useState("");
 
@@ -34,6 +35,11 @@ function FeedPage() {
     const t = setTimeout(() => setQuery(rawQuery.trim()), 250);
     return () => clearTimeout(t);
   }, [rawQuery]);
+
+  // reset subcategory when the top-level category changes
+  useEffect(() => {
+    setSubFilter("all");
+  }, [filter]);
 
   const searching = query.length >= 2;
 
@@ -51,6 +57,25 @@ function FeedPage() {
       return (data ?? []) as unknown as FeedRow[];
     },
   });
+
+  // Build the subcategory list from the current category's rows
+  const subcategories = useMemo(() => {
+    if (filter === "all" || !data) return [] as string[];
+    const set = new Set<string>();
+    for (const r of data) {
+      const g = r.items?.genre?.trim();
+      if (g) set.add(g);
+    }
+    return Array.from(set).sort((a, b) => a.localeCompare(b));
+  }, [data, filter]);
+
+  const visible = useMemo(() => {
+    if (!data) return [];
+    if (subFilter === "all") return data;
+    const s = subFilter.toLowerCase();
+    return data.filter((r) => (r.items?.genre ?? "").toLowerCase() === s);
+  }, [data, subFilter]);
+
 
   return (
     <div className="min-h-screen">
@@ -94,6 +119,16 @@ function FeedPage() {
             ))}
           </div>
         )}
+        {!searching && filter !== "all" && subcategories.length > 0 && (
+          <div className="scrollbar-none mt-2 flex gap-2 overflow-x-auto -mx-5 px-5">
+            <SubChip active={subFilter === "all"} onClick={() => setSubFilter("all")}>All {categoryMeta(filter).plural.toLowerCase()}</SubChip>
+            {subcategories.map((g) => (
+              <SubChip key={g} active={subFilter === g} onClick={() => setSubFilter(g)}>
+                {g}
+              </SubChip>
+            ))}
+          </div>
+        )}
       </header>
 
       {searching ? (
@@ -107,9 +142,15 @@ function FeedPage() {
             </>
           )}
           {!isLoading && (data?.length ?? 0) === 0 && <EmptyState />}
-          {data?.map((rec) => <RecommendationCard key={rec.id} rec={rec} />)}
+          {!isLoading && (data?.length ?? 0) > 0 && visible.length === 0 && (
+            <p className="rounded-2xl border border-dashed border-border bg-card p-6 text-center text-sm text-muted-foreground">
+              No {subFilter.toLowerCase()} recs in your feed yet.
+            </p>
+          )}
+          {visible.map((rec) => <RecommendationCard key={rec.id} rec={rec} />)}
         </div>
       )}
+
     </div>
   );
 }
@@ -294,7 +335,24 @@ function Chip({ active, onClick, children }: { active: boolean; onClick: () => v
   );
 }
 
+function SubChip({ active, onClick, children }: { active: boolean; onClick: () => void; children: React.ReactNode }) {
+  return (
+    <button
+      onClick={onClick}
+      className={cn(
+        "flex shrink-0 items-center gap-1.5 rounded-full border px-3 py-1 text-xs font-medium transition-colors",
+        active
+          ? "border-primary/50 bg-primary/10 text-primary"
+          : "border-border bg-background text-muted-foreground hover:text-foreground",
+      )}
+    >
+      {children}
+    </button>
+  );
+}
+
 function SkeletonCard() {
+
   return <div className="h-40 animate-pulse rounded-2xl bg-muted" />;
 }
 
