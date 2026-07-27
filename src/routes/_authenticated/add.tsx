@@ -268,26 +268,51 @@ function AddPage() {
             )}
 
         {type === "place" && (
-          <div className="space-y-1.5">
-            <Label htmlFor="address">Address</Label>
-            <Input
-              id="address"
-              value={address}
-              onChange={(e) => setAddress(e.target.value)}
-              placeholder="Street, city"
-              className="h-12 rounded-xl"
-            />
-            <Button
-              type="button"
-              variant="outline"
-              onClick={useMyLocation}
-              disabled={locating}
-              className="mt-2 h-11 w-full gap-2 rounded-xl"
-            >
-              <MapPin className="h-4 w-4" />
-              {coords ? "Location pinned ✓" : locating ? "Getting location…" : "Use my current location"}
-            </Button>
-          </div>
+          <>
+            <div className="space-y-1.5">
+              <Label>Type of place</Label>
+              <div className="flex flex-wrap gap-2">
+                {PLACE_SUBCATEGORIES.map((s) => {
+                  const active = placeSub === s;
+                  return (
+                    <button
+                      key={s}
+                      type="button"
+                      onClick={() => setPlaceSub(active ? "" : s)}
+                      className={cn(
+                        "rounded-full px-3 py-1.5 text-sm ring-1 transition-colors",
+                        active
+                          ? "bg-primary text-primary-foreground ring-primary"
+                          : "bg-card text-foreground ring-border hover:bg-muted",
+                      )}
+                    >
+                      {s}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+            <div className="space-y-1.5">
+              <Label htmlFor="address">Address</Label>
+              <Input
+                id="address"
+                value={address}
+                onChange={(e) => setAddress(e.target.value)}
+                placeholder="Street, city"
+                className="h-12 rounded-xl"
+              />
+              <Button
+                type="button"
+                variant="outline"
+                onClick={useMyLocation}
+                disabled={locating}
+                className="mt-2 h-11 w-full gap-2 rounded-xl"
+              >
+                <MapPin className="h-4 w-4" />
+                {coords ? "Location pinned ✓" : locating ? "Getting location…" : "Use my current location"}
+              </Button>
+            </div>
+          </>
         )}
 
         <div className="space-y-2">
