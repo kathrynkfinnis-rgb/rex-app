@@ -100,6 +100,11 @@ function MePage() {
       </section>
 
       <div className="space-y-2 p-5">
+        <Link to="/import">
+          <Button variant="outline" className="h-12 w-full gap-2 rounded-full">
+            <FileUp className="h-4 w-4" /> Import from Sheet or Doc
+          </Button>
+        </Link>
         <Link to="/import-goodreads">
           <Button variant="outline" className="h-12 w-full gap-2 rounded-full">
             <BookOpen className="h-4 w-4" /> Import from Goodreads
