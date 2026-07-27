@@ -47,10 +47,13 @@ function ImportPage() {
   const [tab, setTab] = useState<Tab>("sheet");
   const [sheetUrl, setSheetUrl] = useState("");
   const [pasted, setPasted] = useState("");
+  const [gmapsUrl, setGmapsUrl] = useState("");
   const [loading, setLoading] = useState(false);
 
   const fetchSheet = useServerFn(fetchSheetCsv);
   const extract = useServerFn(extractFromText);
+  const fetchGmaps = useServerFn(fetchGoogleMapsList);
+  const importGmaps = useServerFn(importGoogleMapsPlaces);
   const resolve = useServerFn(resolveStagingRow);
   const approve = useServerFn(approveStagingRow);
 
