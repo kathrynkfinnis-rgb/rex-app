@@ -136,6 +136,74 @@ export type Database = {
         }
         Relationships: []
       }
+      import_staging: {
+        Row: {
+          created_at: string
+          id: string
+          raw_creator: string | null
+          raw_note: string | null
+          raw_rating: number | null
+          raw_title: string
+          resolved_external_id: string | null
+          resolved_external_source: string | null
+          resolved_genre: string | null
+          resolved_image_url: string | null
+          resolved_item_id: string | null
+          resolved_subtitle: string | null
+          source: string
+          status: string
+          suggested_type: Database["public"]["Enums"]["item_type"] | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          raw_creator?: string | null
+          raw_note?: string | null
+          raw_rating?: number | null
+          raw_title: string
+          resolved_external_id?: string | null
+          resolved_external_source?: string | null
+          resolved_genre?: string | null
+          resolved_image_url?: string | null
+          resolved_item_id?: string | null
+          resolved_subtitle?: string | null
+          source: string
+          status?: string
+          suggested_type?: Database["public"]["Enums"]["item_type"] | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          raw_creator?: string | null
+          raw_note?: string | null
+          raw_rating?: number | null
+          raw_title?: string
+          resolved_external_id?: string | null
+          resolved_external_source?: string | null
+          resolved_genre?: string | null
+          resolved_image_url?: string | null
+          resolved_item_id?: string | null
+          resolved_subtitle?: string | null
+          source?: string
+          status?: string
+          suggested_type?: Database["public"]["Enums"]["item_type"] | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "import_staging_resolved_item_id_fkey"
+            columns: ["resolved_item_id"]
+            isOneToOne: false
+            referencedRelation: "items"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       items: {
         Row: {
           address: string | null
