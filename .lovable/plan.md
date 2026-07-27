@@ -1,67 +1,38 @@
-# Recommendations — friend-powered picks across places, books, movies & TV
 
-An installable iPhone web app (PWA) where you and your friends share recommendations across categories, check in / review, and see what friends are loving.
+# Full user test of REX
 
-## Categories
+I'll drive the live preview with a headless browser (Playwright) using your managed auth session, walk every main flow like a real user, capture screenshots + console/network errors at each step, then hand back a prioritised report. No code changes — this is a read-only audit. If you want fixes after, I'll do those as a follow-up.
 
-- **Restaurants & places** — map pin, address, check-in supported
-- **Books** — title, author, cover
-- **Movies** — title, year, poster
-- **TV shows** — title, poster
+## Flows I'll cover
 
-Each recommendation has: category, rating (1–5), note, optional photo, friend attribution.
+1. **Auth & first load** — landing → sign in → redirect to feed. Check session persistence on reload.
+2. **Feed** — loads, category filters (Places / Books / Movies / TV), creator-coloured cards, likes + comments, empty state.
+3. **Add recommendation** — search-as-you-type for a book (OpenLibrary), a film (TMDB), a place (Google), pick, rate with crowns 1–10, add note, submit, confirm it lands in feed + item page.
+4. **Item detail** — enrichment card (facts, reviews), external link previews (Goodreads / IMDb / Google), likes/comments.
+5. **Map** — loads, pins render for place recs, tapping a pin opens the item.
+6. **Creators** — list renders, follow/unfollow persists, followed creator's picks appear in feed with coloured border.
+7. **Friends** — username search, suggested friends (mutuals), share invite link (clipboard fallback), send/accept request.
+8. **Import** — paste a short mixed list, run extraction, review queue, Match + Add + Skip. Also try a Google Sheet URL and a small `.docx`.
+9. **Goodreads import** — upload a small sample CSV, confirm rows stage + resolve.
+10. **Profile (/me)** — avatar, my recs, sign out.
+11. **PWA basics** — manifest loads, theme colour, icons, mobile viewport (393×690) layout sanity, safe-area insets, bottom nav symmetry.
+12. **Cross-cutting** — console errors, failed network requests, 404s, slow queries, obvious a11y issues (alt text, labels, tap targets), broken links.
 
-## Core screens
+## What I'll deliver
 
-- **Feed** (home): friends' recent recommendations across all categories, filterable by category chip (All / Places / Books / Movies / TV).
-- **Map**: only Places category — pins for restaurants + check-in-able spots.
-- **Add**: pick category first → smart search per type (Google Places for restaurants, Google Books for books, TMDB for movies/TV) → rating + note.
-- **Item detail**: friends' ratings & notes, add your own, "I've been here / read it / seen it" check-in.
-- **Friends**: request/accept by username.
-- **Profile**: your recommendations grouped by category.
+A single report grouped by severity:
 
-## Tech decisions
-
-- **Backend**: Lovable Cloud (auth, Postgres, storage, server functions).
-- **Auth**: email/password + Google. Usernames for friend search.
-- **Search per category**:
-  - Places → Google Maps Platform connector (Places API)
-  - Books → Google Books API (public, no key needed for basic search)
-  - Movies/TV → TMDB API (requires a free API key you'd add as a secret)
-- **Push**: Web Push (VAPID). iOS requires "Add to Home Screen" first — I'll build an install prompt.
-- **PWA**: manifest + icons for home-screen install.
-
-## Data model (RLS on, friend-scoped reads)
-
-- `profiles` (id, username, display_name, avatar_url)
-- `friendships` (requester_id, addressee_id, status)
-- `items` — unified table for the thing being recommended:
-  - id, type ('place' | 'book' | 'movie' | 'tv')
-  - title, subtitle (author / year / cuisine), image_url
-  - external_id (google_place_id / isbn / tmdb_id), external_source
-  - lat, lng (nullable — places only)
-- `recommendations` (id, user_id, item_id, rating, note, photo_url, created_at)
-- `check_ins` (id, user_id, item_id, note, created_at)
-- `push_subscriptions` (user_id, endpoint, p256dh, auth)
-
-One `items` table keeps the feed simple; `type` drives the UI.
-
-## Build order
-
-1. Enable Lovable Cloud + connect Google Maps.
-2. Auth (email + Google) + profiles/usernames.
-3. Schema + RLS.
-4. Feed with category filter (start with a couple of seed items).
-5. Add-recommendation flow — Places first, then Books, then Movies/TV.
-6. Map screen (Places only).
-7. Item detail + check-in + reviews.
-8. Friends system.
-9. PWA install prompt + web push on new friend recommendation.
+- **Blocking bugs** — anything that stops a flow (with repro steps, screenshot, console/network evidence).
+- **Broken-but-recoverable** — errors the app swallows or wrong data shown.
+- **UX issues** — confusing states, missing empty/loading/error states, layout glitches on mobile.
+- **Polish** — copy, spacing, iconography, a11y nits.
+- **Suggested improvements** — small, concrete changes ranked by impact vs. effort.
 
 ## Caveats
 
-- Installable web app, not App Store native. Feels app-like on iPhone once added to home screen.
-- iOS push works only after home-screen install (Apple rule).
-- Movies/TV needs a free TMDB API key — I'll ask for it when we get to that step.
+- I'll use your injected Supabase session (no credentials handled by me).
+- I won't send real invites, won't spam friends, won't post to real external services beyond read-only search/enrichment calls the app already makes.
+- Any test recs I create I'll list at the end so you can delete them (or I can, in a follow-up build turn).
+- Import tests use tiny sample inputs to keep AI-extraction credit spend minimal (a few cents).
 
-Approve and I'll start building.
+Approve this and I'll run the audit and come back with the report.
