@@ -171,7 +171,50 @@ function FriendsPage() {
             })}
           </ul>
         )}
+
+        <Button
+          onClick={shareInvite}
+          variant="outline"
+          className="mt-4 h-12 w-full gap-2 rounded-full"
+        >
+          <Share2 className="h-4 w-4" /> Share invite link
+        </Button>
       </div>
+
+      {suggestions && suggestions.length > 0 && (
+        <Section title="People you may know">
+          {suggestions.map((p: any) => {
+            const already = (friendships ?? []).some(
+              (f: any) => f.requester_id === p.id || f.addressee_id === p.id,
+            );
+            return (
+              <div key={p.id} className="flex items-center justify-between rounded-2xl bg-card p-3 ring-1 ring-border">
+                <div className="flex items-center gap-3 min-w-0">
+                  <div className="flex h-9 w-9 items-center justify-center rounded-full bg-secondary text-sm font-semibold">
+                    {(p.display_name || p.username || "?").slice(0, 1).toUpperCase()}
+                  </div>
+                  <div className="min-w-0">
+                    <p className="truncate font-medium">{p.display_name || p.username}</p>
+                    <p className="flex items-center gap-1 truncate text-xs text-muted-foreground">
+                      <Users className="h-3 w-3" />
+                      {p.mutual_count} mutual{p.mutual_count === 1 ? "" : "s"} · @{p.username}
+                    </p>
+                  </div>
+                </div>
+                <Button
+                  size="sm"
+                  onClick={() => sendRequest(p.id)}
+                  disabled={already}
+                  variant={already ? "outline" : "default"}
+                  className="rounded-full"
+                >
+                  {already ? "Sent" : <><UserPlus className="mr-1 h-3.5 w-3.5" /> Add</>}
+                </Button>
+              </div>
+            );
+          })}
+        </Section>
+      )}
 
       {incoming.length > 0 && (
         <Section title="Requests for you">
