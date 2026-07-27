@@ -440,7 +440,7 @@ export type Database = {
     }
     Enums: {
       friendship_status: "pending" | "accepted"
-      item_type: "place" | "book" | "movie" | "tv"
+      item_type: "place" | "book" | "movie" | "tv" | "recipe"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -569,7 +569,7 @@ export const Constants = {
   public: {
     Enums: {
       friendship_status: ["pending", "accepted"],
-      item_type: ["place", "book", "movie", "tv"],
+      item_type: ["place", "book", "movie", "tv", "recipe"],
     },
   },
 } as const
