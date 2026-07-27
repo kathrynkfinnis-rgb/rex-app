@@ -192,9 +192,10 @@ function AddPage() {
       <div className="space-y-5 p-5">
         {needsSearch && !showForm && (
           <SearchPicker
-            type={type as "book" | "movie" | "tv"}
+            type={type}
             onPick={handlePick}
             onManual={() => setManualMode(true)}
+            near={type === "place" ? coords : null}
           />
         )}
 
