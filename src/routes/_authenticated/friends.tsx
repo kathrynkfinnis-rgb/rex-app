@@ -5,7 +5,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { toast } from "sonner";
-import { UserPlus, Check, X, Search } from "lucide-react";
+import { UserPlus, Check, X, Search, Share2, Users } from "lucide-react";
 
 export const Route = createFileRoute("/_authenticated/friends")({
   head: () => ({
