@@ -176,6 +176,55 @@ export const importGoogleMapsPlaces = createServerFn({ method: "POST" })
     return { inserted: rows.length };
   });
 
+// -------- IMDb: import ratings/watchlist CSV export --------
+export const importImdbTitles = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator(
+    (d: {
+      source: string;
+      titles: {
+        title: string;
+        type: "movie" | "tv";
+        year?: string | null;
+        rating?: number | null;
+        note?: string | null;
+      }[];
+    }) =>
+      z
+        .object({
+          source: z.string().min(1).max(80),
+          titles: z
+            .array(
+              z.object({
+                title: z.string().min(1).max(300),
+                type: z.enum(["movie", "tv"]),
+                year: z.string().max(20).nullable().optional(),
+                rating: z.number().min(0).max(10).nullable().optional(),
+                note: z.string().max(2000).nullable().optional(),
+              }),
+            )
+            .min(1)
+            .max(1000),
+        })
+        .parse(d),
+  )
+  .handler(async ({ data, context }) => {
+    const rows = data.titles.map((t) => ({
+      user_id: context.userId,
+      source: data.source,
+      raw_title: t.title.trim().slice(0, 300),
+      raw_creator: t.year ? String(t.year).slice(0, 20) : null,
+      raw_note: t.note?.slice(0, 2000) ?? null,
+      raw_rating: typeof t.rating === "number" ? t.rating : null,
+      suggested_type: t.type,
+      status: "pending",
+    }));
+    const { error } = await context.supabase.from("import_staging").insert(rows);
+    if (error) throw new Error(error.message);
+    return { inserted: rows.length };
+  });
+
+
 // -------- Google Maps: best-effort scrape of a shared list URL --------
 export const fetchGoogleMapsList = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
