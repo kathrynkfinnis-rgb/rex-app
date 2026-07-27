@@ -119,6 +119,16 @@ function FeedPage() {
             ))}
           </div>
         )}
+        {!searching && filter !== "all" && subcategories.length > 0 && (
+          <div className="scrollbar-none mt-2 flex gap-2 overflow-x-auto -mx-5 px-5">
+            <SubChip active={subFilter === "all"} onClick={() => setSubFilter("all")}>All {categoryMeta(filter).plural.toLowerCase()}</SubChip>
+            {subcategories.map((g) => (
+              <SubChip key={g} active={subFilter === g} onClick={() => setSubFilter(g)}>
+                {g}
+              </SubChip>
+            ))}
+          </div>
+        )}
       </header>
 
       {searching ? (
@@ -132,9 +142,15 @@ function FeedPage() {
             </>
           )}
           {!isLoading && (data?.length ?? 0) === 0 && <EmptyState />}
-          {data?.map((rec) => <RecommendationCard key={rec.id} rec={rec} />)}
+          {!isLoading && (data?.length ?? 0) > 0 && visible.length === 0 && (
+            <p className="rounded-2xl border border-dashed border-border bg-card p-6 text-center text-sm text-muted-foreground">
+              No {subFilter.toLowerCase()} recs in your feed yet.
+            </p>
+          )}
+          {visible.map((rec) => <RecommendationCard key={rec.id} rec={rec} />)}
         </div>
       )}
+
     </div>
   );
 }
