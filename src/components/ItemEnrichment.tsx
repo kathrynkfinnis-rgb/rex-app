@@ -61,15 +61,7 @@ export function ItemEnrichment({ itemId }: { itemId: string }) {
       {data.extra_links && data.extra_links.length > 0 && (
         <div className="flex flex-wrap gap-2">
           {data.extra_links.map((l) => (
-            <a
-              key={l.url}
-              href={l.url}
-              target="_blank"
-              rel="noreferrer"
-              className="inline-flex items-center gap-1 rounded-full bg-secondary px-3 py-1.5 text-xs font-medium hover:bg-secondary/70"
-            >
-              {l.label} <ExternalLink className="h-3 w-3" />
-            </a>
+            <LinkPreview key={l.url} link={l} data={data} />
           ))}
         </div>
       )}
