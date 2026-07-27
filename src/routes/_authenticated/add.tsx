@@ -20,7 +20,7 @@ export const Route = createFileRoute("/_authenticated/add")({
   head: () => ({
     meta: [
       { title: "Add a recommendation — REX" },
-      { name: "description", content: "Recommend a place, book, movie, or show." },
+      { name: "description", content: "Recommend a place, book, movie, show, or recipe." },
     ],
   }),
   component: AddPage,
