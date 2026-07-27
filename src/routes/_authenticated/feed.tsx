@@ -335,7 +335,24 @@ function Chip({ active, onClick, children }: { active: boolean; onClick: () => v
   );
 }
 
+function SubChip({ active, onClick, children }: { active: boolean; onClick: () => void; children: React.ReactNode }) {
+  return (
+    <button
+      onClick={onClick}
+      className={cn(
+        "flex shrink-0 items-center gap-1.5 rounded-full border px-3 py-1 text-xs font-medium transition-colors",
+        active
+          ? "border-primary/50 bg-primary/10 text-primary"
+          : "border-border bg-background text-muted-foreground hover:text-foreground",
+      )}
+    >
+      {children}
+    </button>
+  );
+}
+
 function SkeletonCard() {
+
   return <div className="h-40 animate-pulse rounded-2xl bg-muted" />;
 }
 
