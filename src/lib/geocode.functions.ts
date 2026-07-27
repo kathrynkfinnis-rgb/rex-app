@@ -51,14 +51,16 @@ export const geocodeMissingPlaces = createServerFn({ method: "POST" })
         const lat = p?.location?.latitude;
         const lng = p?.location?.longitude;
         if (typeof lat !== "number" || typeof lng !== "number") continue;
-        const patch: Record<string, unknown> = {
-          lat,
-          lng,
-          address: row.address ?? p.formattedAddress ?? null,
-          external_id: p.id ?? null,
-          external_source: "google_places",
-        };
-        const { error: upErr } = await supabase.from("items").update(patch).eq("id", row.id);
+        const { error: upErr } = await supabase
+          .from("items")
+          .update({
+            lat,
+            lng,
+            address: row.address ?? p.formattedAddress ?? null,
+            external_id: p.id ?? null,
+            external_source: "google_places",
+          })
+          .eq("id", row.id);
         if (!upErr) updated += 1;
       } catch {
         // skip
