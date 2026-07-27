@@ -53,17 +53,14 @@ async function enrichBook(item: any): Promise<Enrichment | null> {
     workKey = `/${item.external_id}`;
   }
   if (!workKey) {
-    // Search OpenLibrary by title (+ author from subtitle if present)
     const q = `${item.title}${item.subtitle ? " " + item.subtitle : ""}`;
     const sr = await fetch(
-      `https://openlibrary.org/search.json?q=${encodeURIComponent(q)}&limit=1&fields=key,title,author_name,first_publish_year,cover_i,subject,number_of_pages_median,ratings_average,ratings_count`,
+      `https://openlibrary.org/search.json?q=${encodeURIComponent(q)}&limit=1&fields=key,title,author_name,first_publish_year,cover_i,subject,number_of_pages_median,ratings_average,ratings_count,isbn`,
     );
     if (sr.ok) {
       const sj: any = await sr.json();
       const doc = sj.docs?.[0];
-      if (doc?.key) {
-        return buildBookEnrichment(doc, null, item);
-      }
+      if (doc?.key) return buildBookEnrichment(doc, null, item);
     }
   }
 
@@ -71,7 +68,7 @@ async function enrichBook(item: any): Promise<Enrichment | null> {
     const [workRes, searchRes] = await Promise.all([
       fetch(`https://openlibrary.org${workKey}.json`),
       fetch(
-        `https://openlibrary.org/search.json?q=key:${encodeURIComponent(workKey)}&limit=1&fields=key,title,author_name,first_publish_year,cover_i,subject,number_of_pages_median,ratings_average,ratings_count`,
+        `https://openlibrary.org/search.json?q=key:${encodeURIComponent(workKey)}&limit=1&fields=key,title,author_name,first_publish_year,cover_i,subject,number_of_pages_median,ratings_average,ratings_count,isbn`,
       ),
     ]);
     const work: any = workRes.ok ? await workRes.json() : null;
@@ -104,8 +101,15 @@ function buildBookEnrichment(doc: any | null, work: any | null, item: any): Enri
       : work?.description?.value ?? null;
 
   const olUrl = doc?.key ? `https://openlibrary.org${doc.key}` : work?.key ? `https://openlibrary.org${work.key}` : null;
-  const goodreadsSearch = `https://www.goodreads.com/search?q=${encodeURIComponent((authors[0] ? authors[0] + " " : "") + title)}`;
-  const links: { label: string; url: string }[] = [{ label: "Search on Goodreads", url: goodreadsSearch }];
+
+  // Pick shortest ISBN-13, else any ISBN. Goodreads redirects /book/isbn/{isbn} to the book page.
+  const isbns: string[] = (doc?.isbn ?? []).filter((x: any) => typeof x === "string");
+  const isbn13 = isbns.find((i) => i.length === 13) ?? isbns[0] ?? null;
+
+  const links: { label: string; url: string }[] = [];
+  if (isbn13) {
+    links.push({ label: "View on Goodreads", url: `https://www.goodreads.com/book/isbn/${isbn13}` });
+  }
   if (olUrl) links.push({ label: "View on Open Library", url: olUrl });
 
   return {
