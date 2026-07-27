@@ -36,11 +36,15 @@ export type FeedRow = {
 export function RecommendationCard({ rec }: { rec: FeedRow }) {
   const item = rec.items;
   const author = rec.profiles;
+  const creator = rec.creators;
   if (!item) return null;
   const cat = categoryMeta(item.type);
   const Icon = cat.icon;
   return (
-    <article className="overflow-hidden rounded-2xl bg-card shadow-sm ring-1 ring-border">
+    <article
+      className="overflow-hidden rounded-2xl bg-card shadow-sm ring-1 ring-border"
+      style={creator ? { borderLeft: `4px solid ${creator.color}` } : undefined}
+    >
       <Link
         to="/item/$id"
         params={{ id: item.id }}
