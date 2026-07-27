@@ -321,6 +321,7 @@ function ImportPage() {
   const TABS: { id: Tab; label: string; icon: typeof FileSpreadsheet }[] = [
     { id: "sheet", label: "Sheet", icon: FileSpreadsheet },
     { id: "gmaps", label: "Maps", icon: MapPin },
+    { id: "imdb", label: "IMDb", icon: Film },
     { id: "docx", label: ".docx", icon: FileText },
     { id: "paste", label: "Paste", icon: Sparkles },
   ];
@@ -341,7 +342,8 @@ function ImportPage() {
       </header>
 
       <div className="space-y-5 p-5">
-        <div className="grid grid-cols-4 gap-2 rounded-full bg-muted p-1">
+        <div className="grid grid-cols-5 gap-2 rounded-full bg-muted p-1">
+
           {TABS.map((t) => (
             <button
               key={t.id}
