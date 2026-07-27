@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { useServerFn } from "@tanstack/react-start";
 import { Input } from "@/components/ui/input";
 import { Search, Loader2, Pencil, MapPin } from "lucide-react";
-import { searchMovies, searchTv, type SearchHit } from "@/lib/search.functions";
+import { searchMovies, searchTv, searchPodcasts, type SearchHit } from "@/lib/search.functions";
 import { searchBooksClient } from "@/lib/search-client";
 import { searchPlaces, type PlaceHit } from "@/lib/places.functions";
 import type { ItemType } from "@/lib/categories";
@@ -23,6 +23,7 @@ export function SearchPicker({ type, onPick, onManual, near }: Props) {
   const movieFn = useServerFn(searchMovies);
   const tvFn = useServerFn(searchTv);
   const placesFn = useServerFn(searchPlaces);
+  const podcastFn = useServerFn(searchPodcasts);
 
   useEffect(() => {
     const term = q.trim();
@@ -40,7 +41,9 @@ export function SearchPicker({ type, onPick, onManual, near }: Props) {
               ? await movieFn({ data: { q: term } })
               : type === "tv"
                 ? await tvFn({ data: { q: term } })
-                : await placesFn({ data: { q: term, near: near ?? null } });
+                : type === "podcast"
+                  ? await podcastFn({ data: { q: term } })
+                  : await placesFn({ data: { q: term, near: near ?? null } });
         setResults(hits);
       } catch {
         setResults([]);
@@ -49,7 +52,7 @@ export function SearchPicker({ type, onPick, onManual, near }: Props) {
       }
     }, 300);
     return () => clearTimeout(t);
-  }, [q, type, movieFn, tvFn, placesFn, near?.lat, near?.lng]);
+  }, [q, type, movieFn, tvFn, placesFn, podcastFn, near?.lat, near?.lng]);
 
   const placeholder =
     type === "book"
@@ -58,7 +61,9 @@ export function SearchPicker({ type, onPick, onManual, near }: Props) {
         ? "Search movies…"
         : type === "tv"
           ? "Search TV shows…"
-          : "Search restaurants, cafés, places…";
+          : type === "podcast"
+            ? "Search podcasts…"
+            : "Search restaurants, cafés, places…";
 
   const isPlace = type === "place";
 

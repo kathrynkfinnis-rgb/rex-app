@@ -3,7 +3,7 @@ import { z } from "zod";
 
 export type SearchHit = {
   external_id: string;
-  external_source: "google_books" | "tmdb_movie" | "tmdb_tv";
+  external_source: "google_books" | "tmdb_movie" | "tmdb_tv" | "itunes_podcast";
   title: string;
   subtitle: string | null;
   image_url: string | null;
@@ -89,5 +89,22 @@ export const searchTv = createServerFn({ method: "GET" })
       subtitle: r.first_air_date ? String(r.first_air_date).slice(0, 4) : null,
       image_url: r.poster_path ? `https://image.tmdb.org/t/p/w200${r.poster_path}` : null,
       genre: tmdbGenreName(r.genre_ids),
+    }));
+  });
+
+export const searchPodcasts = createServerFn({ method: "GET" })
+  .inputValidator((d: { q: string }) => querySchema.parse(d))
+  .handler(async ({ data }): Promise<SearchHit[]> => {
+    const url = `https://itunes.apple.com/search?media=podcast&entity=podcast&limit=15&term=${encodeURIComponent(data.q)}`;
+    const res = await fetch(url);
+    if (!res.ok) return [];
+    const json: any = await res.json();
+    return (json.results ?? []).map((r: any) => ({
+      external_id: String(r.collectionId ?? r.trackId),
+      external_source: "itunes_podcast" as const,
+      title: r.collectionName ?? r.trackName ?? "Untitled",
+      subtitle: r.artistName ?? null,
+      image_url: r.artworkUrl600 ?? r.artworkUrl100 ?? null,
+      genre: Array.isArray(r.genres) ? r.genres.find((g: string) => g && g !== "Podcasts") ?? r.primaryGenreName ?? null : r.primaryGenreName ?? null,
     }));
   });

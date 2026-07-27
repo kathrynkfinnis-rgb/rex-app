@@ -11,7 +11,7 @@ import { Input } from "@/components/ui/input";
 import { UserPlus, Mic, Plus, Search, X } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { searchProfiles } from "@/lib/friends.functions";
-import { searchBooks, searchMovies, searchTv, type SearchHit } from "@/lib/search.functions";
+import { searchBooks, searchMovies, searchTv, searchPodcasts, type SearchHit } from "@/lib/search.functions";
 import { searchPlaces, type PlaceHit } from "@/lib/places.functions";
 
 export const Route = createFileRoute("/_authenticated/feed")({
@@ -161,6 +161,7 @@ function SearchResults({ query, feed }: { query: string; feed: FeedRow[] }) {
   const moviesFn = useServerFn(searchMovies);
   const tvFn = useServerFn(searchTv);
   const placesFn = useServerFn(searchPlaces);
+  const podcastsFn = useServerFn(searchPodcasts);
 
   const feedMatches = useMemo(() => {
     const q = query.toLowerCase();
@@ -201,15 +202,21 @@ function SearchResults({ query, feed }: { query: string; feed: FeedRow[] }) {
     queryFn: () => placesFn({ data: { q: query, near: null } }),
     staleTime: 60_000,
   });
+  const podcasts = useQuery({
+    queryKey: ["search-podcasts", query],
+    queryFn: () => podcastsFn({ data: { q: query } }),
+    staleTime: 60_000,
+  });
 
   const catalog: { type: ItemType; hits: (SearchHit | PlaceHit)[] }[] = [
     { type: "book", hits: (books.data ?? []).slice(0, 6) },
     { type: "movie", hits: (movies.data ?? []).slice(0, 6) },
     { type: "tv", hits: (tv.data ?? []).slice(0, 6) },
+    { type: "podcast", hits: (podcasts.data ?? []).slice(0, 6) },
     { type: "place", hits: (places.data ?? []).slice(0, 6) },
   ];
 
-  const anyLoading = people.isLoading || books.isLoading || movies.isLoading || tv.isLoading || places.isLoading;
+  const anyLoading = people.isLoading || books.isLoading || movies.isLoading || tv.isLoading || places.isLoading || podcasts.isLoading;
   const nothing =
     !anyLoading &&
     feedMatches.length === 0 &&
