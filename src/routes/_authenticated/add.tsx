@@ -10,8 +10,10 @@ import { toast } from "sonner";
 import { ArrowLeft, MapPin } from "lucide-react";
 import { CrownRatingInput } from "@/components/CrownRating";
 import { cn } from "@/lib/utils";
-import { SearchPicker } from "@/components/SearchPicker";
+import { SearchPicker, type AnyHit } from "@/components/SearchPicker";
 import type { SearchHit } from "@/lib/search.functions";
+import { getPlacePhotoUrl } from "@/lib/places.functions";
+import { useServerFn } from "@tanstack/react-start";
 
 export const Route = createFileRoute("/_authenticated/add")({
   head: () => ({
