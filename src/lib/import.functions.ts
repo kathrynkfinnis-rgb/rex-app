@@ -139,6 +139,74 @@ export const extractFromText = createServerFn({ method: "POST" })
     return { inserted: rows.length };
   });
 
+// -------- Google Maps: batch insert pre-typed place rows --------
+export const importGoogleMapsPlaces = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator(
+    (d: { source: string; places: { title: string; address?: string | null; note?: string | null }[] }) =>
+      z
+        .object({
+          source: z.string().min(1).max(80),
+          places: z
+            .array(
+              z.object({
+                title: z.string().min(1).max(300),
+                address: z.string().max(500).nullable().optional(),
+                note: z.string().max(2000).nullable().optional(),
+              }),
+            )
+            .min(1)
+            .max(500),
+        })
+        .parse(d),
+  )
+  .handler(async ({ data, context }) => {
+    const rows = data.places.map((p) => ({
+      user_id: context.userId,
+      source: data.source,
+      raw_title: p.title.trim().slice(0, 300),
+      raw_creator: p.address?.slice(0, 200) ?? null,
+      raw_note: p.note?.slice(0, 2000) ?? null,
+      raw_rating: null,
+      suggested_type: "place" as const,
+      status: "pending",
+    }));
+    const { error } = await context.supabase.from("import_staging").insert(rows);
+    if (error) throw new Error(error.message);
+    return { inserted: rows.length };
+  });
+
+// -------- Google Maps: best-effort scrape of a shared list URL --------
+export const fetchGoogleMapsList = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d: { url: string }) => z.object({ url: z.string().url() }).parse(d))
+  .handler(async ({ data }) => {
+    if (!/(google\.[a-z.]+\/maps|maps\.app\.goo\.gl|goo\.gl\/maps)/i.test(data.url)) {
+      throw new Error("Not a Google Maps URL");
+    }
+    const res = await fetch(data.url, {
+      redirect: "follow",
+      headers: {
+        "User-Agent":
+          "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0 Safari/537.36",
+        "Accept-Language": "en-US,en;q=0.9",
+      },
+    });
+    if (!res.ok) throw new Error(`Google blocked the request (${res.status}). Try Takeout export instead.`);
+    const html = await res.text();
+    // Extract candidate place names from the embedded data blob. Google shipping-URL
+    // pages embed lists as nested JSON; place names typically appear as short strings
+    // followed by an address. This is best-effort and can break when Google changes markup.
+    const names = new Set<string>();
+    const regex = /"([A-Z][A-Za-z0-9&'’\-. ]{2,80})",\[null,null,[-\d.]+,[-\d.]+\]/g;
+    let m: RegExpExecArray | null;
+    while ((m = regex.exec(html)) !== null) {
+      names.add(m[1]);
+      if (names.size >= 200) break;
+    }
+    return { titles: Array.from(names) };
+  });
+
 // -------- Resolve a staging row to a real item via search --------
 async function searchPlaces(q: string): Promise<{
   external_id: string;
