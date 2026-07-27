@@ -8,11 +8,13 @@ import { RecommendationCard, type FeedRow } from "@/components/RecommendationCar
 import { TRexLogo } from "@/components/TRexLogo";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { UserPlus, Mic, Plus, Search, X } from "lucide-react";
+import { UserPlus, Mic, Plus, Search, X, User } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { searchProfiles } from "@/lib/friends.functions";
 import { searchBooks, searchMovies, searchTv, searchPodcasts, type SearchHit } from "@/lib/search.functions";
 import { searchPlaces, type PlaceHit } from "@/lib/places.functions";
+
+type SearchScope = "all" | "people" | ItemType;
 
 export const Route = createFileRoute("/_authenticated/feed")({
   head: () => ({
@@ -29,6 +31,7 @@ function FeedPage() {
   const [subFilter, setSubFilter] = useState<string | "all">("all");
   const [rawQuery, setRawQuery] = useState("");
   const [query, setQuery] = useState("");
+  const [searchScope, setSearchScope] = useState<SearchScope>("all");
 
   // debounce search input
   useEffect(() => {
@@ -93,7 +96,13 @@ function FeedPage() {
           <Input
             value={rawQuery}
             onChange={(e) => setRawQuery(e.target.value)}
-            placeholder="Search recs, people, books, films, places…"
+            placeholder={
+              searchScope === "people"
+                ? "Search people…"
+                : searchScope === "all"
+                  ? "Search recs, people, books, films, places…"
+                  : `Search ${categoryMeta(searchScope).plural.toLowerCase()}…`
+            }
             aria-label="Search"
             className="h-11 rounded-full border-border bg-card pl-9 pr-9"
           />
@@ -108,6 +117,20 @@ function FeedPage() {
             </button>
           )}
         </div>
+        {searching && (
+          <div className="scrollbar-none mt-2 flex gap-2 overflow-x-auto -mx-5 px-5">
+            <ScopeChip active={searchScope === "all"} onClick={() => setSearchScope("all")}>All</ScopeChip>
+            <ScopeChip active={searchScope === "people"} onClick={() => setSearchScope("people")}>
+              <User className="h-3.5 w-3.5" /> People
+            </ScopeChip>
+            {CATEGORIES.map((c) => (
+              <ScopeChip key={c.type} active={searchScope === c.type} onClick={() => setSearchScope(c.type)}>
+                <c.icon className="h-3.5 w-3.5" />
+                {c.plural}
+              </ScopeChip>
+            ))}
+          </div>
+        )}
         {!searching && (
           <div className="scrollbar-none mt-3 flex gap-2 overflow-x-auto -mx-5 px-5">
             <Chip active={filter === "all"} onClick={() => setFilter("all")}>All</Chip>
@@ -132,7 +155,7 @@ function FeedPage() {
       </header>
 
       {searching ? (
-        <SearchResults query={query} feed={data ?? []} />
+        <SearchResults query={query} feed={data ?? []} scope={searchScope} />
       ) : (
         <div className="space-y-3 px-4 py-4">
           {isLoading && (
@@ -155,7 +178,7 @@ function FeedPage() {
   );
 }
 
-function SearchResults({ query, feed }: { query: string; feed: FeedRow[] }) {
+function SearchResults({ query, feed, scope }: { query: string; feed: FeedRow[]; scope: SearchScope }) {
   const profilesFn = useServerFn(searchProfiles);
   const booksFn = useServerFn(searchBooks);
   const moviesFn = useServerFn(searchMovies);
@@ -163,49 +186,61 @@ function SearchResults({ query, feed }: { query: string; feed: FeedRow[] }) {
   const placesFn = useServerFn(searchPlaces);
   const podcastsFn = useServerFn(searchPodcasts);
 
+  const searchPeople = scope === "all" || scope === "people";
+  const searchCatalog = scope !== "people";
+
   const feedMatches = useMemo(() => {
     const q = query.toLowerCase();
-    return feed.filter((r) => {
-      const t = r.items?.title?.toLowerCase() ?? "";
-      const s = r.items?.subtitle?.toLowerCase() ?? "";
-      const n = r.note?.toLowerCase() ?? "";
-      const u = r.profiles?.username?.toLowerCase() ?? "";
-      const d = r.profiles?.display_name?.toLowerCase() ?? "";
-      const c = r.creators?.name?.toLowerCase() ?? "";
-      return t.includes(q) || s.includes(q) || n.includes(q) || u.includes(q) || d.includes(q) || c.includes(q);
-    }).slice(0, 10);
-  }, [feed, query]);
+    return feed
+      .filter((r) => {
+        if (scope !== "all" && scope !== "people" && r.items?.type !== scope) return false;
+        const t = r.items?.title?.toLowerCase() ?? "";
+        const s = r.items?.subtitle?.toLowerCase() ?? "";
+        const n = r.note?.toLowerCase() ?? "";
+        const u = r.profiles?.username?.toLowerCase() ?? "";
+        const d = r.profiles?.display_name?.toLowerCase() ?? "";
+        const c = r.creators?.name?.toLowerCase() ?? "";
+        return t.includes(q) || s.includes(q) || n.includes(q) || u.includes(q) || d.includes(q) || c.includes(q);
+      })
+      .slice(0, 10);
+  }, [feed, query, scope]);
 
   const people = useQuery({
     queryKey: ["search-people", query],
     queryFn: () => profilesFn({ data: { query, limit: 10 } }),
     staleTime: 30_000,
+    enabled: searchPeople,
   });
 
   const books = useQuery({
     queryKey: ["search-books", query],
     queryFn: () => booksFn({ data: { q: query } }),
     staleTime: 60_000,
+    enabled: searchCatalog,
   });
   const movies = useQuery({
     queryKey: ["search-movies", query],
     queryFn: () => moviesFn({ data: { q: query } }),
     staleTime: 60_000,
+    enabled: searchCatalog,
   });
   const tv = useQuery({
     queryKey: ["search-tv", query],
     queryFn: () => tvFn({ data: { q: query } }),
     staleTime: 60_000,
+    enabled: searchCatalog,
   });
   const places = useQuery({
     queryKey: ["search-places", query],
     queryFn: () => placesFn({ data: { q: query, near: null } }),
     staleTime: 60_000,
+    enabled: searchCatalog,
   });
   const podcasts = useQuery({
     queryKey: ["search-podcasts", query],
     queryFn: () => podcastsFn({ data: { q: query } }),
     staleTime: 60_000,
+    enabled: searchCatalog,
   });
 
   const catalog: { type: ItemType; hits: (SearchHit | PlaceHit)[] }[] = [
@@ -216,16 +251,23 @@ function SearchResults({ query, feed }: { query: string; feed: FeedRow[] }) {
     { type: "place", hits: (places.data ?? []).slice(0, 6) },
   ];
 
-  const anyLoading = people.isLoading || books.isLoading || movies.isLoading || tv.isLoading || places.isLoading || podcasts.isLoading;
+  const visibleCatalog = useMemo(() => {
+    if (scope === "all") return catalog;
+    return catalog.filter((c) => c.type === scope);
+  }, [catalog, scope]);
+
+  const anyLoading =
+    (searchPeople && people.isLoading) ||
+    (searchCatalog && (books.isLoading || movies.isLoading || tv.isLoading || places.isLoading || podcasts.isLoading));
   const nothing =
     !anyLoading &&
-    feedMatches.length === 0 &&
+    (scope === "people" ? true : feedMatches.length === 0) &&
     (people.data?.length ?? 0) === 0 &&
-    catalog.every((c) => c.hits.length === 0);
+    visibleCatalog.every((c) => c.hits.length === 0);
 
   return (
     <div className="space-y-6 px-4 py-4">
-      {feedMatches.length > 0 && (
+      {scope !== "people" && feedMatches.length > 0 && (
         <Section title="In your feed">
           <div className="space-y-3">
             {feedMatches.map((rec) => <RecommendationCard key={rec.id} rec={rec} />)}
@@ -260,7 +302,7 @@ function SearchResults({ query, feed }: { query: string; feed: FeedRow[] }) {
         </Section>
       )}
 
-      {catalog.map(({ type, hits }) => hits.length > 0 && (
+      {visibleCatalog.map(({ type, hits }) => hits.length > 0 && (
         <CatalogSection key={type} type={type} hits={hits} />
       ))}
 
@@ -351,6 +393,22 @@ function SubChip({ active, onClick, children }: { active: boolean; onClick: () =
         active
           ? "border-primary/50 bg-primary/10 text-primary"
           : "border-border bg-background text-muted-foreground hover:text-foreground",
+      )}
+    >
+      {children}
+    </button>
+  );
+}
+
+function ScopeChip({ active, onClick, children }: { active: boolean; onClick: () => void; children: React.ReactNode }) {
+  return (
+    <button
+      onClick={onClick}
+      className={cn(
+        "flex shrink-0 items-center gap-1.5 rounded-full border px-3 py-1.5 text-xs font-medium transition-colors",
+        active
+          ? "border-primary bg-primary text-primary-foreground"
+          : "border-border bg-card text-foreground hover:bg-muted/40",
       )}
     >
       {children}
