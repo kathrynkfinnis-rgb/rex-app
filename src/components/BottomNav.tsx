@@ -1,14 +1,13 @@
 import { Link, useRouterState } from "@tanstack/react-router";
-import { Home, Map, Plus, Users, User, Mic } from "lucide-react";
+import { Home, Map, Plus, Users, Mic } from "lucide-react";
 import { cn } from "@/lib/utils";
 
-const items: { to: "/feed" | "/map" | "/add" | "/creators" | "/friends" | "/me"; icon: typeof Home; label: string; primary?: boolean }[] = [
+const items: { to: "/feed" | "/map" | "/add" | "/creators" | "/friends"; icon: typeof Home; label: string; primary?: boolean }[] = [
   { to: "/feed", icon: Home, label: "Feed" },
   { to: "/map", icon: Map, label: "Map" },
   { to: "/add", icon: Plus, label: "Add", primary: true },
   { to: "/creators", icon: Mic, label: "Creators" },
   { to: "/friends", icon: Users, label: "Friends" },
-  { to: "/me", icon: User, label: "You" },
 ];
 
 export function BottomNav() {
