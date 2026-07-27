@@ -5,6 +5,7 @@ import { Heart, MessageCircle, Send, Trash2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { formatDistanceToNow } from "date-fns";
 import { toast } from "sonner";
+import { UserAvatar } from "@/components/UserAvatar";
 
 type CommentRow = {
   id: string;
@@ -148,9 +149,7 @@ export function LikesComments({
         <div className={cn("mt-2 space-y-2", compact && "border-t border-border pt-3")}>
           {comments.map((c) => (
             <div key={c.id} className="flex items-start gap-2 rounded-xl bg-secondary/40 px-3 py-2">
-              <div className="mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-secondary text-[11px] font-semibold">
-                {(c.profiles?.display_name || c.profiles?.username || "?").slice(0, 1).toUpperCase()}
-              </div>
+              <UserAvatar url={c.profiles?.avatar_url} name={c.profiles?.display_name || c.profiles?.username} size="xs" className="mt-0.5" />
               <div className="min-w-0 flex-1">
                 <div className="flex items-baseline gap-1.5">
                   <span className="text-xs font-semibold">

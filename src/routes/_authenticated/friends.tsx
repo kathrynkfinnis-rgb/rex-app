@@ -3,6 +3,7 @@ import { useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { supabase } from "@/integrations/supabase/client";
+import { UserAvatar } from "@/components/UserAvatar";
 import { searchProfiles, suggestedFriends } from "@/lib/friends.functions";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -39,11 +40,11 @@ function FriendsPage() {
       if (error) throw error;
       const rows = data ?? [];
       const ids = Array.from(new Set(rows.flatMap((r: any) => [r.requester_id, r.addressee_id])));
-      let profilesById: Record<string, { username: string; display_name: string | null }> = {};
+      let profilesById: Record<string, { username: string; display_name: string | null; avatar_url: string | null }> = {};
       if (ids.length) {
         const { data: profs } = await supabase
           .from("profiles")
-          .select("id, username, display_name")
+          .select("id, username, display_name, avatar_url")
           .in("id", ids);
         for (const p of profs ?? []) profilesById[(p as any).id] = p as any;
       }
@@ -240,9 +241,7 @@ function FriendsPage() {
             return (
               <div key={p.id} className="flex items-center justify-between rounded-2xl bg-card p-3 ring-1 ring-border">
                 <div className="flex items-center gap-3 min-w-0">
-                  <div className="flex h-9 w-9 items-center justify-center rounded-full bg-secondary text-sm font-semibold">
-                    {(p.display_name || p.username || "?").slice(0, 1).toUpperCase()}
-                  </div>
+                  <UserAvatar url={p.avatar_url} name={p.display_name || p.username} size="md" />
                   <div className="min-w-0">
                     <p className="truncate font-medium">{p.display_name || p.username}</p>
                     <p className="flex items-center gap-1 truncate text-xs text-muted-foreground">
@@ -316,9 +315,7 @@ function FriendsPage() {
                 className="flex items-center justify-between rounded-2xl bg-card p-3 ring-1 ring-border transition-colors hover:bg-muted/60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
               >
                 <div className="flex items-center gap-3">
-                  <div className="flex h-9 w-9 items-center justify-center rounded-full bg-secondary text-sm font-semibold">
-                    {(other.display_name || other.username || "?").slice(0, 1).toUpperCase()}
-                  </div>
+                  <UserAvatar url={other.avatar_url} name={other.display_name || other.username} size="md" />
                   <div>
                     <p className="font-medium">{other.display_name || other.username}</p>
                     <p className="text-xs text-muted-foreground">@{other.username}</p>

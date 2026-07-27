@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { RecommendationCard, type FeedRow } from "@/components/RecommendationCard";
 import { toast } from "sonner";
 import { LogOut, Smartphone, BookOpen, FileUp } from "lucide-react";
+import { AvatarUploader } from "@/components/AvatarUploader";
 
 export const Route = createFileRoute("/_authenticated/me")({
   head: () => ({
@@ -64,9 +65,13 @@ function MePage() {
       <header className="border-b border-border bg-background px-5 pb-6 pt-[calc(env(safe-area-inset-top)+1rem)]">
         <h1 className="font-display text-3xl">You</h1>
         <div className="mt-4 flex items-center gap-4">
-          <div className="flex h-16 w-16 items-center justify-center rounded-full bg-primary text-2xl font-semibold text-primary-foreground">
-            {(profile?.display_name || profile?.username || user?.email || "?").slice(0, 1).toUpperCase()}
-          </div>
+          {user ? (
+            <AvatarUploader
+              userId={user.id}
+              currentUrl={profile?.avatar_url}
+              displayName={profile?.display_name || profile?.username || user.email}
+            />
+          ) : null}
           <div className="min-w-0 flex-1">
             <p className="truncate font-display text-2xl">{profile?.display_name || profile?.username}</p>
             <p className="truncate text-sm text-muted-foreground">@{profile?.username}</p>
