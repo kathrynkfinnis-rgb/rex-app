@@ -193,49 +193,61 @@ function SearchResults({ query, feed, scope }: { query: string; feed: FeedRow[];
   const placesFn = useServerFn(searchPlaces);
   const podcastsFn = useServerFn(searchPodcasts);
 
+  const searchPeople = scope === "all" || scope === "people";
+  const searchCatalog = scope !== "people";
+
   const feedMatches = useMemo(() => {
     const q = query.toLowerCase();
-    return feed.filter((r) => {
-      const t = r.items?.title?.toLowerCase() ?? "";
-      const s = r.items?.subtitle?.toLowerCase() ?? "";
-      const n = r.note?.toLowerCase() ?? "";
-      const u = r.profiles?.username?.toLowerCase() ?? "";
-      const d = r.profiles?.display_name?.toLowerCase() ?? "";
-      const c = r.creators?.name?.toLowerCase() ?? "";
-      return t.includes(q) || s.includes(q) || n.includes(q) || u.includes(q) || d.includes(q) || c.includes(q);
-    }).slice(0, 10);
-  }, [feed, query]);
+    return feed
+      .filter((r) => {
+        if (scope !== "all" && scope !== "people" && r.items?.type !== scope) return false;
+        const t = r.items?.title?.toLowerCase() ?? "";
+        const s = r.items?.subtitle?.toLowerCase() ?? "";
+        const n = r.note?.toLowerCase() ?? "";
+        const u = r.profiles?.username?.toLowerCase() ?? "";
+        const d = r.profiles?.display_name?.toLowerCase() ?? "";
+        const c = r.creators?.name?.toLowerCase() ?? "";
+        return t.includes(q) || s.includes(q) || n.includes(q) || u.includes(q) || d.includes(q) || c.includes(q);
+      })
+      .slice(0, 10);
+  }, [feed, query, scope]);
 
   const people = useQuery({
     queryKey: ["search-people", query],
     queryFn: () => profilesFn({ data: { query, limit: 10 } }),
     staleTime: 30_000,
+    enabled: searchPeople,
   });
 
   const books = useQuery({
     queryKey: ["search-books", query],
     queryFn: () => booksFn({ data: { q: query } }),
     staleTime: 60_000,
+    enabled: searchCatalog,
   });
   const movies = useQuery({
     queryKey: ["search-movies", query],
     queryFn: () => moviesFn({ data: { q: query } }),
     staleTime: 60_000,
+    enabled: searchCatalog,
   });
   const tv = useQuery({
     queryKey: ["search-tv", query],
     queryFn: () => tvFn({ data: { q: query } }),
     staleTime: 60_000,
+    enabled: searchCatalog,
   });
   const places = useQuery({
     queryKey: ["search-places", query],
     queryFn: () => placesFn({ data: { q: query, near: null } }),
     staleTime: 60_000,
+    enabled: searchCatalog,
   });
   const podcasts = useQuery({
     queryKey: ["search-podcasts", query],
     queryFn: () => podcastsFn({ data: { q: query } }),
     staleTime: 60_000,
+    enabled: searchCatalog,
   });
 
   const catalog: { type: ItemType; hits: (SearchHit | PlaceHit)[] }[] = [
@@ -246,12 +258,19 @@ function SearchResults({ query, feed, scope }: { query: string; feed: FeedRow[];
     { type: "place", hits: (places.data ?? []).slice(0, 6) },
   ];
 
-  const anyLoading = people.isLoading || books.isLoading || movies.isLoading || tv.isLoading || places.isLoading || podcasts.isLoading;
+  const visibleCatalog = useMemo(() => {
+    if (scope === "all") return catalog;
+    return catalog.filter((c) => c.type === scope);
+  }, [catalog, scope]);
+
+  const anyLoading =
+    (searchPeople && people.isLoading) ||
+    (searchCatalog && (books.isLoading || movies.isLoading || tv.isLoading || places.isLoading || podcasts.isLoading));
   const nothing =
     !anyLoading &&
-    feedMatches.length === 0 &&
+    (scope === "people" ? true : feedMatches.length === 0) &&
     (people.data?.length ?? 0) === 0 &&
-    catalog.every((c) => c.hits.length === 0);
+    visibleCatalog.every((c) => c.hits.length === 0);
 
   return (
     <div className="space-y-6 px-4 py-4">
