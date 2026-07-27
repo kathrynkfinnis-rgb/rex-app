@@ -1,23 +1,28 @@
 import { useEffect, useState } from "react";
 import { useServerFn } from "@tanstack/react-start";
 import { Input } from "@/components/ui/input";
-import { Search, Loader2, Pencil } from "lucide-react";
+import { Search, Loader2, Pencil, MapPin } from "lucide-react";
 import { searchMovies, searchTv, type SearchHit } from "@/lib/search.functions";
 import { searchBooksClient } from "@/lib/search-client";
+import { searchPlaces, type PlaceHit } from "@/lib/places.functions";
 import type { ItemType } from "@/lib/categories";
 
+export type AnyHit = SearchHit | PlaceHit;
+
 type Props = {
-  type: Exclude<ItemType, "place">;
-  onPick: (hit: SearchHit) => void;
+  type: ItemType;
+  onPick: (hit: AnyHit) => void;
   onManual: () => void;
+  near?: { lat: number; lng: number } | null;
 };
 
-export function SearchPicker({ type, onPick, onManual }: Props) {
+export function SearchPicker({ type, onPick, onManual, near }: Props) {
   const [q, setQ] = useState("");
-  const [results, setResults] = useState<SearchHit[]>([]);
+  const [results, setResults] = useState<AnyHit[]>([]);
   const [loading, setLoading] = useState(false);
   const movieFn = useServerFn(searchMovies);
   const tvFn = useServerFn(searchTv);
+  const placesFn = useServerFn(searchPlaces);
 
   useEffect(() => {
     const term = q.trim();
@@ -28,12 +33,14 @@ export function SearchPicker({ type, onPick, onManual }: Props) {
     setLoading(true);
     const t = setTimeout(async () => {
       try {
-        const hits =
+        const hits: AnyHit[] =
           type === "book"
             ? await searchBooksClient(term)
             : type === "movie"
               ? await movieFn({ data: { q: term } })
-              : await tvFn({ data: { q: term } });
+              : type === "tv"
+                ? await tvFn({ data: { q: term } })
+                : await placesFn({ data: { q: term, near: near ?? null } });
         setResults(hits);
       } catch {
         setResults([]);
@@ -42,11 +49,18 @@ export function SearchPicker({ type, onPick, onManual }: Props) {
       }
     }, 300);
     return () => clearTimeout(t);
-  }, [q, type, movieFn, tvFn]);
+  }, [q, type, movieFn, tvFn, placesFn, near?.lat, near?.lng]);
 
   const placeholder =
-    type === "book" ? "Search books (title or author)…" :
-    type === "movie" ? "Search movies…" : "Search TV shows…";
+    type === "book"
+      ? "Search books (title or author)…"
+      : type === "movie"
+        ? "Search movies…"
+        : type === "tv"
+          ? "Search TV shows…"
+          : "Search restaurants, cafés, places…";
+
+  const isPlace = type === "place";
 
   return (
     <div className="space-y-3">
@@ -73,8 +87,16 @@ export function SearchPicker({ type, onPick, onManual }: Props) {
                 onClick={() => onPick(r)}
                 className="flex w-full items-center gap-3 p-3 text-left transition-colors hover:bg-muted/40 active:bg-muted"
               >
-                {r.image_url ? (
-                  <img src={r.image_url} alt="" className="h-14 w-10 flex-none rounded-md object-cover ring-1 ring-border" />
+                {isPlace ? (
+                  <div className="flex h-14 w-10 flex-none items-center justify-center rounded-md bg-secondary text-secondary-foreground ring-1 ring-border">
+                    <MapPin className="h-5 w-5" />
+                  </div>
+                ) : r.image_url ? (
+                  <img
+                    src={r.image_url}
+                    alt=""
+                    className="h-14 w-10 flex-none rounded-md object-cover ring-1 ring-border"
+                  />
                 ) : (
                   <div className="h-14 w-10 flex-none rounded-md bg-muted" />
                 )}
