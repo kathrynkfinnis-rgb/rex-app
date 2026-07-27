@@ -88,5 +88,6 @@ export const searchTv = createServerFn({ method: "GET" })
       title: r.name ?? r.original_name ?? "Untitled",
       subtitle: r.first_air_date ? String(r.first_air_date).slice(0, 4) : null,
       image_url: r.poster_path ? `https://image.tmdb.org/t/p/w200${r.poster_path}` : null,
+      genre: tmdbGenreName(r.genre_ids),
     }));
   });
