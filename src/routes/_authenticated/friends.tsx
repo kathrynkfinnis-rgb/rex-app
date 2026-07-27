@@ -35,12 +35,27 @@ function FriendsPage() {
     queryFn: async () => {
       const { data, error } = await supabase
         .from("friendships")
-        .select("id, requester_id, addressee_id, status, requester:profiles!friendships_requester_id_fkey(username, display_name), addressee:profiles!friendships_addressee_id_fkey(username, display_name)");
+        .select("id, requester_id, addressee_id, status");
       if (error) throw error;
-      return data ?? [];
+      const rows = data ?? [];
+      const ids = Array.from(new Set(rows.flatMap((r: any) => [r.requester_id, r.addressee_id])));
+      let profilesById: Record<string, { username: string; display_name: string | null }> = {};
+      if (ids.length) {
+        const { data: profs } = await supabase
+          .from("profiles")
+          .select("id, username, display_name")
+          .in("id", ids);
+        for (const p of profs ?? []) profilesById[(p as any).id] = p as any;
+      }
+      return rows.map((r: any) => ({
+        ...r,
+        requester: profilesById[r.requester_id],
+        addressee: profilesById[r.addressee_id],
+      }));
     },
     enabled: !!me,
   });
+
 
   const { data: myProfile } = useQuery({
     queryKey: ["me-profile-username", me?.id],
