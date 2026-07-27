@@ -1,9 +1,11 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
-import { MapPin, Compass } from "lucide-react";
+import { MapPin, Compass, Loader2 } from "lucide-react";
 import { ClientOnly } from "@tanstack/react-router";
-import { lazy, Suspense } from "react";
+import { lazy, Suspense, useEffect, useRef, useState } from "react";
+import { useServerFn } from "@tanstack/react-start";
+import { geocodeMissingPlaces } from "@/lib/geocode.functions";
 
 const GoogleMap = lazy(() => import("@/components/GoogleMap").then((m) => ({ default: m.GoogleMap })));
 
@@ -19,6 +21,11 @@ export const Route = createFileRoute("/_authenticated/map")({
 
 function MapPage() {
   const navigate = useNavigate();
+  const qc = useQueryClient();
+  const geocode = useServerFn(geocodeMissingPlaces);
+  const [geocoding, setGeocoding] = useState(false);
+  const ranAuto = useRef(false);
+
   const { data } = useQuery({
     queryKey: ["map-places"],
     queryFn: async () => {
@@ -27,7 +34,7 @@ function MapPage() {
         .select("id, title, subtitle, address, lat, lng, image_url, recommendations(id, rating, user_id, profiles(display_name, username))")
         .eq("type", "place")
         .order("created_at", { ascending: false })
-        .limit(100);
+        .limit(200);
       if (error) throw error;
       return data ?? [];
     },
@@ -36,12 +43,52 @@ function MapPage() {
   const withLoc = (data ?? []).filter((p: any) => p.lat != null && p.lng != null);
   const withoutLoc = (data ?? []).filter((p: any) => p.lat == null || p.lng == null);
 
+  const runGeocode = async () => {
+    setGeocoding(true);
+    try {
+      const res: any = await geocode({ data: { limit: 25 } });
+      await qc.invalidateQueries({ queryKey: ["map-places"] });
+      // If more remain, keep going (up to a few passes) so imported lists resolve.
+      if (res?.updated > 0 && res?.checked === 25) {
+        setTimeout(() => {
+          ranAuto.current = false;
+        }, 100);
+      }
+    } finally {
+      setGeocoding(false);
+    }
+  };
+
+  useEffect(() => {
+    if (ranAuto.current) return;
+    if (!data) return;
+    if (withoutLoc.length === 0) return;
+    ranAuto.current = true;
+    runGeocode();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [data]);
+
   return (
     <div>
       <header className="border-b border-border bg-background px-5 pb-4 pt-[calc(env(safe-area-inset-top)+1rem)]">
-        <h1 className="font-display text-3xl">Places</h1>
-        <p className="mt-1 text-sm text-muted-foreground">Restaurants and spots your friends recommend.</p>
+        <div className="flex items-start justify-between gap-3">
+          <div>
+            <h1 className="font-display text-3xl">Places</h1>
+            <p className="mt-1 text-sm text-muted-foreground">Restaurants and spots your friends recommend.</p>
+          </div>
+          {withoutLoc.length > 0 && (
+            <button
+              onClick={runGeocode}
+              disabled={geocoding}
+              className="mt-1 inline-flex items-center gap-1.5 rounded-full bg-primary/10 px-3 py-1.5 text-xs font-medium text-primary disabled:opacity-60"
+            >
+              {geocoding ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <MapPin className="h-3.5 w-3.5" />}
+              {geocoding ? "Locating…" : `Locate ${withoutLoc.length}`}
+            </button>
+          )}
+        </div>
       </header>
+
 
       <div className="relative m-4 h-72 overflow-hidden rounded-2xl bg-muted ring-1 ring-border">
         {withLoc.length === 0 ? (
