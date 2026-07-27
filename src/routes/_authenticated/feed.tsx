@@ -8,13 +8,6 @@ import { RecommendationCard, type FeedRow } from "@/components/RecommendationCar
 import { TRexLogo } from "@/components/TRexLogo";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
 import { UserPlus, Mic, Plus, Search, X, User } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { searchProfiles } from "@/lib/friends.functions";
