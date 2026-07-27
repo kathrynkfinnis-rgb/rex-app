@@ -54,11 +54,10 @@ export function RecommendationCard({ rec }: { rec: FeedRow }) {
   const Icon = cat.icon;
   const isOwner = currentUserId && currentUserId === rec.user_id;
   return (
-  return (
     <>
     <article
-
       className="relative overflow-hidden rounded-2xl bg-card shadow-sm ring-1 ring-border"
+
       style={creator ? { borderLeft: `4px solid ${creator.color}` } : undefined}
     >
       {isOwner && (
