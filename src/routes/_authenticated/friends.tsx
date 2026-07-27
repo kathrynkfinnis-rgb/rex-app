@@ -1,7 +1,9 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useServerFn } from "@tanstack/react-start";
 import { supabase } from "@/integrations/supabase/client";
+import { searchProfiles, suggestedFriends } from "@/lib/friends.functions";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { toast } from "sonner";
@@ -50,12 +52,13 @@ function FriendsPage() {
     enabled: !!me,
   });
 
+  const suggestedFn = useServerFn(suggestedFriends);
+  const searchFn = useServerFn(searchProfiles);
+
   const { data: suggestions } = useQuery({
     queryKey: ["suggested-friends"],
     queryFn: async () => {
-      const { data, error } = await supabase.rpc("suggested_friends", { _limit: 10 });
-      if (error) throw error;
-      return data ?? [];
+      return await suggestedFn({ data: { limit: 10 } });
     },
     enabled: !!me,
   });
@@ -88,12 +91,12 @@ function FriendsPage() {
   async function doSearch() {
     if (!search.trim()) return;
     setSearching(true);
-    const { data } = await supabase.rpc("search_profiles", {
-      _query: search.trim(),
-      _limit: 10,
-    });
-    setSearchResults((data ?? []) as any[]);
-    setSearching(false);
+    try {
+      const data = await searchFn({ data: { query: search.trim(), limit: 10 } });
+      setSearchResults((data ?? []) as any[]);
+    } finally {
+      setSearching(false);
+    }
   }
 
   async function sendRequest(addresseeId: string) {
