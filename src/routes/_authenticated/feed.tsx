@@ -1,10 +1,12 @@
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, Link } from "@tanstack/react-router";
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { CATEGORIES, type ItemType } from "@/lib/categories";
 import { RecommendationCard, type FeedRow } from "@/components/RecommendationCard";
 import { TRexLogo } from "@/components/TRexLogo";
+import { Button } from "@/components/ui/button";
+import { UserPlus, Mic, Plus } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 export const Route = createFileRoute("/_authenticated/feed")({
@@ -93,11 +95,25 @@ function SkeletonCard() {
 
 function EmptyState() {
   return (
-    <div className="mt-10 rounded-3xl border border-dashed border-border bg-card p-8 text-center">
-      <h2 className="font-display text-2xl">Nothing here yet</h2>
-      <p className="mt-2 text-sm text-muted-foreground">
-        Add your first recommendation — or invite a friend so you can see theirs.
+    <div className="mt-8 rounded-3xl border border-dashed border-border bg-card p-6 text-center">
+      <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-primary/10">
+        <TRexLogo className="h-7 w-7" />
+      </div>
+      <h2 className="mt-3 font-display text-2xl">Your feed is empty</h2>
+      <p className="mx-auto mt-2 max-w-xs text-sm text-muted-foreground">
+        Add friends or follow a creator — their picks will land here.
       </p>
+      <div className="mt-5 grid gap-2">
+        <Button asChild className="h-11 rounded-full">
+          <Link to="/friends"><UserPlus className="mr-1.5 h-4 w-4" /> Add friends</Link>
+        </Button>
+        <Button asChild variant="outline" className="h-11 rounded-full">
+          <Link to="/creators"><Mic className="mr-1.5 h-4 w-4" /> Follow creators</Link>
+        </Button>
+        <Button asChild variant="ghost" className="h-11 rounded-full">
+          <Link to="/add"><Plus className="mr-1.5 h-4 w-4" /> Add your first rec</Link>
+        </Button>
+      </div>
     </div>
   );
 }

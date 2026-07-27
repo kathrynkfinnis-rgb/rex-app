@@ -123,7 +123,8 @@ function CreatorsPage() {
                   <div className="min-w-0">
                     <p className="font-medium truncate">{creator.name}</p>
                     <p className="text-xs text-muted-foreground truncate">
-                      @{creator.slug} · {creator.rec_count} recommendation{creator.rec_count === 1 ? "" : "s"}
+                      @{creator.slug}
+                      {creator.rec_count > 0 && ` · ${creator.rec_count} recommendation${creator.rec_count === 1 ? "" : "s"}`}
                     </p>
                   </div>
                 </div>
