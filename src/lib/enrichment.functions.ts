@@ -47,41 +47,79 @@ export const getItemEnrichment = createServerFn({ method: "GET" })
   });
 
 async function enrichBook(item: any): Promise<Enrichment | null> {
-  let volume: any = null;
-  if (item.external_source === "google_books" && item.external_id) {
-    const res = await fetch(`https://www.googleapis.com/books/v1/volumes/${encodeURIComponent(item.external_id)}`);
-    if (res.ok) volume = await res.json();
+  // Try OpenLibrary first (matches how we now search and it has generous quota).
+  let workKey: string | null = null;
+  if (item.external_id && /^works\/OL\w+W$/i.test(item.external_id)) {
+    workKey = `/${item.external_id}`;
   }
-  if (!volume) {
+  if (!workKey) {
+    // Search OpenLibrary by title (+ author from subtitle if present)
     const q = `${item.title}${item.subtitle ? " " + item.subtitle : ""}`;
-    const res = await fetch(`https://www.googleapis.com/books/v1/volumes?q=${encodeURIComponent(q)}&maxResults=1`);
-    if (res.ok) {
-      const json: any = await res.json();
-      volume = json.items?.[0];
+    const sr = await fetch(
+      `https://openlibrary.org/search.json?q=${encodeURIComponent(q)}&limit=1&fields=key,title,author_name,first_publish_year,cover_i,subject,number_of_pages_median,ratings_average,ratings_count`,
+    );
+    if (sr.ok) {
+      const sj: any = await sr.json();
+      const doc = sj.docs?.[0];
+      if (doc?.key) {
+        return buildBookEnrichment(doc, null, item);
+      }
     }
   }
-  if (!volume) return null;
-  const v = volume.volumeInfo ?? {};
-  const facts: Enrichment["facts"] = [];
-  if (v.authors?.length) facts.push({ label: "Author", value: v.authors.join(", ") });
-  if (v.publishedDate) facts.push({ label: "Published", value: String(v.publishedDate).slice(0, 4) });
-  if (v.publisher) facts.push({ label: "Publisher", value: v.publisher });
-  if (v.pageCount) facts.push({ label: "Pages", value: String(v.pageCount) });
-  if (v.categories?.length) facts.push({ label: "Genre", value: v.categories.slice(0, 2).join(", ") });
 
-  const goodreadsSearch = `https://www.goodreads.com/search?q=${encodeURIComponent((v.authors?.[0] ? v.authors[0] + " " : "") + (v.title ?? item.title))}`;
+  if (workKey) {
+    const [workRes, searchRes] = await Promise.all([
+      fetch(`https://openlibrary.org${workKey}.json`),
+      fetch(
+        `https://openlibrary.org/search.json?q=key:${encodeURIComponent(workKey)}&limit=1&fields=key,title,author_name,first_publish_year,cover_i,subject,number_of_pages_median,ratings_average,ratings_count`,
+      ),
+    ]);
+    const work: any = workRes.ok ? await workRes.json() : null;
+    const doc: any = searchRes.ok ? (await searchRes.json()).docs?.[0] : null;
+    if (work || doc) return buildBookEnrichment(doc, work, item);
+  }
+  return null;
+}
+
+function buildBookEnrichment(doc: any | null, work: any | null, item: any): Enrichment {
+  const title = doc?.title ?? work?.title ?? item.title;
+  const authors: string[] = doc?.author_name ?? [];
+  const facts: Enrichment["facts"] = [];
+  if (authors.length) facts.push({ label: "Author", value: authors.join(", ") });
+  const year = doc?.first_publish_year ?? work?.first_publish_date;
+  if (year) facts.push({ label: "First published", value: String(year).slice(0, 4) });
+  if (doc?.number_of_pages_median) facts.push({ label: "Pages", value: String(doc.number_of_pages_median) });
+  const subjects: string[] = (doc?.subject ?? work?.subjects ?? []).slice(0, 3);
+  if (subjects.length) facts.push({ label: "Subjects", value: subjects.join(", ") });
+
+  const cover = doc?.cover_i
+    ? `https://covers.openlibrary.org/b/id/${doc.cover_i}-L.jpg`
+    : work?.covers?.[0]
+      ? `https://covers.openlibrary.org/b/id/${work.covers[0]}-L.jpg`
+      : null;
+
+  const desc =
+    typeof work?.description === "string"
+      ? work.description
+      : work?.description?.value ?? null;
+
+  const olUrl = doc?.key ? `https://openlibrary.org${doc.key}` : work?.key ? `https://openlibrary.org${work.key}` : null;
+  const goodreadsSearch = `https://www.goodreads.com/search?q=${encodeURIComponent((authors[0] ? authors[0] + " " : "") + title)}`;
+  const links: { label: string; url: string }[] = [{ label: "Search on Goodreads", url: goodreadsSearch }];
+  if (olUrl) links.push({ label: "View on Open Library", url: olUrl });
 
   return {
-    source: "Google Books",
-    source_url: v.infoLink ?? v.canonicalVolumeLink ?? null,
-    description: stripHtml(v.description ?? null),
+    source: "Open Library",
+    source_url: olUrl,
+    description: stripHtml(desc),
     facts,
-    score: v.averageRating
-      ? { value: Number(v.averageRating) * 2, scale: 10, count: v.ratingsCount ?? undefined, label: "Google Books" }
-      : null,
-    image_url: (v.imageLinks?.thumbnail ?? v.imageLinks?.smallThumbnail)?.replace(/^http:/, "https:") ?? null,
+    score:
+      typeof doc?.ratings_average === "number"
+        ? { value: Number(doc.ratings_average) * 2, scale: 10, count: doc.ratings_count ?? undefined, label: "Open Library" }
+        : null,
+    image_url: cover,
     reviews: [],
-    extra_links: [{ label: "Search on Goodreads", url: goodreadsSearch }],
+    extra_links: links,
   };
 }
 
