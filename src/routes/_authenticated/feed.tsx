@@ -8,11 +8,20 @@ import { RecommendationCard, type FeedRow } from "@/components/RecommendationCar
 import { TRexLogo } from "@/components/TRexLogo";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { UserPlus, Mic, Plus, Search, X } from "lucide-react";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { UserPlus, Mic, Plus, Search, X, User } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { searchProfiles } from "@/lib/friends.functions";
 import { searchBooks, searchMovies, searchTv, searchPodcasts, type SearchHit } from "@/lib/search.functions";
 import { searchPlaces, type PlaceHit } from "@/lib/places.functions";
+
+type SearchScope = "all" | "people" | ItemType;
 
 export const Route = createFileRoute("/_authenticated/feed")({
   head: () => ({
