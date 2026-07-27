@@ -1,8 +1,14 @@
 import { Link } from "@tanstack/react-router";
+import { useState } from "react";
+import { useQuery } from "@tanstack/react-query";
 import { CrownRatingDisplay } from "@/components/CrownRating";
 import { LikesComments } from "@/components/LikesComments";
+import { EditRecommendationDialog } from "@/components/EditRecommendationDialog";
 import { categoryMeta, type ItemType } from "@/lib/categories";
+import { supabase } from "@/integrations/supabase/client";
 import { formatDistanceToNow } from "date-fns";
+import { Pencil } from "lucide-react";
+
 
 export type FeedRow = {
   id: string;
