@@ -99,7 +99,12 @@ function MePage() {
         )}
       </section>
 
-      <div className="p-5">
+      <div className="space-y-2 p-5">
+        <Link to="/import-goodreads">
+          <Button variant="outline" className="h-12 w-full gap-2 rounded-full">
+            <BookOpen className="h-4 w-4" /> Import from Goodreads
+          </Button>
+        </Link>
         <Button
           variant="outline"
           onClick={signOut}
