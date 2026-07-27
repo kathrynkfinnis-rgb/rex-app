@@ -39,6 +39,7 @@ function AddPage() {
   const [coords, setCoords] = useState<{ lat: number; lng: number } | null>(null);
   const [picked, setPicked] = useState<AnyHit | null>(null);
   const [manualMode, setManualMode] = useState(false);
+  const [placeSub, setPlaceSub] = useState<PlaceSubcategory | "">("");
 
   const cat = type ? categoryMeta(type) : null;
   const needsSearch = type !== null && type !== "recipe";
