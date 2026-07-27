@@ -18,6 +18,7 @@ import {
   Sparkles,
   Search,
   MapPin,
+  Film,
 } from "lucide-react";
 import mammoth from "mammoth";
 import {
@@ -25,9 +26,11 @@ import {
   fetchSheetCsv,
   fetchGoogleMapsList,
   importGoogleMapsPlaces,
+  importImdbTitles,
   resolveStagingRow,
   approveStagingRow,
 } from "@/lib/import.functions";
+
 
 export const Route = createFileRoute("/_authenticated/import")({
   head: () => ({
@@ -39,7 +42,7 @@ export const Route = createFileRoute("/_authenticated/import")({
   component: ImportPage,
 });
 
-type Tab = "sheet" | "docx" | "paste" | "gmaps";
+type Tab = "sheet" | "docx" | "paste" | "gmaps" | "imdb";
 
 function ImportPage() {
   const navigate = useNavigate();
@@ -54,8 +57,10 @@ function ImportPage() {
   const extract = useServerFn(extractFromText);
   const fetchGmaps = useServerFn(fetchGoogleMapsList);
   const importGmaps = useServerFn(importGoogleMapsPlaces);
+  const importImdb = useServerFn(importImdbTitles);
   const resolve = useServerFn(resolveStagingRow);
   const approve = useServerFn(approveStagingRow);
+
 
   const { data: staging } = useQuery({
     queryKey: ["import-staging"],
@@ -230,6 +235,64 @@ function ImportPage() {
     }
   }
 
+  function imdbTitleType(raw: string): "movie" | "tv" | null {
+    const t = raw.toLowerCase().trim();
+    if (!t) return null;
+    if (t.includes("tv") || t.includes("series") || t.includes("mini")) return "tv";
+    if (t === "movie" || t.includes("movie") || t === "video" || t === "short") return "movie";
+    return null;
+  }
+
+  async function onImdbFile(e: React.ChangeEvent<HTMLInputElement>) {
+    const f = e.target.files?.[0];
+    if (!f) return;
+    setLoading(true);
+    try {
+      const text = await f.text();
+      const lines = text.split(/\r?\n/).filter((l) => l.trim().length > 0);
+      if (lines.length < 2) throw new Error("File looks empty");
+      const header = parseCsvLine(lines[0]).map((h) => h.toLowerCase().replace(/^"|"$/g, "").trim());
+      const idxTitle = header.findIndex((h) => h === "title" || h === "original title" || h === "primary title");
+      const idxType = header.findIndex((h) => h === "title type" || h === "titletype");
+      const idxYear = header.findIndex((h) => h === "year");
+      const idxYourRating = header.findIndex((h) => h === "your rating");
+      if (idxTitle < 0) throw new Error("Couldn't find a Title column — is this the IMDb CSV export?");
+      const titles: {
+        title: string;
+        type: "movie" | "tv";
+        year?: string | null;
+        rating?: number | null;
+      }[] = [];
+      for (let i = 1; i < lines.length; i++) {
+        const cells = parseCsvLine(lines[i]);
+        const title = cells[idxTitle];
+        if (!title) continue;
+        const type = imdbTitleType(idxType >= 0 ? cells[idxType] ?? "" : "movie") ?? "movie";
+        const year = idxYear >= 0 ? cells[idxYear] || null : null;
+        const ratingStr = idxYourRating >= 0 ? cells[idxYourRating] : "";
+        const ratingNum = ratingStr ? Number(ratingStr) : NaN;
+        titles.push({
+          title: title.replace(/^"|"$/g, ""),
+          type,
+          year,
+          rating: Number.isFinite(ratingNum) && ratingNum > 0 ? ratingNum : null,
+        });
+      }
+      if (!titles.length) throw new Error("No titles found in that file");
+      const { inserted } = await importImdb({
+        data: { source: `imdb:${f.name}`, titles: titles.slice(0, 1000) },
+      });
+      toast.success(`Imported ${inserted} title${inserted === 1 ? "" : "s"} — review below`);
+      qc.invalidateQueries({ queryKey: ["import-staging"] });
+    } catch (err: any) {
+      toast.error(err.message ?? "Couldn't read that file");
+    } finally {
+      setLoading(false);
+    }
+  }
+
+
+
   async function onResolve(id: string) {
     try {
       const { matched } = await resolve({ data: { id } });
@@ -258,6 +321,7 @@ function ImportPage() {
   const TABS: { id: Tab; label: string; icon: typeof FileSpreadsheet }[] = [
     { id: "sheet", label: "Sheet", icon: FileSpreadsheet },
     { id: "gmaps", label: "Maps", icon: MapPin },
+    { id: "imdb", label: "IMDb", icon: Film },
     { id: "docx", label: ".docx", icon: FileText },
     { id: "paste", label: "Paste", icon: Sparkles },
   ];
@@ -278,7 +342,8 @@ function ImportPage() {
       </header>
 
       <div className="space-y-5 p-5">
-        <div className="grid grid-cols-4 gap-2 rounded-full bg-muted p-1">
+        <div className="grid grid-cols-5 gap-2 rounded-full bg-muted p-1">
+
           {TABS.map((t) => (
             <button
               key={t.id}
@@ -370,6 +435,43 @@ function ImportPage() {
             </p>
           </div>
         )}
+
+        {tab === "imdb" && (
+          <div className="space-y-4">
+            <label className="flex cursor-pointer flex-col items-center justify-center gap-3 rounded-2xl border-2 border-dashed border-border bg-card p-6 text-center transition-colors hover:bg-muted/40">
+              {loading ? (
+                <Loader2 className="h-8 w-8 animate-spin text-primary" />
+              ) : (
+                <Upload className="h-8 w-8 text-muted-foreground" />
+              )}
+              <div className="font-medium">Upload your IMDb ratings CSV</div>
+              <div className="text-xs text-muted-foreground">
+                Export from{" "}
+                <a
+                  href="https://www.imdb.com/list/ratings"
+                  target="_blank"
+                  rel="noreferrer"
+                  className="underline"
+                >
+                  IMDb → Your Ratings
+                </a>{" "}
+                (or any IMDb list) — click <em>Export</em>, then upload the CSV here.
+              </div>
+              <input
+                type="file"
+                accept=".csv,text/csv"
+                className="hidden"
+                onChange={onImdbFile}
+                disabled={loading}
+              />
+            </label>
+            <p className="text-xs text-muted-foreground">
+              Movies and TV shows are auto-detected from the <em>Title Type</em> column, and your 1–10 IMDb rating carries straight over as crowns. Everything drops into the review queue — hit <em>Match</em> to pull in poster art and details before adding.
+            </p>
+          </div>
+        )}
+
+
 
         {tab === "docx" && (
           <label className="flex cursor-pointer flex-col items-center justify-center gap-3 rounded-2xl border-2 border-dashed border-border bg-card p-8 text-center transition-colors hover:bg-muted/40">
