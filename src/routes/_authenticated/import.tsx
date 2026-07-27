@@ -256,9 +256,10 @@ function ImportPage() {
   }
 
   const TABS: { id: Tab; label: string; icon: typeof FileSpreadsheet }[] = [
-    { id: "sheet", label: "Google Sheet", icon: FileSpreadsheet },
-    { id: "docx", label: "Word / .docx", icon: FileText },
-    { id: "paste", label: "Paste text", icon: Sparkles },
+    { id: "sheet", label: "Sheet", icon: FileSpreadsheet },
+    { id: "gmaps", label: "Maps", icon: MapPin },
+    { id: "docx", label: ".docx", icon: FileText },
+    { id: "paste", label: "Paste", icon: Sparkles },
   ];
 
   return (
