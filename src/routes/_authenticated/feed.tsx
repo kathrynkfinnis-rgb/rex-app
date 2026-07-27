@@ -103,7 +103,13 @@ function FeedPage() {
           <Input
             value={rawQuery}
             onChange={(e) => setRawQuery(e.target.value)}
-            placeholder="Search recs, people, books, films, places…"
+            placeholder={
+              searchScope === "people"
+                ? "Search people…"
+                : searchScope === "all"
+                  ? "Search recs, people, books, films, places…"
+                  : `Search ${categoryMeta(searchScope).plural.toLowerCase()}…`
+            }
             aria-label="Search"
             className="h-11 rounded-full border-border bg-card pl-9 pr-9"
           />
@@ -118,6 +124,20 @@ function FeedPage() {
             </button>
           )}
         </div>
+        {searching && (
+          <div className="scrollbar-none mt-2 flex gap-2 overflow-x-auto -mx-5 px-5">
+            <ScopeChip active={searchScope === "all"} onClick={() => setSearchScope("all")}>All</ScopeChip>
+            <ScopeChip active={searchScope === "people"} onClick={() => setSearchScope("people")}>
+              <User className="h-3.5 w-3.5" /> People
+            </ScopeChip>
+            {CATEGORIES.map((c) => (
+              <ScopeChip key={c.type} active={searchScope === c.type} onClick={() => setSearchScope(c.type)}>
+                <c.icon className="h-3.5 w-3.5" />
+                {c.plural}
+              </ScopeChip>
+            ))}
+          </div>
+        )}
         {!searching && (
           <div className="scrollbar-none mt-3 flex gap-2 overflow-x-auto -mx-5 px-5">
             <Chip active={filter === "all"} onClick={() => setFilter("all")}>All</Chip>
@@ -142,7 +162,7 @@ function FeedPage() {
       </header>
 
       {searching ? (
-        <SearchResults query={query} feed={data ?? []} />
+        <SearchResults query={query} feed={data ?? []} scope={searchScope} />
       ) : (
         <div className="space-y-3 px-4 py-4">
           {isLoading && (
