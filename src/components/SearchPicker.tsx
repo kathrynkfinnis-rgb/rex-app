@@ -2,7 +2,8 @@ import { useEffect, useState } from "react";
 import { useServerFn } from "@tanstack/react-start";
 import { Input } from "@/components/ui/input";
 import { Search, Loader2, Pencil } from "lucide-react";
-import { searchBooks, searchMovies, searchTv, type SearchHit } from "@/lib/search.functions";
+import { searchMovies, searchTv, type SearchHit } from "@/lib/search.functions";
+import { searchBooksClient } from "@/lib/search-client";
 import type { ItemType } from "@/lib/categories";
 
 type Props = {
@@ -15,7 +16,6 @@ export function SearchPicker({ type, onPick, onManual }: Props) {
   const [q, setQ] = useState("");
   const [results, setResults] = useState<SearchHit[]>([]);
   const [loading, setLoading] = useState(false);
-  const bookFn = useServerFn(searchBooks);
   const movieFn = useServerFn(searchMovies);
   const tvFn = useServerFn(searchTv);
 
@@ -28,8 +28,12 @@ export function SearchPicker({ type, onPick, onManual }: Props) {
     setLoading(true);
     const t = setTimeout(async () => {
       try {
-        const fn = type === "book" ? bookFn : type === "movie" ? movieFn : tvFn;
-        const hits = await fn({ data: { q: term } });
+        const hits =
+          type === "book"
+            ? await searchBooksClient(term)
+            : type === "movie"
+              ? await movieFn({ data: { q: term } })
+              : await tvFn({ data: { q: term } });
         setResults(hits);
       } catch {
         setResults([]);
@@ -38,7 +42,7 @@ export function SearchPicker({ type, onPick, onManual }: Props) {
       }
     }, 300);
     return () => clearTimeout(t);
-  }, [q, type, bookFn, movieFn, tvFn]);
+  }, [q, type, movieFn, tvFn]);
 
   const placeholder =
     type === "book" ? "Search books (title or author)…" :
