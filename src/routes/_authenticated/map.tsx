@@ -6,7 +6,7 @@ import { MapPin, Compass } from "lucide-react";
 export const Route = createFileRoute("/_authenticated/map")({
   head: () => ({
     meta: [
-      { title: "Map — T. Rex" },
+      { title: "Map — REX" },
       { name: "description", content: "Places your friends recommend, on a map." },
     ],
   }),

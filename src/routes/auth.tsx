@@ -19,8 +19,8 @@ export const Route = createFileRoute("/auth")({
   validateSearch: searchSchema,
   head: () => ({
     meta: [
-      { title: "Sign in — T. Rex" },
-      { name: "description", content: "Sign in or create your T. Rex account." },
+      { title: "Sign in — REX" },
+      { name: "description", content: "Sign in or create your REX account." },
     ],
   }),
   component: AuthPage,
@@ -97,7 +97,7 @@ function AuthPage() {
           <ArrowLeft className="h-4 w-4" /> Back
         </Link>
         <div className="mt-6 flex items-center gap-2 text-sm font-semibold uppercase tracking-widest text-primary">
-          <TRexLogo className="h-5 w-5" /> T. Rex
+          <TRexLogo className="h-5 w-5" /> REX
         </div>
         <h1 className="mt-4 font-display text-4xl leading-tight">
           {mode === "signup" ? "Start recommending" : "Welcome back"}

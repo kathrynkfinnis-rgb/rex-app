@@ -1,7 +1,7 @@
 import { cn } from "@/lib/utils";
 
 /**
- * T. Rex silhouette wearing a small crown — brand mark for the app.
+ * REX silhouette wearing a small crown — brand mark for the app.
  * Uses currentColor so it inherits from text-* utilities.
  */
 export function TRexLogo({ className }: { className?: string }) {

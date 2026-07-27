@@ -10,7 +10,7 @@ import { cn } from "@/lib/utils";
 export const Route = createFileRoute("/_authenticated/feed")({
   head: () => ({
     meta: [
-      { title: "Your feed — T. Rex" },
+      { title: "Your feed — REX" },
       { name: "description", content: "The latest recommendations from your friends." },
     ],
   }),
@@ -41,7 +41,7 @@ function FeedPage() {
         <div className="flex items-center justify-between">
           <div>
             <div className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-widest text-primary">
-              <TRexLogo className="h-4 w-4" /> T. Rex
+              <TRexLogo className="h-4 w-4" /> REX
             </div>
             <h1 className="mt-0.5 font-display text-3xl">Your feed</h1>
           </div>
