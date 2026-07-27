@@ -18,6 +18,7 @@ export type FeedRow = {
     title: string;
     subtitle: string | null;
     image_url: string | null;
+    genre: string | null;
   } | null;
   profiles: {
     username: string;
