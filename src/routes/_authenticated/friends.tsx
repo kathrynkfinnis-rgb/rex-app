@@ -88,13 +88,11 @@ function FriendsPage() {
   async function doSearch() {
     if (!search.trim()) return;
     setSearching(true);
-    const { data } = await supabase
-      .from("profiles")
-      .select("id, username, display_name")
-      .ilike("username", `%${search.trim().toLowerCase()}%`)
-      .neq("id", uid ?? "")
-      .limit(10);
-    setSearchResults(data ?? []);
+    const { data } = await supabase.rpc("search_profiles", {
+      _query: search.trim(),
+      _limit: 10,
+    });
+    setSearchResults((data ?? []) as any[]);
     setSearching(false);
   }
 
