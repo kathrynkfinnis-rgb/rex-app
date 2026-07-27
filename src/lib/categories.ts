@@ -1,6 +1,6 @@
-import { MapPin, Book, Film, Tv, ChefHat } from "lucide-react";
+import { MapPin, Book, Film, Tv, ChefHat, Mic } from "lucide-react";
 
-export type ItemType = "place" | "book" | "movie" | "tv" | "recipe";
+export type ItemType = "place" | "book" | "movie" | "tv" | "recipe" | "podcast";
 
 export const CATEGORIES: {
   type: ItemType;
@@ -15,6 +15,7 @@ export const CATEGORIES: {
   { type: "book", label: "Book", plural: "Books", icon: Book, tokenClass: "bg-cat-book/15 text-cat-book", subtitleLabel: "Author", actionVerb: "Read it" },
   { type: "movie", label: "Movie", plural: "Movies", icon: Film, tokenClass: "bg-cat-movie/15 text-cat-movie", subtitleLabel: "Year or director", actionVerb: "Seen it" },
   { type: "tv", label: "TV", plural: "TV shows", icon: Tv, tokenClass: "bg-cat-tv/15 text-cat-tv", subtitleLabel: "Network or year", actionVerb: "Watched it" },
+  { type: "podcast", label: "Podcast", plural: "Podcasts", icon: Mic, tokenClass: "bg-cat-podcast/15 text-cat-podcast", subtitleLabel: "Host or network", actionVerb: "Listened" },
   { type: "recipe", label: "Recipe", plural: "Recipes", icon: ChefHat, tokenClass: "bg-cat-recipe/15 text-cat-recipe", subtitleLabel: "Cookbook, chef, or source", actionVerb: "Cooked it" },
 ];
 
