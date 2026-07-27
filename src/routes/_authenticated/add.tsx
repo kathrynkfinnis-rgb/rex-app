@@ -121,7 +121,7 @@ function AddPage() {
             address: type === "place" ? address.trim() || null : null,
             lat: type === "place" ? coords?.lat ?? null : null,
             lng: type === "place" ? coords?.lng ?? null : null,
-            genre: picked?.genre ?? null,
+            genre: type === "place" ? (placeSub || null) : (picked?.genre ?? null),
           })
           .select("id")
           .single();
