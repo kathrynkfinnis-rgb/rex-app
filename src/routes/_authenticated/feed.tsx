@@ -26,6 +26,7 @@ export const Route = createFileRoute("/_authenticated/feed")({
 
 function FeedPage() {
   const [filter, setFilter] = useState<ItemType | "all">("all");
+  const [subFilter, setSubFilter] = useState<string | "all">("all");
   const [rawQuery, setRawQuery] = useState("");
   const [query, setQuery] = useState("");
 
@@ -34,6 +35,11 @@ function FeedPage() {
     const t = setTimeout(() => setQuery(rawQuery.trim()), 250);
     return () => clearTimeout(t);
   }, [rawQuery]);
+
+  // reset subcategory when the top-level category changes
+  useEffect(() => {
+    setSubFilter("all");
+  }, [filter]);
 
   const searching = query.length >= 2;
 
@@ -51,6 +57,25 @@ function FeedPage() {
       return (data ?? []) as unknown as FeedRow[];
     },
   });
+
+  // Build the subcategory list from the current category's rows
+  const subcategories = useMemo(() => {
+    if (filter === "all" || !data) return [] as string[];
+    const set = new Set<string>();
+    for (const r of data) {
+      const g = r.items?.genre?.trim();
+      if (g) set.add(g);
+    }
+    return Array.from(set).sort((a, b) => a.localeCompare(b));
+  }, [data, filter]);
+
+  const visible = useMemo(() => {
+    if (!data) return [];
+    if (subFilter === "all") return data;
+    const s = subFilter.toLowerCase();
+    return data.filter((r) => (r.items?.genre ?? "").toLowerCase() === s);
+  }, [data, subFilter]);
+
 
   return (
     <div className="min-h-screen">
