@@ -43,19 +43,41 @@ export function RecommendationCard({ rec }: { rec: FeedRow }) {
   const item = rec.items;
   const author = rec.profiles;
   const creator = rec.creators;
+  const [editing, setEditing] = useState(false);
+  const { data: currentUserId } = useQuery({
+    queryKey: ["current-user-id"],
+    queryFn: async () => (await supabase.auth.getUser()).data.user?.id ?? null,
+    staleTime: 5 * 60 * 1000,
+  });
   if (!item) return null;
   const cat = categoryMeta(item.type);
   const Icon = cat.icon;
+  const isOwner = currentUserId && currentUserId === rec.user_id;
   return (
     <article
-      className="overflow-hidden rounded-2xl bg-card shadow-sm ring-1 ring-border"
+      className="relative overflow-hidden rounded-2xl bg-card shadow-sm ring-1 ring-border"
       style={creator ? { borderLeft: `4px solid ${creator.color}` } : undefined}
     >
+      {isOwner && (
+        <button
+          type="button"
+          onClick={(e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            setEditing(true);
+          }}
+          className="absolute right-2 top-2 z-10 flex h-8 w-8 items-center justify-center rounded-full bg-background/80 text-muted-foreground shadow-sm ring-1 ring-border backdrop-blur hover:text-foreground"
+          aria-label="Edit post"
+        >
+          <Pencil className="h-4 w-4" />
+        </button>
+      )}
       <Link
         to="/item/$id"
         params={{ id: item.id }}
         className="block transition-shadow hover:shadow-md"
       >
+
         <div className="flex gap-4 p-4">
           <div className="flex h-20 w-20 shrink-0 items-center justify-center overflow-hidden rounded-xl bg-muted">
             {item.image_url ? (
