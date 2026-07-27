@@ -53,6 +53,33 @@ export type Database = {
           },
         ]
       }
+      creators: {
+        Row: {
+          color: string
+          created_at: string
+          emoji: string | null
+          id: string
+          name: string
+          slug: string
+        }
+        Insert: {
+          color: string
+          created_at?: string
+          emoji?: string | null
+          id?: string
+          name: string
+          slug: string
+        }
+        Update: {
+          color?: string
+          created_at?: string
+          emoji?: string | null
+          id?: string
+          name?: string
+          slug?: string
+        }
+        Relationships: []
+      }
       friendships: {
         Row: {
           addressee_id: string
@@ -233,6 +260,7 @@ export type Database = {
       recommendations: {
         Row: {
           created_at: string
+          creator_id: string | null
           id: string
           item_id: string
           note: string | null
@@ -243,6 +271,7 @@ export type Database = {
         }
         Insert: {
           created_at?: string
+          creator_id?: string | null
           id?: string
           item_id: string
           note?: string | null
@@ -253,6 +282,7 @@ export type Database = {
         }
         Update: {
           created_at?: string
+          creator_id?: string | null
           id?: string
           item_id?: string
           note?: string | null
@@ -262,6 +292,13 @@ export type Database = {
           user_id?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "recommendations_creator_id_fkey"
+            columns: ["creator_id"]
+            isOneToOne: false
+            referencedRelation: "creators"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "recommendations_item_id_fkey"
             columns: ["item_id"]
