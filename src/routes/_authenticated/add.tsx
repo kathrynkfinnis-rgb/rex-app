@@ -40,13 +40,30 @@ function AddPage() {
   const [manualMode, setManualMode] = useState(false);
 
   const cat = type ? categoryMeta(type) : null;
-  const needsSearch = type === "book" || type === "movie" || type === "tv";
+  const needsSearch = type !== null;
   const showForm = !needsSearch || picked || manualMode;
+  const photoFn = useServerFn(getPlacePhotoUrl);
 
-  function handlePick(hit: SearchHit) {
-    setPicked(hit);
+  async function handlePick(hit: AnyHit) {
+    setPicked(hit as SearchHit);
     setTitle(hit.title);
     setSubtitle(hit.subtitle ?? "");
+    if (hit.external_source === "google_places") {
+      if (hit.address) setAddress(hit.address);
+      if (typeof hit.lat === "number" && typeof hit.lng === "number") {
+        setCoords({ lat: hit.lat, lng: hit.lng });
+      }
+      if (hit.photo_name) {
+        try {
+          const url = await photoFn({ data: { photoName: hit.photo_name, maxWidth: 800 } });
+          if (url) {
+            setPicked((prev) => (prev ? ({ ...prev, image_url: url } as SearchHit) : prev));
+          }
+        } catch {
+          // photo is optional — ignore
+        }
+      }
+    }
   }
 
   function useMyLocation() {
