@@ -42,12 +42,14 @@ export const searchBooks = createServerFn({ method: "GET" })
     return items.map((it) => {
       const v = it.volumeInfo ?? {};
       const img: string | undefined = v.imageLinks?.thumbnail ?? v.imageLinks?.smallThumbnail;
+      const cats: string[] = Array.isArray(v.categories) ? v.categories : [];
       return {
         external_id: it.id,
         external_source: "google_books" as const,
         title: v.title ?? "Untitled",
         subtitle: (v.authors ?? []).join(", ") || null,
         image_url: img ? img.replace(/^http:/, "https:") : null,
+        genre: cats[0] ? cats[0].split("/")[0].trim() : null,
       };
     });
   });
