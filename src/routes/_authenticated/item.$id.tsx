@@ -8,6 +8,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { toast } from "sonner";
 import { ArrowLeft, MapPin, Check } from "lucide-react";
 import { CrownRatingDisplay, CrownRatingInput } from "@/components/CrownRating";
+import { ItemEnrichment } from "@/components/ItemEnrichment";
 import { cn } from "@/lib/utils";
 import { formatDistanceToNow } from "date-fns";
 
@@ -164,6 +165,8 @@ function ItemPage() {
           {posting ? "Saving…" : myRec ? "Update" : "Post"}
         </Button>
       </section>
+
+      <ItemEnrichment itemId={id} />
 
       <section className="border-t border-border p-5">
         <h2 className="font-display text-2xl">What friends say</h2>
