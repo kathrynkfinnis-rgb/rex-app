@@ -1,4 +1,4 @@
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, Link } from "@tanstack/react-router";
 import { useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
@@ -300,18 +300,24 @@ function FriendsPage() {
         ) : (
           accepted.map((f: any) => {
             const other = f.requester_id === uid ? f.addressee : f.requester;
+            if (!other?.username) return null;
             return (
-              <div key={f.id} className="flex items-center justify-between rounded-2xl bg-card p-3 ring-1 ring-border">
+              <Link
+                key={f.id}
+                to="/profile/$username"
+                params={{ username: other.username }}
+                className="flex items-center justify-between rounded-2xl bg-card p-3 ring-1 ring-border transition-colors hover:bg-muted/60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+              >
                 <div className="flex items-center gap-3">
                   <div className="flex h-9 w-9 items-center justify-center rounded-full bg-secondary text-sm font-semibold">
-                    {(other?.display_name || other?.username || "?").slice(0, 1).toUpperCase()}
+                    {(other.display_name || other.username || "?").slice(0, 1).toUpperCase()}
                   </div>
                   <div>
-                    <p className="font-medium">{other?.display_name || other?.username}</p>
-                    <p className="text-xs text-muted-foreground">@{other?.username}</p>
+                    <p className="font-medium">{other.display_name || other.username}</p>
+                    <p className="text-xs text-muted-foreground">@{other.username}</p>
                   </div>
                 </div>
-              </div>
+              </Link>
             );
           })
         )}
