@@ -216,14 +216,13 @@ export const resolveStagingRow = createServerFn({ method: "POST" })
       hit = await searchPlaces(q);
     }
 
-    const patch: Record<string, unknown> = {
+    await context.supabase.from("import_staging").update({
       resolved_external_id: hit?.external_id ?? null,
       resolved_external_source: hit?.external_source ?? null,
       resolved_image_url: hit?.image_url ?? null,
       resolved_subtitle: hit?.subtitle ?? row.raw_creator ?? null,
       resolved_genre: hit?.genre ?? null,
-    };
-    await context.supabase.from("import_staging").update(patch).eq("id", row.id);
+    }).eq("id", row.id);
     return { matched: !!hit, hit };
   });
 
