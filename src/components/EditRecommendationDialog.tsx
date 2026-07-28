@@ -45,6 +45,23 @@ export function EditRecommendationDialog({
   const isPlace = item?.type === "place";
   const isRecipe = item?.type === "recipe";
 
+  useEffect(() => {
+    if (!open || !isRecipe || !item?.id) return;
+    if (item.recipe_text != null) return;
+    let cancelled = false;
+    (async () => {
+      const { data } = await supabase
+        .from("items")
+        .select("recipe_text" as never)
+        .eq("id", item.id)
+        .maybeSingle();
+      if (!cancelled && data && (data as any).recipe_text != null) {
+        setRecipeText((data as any).recipe_text ?? "");
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [open, isRecipe, item?.id, item?.recipe_text]);
+
   const save = useMutation({
     mutationFn: async () => {
       const { error } = await supabase
