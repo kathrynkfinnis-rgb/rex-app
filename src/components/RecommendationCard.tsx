@@ -147,7 +147,7 @@ export function RecommendationCard({ rec }: { rec: FeedRow }) {
         open={editing}
         onOpenChange={setEditing}
         recommendation={{ id: rec.id, rating: rec.rating, note: rec.note }}
-        item={{ id: item.id, type: item.type, genre: item.genre }}
+        item={{ id: item.id, type: item.type, genre: item.genre, recipe_text: (item as any).recipe_text ?? null }}
       />
     )}
     </>
