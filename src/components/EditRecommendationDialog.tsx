@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
@@ -30,7 +30,7 @@ export function EditRecommendationDialog({
   open: boolean;
   onOpenChange: (v: boolean) => void;
   recommendation: { id: string; rating: number; note: string | null };
-  item?: { id: string; type: ItemType; genre: string | null } | null;
+  item?: { id: string; type: ItemType; genre: string | null; recipe_text?: string | null } | null;
 }) {
   const qc = useQueryClient();
   const [rating, setRating] = useState(recommendation.rating);
@@ -40,8 +40,27 @@ export function EditRecommendationDialog({
       ? (item!.genre as PlaceSubcategory)
       : ""),
   );
+  const [recipeText, setRecipeText] = useState(item?.recipe_text ?? "");
   const [confirmDelete, setConfirmDelete] = useState(false);
   const isPlace = item?.type === "place";
+  const isRecipe = item?.type === "recipe";
+
+  useEffect(() => {
+    if (!open || !isRecipe || !item?.id) return;
+    if (item.recipe_text != null) return;
+    let cancelled = false;
+    (async () => {
+      const { data } = await supabase
+        .from("items")
+        .select("recipe_text" as never)
+        .eq("id", item.id)
+        .maybeSingle();
+      if (!cancelled && data && (data as any).recipe_text != null) {
+        setRecipeText((data as any).recipe_text ?? "");
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [open, isRecipe, item?.id, item?.recipe_text]);
 
   const save = useMutation({
     mutationFn: async () => {
@@ -56,6 +75,16 @@ export function EditRecommendationDialog({
           const { error: itemErr } = await supabase
             .from("items")
             .update({ genre: nextGenre })
+            .eq("id", item.id);
+          if (itemErr) throw itemErr;
+        }
+      }
+      if (isRecipe && item) {
+        const nextRecipe = recipeText.trim() ? recipeText : null;
+        if ((item.recipe_text ?? null) !== nextRecipe) {
+          const { error: itemErr } = await supabase
+            .from("items")
+            .update({ recipe_text: nextRecipe } as never)
             .eq("id", item.id);
           if (itemErr) throw itemErr;
         }
@@ -123,6 +152,22 @@ export function EditRecommendationDialog({
                 </div>
                 <p className="text-xs text-muted-foreground">
                   Changing this updates the place for everyone who saved it.
+                </p>
+              </div>
+            )}
+            {isRecipe && (
+              <div className="space-y-1.5">
+                <Label htmlFor="recipe">Recipe</Label>
+                <Textarea
+                  id="recipe"
+                  value={recipeText}
+                  onChange={(e) => setRecipeText(e.target.value)}
+                  rows={10}
+                  placeholder={"Paste the full recipe here — ingredients, steps, tips…"}
+                  className="font-mono text-sm"
+                />
+                <p className="text-xs text-muted-foreground">
+                  Saved on the recipe so everyone who opens it can read it.
                 </p>
               </div>
             )}

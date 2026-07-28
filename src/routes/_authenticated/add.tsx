@@ -33,6 +33,7 @@ function AddPage() {
   const [subtitle, setSubtitle] = useState("");
   const [address, setAddress] = useState("");
   const [note, setNote] = useState("");
+  const [recipeText, setRecipeText] = useState("");
   const [rating, setRating] = useState(10);
   const [saving, setSaving] = useState(false);
   const [locating, setLocating] = useState(false);
@@ -122,7 +123,8 @@ function AddPage() {
             lat: type === "place" ? coords?.lat ?? null : null,
             lng: type === "place" ? coords?.lng ?? null : null,
             genre: type === "place" ? (placeSub || null) : (picked?.genre ?? null),
-          })
+            ...(type === "recipe" && recipeText.trim() ? { recipe_text: recipeText } : {}),
+          } as never)
           .select("id")
           .single();
         if (itemErr) throw itemErr;
@@ -313,6 +315,23 @@ function AddPage() {
               </Button>
             </div>
           </>
+        )}
+
+        {type === "recipe" && (
+          <div className="space-y-1.5">
+            <Label htmlFor="recipe">Recipe</Label>
+            <Textarea
+              id="recipe"
+              value={recipeText}
+              onChange={(e) => setRecipeText(e.target.value)}
+              rows={10}
+              placeholder={"Paste the full recipe here — ingredients, method, tips…"}
+              className="rounded-xl font-mono text-sm"
+            />
+            <p className="text-xs text-muted-foreground">
+              This is saved on the recipe so friends can read it in-app.
+            </p>
+          </div>
         )}
 
         <div className="space-y-2">
