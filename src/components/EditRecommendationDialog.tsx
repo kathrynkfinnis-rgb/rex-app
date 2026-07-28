@@ -30,7 +30,7 @@ export function EditRecommendationDialog({
   open: boolean;
   onOpenChange: (v: boolean) => void;
   recommendation: { id: string; rating: number; note: string | null };
-  item?: { id: string; type: ItemType; genre: string | null } | null;
+  item?: { id: string; type: ItemType; genre: string | null; recipe_text?: string | null } | null;
 }) {
   const qc = useQueryClient();
   const [rating, setRating] = useState(recommendation.rating);
@@ -40,8 +40,10 @@ export function EditRecommendationDialog({
       ? (item!.genre as PlaceSubcategory)
       : ""),
   );
+  const [recipeText, setRecipeText] = useState(item?.recipe_text ?? "");
   const [confirmDelete, setConfirmDelete] = useState(false);
   const isPlace = item?.type === "place";
+  const isRecipe = item?.type === "recipe";
 
   const save = useMutation({
     mutationFn: async () => {
@@ -56,6 +58,16 @@ export function EditRecommendationDialog({
           const { error: itemErr } = await supabase
             .from("items")
             .update({ genre: nextGenre })
+            .eq("id", item.id);
+          if (itemErr) throw itemErr;
+        }
+      }
+      if (isRecipe && item) {
+        const nextRecipe = recipeText.trim() ? recipeText : null;
+        if ((item.recipe_text ?? null) !== nextRecipe) {
+          const { error: itemErr } = await supabase
+            .from("items")
+            .update({ recipe_text: nextRecipe } as never)
             .eq("id", item.id);
           if (itemErr) throw itemErr;
         }
