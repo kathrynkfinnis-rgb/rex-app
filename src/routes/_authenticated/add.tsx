@@ -33,6 +33,7 @@ function AddPage() {
   const [subtitle, setSubtitle] = useState("");
   const [address, setAddress] = useState("");
   const [note, setNote] = useState("");
+  const [recipeText, setRecipeText] = useState("");
   const [rating, setRating] = useState(10);
   const [saving, setSaving] = useState(false);
   const [locating, setLocating] = useState(false);
