@@ -215,6 +215,7 @@ export type Database = {
           image_url: string | null
           lat: number | null
           lng: number | null
+          recipe_text: string | null
           subtitle: string | null
           title: string
           type: Database["public"]["Enums"]["item_type"]
@@ -229,6 +230,7 @@ export type Database = {
           image_url?: string | null
           lat?: number | null
           lng?: number | null
+          recipe_text?: string | null
           subtitle?: string | null
           title: string
           type: Database["public"]["Enums"]["item_type"]
@@ -243,6 +245,7 @@ export type Database = {
           image_url?: string | null
           lat?: number | null
           lng?: number | null
+          recipe_text?: string | null
           subtitle?: string | null
           title?: string
           type?: Database["public"]["Enums"]["item_type"]
