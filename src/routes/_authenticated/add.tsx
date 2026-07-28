@@ -123,7 +123,8 @@ function AddPage() {
             lat: type === "place" ? coords?.lat ?? null : null,
             lng: type === "place" ? coords?.lng ?? null : null,
             genre: type === "place" ? (placeSub || null) : (picked?.genre ?? null),
-          })
+            ...(type === "recipe" && recipeText.trim() ? { recipe_text: recipeText } : {}),
+          } as never)
           .select("id")
           .single();
         if (itemErr) throw itemErr;
