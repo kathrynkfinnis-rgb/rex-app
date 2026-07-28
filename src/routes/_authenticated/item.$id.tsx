@@ -151,6 +151,16 @@ function ItemPage() {
         </Button>
       </header>
 
+      {item.type === "recipe" && (item as any).recipe_text && (
+        <section className="border-b border-border p-5">
+          <h2 className="font-display text-2xl">Recipe</h2>
+          <pre className="mt-3 whitespace-pre-wrap rounded-2xl bg-card p-4 font-sans text-sm leading-relaxed ring-1 ring-border">
+            {(item as any).recipe_text}
+          </pre>
+        </section>
+      )}
+
+
       <section className="p-5">
         <h2 className="font-display text-2xl">{myRec ? "Update your take" : "Your take"}</h2>
         <div className="mt-3">
