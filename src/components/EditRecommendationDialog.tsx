@@ -194,6 +194,11 @@ export function EditRecommendationDialog({
               />
             </div>
 
+            <div className="space-y-1.5">
+              <Label>Tags</Label>
+              <TagsInput value={tags} onChange={setTags} placeholder="e.g. private dining, date night" />
+            </div>
+
             {uid && (
               <div className="space-y-1.5">
                 <Label>Photos</Label>
