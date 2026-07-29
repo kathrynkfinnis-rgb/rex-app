@@ -28,7 +28,7 @@ export const Route = createFileRoute("/_authenticated/feed")({
 });
 
 function FeedPage() {
-  const [filter, setFilter] = useState<ItemType | "all">("all");
+  const [filter, setFilter] = useState<ItemType | "all" | "asks">("all");
   const [subFilter, setSubFilter] = useState<string | "all">("all");
   const [rawQuery, setRawQuery] = useState("");
   const [query, setQuery] = useState("");
@@ -55,16 +55,31 @@ function FeedPage() {
         .select("id, rating, note, created_at, photo_url, user_id, item_id, items!inner(id, type, title, subtitle, image_url, genre), profiles!recommendations_user_id_fkey(username, display_name, avatar_url), creators(slug, name, color, emoji)")
         .order("created_at", { ascending: false })
         .limit(50);
-      if (filter !== "all") q = q.eq("items.type", filter);
+      if (filter !== "all" && filter !== "asks") q = q.eq("items.type", filter);
       const { data, error } = await q;
       if (error) throw error;
       return (data ?? []) as unknown as FeedRow[];
     },
   });
 
+  const { data: requests } = useQuery({
+    queryKey: ["feed-requests", filter],
+    queryFn: async () => {
+      let q = supabase
+        .from("requests")
+        .select("id, user_id, type, title, note, created_at, profiles!requests_user_id_profiles_fkey(username, display_name, avatar_url)")
+        .order("created_at", { ascending: false })
+        .limit(30);
+      if (filter !== "all" && filter !== "asks") q = q.eq("type", filter);
+      const { data, error } = await q;
+      if (error) throw error;
+      return (data ?? []) as unknown as RequestRow[];
+    },
+  });
+
   // Build the subcategory list from the current category's rows
   const subcategories = useMemo(() => {
-    if (filter === "all" || !data) return [] as string[];
+    if (filter === "all" || filter === "asks" || !data) return [] as string[];
     const set = new Set<string>();
     for (const r of data) {
       const g = r.items?.genre?.trim();
@@ -73,12 +88,19 @@ function FeedPage() {
     return Array.from(set).sort((a, b) => a.localeCompare(b));
   }, [data, filter]);
 
-  const visible = useMemo(() => {
-    if (!data) return [];
-    if (subFilter === "all") return data;
-    const s = subFilter.toLowerCase();
-    return data.filter((r) => (r.items?.genre ?? "").toLowerCase() === s);
-  }, [data, subFilter]);
+  type FeedEntry = { kind: "rec"; row: FeedRow; created_at: string } | { kind: "req"; row: RequestRow; created_at: string };
+  const visible = useMemo<FeedEntry[]>(() => {
+    if (filter === "asks") {
+      return (requests ?? []).map((r) => ({ kind: "req" as const, row: r, created_at: r.created_at }));
+    }
+    const recs = (data ?? [])
+      .filter((r) => subFilter === "all" || (r.items?.genre ?? "").toLowerCase() === subFilter.toLowerCase())
+      .map((r) => ({ kind: "rec" as const, row: r, created_at: r.created_at }));
+    const reqs = subFilter === "all"
+      ? (requests ?? []).map((r) => ({ kind: "req" as const, row: r, created_at: r.created_at }))
+      : [];
+    return [...recs, ...reqs].sort((a, b) => (a.created_at < b.created_at ? 1 : -1));
+  }, [data, requests, filter, subFilter]);
 
 
   return (
