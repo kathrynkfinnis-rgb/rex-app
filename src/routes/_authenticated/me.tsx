@@ -4,7 +4,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { RecommendationCard, type FeedRow } from "@/components/RecommendationCard";
 import { toast } from "sonner";
-import { LogOut, Smartphone, BookOpen, FileUp, Bookmark } from "lucide-react";
+import { LogOut, Smartphone, BookOpen, FileUp, Bookmark, BookmarkCheck } from "lucide-react";
 import { AvatarUploader } from "@/components/AvatarUploader";
 import { categoryMeta, type ItemType } from "@/lib/categories";
 import { cn } from "@/lib/utils";
@@ -160,6 +160,19 @@ function MePage() {
           </div>
         ) : (
           <p className="text-sm text-muted-foreground">Nothing saved yet — tap "Want to…" on any recommendation.</p>
+        )}
+      </section>
+
+      <section className="p-4">
+        <h2 className="mb-3 flex items-center gap-2 text-xs font-semibold uppercase tracking-widest text-muted-foreground">
+          <BookmarkCheck className="h-3.5 w-3.5" /> Saved posts
+        </h2>
+        {mySaved && mySaved.length > 0 ? (
+          <div className="space-y-3">
+            {mySaved.map((s) => <RecommendationCard key={s.id} rec={s.recommendations} />)}
+          </div>
+        ) : (
+          <p className="text-sm text-muted-foreground">Nothing saved yet — tap the bookmark on any post to save it here.</p>
         )}
       </section>
 
