@@ -87,8 +87,6 @@ function FriendsPage() {
   async function shareInvite() {
     const username = myProfile?.username;
     const origin = typeof window !== "undefined" ? window.location.origin : "";
-    // If we're on a Lovable editor/preview host, use the published app URL so
-    // invitees land on the app rather than a "collaborate on this project" page.
     const host = typeof window !== "undefined" ? window.location.hostname : "";
     const isLovableInternal = /id-preview|lovableproject\.com$/i.test(host) || host.endsWith("lovable.dev");
     const publicBase = isLovableInternal ? "https://pocket-app-pioneers.lovable.app" : origin;
@@ -96,47 +94,39 @@ function FriendsPage() {
       ? `${publicBase}/auth?mode=signup${username ? `&ref=${encodeURIComponent(username)}` : ""}`
       : "";
     const text = username
-      ? `Add me on REX 🦖 — I'm @${username}. Follow my recommendations for books, films, TV & places.`
-      : `Join me on REX 🦖 — recommendations for books, films, TV & places from friends you trust.`;
-    const full = `${text} ${url}`;
+      ? `Join me on REX 🦖 — the little book of books, films, shows & places friends actually love. I'm @${username}.`
+      : `Join me on REX 🦖 — the little book of books, films, shows & places friends actually love.`;
+    const full = `${text}\n${url}`;
 
-
-    // Try native share (often blocked inside iframes/previews without allow="web-share")
+    // Native share first (mobile)
     if (typeof navigator !== "undefined" && (navigator as any).share) {
       try {
-        await (navigator as any).share({ title: "Join me on REX", text, url });
+        await (navigator as any).share({ title: "Join me on REX 🦖", text, url });
         return;
       } catch (err: any) {
-        if (err?.name === "AbortError") return; // user cancelled the sheet
-        // otherwise fall through to clipboard
+        if (err?.name === "AbortError") return;
       }
     }
 
-    // Clipboard fallback
+    // Desktop / iframe fallback: open WhatsApp Web with prefilled message
+    const waHref = `https://wa.me/?text=${encodeURIComponent(full)}`;
+    try {
+      window.open(waHref, "_blank", "noopener,noreferrer");
+      // Also copy to clipboard as a belt-and-braces
+      await navigator.clipboard.writeText(full).catch(() => {});
+      toast.success("Opened WhatsApp — link also copied");
+      return;
+    } catch {}
+
+    // Last-resort clipboard
     try {
       await navigator.clipboard.writeText(full);
       toast.success("Invite link copied to clipboard");
-      return;
     } catch {
-      // Legacy execCommand fallback (works in more iframe contexts)
-      try {
-        const ta = document.createElement("textarea");
-        ta.value = full;
-        ta.style.position = "fixed";
-        ta.style.opacity = "0";
-        document.body.appendChild(ta);
-        ta.focus();
-        ta.select();
-        const ok = document.execCommand("copy");
-        document.body.removeChild(ta);
-        if (ok) {
-          toast.success("Invite link copied to clipboard");
-          return;
-        }
-      } catch {}
       toast.error(`Couldn't copy automatically. Link: ${url}`, { duration: 12000 });
     }
   }
+
 
   async function doSearch() {
     if (!search.trim()) return;
