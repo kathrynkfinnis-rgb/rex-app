@@ -5,10 +5,11 @@ import { useServerFn } from "@tanstack/react-start";
 import { supabase } from "@/integrations/supabase/client";
 import { CATEGORIES, categoryMeta, type ItemType } from "@/lib/categories";
 import { RecommendationCard, type FeedRow } from "@/components/RecommendationCard";
+import { RequestCard, type RequestRow } from "@/components/RequestCard";
 import { TRexLogo } from "@/components/TRexLogo";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { UserPlus, Mic, Plus, Search, X, User } from "lucide-react";
+import { UserPlus, Mic, Plus, Search, X, User, Sparkles } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { searchProfiles } from "@/lib/friends.functions";
 import { searchBooks, searchMovies, searchTv, searchPodcasts, type SearchHit } from "@/lib/search.functions";
@@ -27,7 +28,7 @@ export const Route = createFileRoute("/_authenticated/feed")({
 });
 
 function FeedPage() {
-  const [filter, setFilter] = useState<ItemType | "all">("all");
+  const [filter, setFilter] = useState<ItemType | "all" | "asks">("all");
   const [subFilter, setSubFilter] = useState<string | "all">("all");
   const [rawQuery, setRawQuery] = useState("");
   const [query, setQuery] = useState("");
@@ -54,16 +55,31 @@ function FeedPage() {
         .select("id, rating, note, created_at, photo_url, user_id, item_id, items!inner(id, type, title, subtitle, image_url, genre), profiles!recommendations_user_id_fkey(username, display_name, avatar_url), creators(slug, name, color, emoji)")
         .order("created_at", { ascending: false })
         .limit(50);
-      if (filter !== "all") q = q.eq("items.type", filter);
+      if (filter !== "all" && filter !== "asks") q = q.eq("items.type", filter);
       const { data, error } = await q;
       if (error) throw error;
       return (data ?? []) as unknown as FeedRow[];
     },
   });
 
+  const { data: requests } = useQuery({
+    queryKey: ["feed-requests", filter],
+    queryFn: async () => {
+      let q = supabase
+        .from("requests")
+        .select("id, user_id, type, title, note, created_at, profiles!requests_user_id_profiles_fkey(username, display_name, avatar_url)")
+        .order("created_at", { ascending: false })
+        .limit(30);
+      if (filter !== "all" && filter !== "asks") q = q.eq("type", filter);
+      const { data, error } = await q;
+      if (error) throw error;
+      return (data ?? []) as unknown as RequestRow[];
+    },
+  });
+
   // Build the subcategory list from the current category's rows
   const subcategories = useMemo(() => {
-    if (filter === "all" || !data) return [] as string[];
+    if (filter === "all" || filter === "asks" || !data) return [] as string[];
     const set = new Set<string>();
     for (const r of data) {
       const g = r.items?.genre?.trim();
@@ -72,12 +88,19 @@ function FeedPage() {
     return Array.from(set).sort((a, b) => a.localeCompare(b));
   }, [data, filter]);
 
-  const visible = useMemo(() => {
-    if (!data) return [];
-    if (subFilter === "all") return data;
-    const s = subFilter.toLowerCase();
-    return data.filter((r) => (r.items?.genre ?? "").toLowerCase() === s);
-  }, [data, subFilter]);
+  type FeedEntry = { kind: "rec"; row: FeedRow; created_at: string } | { kind: "req"; row: RequestRow; created_at: string };
+  const visible = useMemo<FeedEntry[]>(() => {
+    if (filter === "asks") {
+      return (requests ?? []).map((r) => ({ kind: "req" as const, row: r, created_at: r.created_at }));
+    }
+    const recs = (data ?? [])
+      .filter((r) => subFilter === "all" || (r.items?.genre ?? "").toLowerCase() === subFilter.toLowerCase())
+      .map((r) => ({ kind: "rec" as const, row: r, created_at: r.created_at }));
+    const reqs = subFilter === "all"
+      ? (requests ?? []).map((r) => ({ kind: "req" as const, row: r, created_at: r.created_at }))
+      : [];
+    return [...recs, ...reqs].sort((a, b) => (a.created_at < b.created_at ? 1 : -1));
+  }, [data, requests, filter, subFilter]);
 
 
   return (
@@ -134,6 +157,9 @@ function FeedPage() {
         {!searching && (
           <div className="scrollbar-none mt-3 flex gap-2 overflow-x-auto -mx-5 px-5">
             <Chip active={filter === "all"} onClick={() => setFilter("all")}>All</Chip>
+            <Chip active={filter === "asks"} onClick={() => setFilter("asks")}>
+              <Sparkles className="h-3.5 w-3.5" /> Asks
+            </Chip>
             {CATEGORIES.map((c) => (
               <Chip key={c.type} active={filter === c.type} onClick={() => setFilter(c.type)}>
                 <c.icon className="h-3.5 w-3.5" />
@@ -142,7 +168,7 @@ function FeedPage() {
             ))}
           </div>
         )}
-        {!searching && filter !== "all" && subcategories.length > 0 && (
+        {!searching && filter !== "all" && filter !== "asks" && subcategories.length > 0 && (
           <div className="scrollbar-none mt-2 flex gap-2 overflow-x-auto -mx-5 px-5">
             <SubChip active={subFilter === "all"} onClick={() => setSubFilter("all")}>All {categoryMeta(filter).plural.toLowerCase()}</SubChip>
             {subcategories.map((g) => (
@@ -158,19 +184,36 @@ function FeedPage() {
         <SearchResults query={query} feed={data ?? []} scope={searchScope} />
       ) : (
         <div className="space-y-3 px-4 py-4">
+          <Link
+            to="/ask"
+            className="flex items-center gap-3 rounded-2xl bg-gradient-to-br from-accent/15 to-card p-3 ring-1 ring-accent/40 transition-transform active:scale-[0.99]"
+          >
+            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-accent/20 text-accent-foreground">
+              <Sparkles className="h-5 w-5" />
+            </div>
+            <div className="min-w-0 flex-1">
+              <p className="font-medium">Ask friends for a rec</p>
+              <p className="truncate text-xs text-muted-foreground">Put out a blast — friends can chime in.</p>
+            </div>
+            <Plus className="h-4 w-4 text-muted-foreground" />
+          </Link>
           {isLoading && (
             <>
               <SkeletonCard />
               <SkeletonCard />
             </>
           )}
-          {!isLoading && (data?.length ?? 0) === 0 && <EmptyState />}
-          {!isLoading && (data?.length ?? 0) > 0 && visible.length === 0 && (
+          {!isLoading && visible.length === 0 && filter !== "asks" && <EmptyState />}
+          {!isLoading && visible.length === 0 && filter === "asks" && (
             <p className="rounded-2xl border border-dashed border-border bg-card p-6 text-center text-sm text-muted-foreground">
-              No {subFilter.toLowerCase()} recs in your feed yet.
+              No asks yet — be the first to ask your friends.
             </p>
           )}
-          {visible.map((rec) => <RecommendationCard key={rec.id} rec={rec} />)}
+          {visible.map((entry) =>
+            entry.kind === "rec"
+              ? <RecommendationCard key={`r-${entry.row.id}`} rec={entry.row} />
+              : <RequestCard key={`q-${entry.row.id}`} req={entry.row} />,
+          )}
         </div>
       )}
 
