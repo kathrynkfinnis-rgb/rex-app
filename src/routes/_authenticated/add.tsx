@@ -3,7 +3,7 @@ import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 
-import { CATEGORIES, type ItemType, categoryMeta, PLACE_SUBCATEGORIES, normalizePlaceSubcategory, type PlaceSubcategory } from "@/lib/categories";
+import { CATEGORIES, type ItemType, categoryMeta, PLACE_SUBCATEGORIES, normalizePlaceSubcategory, subcategoriesFor } from "@/lib/categories";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -43,7 +43,7 @@ function AddPage() {
   const [coords, setCoords] = useState<{ lat: number; lng: number } | null>(null);
   const [picked, setPicked] = useState<AnyHit | null>(null);
   const [manualMode, setManualMode] = useState(false);
-  const [placeSub, setPlaceSub] = useState<PlaceSubcategory | "">("");
+  const [placeSub, setPlaceSub] = useState<string>("");
   const [justAdded, setJustAdded] = useState<{ itemId: string; title: string } | null>(null);
   const [photos, setPhotos] = useState<string[]>([]);
   const { data: uid } = useQuery({
@@ -149,7 +149,7 @@ function AddPage() {
             address: type === "place" ? address.trim() || null : null,
             lat: type === "place" ? coords?.lat ?? null : null,
             lng: type === "place" ? coords?.lng ?? null : null,
-            genre: type === "place" ? (placeSub || null) : (picked?.genre ?? null),
+            genre: placeSub || (picked?.genre ?? null),
             ...(type === "recipe" && recipeText.trim() ? { recipe_text: recipeText } : {}),
           } as never)
           .select("id")
@@ -337,31 +337,34 @@ function AddPage() {
               </>
             )}
 
+        {subcategoriesFor(type).length > 0 && (
+          <div className="space-y-1.5">
+            <Label>{type === "place" ? "Type of place" : `Type of ${cat!.label.toLowerCase()}`}</Label>
+            <div className="flex flex-wrap gap-2">
+              {subcategoriesFor(type).map((s) => {
+                const active = placeSub === s;
+                return (
+                  <button
+                    key={s}
+                    type="button"
+                    onClick={() => setPlaceSub(active ? "" : s)}
+                    className={cn(
+                      "rounded-full px-3 py-1.5 text-sm ring-1 transition-colors",
+                      active
+                        ? "bg-primary text-primary-foreground ring-primary"
+                        : "bg-card text-foreground ring-border hover:bg-muted",
+                    )}
+                  >
+                    {s}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        )}
+
         {type === "place" && (
           <>
-            <div className="space-y-1.5">
-              <Label>Type of place</Label>
-              <div className="flex flex-wrap gap-2">
-                {PLACE_SUBCATEGORIES.map((s) => {
-                  const active = placeSub === s;
-                  return (
-                    <button
-                      key={s}
-                      type="button"
-                      onClick={() => setPlaceSub(active ? "" : s)}
-                      className={cn(
-                        "rounded-full px-3 py-1.5 text-sm ring-1 transition-colors",
-                        active
-                          ? "bg-primary text-primary-foreground ring-primary"
-                          : "bg-card text-foreground ring-border hover:bg-muted",
-                      )}
-                    >
-                      {s}
-                    </button>
-                  );
-                })}
-              </div>
-            </div>
             <div className="space-y-1.5">
               <Label htmlFor="address">Address</Label>
               <Input

@@ -18,7 +18,7 @@ import { Label } from "@/components/ui/label";
 import { CrownRatingInput } from "@/components/CrownRating";
 import { Loader2, Trash2 } from "lucide-react";
 import { toast } from "sonner";
-import { PLACE_SUBCATEGORIES, type PlaceSubcategory, type ItemType } from "@/lib/categories";
+import { subcategoriesFor, categoryMeta, type ItemType } from "@/lib/categories";
 import { cn } from "@/lib/utils";
 import { RecipeEditor } from "@/components/RecipeEditor";
 import { PhotoUploader } from "@/components/PhotoUploader";
@@ -43,10 +43,9 @@ export function EditRecommendationDialog({
     ? [recommendation.photo_url]
     : []) as string[];
   const [photos, setPhotos] = useState<string[]>(initialPhotos);
-  const [placeSub, setPlaceSub] = useState<PlaceSubcategory | "">(
-    (item?.type === "place" && (PLACE_SUBCATEGORIES as readonly string[]).includes(item.genre ?? "")
-      ? (item!.genre as PlaceSubcategory)
-      : ""),
+  const subOptions = item ? subcategoriesFor(item.type) : [];
+  const [placeSub, setPlaceSub] = useState<string>(
+    item && (subOptions as readonly string[]).includes(item.genre ?? "") ? (item.genre as string) : "",
   );
   const [recipeText, setRecipeText] = useState(item?.recipe_text ?? "");
   const [confirmDelete, setConfirmDelete] = useState(false);
@@ -87,7 +86,7 @@ export function EditRecommendationDialog({
         } as never)
         .eq("id", recommendation.id);
       if (error) throw error;
-      if (isPlace && item) {
+      if (item && subOptions.length > 0) {
         const nextGenre = placeSub || null;
         if ((item.genre ?? null) !== nextGenre) {
           const { error: itemErr } = await supabase
@@ -145,11 +144,11 @@ export function EditRecommendationDialog({
               <label className="mb-2 block text-sm font-medium">Rating</label>
               <CrownRatingInput value={rating} onChange={setRating} size="md" />
             </div>
-            {isPlace && (
+            {item && subOptions.length > 0 && (
               <div className="space-y-1.5">
-                <Label>Type of place</Label>
+                <Label>{isPlace ? "Type of place" : `Type of ${categoryMeta(item.type).label.toLowerCase()}`}</Label>
                 <div className="flex flex-wrap gap-2">
-                  {PLACE_SUBCATEGORIES.map((s) => {
+                  {subOptions.map((s) => {
                     const active = placeSub === s;
                     return (
                       <button
@@ -169,7 +168,7 @@ export function EditRecommendationDialog({
                   })}
                 </div>
                 <p className="text-xs text-muted-foreground">
-                  Changing this updates the place for everyone who saved it.
+                  Changing this updates the tag for everyone who saved it.
                 </p>
               </div>
             )}
