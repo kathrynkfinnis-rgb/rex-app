@@ -175,6 +175,77 @@ function AdminPage() {
         </div>
       </Section>
 
+      <Section title="Activation & funnel" icon={<Zap className="h-4 w-4" />}>
+        <div className="grid grid-cols-2 gap-2">
+          <Kpi label="Activation rate" value={ratio(e?.activated_users, e?.total_users)} sub={`${e?.activated_users ?? 0} posted ≥1 rec`} accent />
+          <Kpi label="Connected rate" value={ratio(e?.users_with_friend, e?.total_users)} sub={`${e?.users_with_friend ?? 0} have ≥1 friend`} />
+          <Kpi label="Recs / active user" value={e?.recs_per_active_user} sub="depth of use" />
+          <Kpi label="Avg crowns" value={e?.avg_rating} sub="rating quality" />
+          <Kpi label="Recs with photo" value={ratio(e?.recs_with_photo, c?.recs_total)} sub="richness" />
+          <Kpi label="Recs with note" value={ratio(e?.recs_with_note, c?.recs_total)} sub="richness" />
+          <Kpi label="Blast answer rate" value={ratio(e?.blasts_answered, e?.blasts_total)} sub="asks with ≥1 reply" />
+          <Kpi label="Places geocoded" value={ratio(e?.places_geocoded, e?.places_total)} sub="map coverage" />
+        </div>
+      </Section>
+
+      <Section title="Social graph" icon={<Network className="h-4 w-4" />}>
+        <div className="grid grid-cols-2 gap-2">
+          <Kpi label="Friendships" value={e?.friendships_accepted} sub="accepted" />
+          <Kpi label="Pending requests" value={e?.friendships_pending} />
+          <Kpi label="Accept rate" value={e?.friend_accept_rate != null ? `${e.friend_accept_rate}%` : undefined} />
+          <Kpi label="Avg friends / user" value={e?.avg_friends} />
+          <Kpi label="Lists created" value={e?.lists_total} sub={`${e?.lists_published ?? 0} published`} />
+          <Kpi label="Want-to saves" value={e?.wants_total} />
+          <Kpi label="Catalog items" value={e?.items_total} />
+          <Kpi label="Bulk imports" value={e?.imports_total} />
+        </div>
+      </Section>
+
+      <Section title="Trends · last 8 weeks" icon={<BarChart3 className="h-4 w-4" />}>
+        <div className="space-y-2">
+          <Spark label="Signups per week" points={e?.signups_by_week} />
+          <Spark label="Recs per week" points={e?.recs_by_week} />
+        </div>
+      </Section>
+
+      <Section title="Category mix" icon={<Sparkles className="h-4 w-4" />}>
+        <div className="rounded-xl border border-border bg-card p-3 space-y-1.5">
+          {(e?.by_category ?? []).map((row) => (
+            <div key={row.type} className="flex items-center gap-2">
+              <div className="w-20 shrink-0 text-xs capitalize">{row.type}</div>
+              <div className="h-2 flex-1 overflow-hidden rounded-full bg-muted">
+                <div
+                  className="h-full rounded-full bg-primary"
+                  style={{ width: `${pct(row.count, e?.by_category)}%` }}
+                />
+              </div>
+              <div className="w-8 text-right text-xs tabular-nums text-muted-foreground">{row.count}</div>
+            </div>
+          ))}
+          {(e?.by_category?.length ?? 0) === 0 && <p className="text-xs text-muted-foreground">No recommendations yet.</p>}
+        </div>
+      </Section>
+
+      <Section title="Top contributors" icon={<TrendingUp className="h-4 w-4" />}>
+        <div className="rounded-xl border border-border bg-card p-3 space-y-2">
+          {(e?.top_contributors ?? []).map((t, i) => (
+            <Link
+              key={t.username}
+              to="/profile/$username"
+              params={{ username: t.username }}
+              className="flex items-center gap-2 text-sm"
+            >
+              <span className="w-4 text-xs text-muted-foreground tabular-nums">{i + 1}</span>
+              <span className="flex-1 truncate font-medium">{t.display_name || t.username}</span>
+              <span className="text-xs tabular-nums text-muted-foreground">{t.count} recs</span>
+            </Link>
+          ))}
+          {(e?.top_contributors?.length ?? 0) === 0 && <p className="text-xs text-muted-foreground">No data yet.</p>}
+        </div>
+      </Section>
+
+
+
       <Section title="Admin team" icon={<Crown className="h-4 w-4" />}>
         <div className="space-y-2">
           {(adminsQ.data ?? []).map((a) => (
