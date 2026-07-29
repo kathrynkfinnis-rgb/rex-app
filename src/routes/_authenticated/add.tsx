@@ -53,7 +53,7 @@ function AddPage() {
   });
 
   const cat = type ? categoryMeta(type) : null;
-  const needsSearch = type !== null && type !== "recipe";
+  const needsSearch = type !== null && type !== "recipe" && type !== "event";
   const showForm = !needsSearch || picked || manualMode;
   const photoFn = useServerFn(getPlacePhotoUrl);
 

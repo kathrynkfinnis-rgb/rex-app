@@ -1,6 +1,6 @@
-import { MapPin, Book, Film, Tv, ChefHat, Mic } from "lucide-react";
+import { MapPin, Book, Film, Tv, ChefHat, Mic, Ticket } from "lucide-react";
 
-export type ItemType = "place" | "book" | "movie" | "tv" | "recipe" | "podcast";
+export type ItemType = "place" | "book" | "movie" | "tv" | "recipe" | "podcast" | "event";
 
 export const CATEGORIES: {
   type: ItemType;
@@ -18,6 +18,7 @@ export const CATEGORIES: {
   { type: "tv", label: "TV", plural: "TV shows", icon: Tv, tokenClass: "bg-cat-tv/15 text-cat-tv", subtitleLabel: "Network or year", actionVerb: "Watched it", wantVerb: "Want to watch" },
   { type: "podcast", label: "Podcast", plural: "Podcasts", icon: Mic, tokenClass: "bg-cat-podcast/15 text-cat-podcast", subtitleLabel: "Host or network", actionVerb: "Listened", wantVerb: "Want to listen" },
   { type: "recipe", label: "Recipe", plural: "Recipes", icon: ChefHat, tokenClass: "bg-cat-recipe/15 text-cat-recipe", subtitleLabel: "Cookbook, chef, or source", actionVerb: "Cooked it", wantVerb: "Want to try" },
+  { type: "event", label: "Event", plural: "Events", icon: Ticket, tokenClass: "bg-cat-event/15 text-cat-event", subtitleLabel: "Venue, date, or type", actionVerb: "Went", wantVerb: "Want to go" },
 ];
 
 export function categoryMeta(type: ItemType) {
