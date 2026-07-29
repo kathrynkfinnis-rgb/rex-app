@@ -41,11 +41,28 @@ function AddPage() {
   const [picked, setPicked] = useState<AnyHit | null>(null);
   const [manualMode, setManualMode] = useState(false);
   const [placeSub, setPlaceSub] = useState<PlaceSubcategory | "">("");
+  const [justAdded, setJustAdded] = useState<{ itemId: string; title: string } | null>(null);
 
   const cat = type ? categoryMeta(type) : null;
   const needsSearch = type !== null && type !== "recipe";
   const showForm = !needsSearch || picked || manualMode;
   const photoFn = useServerFn(getPlacePhotoUrl);
+
+  function resetForm() {
+    setType(null);
+    setTitle("");
+    setSubtitle("");
+    setAddress("");
+    setNote("");
+    setRecipeText("");
+    setRating(10);
+    setCoords(null);
+    setPicked(null);
+    setManualMode(false);
+    setPlaceSub("");
+    setJustAdded(null);
+  }
+
 
   async function handlePick(hit: AnyHit) {
     setPicked(hit);
