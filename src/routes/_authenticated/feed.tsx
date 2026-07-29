@@ -1,6 +1,6 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useEffect, useMemo, useState } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { supabase } from "@/integrations/supabase/client";
 import { CATEGORIES, categoryMeta, type ItemType } from "@/lib/categories";
@@ -28,11 +28,35 @@ export const Route = createFileRoute("/_authenticated/feed")({
 });
 
 function FeedPage() {
+  const qc = useQueryClient();
   const [filter, setFilter] = useState<ItemType | "all" | "asks">("all");
   const [subFilter, setSubFilter] = useState<string | "all">("all");
   const [rawQuery, setRawQuery] = useState("");
   const [query, setQuery] = useState("");
   const [searchScope, setSearchScope] = useState<SearchScope>("all");
+
+  // Live updates: refetch the feed and asks whenever anything changes.
+  useEffect(() => {
+    const channel = supabase
+      .channel("feed-live")
+      .on("postgres_changes", { event: "*", schema: "public", table: "recommendations" }, () => {
+        qc.invalidateQueries({ queryKey: ["feed"] });
+      })
+      .on("postgres_changes", { event: "*", schema: "public", table: "requests" }, () => {
+        qc.invalidateQueries({ queryKey: ["feed-requests"] });
+      })
+      .on("postgres_changes", { event: "*", schema: "public", table: "recommendation_likes" }, () => {
+        qc.invalidateQueries({ queryKey: ["likes-comments"] });
+      })
+      .on("postgres_changes", { event: "*", schema: "public", table: "recommendation_comments" }, () => {
+        qc.invalidateQueries({ queryKey: ["likes-comments"] });
+      })
+      .subscribe();
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [qc]);
+
 
   // debounce search input
   useEffect(() => {
