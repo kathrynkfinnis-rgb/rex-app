@@ -41,11 +41,28 @@ function AddPage() {
   const [picked, setPicked] = useState<AnyHit | null>(null);
   const [manualMode, setManualMode] = useState(false);
   const [placeSub, setPlaceSub] = useState<PlaceSubcategory | "">("");
+  const [justAdded, setJustAdded] = useState<{ itemId: string; title: string } | null>(null);
 
   const cat = type ? categoryMeta(type) : null;
   const needsSearch = type !== null && type !== "recipe";
   const showForm = !needsSearch || picked || manualMode;
   const photoFn = useServerFn(getPlacePhotoUrl);
+
+  function resetForm() {
+    setType(null);
+    setTitle("");
+    setSubtitle("");
+    setAddress("");
+    setNote("");
+    setRecipeText("");
+    setRating(10);
+    setCoords(null);
+    setPicked(null);
+    setManualMode(false);
+    setPlaceSub("");
+    setJustAdded(null);
+  }
+
 
   async function handlePick(hit: AnyHit) {
     setPicked(hit);
@@ -140,12 +157,51 @@ function AddPage() {
       if (recErr) throw recErr;
 
       toast.success("Added to your feed");
-      navigate({ to: "/item/$id", params: { id: itemId! } });
+      setJustAdded({ itemId: itemId!, title: title.trim() });
     } catch (err) {
+
       toast.error(err instanceof Error ? err.message : "Couldn't save");
     } finally {
       setSaving(false);
     }
+  }
+
+  if (justAdded) {
+    return (
+      <div className="flex min-h-[70vh] flex-col items-center justify-center gap-6 p-6 text-center">
+        <div className="flex h-20 w-20 items-center justify-center rounded-full bg-primary/15 text-4xl">
+          🦖
+        </div>
+        <div>
+          <h1 className="font-display text-3xl">Nice one!</h1>
+          <p className="mt-2 text-muted-foreground">
+            "{justAdded.title}" is in your feed.
+          </p>
+        </div>
+        <div className="flex w-full max-w-sm flex-col gap-2">
+          <Button
+            onClick={resetForm}
+            className="h-14 w-full rounded-full text-base font-semibold shadow-lg shadow-primary/30"
+          >
+            Add another
+          </Button>
+          <Button
+            variant="outline"
+            onClick={() => navigate({ to: "/item/$id", params: { id: justAdded.itemId } })}
+            className="h-12 w-full rounded-full"
+          >
+            View recommendation
+          </Button>
+          <Button
+            variant="ghost"
+            onClick={() => navigate({ to: "/feed" })}
+            className="h-12 w-full rounded-full"
+          >
+            Back to feed
+          </Button>
+        </div>
+      </div>
+    );
   }
 
   if (!type) {
