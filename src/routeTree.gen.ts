@@ -22,9 +22,9 @@ import { Route as AuthenticatedImportRouteImport } from './routes/_authenticated
 import { Route as AuthenticatedFriendsRouteImport } from './routes/_authenticated/friends'
 import { Route as AuthenticatedFeedRouteImport } from './routes/_authenticated/feed'
 import { Route as AuthenticatedCreatorsRouteImport } from './routes/_authenticated/creators'
-import { Route as AuthenticatedAskRouteImport } from './routes/_authenticated/ask'
 import { Route as AuthenticatedAdminRouteImport } from './routes/_authenticated/admin'
 import { Route as AuthenticatedAddRouteImport } from './routes/_authenticated/add'
+import { Route as AuthenticatedAskIndexRouteImport } from './routes/_authenticated/ask.index'
 import { Route as AuthenticatedProfileUsernameRouteImport } from './routes/_authenticated/profile.$username'
 import { Route as AuthenticatedItemIdRouteImport } from './routes/_authenticated/item.$id'
 import { Route as AuthenticatedAskIdRouteImport } from './routes/_authenticated/ask.$id'
@@ -96,11 +96,6 @@ const AuthenticatedCreatorsRoute = AuthenticatedCreatorsRouteImport.update({
   path: '/creators',
   getParentRoute: () => AuthenticatedRouteRoute,
 } as any)
-const AuthenticatedAskRoute = AuthenticatedAskRouteImport.update({
-  id: '/ask',
-  path: '/ask',
-  getParentRoute: () => AuthenticatedRouteRoute,
-} as any)
 const AuthenticatedAdminRoute = AuthenticatedAdminRouteImport.update({
   id: '/admin',
   path: '/admin',
@@ -109,6 +104,11 @@ const AuthenticatedAdminRoute = AuthenticatedAdminRouteImport.update({
 const AuthenticatedAddRoute = AuthenticatedAddRouteImport.update({
   id: '/add',
   path: '/add',
+  getParentRoute: () => AuthenticatedRouteRoute,
+} as any)
+const AuthenticatedAskIndexRoute = AuthenticatedAskIndexRouteImport.update({
+  id: '/ask/',
+  path: '/ask/',
   getParentRoute: () => AuthenticatedRouteRoute,
 } as any)
 const AuthenticatedProfileUsernameRoute =
@@ -123,9 +123,9 @@ const AuthenticatedItemIdRoute = AuthenticatedItemIdRouteImport.update({
   getParentRoute: () => AuthenticatedRouteRoute,
 } as any)
 const AuthenticatedAskIdRoute = AuthenticatedAskIdRouteImport.update({
-  id: '/$id',
-  path: '/$id',
-  getParentRoute: () => AuthenticatedAskRoute,
+  id: '/ask/$id',
+  path: '/ask/$id',
+  getParentRoute: () => AuthenticatedRouteRoute,
 } as any)
 
 export interface FileRoutesByFullPath {
@@ -133,7 +133,6 @@ export interface FileRoutesByFullPath {
   '/auth': typeof AuthRoute
   '/add': typeof AuthenticatedAddRoute
   '/admin': typeof AuthenticatedAdminRoute
-  '/ask': typeof AuthenticatedAskRouteWithChildren
   '/creators': typeof AuthenticatedCreatorsRoute
   '/feed': typeof AuthenticatedFeedRoute
   '/friends': typeof AuthenticatedFriendsRoute
@@ -147,13 +146,13 @@ export interface FileRoutesByFullPath {
   '/ask/$id': typeof AuthenticatedAskIdRoute
   '/item/$id': typeof AuthenticatedItemIdRoute
   '/profile/$username': typeof AuthenticatedProfileUsernameRoute
+  '/ask/': typeof AuthenticatedAskIndexRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/auth': typeof AuthRoute
   '/add': typeof AuthenticatedAddRoute
   '/admin': typeof AuthenticatedAdminRoute
-  '/ask': typeof AuthenticatedAskRouteWithChildren
   '/creators': typeof AuthenticatedCreatorsRoute
   '/feed': typeof AuthenticatedFeedRoute
   '/friends': typeof AuthenticatedFriendsRoute
@@ -167,6 +166,7 @@ export interface FileRoutesByTo {
   '/ask/$id': typeof AuthenticatedAskIdRoute
   '/item/$id': typeof AuthenticatedItemIdRoute
   '/profile/$username': typeof AuthenticatedProfileUsernameRoute
+  '/ask': typeof AuthenticatedAskIndexRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -175,7 +175,6 @@ export interface FileRoutesById {
   '/auth': typeof AuthRoute
   '/_authenticated/add': typeof AuthenticatedAddRoute
   '/_authenticated/admin': typeof AuthenticatedAdminRoute
-  '/_authenticated/ask': typeof AuthenticatedAskRouteWithChildren
   '/_authenticated/creators': typeof AuthenticatedCreatorsRoute
   '/_authenticated/feed': typeof AuthenticatedFeedRoute
   '/_authenticated/friends': typeof AuthenticatedFriendsRoute
@@ -189,6 +188,7 @@ export interface FileRoutesById {
   '/_authenticated/ask/$id': typeof AuthenticatedAskIdRoute
   '/_authenticated/item/$id': typeof AuthenticatedItemIdRoute
   '/_authenticated/profile/$username': typeof AuthenticatedProfileUsernameRoute
+  '/_authenticated/ask/': typeof AuthenticatedAskIndexRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -197,7 +197,6 @@ export interface FileRouteTypes {
     | '/auth'
     | '/add'
     | '/admin'
-    | '/ask'
     | '/creators'
     | '/feed'
     | '/friends'
@@ -211,13 +210,13 @@ export interface FileRouteTypes {
     | '/ask/$id'
     | '/item/$id'
     | '/profile/$username'
+    | '/ask/'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
     | '/auth'
     | '/add'
     | '/admin'
-    | '/ask'
     | '/creators'
     | '/feed'
     | '/friends'
@@ -231,6 +230,7 @@ export interface FileRouteTypes {
     | '/ask/$id'
     | '/item/$id'
     | '/profile/$username'
+    | '/ask'
   id:
     | '__root__'
     | '/'
@@ -238,7 +238,6 @@ export interface FileRouteTypes {
     | '/auth'
     | '/_authenticated/add'
     | '/_authenticated/admin'
-    | '/_authenticated/ask'
     | '/_authenticated/creators'
     | '/_authenticated/feed'
     | '/_authenticated/friends'
@@ -252,6 +251,7 @@ export interface FileRouteTypes {
     | '/_authenticated/ask/$id'
     | '/_authenticated/item/$id'
     | '/_authenticated/profile/$username'
+    | '/_authenticated/ask/'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -354,13 +354,6 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedCreatorsRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
-    '/_authenticated/ask': {
-      id: '/_authenticated/ask'
-      path: '/ask'
-      fullPath: '/ask'
-      preLoaderRoute: typeof AuthenticatedAskRouteImport
-      parentRoute: typeof AuthenticatedRouteRoute
-    }
     '/_authenticated/admin': {
       id: '/_authenticated/admin'
       path: '/admin'
@@ -373,6 +366,13 @@ declare module '@tanstack/react-router' {
       path: '/add'
       fullPath: '/add'
       preLoaderRoute: typeof AuthenticatedAddRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
+    '/_authenticated/ask/': {
+      id: '/_authenticated/ask/'
+      path: '/ask'
+      fullPath: '/ask/'
+      preLoaderRoute: typeof AuthenticatedAskIndexRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
     '/_authenticated/profile/$username': {
@@ -391,29 +391,17 @@ declare module '@tanstack/react-router' {
     }
     '/_authenticated/ask/$id': {
       id: '/_authenticated/ask/$id'
-      path: '/$id'
+      path: '/ask/$id'
       fullPath: '/ask/$id'
       preLoaderRoute: typeof AuthenticatedAskIdRouteImport
-      parentRoute: typeof AuthenticatedAskRoute
+      parentRoute: typeof AuthenticatedRouteRoute
     }
   }
 }
 
-interface AuthenticatedAskRouteChildren {
-  AuthenticatedAskIdRoute: typeof AuthenticatedAskIdRoute
-}
-
-const AuthenticatedAskRouteChildren: AuthenticatedAskRouteChildren = {
-  AuthenticatedAskIdRoute: AuthenticatedAskIdRoute,
-}
-
-const AuthenticatedAskRouteWithChildren =
-  AuthenticatedAskRoute._addFileChildren(AuthenticatedAskRouteChildren)
-
 interface AuthenticatedRouteRouteChildren {
   AuthenticatedAddRoute: typeof AuthenticatedAddRoute
   AuthenticatedAdminRoute: typeof AuthenticatedAdminRoute
-  AuthenticatedAskRoute: typeof AuthenticatedAskRouteWithChildren
   AuthenticatedCreatorsRoute: typeof AuthenticatedCreatorsRoute
   AuthenticatedFeedRoute: typeof AuthenticatedFeedRoute
   AuthenticatedFriendsRoute: typeof AuthenticatedFriendsRoute
@@ -423,14 +411,15 @@ interface AuthenticatedRouteRouteChildren {
   AuthenticatedMeRoute: typeof AuthenticatedMeRoute
   AuthenticatedNotificationSettingsRoute: typeof AuthenticatedNotificationSettingsRoute
   AuthenticatedNotificationsRoute: typeof AuthenticatedNotificationsRoute
+  AuthenticatedAskIdRoute: typeof AuthenticatedAskIdRoute
   AuthenticatedItemIdRoute: typeof AuthenticatedItemIdRoute
   AuthenticatedProfileUsernameRoute: typeof AuthenticatedProfileUsernameRoute
+  AuthenticatedAskIndexRoute: typeof AuthenticatedAskIndexRoute
 }
 
 const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
   AuthenticatedAddRoute: AuthenticatedAddRoute,
   AuthenticatedAdminRoute: AuthenticatedAdminRoute,
-  AuthenticatedAskRoute: AuthenticatedAskRouteWithChildren,
   AuthenticatedCreatorsRoute: AuthenticatedCreatorsRoute,
   AuthenticatedFeedRoute: AuthenticatedFeedRoute,
   AuthenticatedFriendsRoute: AuthenticatedFriendsRoute,
@@ -441,8 +430,10 @@ const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
   AuthenticatedNotificationSettingsRoute:
     AuthenticatedNotificationSettingsRoute,
   AuthenticatedNotificationsRoute: AuthenticatedNotificationsRoute,
+  AuthenticatedAskIdRoute: AuthenticatedAskIdRoute,
   AuthenticatedItemIdRoute: AuthenticatedItemIdRoute,
   AuthenticatedProfileUsernameRoute: AuthenticatedProfileUsernameRoute,
+  AuthenticatedAskIndexRoute: AuthenticatedAskIndexRoute,
 }
 
 const AuthenticatedRouteRouteWithChildren =
@@ -457,3 +448,13 @@ const rootRouteChildren: RootRouteChildren = {
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
   ._addFileTypes<FileRouteTypes>()
+
+import type { getRouter } from './router.tsx'
+import type { startInstance } from './start.ts'
+declare module '@tanstack/react-start' {
+  interface Register {
+    ssr: true
+    router: Awaited<ReturnType<typeof getRouter>>
+    config: Awaited<ReturnType<typeof startInstance.getOptions>>
+  }
+}
