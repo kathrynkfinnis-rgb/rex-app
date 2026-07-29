@@ -163,7 +163,9 @@ function AddPage() {
         item_id: itemId!,
         rating,
         note: note.trim() || null,
-      });
+        photo_url: photos[0] ?? null,
+        photo_urls: photos,
+      } as never);
       if (recErr) throw recErr;
 
       toast.success("Added to your feed");
