@@ -19,9 +19,11 @@ import { Route as AuthenticatedImportRouteImport } from './routes/_authenticated
 import { Route as AuthenticatedFriendsRouteImport } from './routes/_authenticated/friends'
 import { Route as AuthenticatedFeedRouteImport } from './routes/_authenticated/feed'
 import { Route as AuthenticatedCreatorsRouteImport } from './routes/_authenticated/creators'
+import { Route as AuthenticatedAskRouteImport } from './routes/_authenticated/ask'
 import { Route as AuthenticatedAddRouteImport } from './routes/_authenticated/add'
 import { Route as AuthenticatedProfileUsernameRouteImport } from './routes/_authenticated/profile.$username'
 import { Route as AuthenticatedItemIdRouteImport } from './routes/_authenticated/item.$id'
+import { Route as AuthenticatedAskIdRouteImport } from './routes/_authenticated/ask.$id'
 
 const AuthRoute = AuthRouteImport.update({
   id: '/auth',
@@ -73,6 +75,11 @@ const AuthenticatedCreatorsRoute = AuthenticatedCreatorsRouteImport.update({
   path: '/creators',
   getParentRoute: () => AuthenticatedRouteRoute,
 } as any)
+const AuthenticatedAskRoute = AuthenticatedAskRouteImport.update({
+  id: '/ask',
+  path: '/ask',
+  getParentRoute: () => AuthenticatedRouteRoute,
+} as any)
 const AuthenticatedAddRoute = AuthenticatedAddRouteImport.update({
   id: '/add',
   path: '/add',
@@ -89,11 +96,17 @@ const AuthenticatedItemIdRoute = AuthenticatedItemIdRouteImport.update({
   path: '/item/$id',
   getParentRoute: () => AuthenticatedRouteRoute,
 } as any)
+const AuthenticatedAskIdRoute = AuthenticatedAskIdRouteImport.update({
+  id: '/$id',
+  path: '/$id',
+  getParentRoute: () => AuthenticatedAskRoute,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/auth': typeof AuthRoute
   '/add': typeof AuthenticatedAddRoute
+  '/ask': typeof AuthenticatedAskRouteWithChildren
   '/creators': typeof AuthenticatedCreatorsRoute
   '/feed': typeof AuthenticatedFeedRoute
   '/friends': typeof AuthenticatedFriendsRoute
@@ -101,6 +114,7 @@ export interface FileRoutesByFullPath {
   '/import-goodreads': typeof AuthenticatedImportGoodreadsRoute
   '/map': typeof AuthenticatedMapRoute
   '/me': typeof AuthenticatedMeRoute
+  '/ask/$id': typeof AuthenticatedAskIdRoute
   '/item/$id': typeof AuthenticatedItemIdRoute
   '/profile/$username': typeof AuthenticatedProfileUsernameRoute
 }
@@ -108,6 +122,7 @@ export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/auth': typeof AuthRoute
   '/add': typeof AuthenticatedAddRoute
+  '/ask': typeof AuthenticatedAskRouteWithChildren
   '/creators': typeof AuthenticatedCreatorsRoute
   '/feed': typeof AuthenticatedFeedRoute
   '/friends': typeof AuthenticatedFriendsRoute
@@ -115,6 +130,7 @@ export interface FileRoutesByTo {
   '/import-goodreads': typeof AuthenticatedImportGoodreadsRoute
   '/map': typeof AuthenticatedMapRoute
   '/me': typeof AuthenticatedMeRoute
+  '/ask/$id': typeof AuthenticatedAskIdRoute
   '/item/$id': typeof AuthenticatedItemIdRoute
   '/profile/$username': typeof AuthenticatedProfileUsernameRoute
 }
@@ -124,6 +140,7 @@ export interface FileRoutesById {
   '/_authenticated': typeof AuthenticatedRouteRouteWithChildren
   '/auth': typeof AuthRoute
   '/_authenticated/add': typeof AuthenticatedAddRoute
+  '/_authenticated/ask': typeof AuthenticatedAskRouteWithChildren
   '/_authenticated/creators': typeof AuthenticatedCreatorsRoute
   '/_authenticated/feed': typeof AuthenticatedFeedRoute
   '/_authenticated/friends': typeof AuthenticatedFriendsRoute
@@ -131,6 +148,7 @@ export interface FileRoutesById {
   '/_authenticated/import-goodreads': typeof AuthenticatedImportGoodreadsRoute
   '/_authenticated/map': typeof AuthenticatedMapRoute
   '/_authenticated/me': typeof AuthenticatedMeRoute
+  '/_authenticated/ask/$id': typeof AuthenticatedAskIdRoute
   '/_authenticated/item/$id': typeof AuthenticatedItemIdRoute
   '/_authenticated/profile/$username': typeof AuthenticatedProfileUsernameRoute
 }
@@ -140,6 +158,7 @@ export interface FileRouteTypes {
     | '/'
     | '/auth'
     | '/add'
+    | '/ask'
     | '/creators'
     | '/feed'
     | '/friends'
@@ -147,6 +166,7 @@ export interface FileRouteTypes {
     | '/import-goodreads'
     | '/map'
     | '/me'
+    | '/ask/$id'
     | '/item/$id'
     | '/profile/$username'
   fileRoutesByTo: FileRoutesByTo
@@ -154,6 +174,7 @@ export interface FileRouteTypes {
     | '/'
     | '/auth'
     | '/add'
+    | '/ask'
     | '/creators'
     | '/feed'
     | '/friends'
@@ -161,6 +182,7 @@ export interface FileRouteTypes {
     | '/import-goodreads'
     | '/map'
     | '/me'
+    | '/ask/$id'
     | '/item/$id'
     | '/profile/$username'
   id:
@@ -169,6 +191,7 @@ export interface FileRouteTypes {
     | '/_authenticated'
     | '/auth'
     | '/_authenticated/add'
+    | '/_authenticated/ask'
     | '/_authenticated/creators'
     | '/_authenticated/feed'
     | '/_authenticated/friends'
@@ -176,6 +199,7 @@ export interface FileRouteTypes {
     | '/_authenticated/import-goodreads'
     | '/_authenticated/map'
     | '/_authenticated/me'
+    | '/_authenticated/ask/$id'
     | '/_authenticated/item/$id'
     | '/_authenticated/profile/$username'
   fileRoutesById: FileRoutesById
@@ -258,6 +282,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedCreatorsRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
+    '/_authenticated/ask': {
+      id: '/_authenticated/ask'
+      path: '/ask'
+      fullPath: '/ask'
+      preLoaderRoute: typeof AuthenticatedAskRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
     '/_authenticated/add': {
       id: '/_authenticated/add'
       path: '/add'
@@ -279,11 +310,30 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedItemIdRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
+    '/_authenticated/ask/$id': {
+      id: '/_authenticated/ask/$id'
+      path: '/$id'
+      fullPath: '/ask/$id'
+      preLoaderRoute: typeof AuthenticatedAskIdRouteImport
+      parentRoute: typeof AuthenticatedAskRoute
+    }
   }
 }
 
+interface AuthenticatedAskRouteChildren {
+  AuthenticatedAskIdRoute: typeof AuthenticatedAskIdRoute
+}
+
+const AuthenticatedAskRouteChildren: AuthenticatedAskRouteChildren = {
+  AuthenticatedAskIdRoute: AuthenticatedAskIdRoute,
+}
+
+const AuthenticatedAskRouteWithChildren =
+  AuthenticatedAskRoute._addFileChildren(AuthenticatedAskRouteChildren)
+
 interface AuthenticatedRouteRouteChildren {
   AuthenticatedAddRoute: typeof AuthenticatedAddRoute
+  AuthenticatedAskRoute: typeof AuthenticatedAskRouteWithChildren
   AuthenticatedCreatorsRoute: typeof AuthenticatedCreatorsRoute
   AuthenticatedFeedRoute: typeof AuthenticatedFeedRoute
   AuthenticatedFriendsRoute: typeof AuthenticatedFriendsRoute
@@ -297,6 +347,7 @@ interface AuthenticatedRouteRouteChildren {
 
 const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
   AuthenticatedAddRoute: AuthenticatedAddRoute,
+  AuthenticatedAskRoute: AuthenticatedAskRouteWithChildren,
   AuthenticatedCreatorsRoute: AuthenticatedCreatorsRoute,
   AuthenticatedFeedRoute: AuthenticatedFeedRoute,
   AuthenticatedFriendsRoute: AuthenticatedFriendsRoute,
@@ -319,13 +370,3 @@ const rootRouteChildren: RootRouteChildren = {
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
   ._addFileTypes<FileRouteTypes>()
-
-import type { getRouter } from './router.tsx'
-import type { startInstance } from './start.ts'
-declare module '@tanstack/react-start' {
-  interface Register {
-    ssr: true
-    router: Awaited<ReturnType<typeof getRouter>>
-    config: Awaited<ReturnType<typeof startInstance.getOptions>>
-  }
-}
