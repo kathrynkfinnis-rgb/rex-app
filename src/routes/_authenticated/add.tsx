@@ -413,6 +413,13 @@ function AddPage() {
           />
         </div>
 
+        {uid && (
+          <div className="space-y-1.5">
+            <Label>Photos</Label>
+            <PhotoUploader userId={uid} value={photos} onChange={setPhotos} />
+          </div>
+        )}
+
         <Button
           type="button"
           onClick={handleSave}
