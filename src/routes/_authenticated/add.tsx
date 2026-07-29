@@ -70,6 +70,7 @@ function AddPage() {
     setManualMode(false);
     setPlaceSub("");
     setJustAdded(null);
+    setPhotos([]);
   }
 
 
