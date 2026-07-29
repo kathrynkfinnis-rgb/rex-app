@@ -673,6 +673,26 @@ export type Database = {
       admin_kpis_content: { Args: never; Returns: Json }
       admin_kpis_users: { Args: never; Returns: Json }
       are_friends: { Args: { _a: string; _b: string }; Returns: boolean }
+      get_shared_recommendation: {
+        Args: { rec_id: string }
+        Returns: {
+          author_avatar_url: string
+          author_display_name: string
+          author_username: string
+          created_at: string
+          id: string
+          item_genre: string
+          item_id: string
+          item_image_url: string
+          item_subtitle: string
+          item_title: string
+          item_type: string
+          note: string
+          photo_url: string
+          photo_urls: string[]
+          rating: number
+        }[]
+      }
       has_role: {
         Args: {
           _role: Database["public"]["Enums"]["app_role"]
