@@ -3,6 +3,8 @@ import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { Crown, Users, TrendingUp, MessageCircle, Heart, Bookmark, Megaphone, Sparkles, ArrowLeft, Zap, Network, BarChart3 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { AdminTeamManager } from "@/components/AdminTeamManager";
+
 
 export const Route = createFileRoute("/_authenticated/admin")({
   head: () => ({
