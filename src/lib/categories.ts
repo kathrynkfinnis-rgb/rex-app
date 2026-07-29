@@ -10,13 +10,14 @@ export const CATEGORIES: {
   tokenClass: string;
   subtitleLabel: string;
   actionVerb: string;
+  wantVerb: string;
 }[] = [
-  { type: "place", label: "Place", plural: "Places", icon: MapPin, tokenClass: "bg-cat-place/15 text-cat-place", subtitleLabel: "Address or neighborhood", actionVerb: "Been here" },
-  { type: "book", label: "Book", plural: "Books", icon: Book, tokenClass: "bg-cat-book/15 text-cat-book", subtitleLabel: "Author", actionVerb: "Read it" },
-  { type: "movie", label: "Movie", plural: "Movies", icon: Film, tokenClass: "bg-cat-movie/15 text-cat-movie", subtitleLabel: "Year or director", actionVerb: "Seen it" },
-  { type: "tv", label: "TV", plural: "TV shows", icon: Tv, tokenClass: "bg-cat-tv/15 text-cat-tv", subtitleLabel: "Network or year", actionVerb: "Watched it" },
-  { type: "podcast", label: "Podcast", plural: "Podcasts", icon: Mic, tokenClass: "bg-cat-podcast/15 text-cat-podcast", subtitleLabel: "Host or network", actionVerb: "Listened" },
-  { type: "recipe", label: "Recipe", plural: "Recipes", icon: ChefHat, tokenClass: "bg-cat-recipe/15 text-cat-recipe", subtitleLabel: "Cookbook, chef, or source", actionVerb: "Cooked it" },
+  { type: "place", label: "Place", plural: "Places", icon: MapPin, tokenClass: "bg-cat-place/15 text-cat-place", subtitleLabel: "Address or neighborhood", actionVerb: "Been here", wantVerb: "Want to visit" },
+  { type: "book", label: "Book", plural: "Books", icon: Book, tokenClass: "bg-cat-book/15 text-cat-book", subtitleLabel: "Author", actionVerb: "Read it", wantVerb: "Want to read" },
+  { type: "movie", label: "Movie", plural: "Movies", icon: Film, tokenClass: "bg-cat-movie/15 text-cat-movie", subtitleLabel: "Year or director", actionVerb: "Seen it", wantVerb: "Want to watch" },
+  { type: "tv", label: "TV", plural: "TV shows", icon: Tv, tokenClass: "bg-cat-tv/15 text-cat-tv", subtitleLabel: "Network or year", actionVerb: "Watched it", wantVerb: "Want to watch" },
+  { type: "podcast", label: "Podcast", plural: "Podcasts", icon: Mic, tokenClass: "bg-cat-podcast/15 text-cat-podcast", subtitleLabel: "Host or network", actionVerb: "Listened", wantVerb: "Want to listen" },
+  { type: "recipe", label: "Recipe", plural: "Recipes", icon: ChefHat, tokenClass: "bg-cat-recipe/15 text-cat-recipe", subtitleLabel: "Cookbook, chef, or source", actionVerb: "Cooked it", wantVerb: "Want to try" },
 ];
 
 export function categoryMeta(type: ItemType) {

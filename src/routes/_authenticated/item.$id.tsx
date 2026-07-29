@@ -11,6 +11,7 @@ import { CrownRatingDisplay, CrownRatingInput } from "@/components/CrownRating";
 import { ItemEnrichment } from "@/components/ItemEnrichment";
 import { LikesComments } from "@/components/LikesComments";
 import { UserAvatar } from "@/components/UserAvatar";
+import { WantButton } from "@/components/WantButton";
 import { cn } from "@/lib/utils";
 import { formatDistanceToNow } from "date-fns";
 
@@ -140,15 +141,18 @@ function ItemPage() {
             <span className="text-sm text-muted-foreground">· {recs.length} rec{recs.length === 1 ? "" : "s"}</span>
           </div>
         )}
-        <Button
-          type="button"
-          onClick={checkIn}
-          disabled={checking}
-          variant="outline"
-          className="mt-4 h-11 w-full gap-2 rounded-full border-accent bg-accent/10 text-accent-foreground hover:bg-accent/20"
-        >
-          <Check className="h-4 w-4" /> {cat.actionVerb}
-        </Button>
+        <div className="mt-4 grid grid-cols-1 gap-2 sm:grid-cols-2">
+          <Button
+            type="button"
+            onClick={checkIn}
+            disabled={checking}
+            variant="outline"
+            className="h-11 w-full gap-2 rounded-full border-accent bg-accent/10 text-accent-foreground hover:bg-accent/20"
+          >
+            <Check className="h-4 w-4" /> {cat.actionVerb}
+          </Button>
+          <WantButton itemId={id} itemType={item.type as ItemType} />
+        </div>
       </header>
 
       {item.type === "recipe" && (item as any).recipe_text && (
