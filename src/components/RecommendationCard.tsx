@@ -116,6 +116,15 @@ export function RecommendationCard({ rec }: { rec: FeedRow }) {
                 &ldquo;{rec.note}&rdquo;
               </p>
             )}
+            {rec.tags && rec.tags.length > 0 && (
+              <div className="mt-1 flex flex-wrap gap-1">
+                {rec.tags.map((t) => (
+                  <span key={t} className="rounded-full bg-primary/10 px-1.5 py-0.5 text-[10px] font-medium text-primary">
+                    #{t}
+                  </span>
+                ))}
+              </div>
+            )}
           </div>
         </div>
         {(() => {
