@@ -47,10 +47,12 @@ function ProfileButton() {
 }
 
 function AuthedLayout() {
+  const { user } = useRouteContext({ from: "/_authenticated" });
   return (
     <div className="min-h-screen bg-background pb-24">
       <div className="fixed left-1/2 top-[calc(env(safe-area-inset-top)+0.75rem)] z-40 w-full max-w-md -translate-x-1/2 px-4 pointer-events-none">
-        <div className="flex justify-end">
+        <div className="flex justify-end gap-2">
+          <NotificationBell userId={user.id} />
           <ProfileButton />
         </div>
       </div>
