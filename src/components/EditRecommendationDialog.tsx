@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import {
@@ -21,6 +21,7 @@ import { toast } from "sonner";
 import { PLACE_SUBCATEGORIES, type PlaceSubcategory, type ItemType } from "@/lib/categories";
 import { cn } from "@/lib/utils";
 import { RecipeEditor } from "@/components/RecipeEditor";
+import { PhotoUploader } from "@/components/PhotoUploader";
 
 export function EditRecommendationDialog({
   open,
