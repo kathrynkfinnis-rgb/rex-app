@@ -14,6 +14,7 @@ import { UserAvatar } from "@/components/UserAvatar";
 import { WantButton } from "@/components/WantButton";
 import { cn } from "@/lib/utils";
 import { formatDistanceToNow } from "date-fns";
+import { parseRecipe } from "@/lib/recipe";
 
 export const Route = createFileRoute("/_authenticated/item/$id")({
   head: () => ({
@@ -156,13 +157,9 @@ function ItemPage() {
       </header>
 
       {item.type === "recipe" && (item as any).recipe_text && (
-        <section className="border-b border-border p-5">
-          <h2 className="font-display text-2xl">Recipe</h2>
-          <pre className="mt-3 whitespace-pre-wrap rounded-2xl bg-card p-4 font-sans text-sm leading-relaxed ring-1 ring-border">
-            {(item as any).recipe_text}
-          </pre>
-        </section>
+        <RecipeView text={(item as any).recipe_text as string} />
       )}
+
 
 
       <section className="p-5">
@@ -225,3 +222,52 @@ function ItemPage() {
     </div>
   );
 }
+
+function RecipeView({ text }: { text: string }) {
+  const { ingredients, method, legacy } = parseRecipe(text);
+  if (legacy) {
+    return (
+      <section className="border-b border-border p-5">
+        <h2 className="font-display text-2xl">Recipe</h2>
+        <pre className="mt-3 whitespace-pre-wrap rounded-2xl bg-card p-4 font-sans text-sm leading-relaxed ring-1 ring-border">
+          {legacy}
+        </pre>
+      </section>
+    );
+  }
+  if (!ingredients.length && !method.length) return null;
+  return (
+    <section className="space-y-6 border-b border-border p-5">
+      <h2 className="font-display text-2xl">Recipe</h2>
+      {ingredients.length > 0 && (
+        <div className="rounded-2xl bg-card p-4 ring-1 ring-border">
+          <h3 className="font-display text-lg">Ingredients</h3>
+          <ul className="mt-3 space-y-1.5">
+            {ingredients.map((ing, i) => (
+              <li key={i} className="flex items-start gap-2 text-sm leading-relaxed">
+                <span className="mt-2 h-1.5 w-1.5 flex-none rounded-full bg-primary/70" />
+                <span>{ing}</span>
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+      {method.length > 0 && (
+        <div className="rounded-2xl bg-card p-4 ring-1 ring-border">
+          <h3 className="font-display text-lg">Method</h3>
+          <ol className="mt-3 space-y-3">
+            {method.map((step, i) => (
+              <li key={i} className="flex items-start gap-3 text-sm leading-relaxed">
+                <span className="mt-0.5 flex h-6 w-6 flex-none items-center justify-center rounded-full bg-primary/15 text-xs font-semibold text-primary">
+                  {i + 1}
+                </span>
+                <span>{step}</span>
+              </li>
+            ))}
+          </ol>
+        </div>
+      )}
+    </section>
+  );
+}
+
