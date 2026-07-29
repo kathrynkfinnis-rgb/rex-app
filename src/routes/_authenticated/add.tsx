@@ -166,6 +166,7 @@ function AddPage() {
         note: note.trim() || null,
         photo_url: photos[0] ?? null,
         photo_urls: photos,
+        tags,
       } as never);
       if (recErr) throw recErr;
 
