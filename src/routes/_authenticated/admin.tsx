@@ -247,35 +247,9 @@ function AdminPage() {
 
 
       <Section title="Admin team" icon={<Crown className="h-4 w-4" />}>
-        <div className="space-y-2">
-          {(adminsQ.data ?? []).map((a) => (
-            <Link
-              key={a.id}
-              to="/profile/$username"
-              params={{ username: a.username }}
-              className="flex items-center gap-3 rounded-xl border border-border bg-card p-3"
-            >
-              <div
-                className="flex h-9 w-9 items-center justify-center rounded-full bg-primary text-xs font-semibold text-primary-foreground bg-cover bg-center"
-                style={a.avatar_url ? { backgroundImage: `url(${a.avatar_url})` } : undefined}
-              >
-                {!a.avatar_url && (a.display_name || a.username || "?").slice(0, 1).toUpperCase()}
-              </div>
-              <div className="flex-1 min-w-0">
-                <div className="text-sm font-semibold truncate">{a.display_name || a.username}</div>
-                <div className="text-xs text-muted-foreground truncate">@{a.username}</div>
-              </div>
-              <Crown className="h-4 w-4 text-primary" />
-            </Link>
-          ))}
-          {adminsQ.data?.length === 0 && (
-            <p className="text-xs text-muted-foreground">No admins yet.</p>
-          )}
-          <p className="pt-2 text-[11px] text-muted-foreground">
-            To add more admins, ask Lovable to run a migration granting them the <code>admin</code> role.
-          </p>
-        </div>
+        <AdminTeamManager currentUserId={user?.id} />
       </Section>
+
     </div>
   );
 }
