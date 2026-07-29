@@ -152,9 +152,9 @@ function AddPage() {
             image_url: picked?.image_url ?? null,
             external_id: picked?.external_id ?? null,
             external_source: picked?.external_source ?? null,
-            address: type === "place" ? address.trim() || null : null,
-            lat: type === "place" ? coords?.lat ?? null : null,
-            lng: type === "place" ? coords?.lng ?? null : null,
+            address: type === "place" || type === "event" ? address.trim() || null : null,
+            lat: type === "place" || type === "event" ? coords?.lat ?? null : null,
+            lng: type === "place" || type === "event" ? coords?.lng ?? null : null,
             genre: placeSub || (picked?.genre ?? null),
             ...(type === "recipe" && recipeText.trim() ? { recipe_text: recipeText } : {}),
           } as never)
