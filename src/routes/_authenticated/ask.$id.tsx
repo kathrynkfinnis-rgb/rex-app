@@ -55,7 +55,7 @@ function AskDetailPage() {
   });
 
   async function handlePickSuggestion(hit: AnyHit) {
-    const hitType: ItemType = (req?.type as ItemType | null) ?? ("place" as ItemType);
+    const hitType: ItemType = (data?.req?.type as ItemType | null) ?? ("place" as ItemType);
     // Reuse existing item if we've seen this external id before
     let itemId: string | undefined;
     if (hit.external_source && hit.external_id) {
