@@ -210,6 +210,13 @@ function MePage() {
             <BookOpen className="h-4 w-4" /> Import from Goodreads
           </Button>
         </Link>
+        {isAdmin && (
+          <Link to="/admin">
+            <Button variant="outline" className="h-12 w-full gap-2 rounded-full border-primary/40 text-primary">
+              <Crown className="h-4 w-4" /> REX admin dashboard
+            </Button>
+          </Link>
+        )}
         <Button
           variant="outline"
           onClick={signOut}
@@ -217,6 +224,7 @@ function MePage() {
         >
           <LogOut className="h-4 w-4" /> Sign out
         </Button>
+
       </div>
     </div>
   );
