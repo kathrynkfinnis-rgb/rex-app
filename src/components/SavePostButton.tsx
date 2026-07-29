@@ -53,7 +53,7 @@ export function SavePostButton({
     onSuccess: (nowSaved) => {
       qc.setQueryData(["saved-post", recommendationId, userId], nowSaved);
       qc.invalidateQueries({ queryKey: ["my-saved-posts"] });
-      toast.success(nowSaved ? "Added to Hit List" : "Removed from Hit List");
+      toast.success(nowSaved ? "Added to My List" : "Removed from My List");
     },
     onError: (e: any) => toast.error(e.message || "Couldn't save"),
   });
