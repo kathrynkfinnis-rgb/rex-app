@@ -38,6 +38,18 @@ function MePage() {
     enabled: !!user,
   });
 
+  const { data: isAdmin } = useQuery({
+    queryKey: ["me-is-admin", user?.id],
+    enabled: !!user,
+    queryFn: async () => {
+      const { data } = await supabase
+        .from("user_roles").select("role")
+        .eq("user_id", user!.id).eq("role", "admin").maybeSingle();
+      return !!data;
+    },
+  });
+
+
   const { data: myRecs } = useQuery({
     queryKey: ["my-recs", user?.id],
     queryFn: async () => {
