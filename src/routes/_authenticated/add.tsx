@@ -45,6 +45,12 @@ function AddPage() {
   const [manualMode, setManualMode] = useState(false);
   const [placeSub, setPlaceSub] = useState<PlaceSubcategory | "">("");
   const [justAdded, setJustAdded] = useState<{ itemId: string; title: string } | null>(null);
+  const [photos, setPhotos] = useState<string[]>([]);
+  const { data: uid } = useQuery({
+    queryKey: ["current-user-id"],
+    queryFn: async () => (await supabase.auth.getUser()).data.user?.id ?? null,
+    staleTime: 5 * 60 * 1000,
+  });
 
   const cat = type ? categoryMeta(type) : null;
   const needsSearch = type !== null && type !== "recipe";
