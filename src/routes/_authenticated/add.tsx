@@ -18,6 +18,7 @@ import { getPlacePhotoUrl } from "@/lib/places.functions";
 import { useServerFn } from "@tanstack/react-start";
 import { RecipeEditor } from "@/components/RecipeEditor";
 import { PhotoUploader } from "@/components/PhotoUploader";
+import { TagsInput } from "@/components/TagsInput";
 
 export const Route = createFileRoute("/_authenticated/add")({
   head: () => ({
