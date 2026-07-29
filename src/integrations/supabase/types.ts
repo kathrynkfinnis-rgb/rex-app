@@ -144,6 +144,7 @@ export type Database = {
           item_type: string
           name: string
           user_id: string
+          visibility: Database["public"]["Enums"]["list_visibility"]
         }
         Insert: {
           created_at?: string
@@ -152,6 +153,7 @@ export type Database = {
           item_type: string
           name: string
           user_id: string
+          visibility?: Database["public"]["Enums"]["list_visibility"]
         }
         Update: {
           created_at?: string
@@ -160,6 +162,7 @@ export type Database = {
           item_type?: string
           name?: string
           user_id?: string
+          visibility?: Database["public"]["Enums"]["list_visibility"]
         }
         Relationships: []
       }
@@ -785,6 +788,7 @@ export type Database = {
         | "recipe"
         | "podcast"
         | "event"
+      list_visibility: "draft" | "friends" | "public"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -915,6 +919,7 @@ export const Constants = {
       app_role: ["admin", "moderator", "user"],
       friendship_status: ["pending", "accepted"],
       item_type: ["place", "book", "movie", "tv", "recipe", "podcast", "event"],
+      list_visibility: ["draft", "friends", "public"],
     },
   },
 } as const
