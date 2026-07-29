@@ -44,6 +44,7 @@ export function EditRecommendationDialog({
     ? [recommendation.photo_url]
     : []) as string[];
   const [photos, setPhotos] = useState<string[]>(initialPhotos);
+  const [tags, setTags] = useState<string[]>(recommendation.tags ?? []);
   const subOptions = item ? subcategoriesFor(item.type) : [];
   const [placeSub, setPlaceSub] = useState<string>(
     item && (subOptions as readonly string[]).includes(item.genre ?? "") ? (item.genre as string) : "",
