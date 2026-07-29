@@ -149,7 +149,7 @@ function AddPage() {
             address: type === "place" ? address.trim() || null : null,
             lat: type === "place" ? coords?.lat ?? null : null,
             lng: type === "place" ? coords?.lng ?? null : null,
-            genre: type === "place" ? (placeSub || null) : (picked?.genre ?? null),
+            genre: placeSub || (picked?.genre ?? null),
             ...(type === "recipe" && recipeText.trim() ? { recipe_text: recipeText } : {}),
           } as never)
           .select("id")
