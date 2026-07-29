@@ -114,6 +114,42 @@ function MePage() {
       )}
 
       <section className="p-4">
+        <h2 className="mb-3 flex items-center gap-2 text-xs font-semibold uppercase tracking-widest text-muted-foreground">
+          <Bookmark className="h-3.5 w-3.5" /> Your want-to list
+        </h2>
+        {myWants && myWants.length > 0 ? (
+          <div className="space-y-2">
+            {myWants.map((w) => {
+              const cat = categoryMeta(w.items.type);
+              const Icon = cat.icon;
+              return (
+                <Link
+                  key={w.id}
+                  to="/item/$id"
+                  params={{ id: w.item_id }}
+                  className="flex items-center gap-3 rounded-2xl bg-card p-3 ring-1 ring-border transition-colors active:scale-[0.99]"
+                >
+                  <div className={cn("flex h-12 w-12 shrink-0 items-center justify-center overflow-hidden rounded-xl", cat.tokenClass)}>
+                    {w.items.image_url ? (
+                      <img src={w.items.image_url} alt="" className="h-full w-full object-cover" />
+                    ) : (
+                      <Icon className="h-5 w-5" />
+                    )}
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <p className="truncate font-medium">{w.items.title}</p>
+                    <p className="truncate text-xs text-muted-foreground">{cat.wantVerb}</p>
+                  </div>
+                </Link>
+              );
+            })}
+          </div>
+        ) : (
+          <p className="text-sm text-muted-foreground">Nothing saved yet — tap "Want to…" on any recommendation.</p>
+        )}
+      </section>
+
+      <section className="p-4">
         <h2 className="mb-3 text-xs font-semibold uppercase tracking-widest text-muted-foreground">Your recommendations</h2>
         {myRecs && myRecs.length > 0 ? (
           <div className="space-y-3">
