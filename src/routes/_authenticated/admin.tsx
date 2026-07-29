@@ -1,7 +1,7 @@
 import { createFileRoute, Link, useRouteContext } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
-import { Crown, Users, TrendingUp, MessageCircle, Heart, Bookmark, Megaphone, Sparkles, ArrowLeft } from "lucide-react";
+import { Crown, Users, TrendingUp, MessageCircle, Heart, Bookmark, Megaphone, Sparkles, ArrowLeft, Zap, Network, BarChart3 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 export const Route = createFileRoute("/_authenticated/admin")({
