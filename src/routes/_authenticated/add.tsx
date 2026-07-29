@@ -46,6 +46,7 @@ function AddPage() {
   const [placeSub, setPlaceSub] = useState<string>("");
   const [justAdded, setJustAdded] = useState<{ itemId: string; title: string } | null>(null);
   const [photos, setPhotos] = useState<string[]>([]);
+  const [tags, setTags] = useState<string[]>([]);
   const { data: uid } = useQuery({
     queryKey: ["current-user-id"],
     queryFn: async () => (await supabase.auth.getUser()).data.user?.id ?? null,
