@@ -1,0 +1,2 @@
+ALTER TABLE public.requests ADD CONSTRAINT requests_user_id_profiles_fkey FOREIGN KEY (user_id) REFERENCES public.profiles(id) ON DELETE CASCADE;
+ALTER TABLE public.request_comments ADD CONSTRAINT request_comments_user_id_profiles_fkey FOREIGN KEY (user_id) REFERENCES public.profiles(id) ON DELETE CASCADE;
