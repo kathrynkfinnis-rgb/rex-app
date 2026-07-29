@@ -32,7 +32,7 @@ export function EditRecommendationDialog({
 }: {
   open: boolean;
   onOpenChange: (v: boolean) => void;
-  recommendation: { id: string; rating: number; note: string | null; photo_url?: string | null; photo_urls?: string[] | null };
+  recommendation: { id: string; rating: number; note: string | null; photo_url?: string | null; photo_urls?: string[] | null; tags?: string[] | null };
   item?: { id: string; type: ItemType; genre: string | null; recipe_text?: string | null } | null;
 }) {
   const qc = useQueryClient();
