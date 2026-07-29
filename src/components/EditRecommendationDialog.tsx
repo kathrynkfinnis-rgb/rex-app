@@ -86,7 +86,7 @@ export function EditRecommendationDialog({
         } as never)
         .eq("id", recommendation.id);
       if (error) throw error;
-      if (isPlace && item) {
+      if (item && subOptions.length > 0) {
         const nextGenre = placeSub || null;
         if ((item.genre ?? null) !== nextGenre) {
           const { error: itemErr } = await supabase
