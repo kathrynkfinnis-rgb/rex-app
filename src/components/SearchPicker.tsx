@@ -67,9 +67,12 @@ export function SearchPicker({ type, onPick, onManual, near }: Props) {
           ? "Search TV shows…"
           : type === "podcast"
             ? "Search podcasts…"
-            : "Search restaurants, cafés, places…";
+            : type === "event"
+              ? "Search events, concerts, shows…"
+              : "Search restaurants, cafés, places…";
 
   const isPlace = type === "place";
+  const isEvent = type === "event";
 
   return (
     <div className="space-y-3">
