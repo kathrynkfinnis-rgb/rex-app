@@ -10,6 +10,10 @@ import { formatDistanceToNow } from "date-fns";
 import { Pencil } from "lucide-react";
 import { UserAvatar } from "@/components/UserAvatar";
 import { SavePostButton } from "@/components/SavePostButton";
+import { ShareButton } from "@/components/ShareButton";
+
+const SHARE_SITE = "https://pocket-app-pioneers.lovable.app";
+
 
 
 export type FeedRow = {
