@@ -23,6 +23,7 @@ export type FeedRow = {
   created_at: string;
   photo_url: string | null;
   photo_urls?: string[] | null;
+  tags?: string[] | null;
   user_id: string;
   item_id: string;
   items: {
