@@ -4,7 +4,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { RecommendationCard, type FeedRow } from "@/components/RecommendationCard";
 import { toast } from "sonner";
-import { LogOut, Smartphone, BookOpen, FileUp, Bookmark, BookmarkCheck } from "lucide-react";
+import { LogOut, Smartphone, BookOpen, FileUp, Bookmark, BookmarkCheck, Crown } from "lucide-react";
 import { AvatarUploader } from "@/components/AvatarUploader";
 import { categoryMeta, type ItemType } from "@/lib/categories";
 import { cn } from "@/lib/utils";
@@ -37,6 +37,18 @@ function MePage() {
     },
     enabled: !!user,
   });
+
+  const { data: isAdmin } = useQuery({
+    queryKey: ["me-is-admin", user?.id],
+    enabled: !!user,
+    queryFn: async () => {
+      const { data } = await supabase
+        .from("user_roles").select("role")
+        .eq("user_id", user!.id).eq("role", "admin").maybeSingle();
+      return !!data;
+    },
+  });
+
 
   const { data: myRecs } = useQuery({
     queryKey: ["my-recs", user?.id],
@@ -198,6 +210,13 @@ function MePage() {
             <BookOpen className="h-4 w-4" /> Import from Goodreads
           </Button>
         </Link>
+        {isAdmin && (
+          <Link to="/admin">
+            <Button variant="outline" className="h-12 w-full gap-2 rounded-full border-primary/40 text-primary">
+              <Crown className="h-4 w-4" /> REX admin dashboard
+            </Button>
+          </Link>
+        )}
         <Button
           variant="outline"
           onClick={signOut}
@@ -205,6 +224,7 @@ function MePage() {
         >
           <LogOut className="h-4 w-4" /> Sign out
         </Button>
+
       </div>
     </div>
   );
