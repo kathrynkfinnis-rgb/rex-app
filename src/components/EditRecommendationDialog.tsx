@@ -157,20 +157,13 @@ export function EditRecommendationDialog({
             )}
             {isRecipe && (
               <div className="space-y-1.5">
-                <Label htmlFor="recipe">Recipe</Label>
-                <Textarea
-                  id="recipe"
-                  value={recipeText}
-                  onChange={(e) => setRecipeText(e.target.value)}
-                  rows={10}
-                  placeholder={"Paste the full recipe here — ingredients, steps, tips…"}
-                  className="font-mono text-sm"
-                />
+                <RecipeEditor value={recipeText} onChange={setRecipeText} />
                 <p className="text-xs text-muted-foreground">
                   Saved on the recipe so everyone who opens it can read it.
                 </p>
               </div>
             )}
+
             <div>
               <label className="mb-2 block text-sm font-medium">Note</label>
               <Textarea
