@@ -13,26 +13,34 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { MoreHorizontal, Plus, Trash2 } from "lucide-react";
+import { Lock, MoreHorizontal, Plus, Trash2, Users, Globe2, Check } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { CATEGORIES, categoryMeta, type ItemType } from "@/lib/categories";
 import { toast } from "sonner";
 import type { FeedRow } from "@/components/RecommendationCard";
 
+type Visibility = "draft" | "friends" | "public";
 type ItemLite = { id: string; type: ItemType; title: string; subtitle: string | null; image_url: string | null };
 type WantRow = { id: string; item_id: string; list_id: string | null; items: ItemLite };
 type SavedRow = { id: string; list_id: string | null; recommendations: FeedRow };
-type ListRow = { id: string; user_id: string; item_type: ItemType; name: string; emoji: string | null };
+type ListRow = { id: string; user_id: string; item_type: ItemType; name: string; emoji: string | null; visibility: Visibility };
 
 type Entry =
   | { kind: "want"; id: string; itemType: ItemType; title: string; image: string | null; href: string; params: any; listId: string | null }
   | { kind: "saved"; id: string; itemType: ItemType; title: string; image: string | null; href: string; params: any; listId: string | null };
+
+const VISIBILITY_META: Record<Visibility, { label: string; icon: typeof Lock; hint: string }> = {
+  draft: { label: "Draft", icon: Lock, hint: "Only you" },
+  friends: { label: "Friends", icon: Users, hint: "Visible to your friends" },
+  public: { label: "Public", icon: Globe2, hint: "Anyone on REX (friends can share on)" },
+};
 
 export function HitList({ userId }: { userId: string }) {
   const qc = useQueryClient();
   const [newListFor, setNewListFor] = useState<ItemType | null>(null);
   const [newName, setNewName] = useState("");
   const [newEmoji, setNewEmoji] = useState("");
+  const [newVisibility, setNewVisibility] = useState<Visibility>("draft");
 
   const { data: wants } = useQuery({
     queryKey: ["my-wants", userId],
@@ -63,7 +71,7 @@ export function HitList({ userId }: { userId: string }) {
     queryFn: async () => {
       const { data } = await supabase
         .from("hitlist_lists")
-        .select("id, user_id, item_type, name, emoji")
+        .select("id, user_id, item_type, name, emoji, visibility")
         .eq("user_id", userId)
         .order("created_at", { ascending: true });
       return (data ?? []) as unknown as ListRow[];
@@ -136,7 +144,7 @@ export function HitList({ userId }: { userId: string }) {
     const table = entry.kind === "want" ? "wants" : "saved_posts";
     const { error } = await supabase.from(table).delete().eq("id", entry.id);
     if (error) return toast.error(error.message);
-    toast.success("Removed from Hit List");
+    toast.success("Removed from My List");
     qc.invalidateQueries({ queryKey: entry.kind === "want" ? ["my-wants", userId] : ["my-saved-posts", userId] });
   }
 
@@ -147,12 +155,27 @@ export function HitList({ userId }: { userId: string }) {
       item_type: newListFor,
       name: newName.trim(),
       emoji: newEmoji.trim() || null,
+      visibility: newVisibility,
     });
     if (error) return toast.error(error.message);
     toast.success("List created");
     setNewListFor(null);
     setNewName("");
     setNewEmoji("");
+    setNewVisibility("draft");
+    qc.invalidateQueries({ queryKey: ["my-hitlist-lists", userId] });
+  }
+
+  async function updateVisibility(list: ListRow, visibility: Visibility) {
+    const { error } = await supabase.from("hitlist_lists").update({ visibility }).eq("id", list.id);
+    if (error) return toast.error(error.message);
+    toast.success(
+      visibility === "draft"
+        ? "List moved back to draft"
+        : visibility === "friends"
+        ? "Shared with friends"
+        : "Published — anyone on REX can see it",
+    );
     qc.invalidateQueries({ queryKey: ["my-hitlist-lists", userId] });
   }
 
@@ -168,7 +191,7 @@ export function HitList({ userId }: { userId: string }) {
   if (entries.length === 0 && (lists?.length ?? 0) === 0) {
     return (
       <p className="text-sm text-muted-foreground">
-        Nothing on your Hit List yet — tap the bookmark on any post, or hit "Want to…" on an item page.
+        Nothing on your list yet — tap the bookmark on any post, or hit "Want to…" on an item page.
       </p>
     );
   }
@@ -195,6 +218,7 @@ export function HitList({ userId }: { userId: string }) {
                   setNewListFor(cat.type);
                   setNewName("");
                   setNewEmoji("");
+                  setNewVisibility("draft");
                 }}
               >
                 <Plus className="h-3.5 w-3.5" /> New list
@@ -211,23 +235,60 @@ export function HitList({ userId }: { userId: string }) {
 
             {subs.map((list) => {
               const inList = all.filter((e) => e.listId === list.id);
+              const VMeta = VISIBILITY_META[list.visibility];
+              const VIcon = VMeta.icon;
               return (
                 <div key={list.id} className="rounded-2xl border border-border bg-card/40 p-3">
-                  <div className="mb-2 flex items-center justify-between">
-                    <p className="font-medium">
+                  <div className="mb-2 flex items-center justify-between gap-2">
+                    <p className="min-w-0 truncate font-medium">
                       <span className="mr-1.5">{list.emoji ?? cat.hitDefaultEmoji}</span>
                       {list.name}{" "}
                       <span className="text-xs text-muted-foreground">({inList.length})</span>
                     </p>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        if (confirm(`Delete list "${list.name}"? Items go back to default.`)) deleteList(list);
-                      }}
-                      className="text-xs text-muted-foreground hover:text-destructive"
-                    >
-                      <Trash2 className="h-3.5 w-3.5" />
-                    </button>
+                    <div className="flex items-center gap-1">
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <button
+                            type="button"
+                            className={cn(
+                              "inline-flex items-center gap-1 rounded-full px-2 py-1 text-[11px] font-medium ring-1 ring-border",
+                              list.visibility === "draft" && "bg-muted text-muted-foreground",
+                              list.visibility === "friends" && "bg-primary/10 text-primary",
+                              list.visibility === "public" && "bg-accent text-accent-foreground",
+                            )}
+                          >
+                            <VIcon className="h-3 w-3" /> {VMeta.label}
+                          </button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end">
+                          <DropdownMenuLabel>Who can see this list</DropdownMenuLabel>
+                          {(["draft", "friends", "public"] as Visibility[]).map((v) => {
+                            const M = VISIBILITY_META[v];
+                            const I = M.icon;
+                            return (
+                              <DropdownMenuItem key={v} onClick={() => updateVisibility(list, v)}>
+                                <I className="mr-2 h-4 w-4" />
+                                <span className="flex-1">
+                                  {M.label}
+                                  <span className="ml-1 text-xs text-muted-foreground">— {M.hint}</span>
+                                </span>
+                                {list.visibility === v ? <Check className="ml-2 h-3.5 w-3.5" /> : null}
+                              </DropdownMenuItem>
+                            );
+                          })}
+                        </DropdownMenuContent>
+                      </DropdownMenu>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          if (confirm(`Delete list "${list.name}"? Items go back to default.`)) deleteList(list);
+                        }}
+                        className="rounded-full p-1.5 text-muted-foreground hover:bg-muted hover:text-destructive"
+                        aria-label="Delete list"
+                      >
+                        <Trash2 className="h-3.5 w-3.5" />
+                      </button>
+                    </div>
                   </div>
                   {inList.length > 0 ? (
                     <EntryList
@@ -261,7 +322,7 @@ export function HitList({ userId }: { userId: string }) {
                 autoFocus
                 value={newName}
                 onChange={(e) => setNewName(e.target.value)}
-                placeholder="e.g. Tokyo hit list"
+                placeholder="e.g. Tokyo list"
               />
             </div>
             <div>
@@ -272,6 +333,31 @@ export function HitList({ userId }: { userId: string }) {
                 placeholder="🏯"
                 maxLength={4}
               />
+            </div>
+            <div>
+              <label className="mb-1.5 block text-xs font-medium">Who can see it</label>
+              <div className="grid grid-cols-3 gap-2">
+                {(["draft", "friends", "public"] as Visibility[]).map((v) => {
+                  const M = VISIBILITY_META[v];
+                  const I = M.icon;
+                  const active = newVisibility === v;
+                  return (
+                    <button
+                      key={v}
+                      type="button"
+                      onClick={() => setNewVisibility(v)}
+                      className={cn(
+                        "flex flex-col items-center gap-1 rounded-xl border p-2 text-xs transition",
+                        active ? "border-primary bg-primary/10 text-primary" : "border-border text-muted-foreground hover:bg-muted",
+                      )}
+                    >
+                      <I className="h-4 w-4" />
+                      <span className="font-medium">{M.label}</span>
+                    </button>
+                  );
+                })}
+              </div>
+              <p className="mt-1.5 text-[11px] text-muted-foreground">{VISIBILITY_META[newVisibility].hint}</p>
             </div>
           </div>
           <DialogFooter>
@@ -347,7 +433,7 @@ function EntryList({
               ))}
               <DropdownMenuSeparator />
               <DropdownMenuItem className="text-destructive" onClick={() => onRemove(e)}>
-                <Trash2 className="mr-2 h-4 w-4" /> Remove from Hit List
+                <Trash2 className="mr-2 h-4 w-4" /> Remove from My List
               </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
