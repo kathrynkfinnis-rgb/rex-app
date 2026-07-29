@@ -18,7 +18,7 @@ import { Label } from "@/components/ui/label";
 import { CrownRatingInput } from "@/components/CrownRating";
 import { Loader2, Trash2 } from "lucide-react";
 import { toast } from "sonner";
-import { PLACE_SUBCATEGORIES, type PlaceSubcategory, type ItemType } from "@/lib/categories";
+import { subcategoriesFor, categoryMeta, type ItemType } from "@/lib/categories";
 import { cn } from "@/lib/utils";
 import { RecipeEditor } from "@/components/RecipeEditor";
 import { PhotoUploader } from "@/components/PhotoUploader";
