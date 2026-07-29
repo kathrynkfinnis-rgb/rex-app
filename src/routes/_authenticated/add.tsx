@@ -1,5 +1,6 @@
 import { createFileRoute, useNavigate, Link } from "@tanstack/react-router";
 import { useState } from "react";
+import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 
 import { CATEGORIES, type ItemType, categoryMeta, PLACE_SUBCATEGORIES, normalizePlaceSubcategory, type PlaceSubcategory } from "@/lib/categories";
@@ -16,6 +17,7 @@ import type { SearchHit } from "@/lib/search.functions";
 import { getPlacePhotoUrl } from "@/lib/places.functions";
 import { useServerFn } from "@tanstack/react-start";
 import { RecipeEditor } from "@/components/RecipeEditor";
+import { PhotoUploader } from "@/components/PhotoUploader";
 
 export const Route = createFileRoute("/_authenticated/add")({
   head: () => ({
