@@ -2,6 +2,7 @@ import { createFileRoute, Outlet, redirect, Link, useRouteContext } from "@tanst
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { BottomNav } from "@/components/BottomNav";
+import { NotificationBell } from "@/components/NotificationBell";
 import { cn } from "@/lib/utils";
 
 export const Route = createFileRoute("/_authenticated")({
