@@ -137,6 +137,7 @@ function AdminPage() {
 
   const u = usersQ.data;
   const c = contentQ.data;
+  const e = engQ.data;
 
   return (
     <div className="px-4 pb-8 pt-20">
