@@ -191,6 +191,13 @@ export function EditRecommendationDialog({
                 placeholder="What did you think?"
               />
             </div>
+
+            {uid && (
+              <div className="space-y-1.5">
+                <Label>Photos</Label>
+                <PhotoUploader userId={uid} value={photos} onChange={setPhotos} />
+              </div>
+            )}
           </div>
           <DialogFooter className="flex-row justify-between sm:justify-between">
             <Button
