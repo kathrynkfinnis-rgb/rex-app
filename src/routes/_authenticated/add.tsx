@@ -374,21 +374,14 @@ function AddPage() {
         )}
 
         {type === "recipe" && (
-          <div className="space-y-1.5">
-            <Label htmlFor="recipe">Recipe</Label>
-            <Textarea
-              id="recipe"
-              value={recipeText}
-              onChange={(e) => setRecipeText(e.target.value)}
-              rows={10}
-              placeholder={"Paste the full recipe here — ingredients, method, tips…"}
-              className="rounded-xl font-mono text-sm"
-            />
-            <p className="text-xs text-muted-foreground">
-              This is saved on the recipe so friends can read it in-app.
+          <div className="rounded-2xl bg-card p-4 ring-1 ring-border">
+            <RecipeEditor value={recipeText} onChange={setRecipeText} />
+            <p className="mt-4 text-xs text-muted-foreground">
+              Saved on the recipe so friends can cook it in-app.
             </p>
           </div>
         )}
+
 
         <div className="space-y-2">
           <Label>Your rating</Label>
