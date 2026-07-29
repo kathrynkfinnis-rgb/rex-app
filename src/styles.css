@@ -57,6 +57,7 @@
   --color-cat-recipe: var(--cat-recipe);
   --color-cat-podcast: var(--cat-podcast);
   --color-cat-event: var(--cat-event);
+  --color-cat-other: var(--cat-other);
 }
 
 :root {
