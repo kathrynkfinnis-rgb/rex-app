@@ -31,12 +31,18 @@ export function EditRecommendationDialog({
 }: {
   open: boolean;
   onOpenChange: (v: boolean) => void;
-  recommendation: { id: string; rating: number; note: string | null };
+  recommendation: { id: string; rating: number; note: string | null; photo_url?: string | null; photo_urls?: string[] | null };
   item?: { id: string; type: ItemType; genre: string | null; recipe_text?: string | null } | null;
 }) {
   const qc = useQueryClient();
   const [rating, setRating] = useState(recommendation.rating);
   const [note, setNote] = useState(recommendation.note ?? "");
+  const initialPhotos = (recommendation.photo_urls && recommendation.photo_urls.length
+    ? recommendation.photo_urls
+    : recommendation.photo_url
+    ? [recommendation.photo_url]
+    : []) as string[];
+  const [photos, setPhotos] = useState<string[]>(initialPhotos);
   const [placeSub, setPlaceSub] = useState<PlaceSubcategory | "">(
     (item?.type === "place" && (PLACE_SUBCATEGORIES as readonly string[]).includes(item.genre ?? "")
       ? (item!.genre as PlaceSubcategory)
@@ -46,6 +52,11 @@ export function EditRecommendationDialog({
   const [confirmDelete, setConfirmDelete] = useState(false);
   const isPlace = item?.type === "place";
   const isRecipe = item?.type === "recipe";
+  const { data: uid } = useQuery({
+    queryKey: ["current-user-id"],
+    queryFn: async () => (await supabase.auth.getUser()).data.user?.id ?? null,
+    staleTime: 5 * 60 * 1000,
+  });
 
   useEffect(() => {
     if (!open || !isRecipe || !item?.id) return;
