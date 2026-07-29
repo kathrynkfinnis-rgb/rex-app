@@ -136,6 +136,33 @@ export type Database = {
         }
         Relationships: []
       }
+      hitlist_lists: {
+        Row: {
+          created_at: string
+          emoji: string | null
+          id: string
+          item_type: string
+          name: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          emoji?: string | null
+          id?: string
+          item_type: string
+          name: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          emoji?: string | null
+          id?: string
+          item_type?: string
+          name?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       import_staging: {
         Row: {
           created_at: string
@@ -590,22 +617,32 @@ export type Database = {
         Row: {
           created_at: string
           id: string
+          list_id: string | null
           recommendation_id: string
           user_id: string
         }
         Insert: {
           created_at?: string
           id?: string
+          list_id?: string | null
           recommendation_id: string
           user_id: string
         }
         Update: {
           created_at?: string
           id?: string
+          list_id?: string | null
           recommendation_id?: string
           user_id?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "saved_posts_list_id_fkey"
+            columns: ["list_id"]
+            isOneToOne: false
+            referencedRelation: "hitlist_lists"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "saved_posts_recommendation_id_fkey"
             columns: ["recommendation_id"]
@@ -641,18 +678,21 @@ export type Database = {
           created_at: string
           id: string
           item_id: string
+          list_id: string | null
           user_id: string
         }
         Insert: {
           created_at?: string
           id?: string
           item_id: string
+          list_id?: string | null
           user_id: string
         }
         Update: {
           created_at?: string
           id?: string
           item_id?: string
+          list_id?: string | null
           user_id?: string
         }
         Relationships: [
@@ -661,6 +701,13 @@ export type Database = {
             columns: ["item_id"]
             isOneToOne: false
             referencedRelation: "items"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "wants_list_id_fkey"
+            columns: ["list_id"]
+            isOneToOne: false
+            referencedRelation: "hitlist_lists"
             referencedColumns: ["id"]
           },
         ]
