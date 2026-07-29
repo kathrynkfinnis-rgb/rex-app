@@ -426,6 +426,22 @@ function AddPage() {
           </div>
         )}
 
+        <div className="space-y-1.5">
+          <Label>Tags</Label>
+          <TagsInput
+            value={tags}
+            onChange={setTags}
+            placeholder={type === "place" ? "e.g. private dining, date night, dog friendly" : "Add tags (press enter)"}
+            suggestions={
+              type === "place"
+                ? ["private dining", "date night", "outdoor seating", "dog friendly", "kid friendly"]
+                : type === "recipe"
+                ? ["quick", "gluten free", "vegetarian", "meal prep"]
+                : []
+            }
+          />
+        </div>
+
         <Button
           type="button"
           onClick={handleSave}
