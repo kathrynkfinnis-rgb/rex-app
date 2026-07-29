@@ -43,7 +43,7 @@ function AddPage() {
   const [coords, setCoords] = useState<{ lat: number; lng: number } | null>(null);
   const [picked, setPicked] = useState<AnyHit | null>(null);
   const [manualMode, setManualMode] = useState(false);
-  const [placeSub, setPlaceSub] = useState<PlaceSubcategory | "">("");
+  const [placeSub, setPlaceSub] = useState<string>("");
   const [justAdded, setJustAdded] = useState<{ itemId: string; title: string } | null>(null);
   const [photos, setPhotos] = useState<string[]>([]);
   const { data: uid } = useQuery({
