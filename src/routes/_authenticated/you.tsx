@@ -173,7 +173,7 @@ function YouPage() {
               {mix.map(([type, n]) => (
                 <div key={type} className="flex items-center gap-2">
                   <div className="w-20 shrink-0 truncate text-xs">
-                    {CATEGORIES.find((c) => c.value === type)?.label ?? type}
+                    {CATEGORIES.find((c) => c.type === type)?.label ?? type}
                   </div>
                   <div className="h-2 flex-1 overflow-hidden rounded-full bg-muted">
                     <div className="h-full rounded-full bg-primary" style={{ width: `${Math.max(6, (n / maxMix) * 100)}%` }} />
