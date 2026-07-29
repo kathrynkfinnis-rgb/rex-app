@@ -228,17 +228,17 @@ function AddPage() {
           </button>
           <h1 className="mt-3 font-display text-3xl">What are you recommending?</h1>
         </header>
-        <div className="grid grid-cols-2 gap-3 p-4">
+        <div className="grid grid-cols-2 gap-2 p-4">
           {CATEGORIES.map((c) => (
             <button
               key={c.type}
               onClick={() => setType(c.type)}
-              className="flex aspect-square flex-col items-center justify-center gap-3 rounded-3xl bg-card ring-1 ring-border transition-transform active:scale-95"
+              className="flex items-center gap-3 rounded-2xl bg-card p-3 ring-1 ring-border transition-transform active:scale-95"
             >
-              <div className={cn("flex h-14 w-14 items-center justify-center rounded-2xl", c.tokenClass)}>
-                <c.icon className="h-7 w-7" />
+              <div className={cn("flex h-10 w-10 shrink-0 items-center justify-center rounded-xl", c.tokenClass)}>
+                <c.icon className="h-5 w-5" />
               </div>
-              <span className="font-display text-2xl">{c.plural}</span>
+              <span className="min-w-0 truncate font-display text-base">{c.plural}</span>
             </button>
           ))}
         </div>
