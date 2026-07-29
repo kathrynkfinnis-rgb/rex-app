@@ -17,6 +17,7 @@ export type FeedRow = {
   note: string | null;
   created_at: string;
   photo_url: string | null;
+  photo_urls?: string[] | null;
   user_id: string;
   item_id: string;
   items: {
