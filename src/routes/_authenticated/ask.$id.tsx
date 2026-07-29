@@ -41,13 +41,13 @@ function AskDetailPage() {
     queryFn: async () => {
       const { data: req, error } = await supabase
         .from("requests")
-        .select("id, user_id, type, title, note, created_at, profiles!requests_user_id_fkey(username, display_name, avatar_url)")
+        .select("id, user_id, type, title, note, created_at, profiles!requests_user_id_profiles_fkey(username, display_name, avatar_url)")
         .eq("id", id)
         .single();
       if (error) throw error;
       const { data: comments } = await supabase
         .from("request_comments")
-        .select("id, body, created_at, user_id, suggested_item_id, profiles!request_comments_user_id_fkey(username, display_name, avatar_url), items(id, type, title, subtitle, image_url)")
+        .select("id, body, created_at, user_id, suggested_item_id, profiles!request_comments_user_id_profiles_fkey(username, display_name, avatar_url), items(id, type, title, subtitle, image_url)")
         .eq("request_id", id)
         .order("created_at", { ascending: true });
       return { req, comments: comments ?? [] };
@@ -55,6 +55,7 @@ function AskDetailPage() {
   });
 
   async function handlePickSuggestion(hit: AnyHit) {
+    const hitType: ItemType = (req?.type as ItemType | null) ?? ("place" as ItemType);
     // Reuse existing item if we've seen this external id before
     let itemId: string | undefined;
     if (hit.external_source && hit.external_id) {
@@ -70,7 +71,7 @@ function AskDetailPage() {
       const { data: item, error } = await supabase
         .from("items")
         .insert({
-          type: hit.type,
+          type: hitType,
           title: hit.title,
           subtitle: hit.subtitle ?? null,
           image_url: hit.image_url ?? null,
@@ -91,7 +92,7 @@ function AskDetailPage() {
       title: hit.title,
       subtitle: hit.subtitle ?? null,
       image_url: hit.image_url ?? null,
-      type: hit.type,
+      type: hitType,
     });
     setSuggestOpen(false);
   }
