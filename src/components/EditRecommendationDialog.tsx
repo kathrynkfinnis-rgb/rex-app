@@ -43,10 +43,9 @@ export function EditRecommendationDialog({
     ? [recommendation.photo_url]
     : []) as string[];
   const [photos, setPhotos] = useState<string[]>(initialPhotos);
-  const [placeSub, setPlaceSub] = useState<PlaceSubcategory | "">(
-    (item?.type === "place" && (PLACE_SUBCATEGORIES as readonly string[]).includes(item.genre ?? "")
-      ? (item!.genre as PlaceSubcategory)
-      : ""),
+  const subOptions = item ? subcategoriesFor(item.type) : [];
+  const [placeSub, setPlaceSub] = useState<string>(
+    item && (subOptions as readonly string[]).includes(item.genre ?? "") ? (item.genre as string) : "",
   );
   const [recipeText, setRecipeText] = useState(item?.recipe_text ?? "");
   const [confirmDelete, setConfirmDelete] = useState(false);
