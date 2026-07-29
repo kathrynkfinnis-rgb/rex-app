@@ -71,11 +71,22 @@ export function RequestCard({ req }: { req: RequestRow }) {
   }
 
   return (
+    <>
     <Link
       to="/ask/$id"
       params={{ id: req.id }}
       className="relative block overflow-hidden rounded-2xl bg-gradient-to-br from-accent/15 via-card to-card p-4 shadow-sm ring-1 ring-accent/40 transition-transform active:scale-[0.99]"
     >
+      {isOwner && (
+        <button
+          type="button"
+          onClick={(e) => { e.preventDefault(); e.stopPropagation(); setConfirmDelete(true); }}
+          className="absolute right-1.5 top-1.5 z-10 flex h-7 w-7 items-center justify-center rounded-full bg-background/80 text-muted-foreground shadow-sm ring-1 ring-border backdrop-blur hover:text-destructive"
+          aria-label="Delete blast"
+        >
+          <Trash2 className="h-3.5 w-3.5" />
+        </button>
+      )}
       <div className="flex items-center gap-2">
         <span className="inline-flex items-center gap-1 rounded-full bg-accent/20 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-widest text-accent-foreground">
           <Sparkles className="h-3 w-3" /> Asking
@@ -103,5 +114,25 @@ export function RequestCard({ req }: { req: RequestRow }) {
         </span>
       </div>
     </Link>
+    <AlertDialog open={confirmDelete} onOpenChange={setConfirmDelete}>
+      <AlertDialogContent>
+        <AlertDialogHeader>
+          <AlertDialogTitle>Delete this blast?</AlertDialogTitle>
+          <AlertDialogDescription>
+            This removes your ask and all replies. This can't be undone.
+          </AlertDialogDescription>
+        </AlertDialogHeader>
+        <AlertDialogFooter>
+          <AlertDialogCancel>Cancel</AlertDialogCancel>
+          <AlertDialogAction
+            onClick={(e) => { e.preventDefault(); handleDelete(); }}
+            className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+          >
+            {deleting ? "Deleting…" : "Delete"}
+          </AlertDialogAction>
+        </AlertDialogFooter>
+      </AlertDialogContent>
+    </AlertDialog>
+    </>
   );
 }
