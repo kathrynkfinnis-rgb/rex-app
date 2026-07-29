@@ -97,26 +97,6 @@ function AdminPage() {
 
 
 
-  const adminsQ = useQuery({
-    queryKey: ["admin-team"],
-    enabled,
-    queryFn: async () => {
-      const { data: roles } = await supabase
-        .from("user_roles")
-        .select("user_id, created_at, role")
-        .eq("role", "admin");
-      const ids = (roles ?? []).map((r) => r.user_id);
-      if (ids.length === 0) return [];
-      const { data: profiles } = await supabase
-        .from("profiles")
-        .select("id, username, display_name, avatar_url")
-        .in("id", ids);
-      return (profiles ?? []).map((p) => ({
-        ...p,
-        since: roles!.find((r) => r.user_id === p.id)?.created_at,
-      }));
-    },
-  });
 
   if (roleLoading) {
     return <div className="p-6 pt-20 text-sm text-muted-foreground">Loading…</div>;
