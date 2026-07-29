@@ -42,11 +42,11 @@ export function WantButton({ itemId, itemType, className }: { itemId: string; it
       if (active) {
         const { error } = await supabase.from("wants").delete().eq("user_id", uid).eq("item_id", itemId);
         if (error) throw error;
-        toast.success("Removed from Hit List");
+        toast.success("Removed from My List");
       } else {
         const { error } = await supabase.from("wants").insert({ user_id: uid, item_id: itemId });
         if (error) throw error;
-        toast.success(`Added to Hit List — ${verb.toLowerCase()}`);
+        toast.success(`Added to My List — ${verb.toLowerCase()}`);
       }
       qc.invalidateQueries({ queryKey: ["want", itemId, uid] });
       qc.invalidateQueries({ queryKey: ["my-wants", uid] });
