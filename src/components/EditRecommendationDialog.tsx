@@ -20,6 +20,7 @@ import { Loader2, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import { PLACE_SUBCATEGORIES, type PlaceSubcategory, type ItemType } from "@/lib/categories";
 import { cn } from "@/lib/utils";
+import { RecipeEditor } from "@/components/RecipeEditor";
 
 export function EditRecommendationDialog({
   open,
