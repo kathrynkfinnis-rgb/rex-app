@@ -120,9 +120,9 @@ function NotificationsPage() {
                   }`}
                 >
                   <UserAvatar
-                    src={n.actor?.avatar_url ?? null}
+                    url={n.actor?.avatar_url ?? null}
                     name={n.actor?.display_name || n.actor?.username || "?"}
-                    size={40}
+                    size="md"
                   />
                   <div className="min-w-0 flex-1">
                     <p className="line-clamp-3 text-sm">{notifCopy(n)}</p>
