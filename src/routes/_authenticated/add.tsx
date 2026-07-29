@@ -1,5 +1,6 @@
 import { createFileRoute, useNavigate, Link } from "@tanstack/react-router";
 import { useState } from "react";
+import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 
 import { CATEGORIES, type ItemType, categoryMeta, PLACE_SUBCATEGORIES, normalizePlaceSubcategory, type PlaceSubcategory } from "@/lib/categories";
@@ -16,6 +17,7 @@ import type { SearchHit } from "@/lib/search.functions";
 import { getPlacePhotoUrl } from "@/lib/places.functions";
 import { useServerFn } from "@tanstack/react-start";
 import { RecipeEditor } from "@/components/RecipeEditor";
+import { PhotoUploader } from "@/components/PhotoUploader";
 
 export const Route = createFileRoute("/_authenticated/add")({
   head: () => ({
@@ -43,6 +45,12 @@ function AddPage() {
   const [manualMode, setManualMode] = useState(false);
   const [placeSub, setPlaceSub] = useState<PlaceSubcategory | "">("");
   const [justAdded, setJustAdded] = useState<{ itemId: string; title: string } | null>(null);
+  const [photos, setPhotos] = useState<string[]>([]);
+  const { data: uid } = useQuery({
+    queryKey: ["current-user-id"],
+    queryFn: async () => (await supabase.auth.getUser()).data.user?.id ?? null,
+    staleTime: 5 * 60 * 1000,
+  });
 
   const cat = type ? categoryMeta(type) : null;
   const needsSearch = type !== null && type !== "recipe";
@@ -62,6 +70,7 @@ function AddPage() {
     setManualMode(false);
     setPlaceSub("");
     setJustAdded(null);
+    setPhotos([]);
   }
 
 
@@ -154,7 +163,9 @@ function AddPage() {
         item_id: itemId!,
         rating,
         note: note.trim() || null,
-      });
+        photo_url: photos[0] ?? null,
+        photo_urls: photos,
+      } as never);
       if (recErr) throw recErr;
 
       toast.success("Added to your feed");
@@ -401,6 +412,13 @@ function AddPage() {
             className="rounded-xl"
           />
         </div>
+
+        {uid && (
+          <div className="space-y-1.5">
+            <Label>Photos</Label>
+            <PhotoUploader userId={uid} value={photos} onChange={setPhotos} />
+          </div>
+        )}
 
         <Button
           type="button"

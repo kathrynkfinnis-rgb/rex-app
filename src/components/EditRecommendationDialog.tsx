@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import {
@@ -21,6 +21,7 @@ import { toast } from "sonner";
 import { PLACE_SUBCATEGORIES, type PlaceSubcategory, type ItemType } from "@/lib/categories";
 import { cn } from "@/lib/utils";
 import { RecipeEditor } from "@/components/RecipeEditor";
+import { PhotoUploader } from "@/components/PhotoUploader";
 
 export function EditRecommendationDialog({
   open,
@@ -30,12 +31,18 @@ export function EditRecommendationDialog({
 }: {
   open: boolean;
   onOpenChange: (v: boolean) => void;
-  recommendation: { id: string; rating: number; note: string | null };
+  recommendation: { id: string; rating: number; note: string | null; photo_url?: string | null; photo_urls?: string[] | null };
   item?: { id: string; type: ItemType; genre: string | null; recipe_text?: string | null } | null;
 }) {
   const qc = useQueryClient();
   const [rating, setRating] = useState(recommendation.rating);
   const [note, setNote] = useState(recommendation.note ?? "");
+  const initialPhotos = (recommendation.photo_urls && recommendation.photo_urls.length
+    ? recommendation.photo_urls
+    : recommendation.photo_url
+    ? [recommendation.photo_url]
+    : []) as string[];
+  const [photos, setPhotos] = useState<string[]>(initialPhotos);
   const [placeSub, setPlaceSub] = useState<PlaceSubcategory | "">(
     (item?.type === "place" && (PLACE_SUBCATEGORIES as readonly string[]).includes(item.genre ?? "")
       ? (item!.genre as PlaceSubcategory)
@@ -45,6 +52,11 @@ export function EditRecommendationDialog({
   const [confirmDelete, setConfirmDelete] = useState(false);
   const isPlace = item?.type === "place";
   const isRecipe = item?.type === "recipe";
+  const { data: uid } = useQuery({
+    queryKey: ["current-user-id"],
+    queryFn: async () => (await supabase.auth.getUser()).data.user?.id ?? null,
+    staleTime: 5 * 60 * 1000,
+  });
 
   useEffect(() => {
     if (!open || !isRecipe || !item?.id) return;
@@ -67,7 +79,12 @@ export function EditRecommendationDialog({
     mutationFn: async () => {
       const { error } = await supabase
         .from("recommendations")
-        .update({ rating, note: note.trim() ? note.trim() : null })
+        .update({
+          rating,
+          note: note.trim() ? note.trim() : null,
+          photo_url: photos[0] ?? null,
+          photo_urls: photos,
+        } as never)
         .eq("id", recommendation.id);
       if (error) throw error;
       if (isPlace && item) {
@@ -174,6 +191,13 @@ export function EditRecommendationDialog({
                 placeholder="What did you think?"
               />
             </div>
+
+            {uid && (
+              <div className="space-y-1.5">
+                <Label>Photos</Label>
+                <PhotoUploader userId={uid} value={photos} onChange={setPhotos} />
+              </div>
+            )}
           </div>
           <DialogFooter className="flex-row justify-between sm:justify-between">
             <Button
