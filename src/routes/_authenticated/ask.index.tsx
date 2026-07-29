@@ -10,7 +10,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 
-export const Route = createFileRoute("/_authenticated/ask")({
+export const Route = createFileRoute("/_authenticated/ask/")({
   head: () => ({
     meta: [
       { title: "Ask friends — REX" },
