@@ -142,7 +142,7 @@ function AdminPage() {
   return (
     <div className="px-4 pb-8 pt-20">
       <div className="mb-4 flex items-center gap-2">
-        <Link to="/me" className="rounded-full p-1 text-muted-foreground hover:bg-muted"><ArrowLeft className="h-5 w-5" /></Link>
+        <Link to="/you" className="rounded-full p-1 text-muted-foreground hover:bg-muted"><ArrowLeft className="h-5 w-5" /></Link>
         <div>
           <h1 className="text-xl font-bold flex items-center gap-2">
             <Crown className="h-5 w-5 text-primary" /> REX Admin

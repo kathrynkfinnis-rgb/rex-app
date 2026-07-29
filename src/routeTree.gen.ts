@@ -13,6 +13,7 @@ import { Route as AuthRouteImport } from './routes/auth'
 import { Route as AuthenticatedRouteRouteImport } from './routes/_authenticated/route'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as RIdRouteImport } from './routes/r.$id'
+import { Route as AuthenticatedYouRouteImport } from './routes/_authenticated/you'
 import { Route as AuthenticatedNotificationsRouteImport } from './routes/_authenticated/notifications'
 import { Route as AuthenticatedNotificationSettingsRouteImport } from './routes/_authenticated/notification-settings'
 import { Route as AuthenticatedMeRouteImport } from './routes/_authenticated/me'
@@ -47,6 +48,11 @@ const RIdRoute = RIdRouteImport.update({
   id: '/r/$id',
   path: '/r/$id',
   getParentRoute: () => rootRouteImport,
+} as any)
+const AuthenticatedYouRoute = AuthenticatedYouRouteImport.update({
+  id: '/you',
+  path: '/you',
+  getParentRoute: () => AuthenticatedRouteRoute,
 } as any)
 const AuthenticatedNotificationsRoute =
   AuthenticatedNotificationsRouteImport.update({
@@ -142,6 +148,7 @@ export interface FileRoutesByFullPath {
   '/me': typeof AuthenticatedMeRoute
   '/notification-settings': typeof AuthenticatedNotificationSettingsRoute
   '/notifications': typeof AuthenticatedNotificationsRoute
+  '/you': typeof AuthenticatedYouRoute
   '/r/$id': typeof RIdRoute
   '/ask/$id': typeof AuthenticatedAskIdRoute
   '/item/$id': typeof AuthenticatedItemIdRoute
@@ -162,6 +169,7 @@ export interface FileRoutesByTo {
   '/me': typeof AuthenticatedMeRoute
   '/notification-settings': typeof AuthenticatedNotificationSettingsRoute
   '/notifications': typeof AuthenticatedNotificationsRoute
+  '/you': typeof AuthenticatedYouRoute
   '/r/$id': typeof RIdRoute
   '/ask/$id': typeof AuthenticatedAskIdRoute
   '/item/$id': typeof AuthenticatedItemIdRoute
@@ -184,6 +192,7 @@ export interface FileRoutesById {
   '/_authenticated/me': typeof AuthenticatedMeRoute
   '/_authenticated/notification-settings': typeof AuthenticatedNotificationSettingsRoute
   '/_authenticated/notifications': typeof AuthenticatedNotificationsRoute
+  '/_authenticated/you': typeof AuthenticatedYouRoute
   '/r/$id': typeof RIdRoute
   '/_authenticated/ask/$id': typeof AuthenticatedAskIdRoute
   '/_authenticated/item/$id': typeof AuthenticatedItemIdRoute
@@ -206,6 +215,7 @@ export interface FileRouteTypes {
     | '/me'
     | '/notification-settings'
     | '/notifications'
+    | '/you'
     | '/r/$id'
     | '/ask/$id'
     | '/item/$id'
@@ -226,6 +236,7 @@ export interface FileRouteTypes {
     | '/me'
     | '/notification-settings'
     | '/notifications'
+    | '/you'
     | '/r/$id'
     | '/ask/$id'
     | '/item/$id'
@@ -247,6 +258,7 @@ export interface FileRouteTypes {
     | '/_authenticated/me'
     | '/_authenticated/notification-settings'
     | '/_authenticated/notifications'
+    | '/_authenticated/you'
     | '/r/$id'
     | '/_authenticated/ask/$id'
     | '/_authenticated/item/$id'
@@ -290,6 +302,13 @@ declare module '@tanstack/react-router' {
       fullPath: '/r/$id'
       preLoaderRoute: typeof RIdRouteImport
       parentRoute: typeof rootRouteImport
+    }
+    '/_authenticated/you': {
+      id: '/_authenticated/you'
+      path: '/you'
+      fullPath: '/you'
+      preLoaderRoute: typeof AuthenticatedYouRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
     }
     '/_authenticated/notifications': {
       id: '/_authenticated/notifications'
@@ -411,6 +430,7 @@ interface AuthenticatedRouteRouteChildren {
   AuthenticatedMeRoute: typeof AuthenticatedMeRoute
   AuthenticatedNotificationSettingsRoute: typeof AuthenticatedNotificationSettingsRoute
   AuthenticatedNotificationsRoute: typeof AuthenticatedNotificationsRoute
+  AuthenticatedYouRoute: typeof AuthenticatedYouRoute
   AuthenticatedAskIdRoute: typeof AuthenticatedAskIdRoute
   AuthenticatedItemIdRoute: typeof AuthenticatedItemIdRoute
   AuthenticatedProfileUsernameRoute: typeof AuthenticatedProfileUsernameRoute
@@ -430,6 +450,7 @@ const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
   AuthenticatedNotificationSettingsRoute:
     AuthenticatedNotificationSettingsRoute,
   AuthenticatedNotificationsRoute: AuthenticatedNotificationsRoute,
+  AuthenticatedYouRoute: AuthenticatedYouRoute,
   AuthenticatedAskIdRoute: AuthenticatedAskIdRoute,
   AuthenticatedItemIdRoute: AuthenticatedItemIdRoute,
   AuthenticatedProfileUsernameRoute: AuthenticatedProfileUsernameRoute,
