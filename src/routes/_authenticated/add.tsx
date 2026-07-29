@@ -55,7 +55,7 @@ function AddPage() {
   });
 
   const cat = type ? categoryMeta(type) : null;
-  const needsSearch = type !== null && type !== "recipe" && type !== "event";
+  const needsSearch = type !== null && type !== "recipe";
   const showForm = !needsSearch || picked || manualMode;
   const photoFn = useServerFn(getPlacePhotoUrl);
 
@@ -79,15 +79,19 @@ function AddPage() {
   async function handlePick(hit: AnyHit) {
     setPicked(hit);
     setTitle(hit.title);
-    setSubtitle(hit.external_source === "google_places" ? "" : hit.subtitle ?? "");
-    if (hit.external_source === "google_places") {
-      if (hit.address) setAddress(hit.address);
-      const guess = normalizePlaceSubcategory(hit.genre);
-      if (guess) setPlaceSub(guess);
-      if (typeof hit.lat === "number" && typeof hit.lng === "number") {
+    const isGooglePlace = hit.external_source === "google_places";
+    const isTmEvent = hit.external_source === "ticketmaster_event";
+    setSubtitle(isGooglePlace ? "" : hit.subtitle ?? "");
+    if (isGooglePlace || isTmEvent) {
+      if ("address" in hit && hit.address) setAddress(hit.address);
+      if (isGooglePlace) {
+        const guess = normalizePlaceSubcategory(hit.genre);
+        if (guess) setPlaceSub(guess);
+      }
+      if ("lat" in hit && "lng" in hit && typeof hit.lat === "number" && typeof hit.lng === "number") {
         setCoords({ lat: hit.lat, lng: hit.lng });
       }
-      if (hit.photo_name) {
+      if (isGooglePlace && "photo_name" in hit && hit.photo_name) {
         try {
           const url = await photoFn({ data: { photoName: hit.photo_name, maxWidth: 800 } });
           if (url) {
@@ -148,9 +152,9 @@ function AddPage() {
             image_url: picked?.image_url ?? null,
             external_id: picked?.external_id ?? null,
             external_source: picked?.external_source ?? null,
-            address: type === "place" ? address.trim() || null : null,
-            lat: type === "place" ? coords?.lat ?? null : null,
-            lng: type === "place" ? coords?.lng ?? null : null,
+            address: type === "place" || type === "event" ? address.trim() || null : null,
+            lat: type === "place" || type === "event" ? coords?.lat ?? null : null,
+            lng: type === "place" || type === "event" ? coords?.lng ?? null : null,
             genre: placeSub || (picked?.genre ?? null),
             ...(type === "recipe" && recipeText.trim() ? { recipe_text: recipeText } : {}),
           } as never)

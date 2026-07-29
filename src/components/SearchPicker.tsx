@@ -1,13 +1,14 @@
 import { useEffect, useState } from "react";
 import { useServerFn } from "@tanstack/react-start";
 import { Input } from "@/components/ui/input";
-import { Search, Loader2, Pencil, MapPin } from "lucide-react";
+import { Search, Loader2, Pencil, MapPin, Ticket } from "lucide-react";
 import { searchMovies, searchTv, searchPodcasts, type SearchHit } from "@/lib/search.functions";
 import { searchBooksClient } from "@/lib/search-client";
 import { searchPlaces, type PlaceHit } from "@/lib/places.functions";
+import { searchEvents, type EventHit } from "@/lib/events.functions";
 import type { ItemType } from "@/lib/categories";
 
-export type AnyHit = SearchHit | PlaceHit;
+export type AnyHit = SearchHit | PlaceHit | EventHit;
 
 type Props = {
   type: ItemType;
@@ -24,6 +25,7 @@ export function SearchPicker({ type, onPick, onManual, near }: Props) {
   const tvFn = useServerFn(searchTv);
   const placesFn = useServerFn(searchPlaces);
   const podcastFn = useServerFn(searchPodcasts);
+  const eventFn = useServerFn(searchEvents);
 
   useEffect(() => {
     const term = q.trim();
@@ -43,7 +45,9 @@ export function SearchPicker({ type, onPick, onManual, near }: Props) {
                 ? await tvFn({ data: { q: term } })
                 : type === "podcast"
                   ? await podcastFn({ data: { q: term } })
-                  : await placesFn({ data: { q: term, near: near ?? null } });
+                  : type === "event"
+                    ? await eventFn({ data: { q: term, near: near ?? null } })
+                    : await placesFn({ data: { q: term, near: near ?? null } });
         setResults(hits);
       } catch {
         setResults([]);
@@ -52,7 +56,7 @@ export function SearchPicker({ type, onPick, onManual, near }: Props) {
       }
     }, 300);
     return () => clearTimeout(t);
-  }, [q, type, movieFn, tvFn, placesFn, podcastFn, near?.lat, near?.lng]);
+  }, [q, type, movieFn, tvFn, placesFn, podcastFn, eventFn, near?.lat, near?.lng]);
 
   const placeholder =
     type === "book"
@@ -63,9 +67,12 @@ export function SearchPicker({ type, onPick, onManual, near }: Props) {
           ? "Search TV shows…"
           : type === "podcast"
             ? "Search podcasts…"
-            : "Search restaurants, cafés, places…";
+            : type === "event"
+              ? "Search events, concerts, shows…"
+              : "Search restaurants, cafés, places…";
 
   const isPlace = type === "place";
+  const isEvent = type === "event";
 
   return (
     <div className="space-y-3">
@@ -95,6 +102,10 @@ export function SearchPicker({ type, onPick, onManual, near }: Props) {
                 {isPlace ? (
                   <div className="flex h-14 w-10 flex-none items-center justify-center rounded-md bg-secondary text-secondary-foreground ring-1 ring-border">
                     <MapPin className="h-5 w-5" />
+                  </div>
+                ) : isEvent && !r.image_url ? (
+                  <div className="flex h-14 w-10 flex-none items-center justify-center rounded-md bg-secondary text-secondary-foreground ring-1 ring-border">
+                    <Ticket className="h-5 w-5" />
                   </div>
                 ) : r.image_url ? (
                   <img
