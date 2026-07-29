@@ -14,6 +14,7 @@ import { UserAvatar } from "@/components/UserAvatar";
 import { WantButton } from "@/components/WantButton";
 import { cn } from "@/lib/utils";
 import { formatDistanceToNow } from "date-fns";
+import { parseRecipe } from "@/lib/recipe";
 
 export const Route = createFileRoute("/_authenticated/item/$id")({
   head: () => ({
