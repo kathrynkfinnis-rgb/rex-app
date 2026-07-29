@@ -70,6 +70,20 @@ function MePage() {
     enabled: !!user,
   });
 
+  const { data: mySaved } = useQuery({
+    queryKey: ["my-saved-posts", user?.id],
+    queryFn: async () => {
+      if (!user) return [];
+      const { data } = await supabase
+        .from("saved_posts")
+        .select("id, created_at, recommendations!inner(id, rating, note, created_at, photo_url, photo_urls, user_id, item_id, items!inner(id, type, title, subtitle, image_url, genre), profiles!recommendations_user_id_fkey(username, display_name, avatar_url))")
+        .eq("user_id", user.id)
+        .order("created_at", { ascending: false });
+      return (data ?? []) as unknown as Array<{ id: string; recommendations: FeedRow }>;
+    },
+    enabled: !!user,
+  });
+
   async function signOut() {
     await qc.cancelQueries();
     qc.clear();
