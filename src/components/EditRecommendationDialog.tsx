@@ -85,6 +85,7 @@ export function EditRecommendationDialog({
           note: note.trim() ? note.trim() : null,
           photo_url: photos[0] ?? null,
           photo_urls: photos,
+          tags,
         } as never)
         .eq("id", recommendation.id);
       if (error) throw error;
