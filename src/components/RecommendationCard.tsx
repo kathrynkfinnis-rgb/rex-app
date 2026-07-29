@@ -9,6 +9,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { formatDistanceToNow } from "date-fns";
 import { Pencil } from "lucide-react";
 import { UserAvatar } from "@/components/UserAvatar";
+import { SavePostButton } from "@/components/SavePostButton";
 
 
 export type FeedRow = {
@@ -170,8 +171,9 @@ export function RecommendationCard({ rec }: { rec: FeedRow }) {
         )}
         <span>{formatDistanceToNow(new Date(rec.created_at), { addSuffix: true })}</span>
       </div>
-      <div className="border-t border-border">
-        <LikesComments recommendationId={rec.id} compact />
+      <div className="flex items-center border-t border-border">
+        <div className="flex-1"><LikesComments recommendationId={rec.id} compact /></div>
+        <SavePostButton recommendationId={rec.id} className="mr-2" />
       </div>
     </article>
     {isOwner && (

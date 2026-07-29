@@ -4,7 +4,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { RecommendationCard, type FeedRow } from "@/components/RecommendationCard";
 import { toast } from "sonner";
-import { LogOut, Smartphone, BookOpen, FileUp, Bookmark } from "lucide-react";
+import { LogOut, Smartphone, BookOpen, FileUp, Bookmark, BookmarkCheck } from "lucide-react";
 import { AvatarUploader } from "@/components/AvatarUploader";
 import { categoryMeta, type ItemType } from "@/lib/categories";
 import { cn } from "@/lib/utils";
@@ -66,6 +66,20 @@ function MePage() {
         item_id: string;
         items: { id: string; type: ItemType; title: string; subtitle: string | null; image_url: string | null };
       }>;
+    },
+    enabled: !!user,
+  });
+
+  const { data: mySaved } = useQuery({
+    queryKey: ["my-saved-posts", user?.id],
+    queryFn: async () => {
+      if (!user) return [];
+      const { data } = await supabase
+        .from("saved_posts")
+        .select("id, created_at, recommendations!inner(id, rating, note, created_at, photo_url, photo_urls, user_id, item_id, items!inner(id, type, title, subtitle, image_url, genre), profiles!recommendations_user_id_fkey(username, display_name, avatar_url))")
+        .eq("user_id", user.id)
+        .order("created_at", { ascending: false });
+      return (data ?? []) as unknown as Array<{ id: string; recommendations: FeedRow }>;
     },
     enabled: !!user,
   });
@@ -146,6 +160,19 @@ function MePage() {
           </div>
         ) : (
           <p className="text-sm text-muted-foreground">Nothing saved yet — tap "Want to…" on any recommendation.</p>
+        )}
+      </section>
+
+      <section className="p-4">
+        <h2 className="mb-3 flex items-center gap-2 text-xs font-semibold uppercase tracking-widest text-muted-foreground">
+          <BookmarkCheck className="h-3.5 w-3.5" /> Saved posts
+        </h2>
+        {mySaved && mySaved.length > 0 ? (
+          <div className="space-y-3">
+            {mySaved.map((s) => <RecommendationCard key={s.id} rec={s.recommendations} />)}
+          </div>
+        ) : (
+          <p className="text-sm text-muted-foreground">Nothing saved yet — tap the bookmark on any post to save it here.</p>
         )}
       </section>
 
