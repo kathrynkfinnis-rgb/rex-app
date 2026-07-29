@@ -28,6 +28,20 @@ type ContentKpis = {
   likes_total: number; likes_7d: number;
   saves_total: number; saves_7d: number;
 };
+type WeekPoint = { week: string; count: number };
+type EngagementKpis = {
+  total_users: number; activated_users: number; users_with_friend: number;
+  friendships_accepted: number; friendships_pending: number; friend_accept_rate: number;
+  avg_friends: number; recs_per_active_user: number;
+  recs_with_photo: number; recs_with_note: number; avg_rating: number;
+  lists_total: number; lists_published: number; wants_total: number;
+  items_total: number; places_geocoded: number; places_total: number;
+  blasts_answered: number; blasts_total: number; imports_total: number;
+  by_category: { type: string; count: number }[];
+  signups_by_week: WeekPoint[];
+  recs_by_week: WeekPoint[];
+  top_contributors: { username: string; display_name: string | null; count: number }[];
+};
 
 function AdminPage() {
   const { user } = useRouteContext({ from: "/_authenticated" });
