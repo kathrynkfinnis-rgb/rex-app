@@ -79,15 +79,19 @@ function AddPage() {
   async function handlePick(hit: AnyHit) {
     setPicked(hit);
     setTitle(hit.title);
-    setSubtitle(hit.external_source === "google_places" ? "" : hit.subtitle ?? "");
-    if (hit.external_source === "google_places") {
-      if (hit.address) setAddress(hit.address);
-      const guess = normalizePlaceSubcategory(hit.genre);
-      if (guess) setPlaceSub(guess);
-      if (typeof hit.lat === "number" && typeof hit.lng === "number") {
+    const isGooglePlace = hit.external_source === "google_places";
+    const isTmEvent = hit.external_source === "ticketmaster_event";
+    setSubtitle(isGooglePlace ? "" : hit.subtitle ?? "");
+    if (isGooglePlace || isTmEvent) {
+      if ("address" in hit && hit.address) setAddress(hit.address);
+      if (isGooglePlace) {
+        const guess = normalizePlaceSubcategory(hit.genre);
+        if (guess) setPlaceSub(guess);
+      }
+      if ("lat" in hit && "lng" in hit && typeof hit.lat === "number" && typeof hit.lng === "number") {
         setCoords({ lat: hit.lat, lng: hit.lng });
       }
-      if (hit.photo_name) {
+      if (isGooglePlace && "photo_name" in hit && hit.photo_name) {
         try {
           const url = await photoFn({ data: { photoName: hit.photo_name, maxWidth: 800 } });
           if (url) {
