@@ -48,7 +48,7 @@ function ItemPage() {
       if (error) throw error;
       const { data: recs } = await supabase
         .from("recommendations")
-        .select("id, rating, note, created_at, user_id, profiles!recommendations_user_id_fkey(username, display_name, avatar_url)")
+        .select("id, rating, note, created_at, photo_url, photo_urls, user_id, profiles!recommendations_user_id_fkey(username, display_name, avatar_url)")
         .eq("item_id", id)
         .order("created_at", { ascending: false });
       const { data: checks } = await supabase
