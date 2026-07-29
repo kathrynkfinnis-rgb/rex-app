@@ -11,14 +11,16 @@ export const CATEGORIES: {
   subtitleLabel: string;
   actionVerb: string;
   wantVerb: string;
+  hitDefaultEmoji: string;
+  hitDefaultLabel: string;
 }[] = [
-  { type: "place", label: "Place", plural: "Places", icon: MapPin, tokenClass: "bg-cat-place/15 text-cat-place", subtitleLabel: "Address or neighborhood", actionVerb: "Been here", wantVerb: "Want to visit" },
-  { type: "book", label: "Book", plural: "Books", icon: Book, tokenClass: "bg-cat-book/15 text-cat-book", subtitleLabel: "Author", actionVerb: "Read it", wantVerb: "Want to read" },
-  { type: "movie", label: "Movie", plural: "Movies", icon: Film, tokenClass: "bg-cat-movie/15 text-cat-movie", subtitleLabel: "Year or director", actionVerb: "Seen it", wantVerb: "Want to watch" },
-  { type: "tv", label: "TV", plural: "TV shows", icon: Tv, tokenClass: "bg-cat-tv/15 text-cat-tv", subtitleLabel: "Network or year", actionVerb: "Watched it", wantVerb: "Want to watch" },
-  { type: "podcast", label: "Podcast", plural: "Podcasts", icon: Mic, tokenClass: "bg-cat-podcast/15 text-cat-podcast", subtitleLabel: "Host or network", actionVerb: "Listened", wantVerb: "Want to listen" },
-  { type: "recipe", label: "Recipe", plural: "Recipes", icon: ChefHat, tokenClass: "bg-cat-recipe/15 text-cat-recipe", subtitleLabel: "Cookbook, chef, or source", actionVerb: "Cooked it", wantVerb: "Want to try" },
-  { type: "event", label: "Event", plural: "Events", icon: Ticket, tokenClass: "bg-cat-event/15 text-cat-event", subtitleLabel: "Venue, date, or type", actionVerb: "Went", wantVerb: "Want to go" },
+  { type: "place", label: "Place", plural: "Places", icon: MapPin, tokenClass: "bg-cat-place/15 text-cat-place", subtitleLabel: "Address or neighborhood", actionVerb: "Been here", wantVerb: "Want to visit", hitDefaultEmoji: "✈️", hitDefaultLabel: "To visit" },
+  { type: "book", label: "Book", plural: "Books", icon: Book, tokenClass: "bg-cat-book/15 text-cat-book", subtitleLabel: "Author", actionVerb: "Read it", wantVerb: "Want to read", hitDefaultEmoji: "📚", hitDefaultLabel: "To be read" },
+  { type: "movie", label: "Movie", plural: "Movies", icon: Film, tokenClass: "bg-cat-movie/15 text-cat-movie", subtitleLabel: "Year or director", actionVerb: "Seen it", wantVerb: "Want to watch", hitDefaultEmoji: "🎬", hitDefaultLabel: "To watch" },
+  { type: "tv", label: "TV", plural: "TV shows", icon: Tv, tokenClass: "bg-cat-tv/15 text-cat-tv", subtitleLabel: "Network or year", actionVerb: "Watched it", wantVerb: "Want to watch", hitDefaultEmoji: "📺", hitDefaultLabel: "To watch" },
+  { type: "podcast", label: "Podcast", plural: "Podcasts", icon: Mic, tokenClass: "bg-cat-podcast/15 text-cat-podcast", subtitleLabel: "Host or network", actionVerb: "Listened", wantVerb: "Want to listen", hitDefaultEmoji: "🎧", hitDefaultLabel: "To listen" },
+  { type: "recipe", label: "Recipe", plural: "Recipes", icon: ChefHat, tokenClass: "bg-cat-recipe/15 text-cat-recipe", subtitleLabel: "Cookbook, chef, or source", actionVerb: "Cooked it", wantVerb: "Want to try", hitDefaultEmoji: "🍜", hitDefaultLabel: "To eat" },
+  { type: "event", label: "Event", plural: "Events", icon: Ticket, tokenClass: "bg-cat-event/15 text-cat-event", subtitleLabel: "Venue, date, or type", actionVerb: "Went", wantVerb: "Want to go", hitDefaultEmoji: "🎟️", hitDefaultLabel: "To attend" },
 ];
 
 export function categoryMeta(type: ItemType) {
