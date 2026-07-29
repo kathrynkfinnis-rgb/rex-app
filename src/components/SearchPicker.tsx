@@ -25,6 +25,7 @@ export function SearchPicker({ type, onPick, onManual, near }: Props) {
   const tvFn = useServerFn(searchTv);
   const placesFn = useServerFn(searchPlaces);
   const podcastFn = useServerFn(searchPodcasts);
+  const eventFn = useServerFn(searchEvents);
 
   useEffect(() => {
     const term = q.trim();
@@ -44,7 +45,9 @@ export function SearchPicker({ type, onPick, onManual, near }: Props) {
                 ? await tvFn({ data: { q: term } })
                 : type === "podcast"
                   ? await podcastFn({ data: { q: term } })
-                  : await placesFn({ data: { q: term, near: near ?? null } });
+                  : type === "event"
+                    ? await eventFn({ data: { q: term, near: near ?? null } })
+                    : await placesFn({ data: { q: term, near: near ?? null } });
         setResults(hits);
       } catch {
         setResults([]);
@@ -53,7 +56,7 @@ export function SearchPicker({ type, onPick, onManual, near }: Props) {
       }
     }, 300);
     return () => clearTimeout(t);
-  }, [q, type, movieFn, tvFn, placesFn, podcastFn, near?.lat, near?.lng]);
+  }, [q, type, movieFn, tvFn, placesFn, podcastFn, eventFn, near?.lat, near?.lng]);
 
   const placeholder =
     type === "book"
