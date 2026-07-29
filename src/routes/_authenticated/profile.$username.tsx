@@ -37,7 +37,7 @@ function ProfilePage() {
       if (!profile) return [];
       const { data, error } = await supabase
         .from("recommendations")
-        .select("id, rating, note, created_at, photo_url, user_id, item_id, items!inner(id, type, title, subtitle, image_url, genre), profiles!recommendations_user_id_fkey(username, display_name, avatar_url), creators(slug, name, color, emoji)")
+        .select("id, rating, note, created_at, photo_url, photo_urls, user_id, item_id, items!inner(id, type, title, subtitle, image_url, genre), profiles!recommendations_user_id_fkey(username, display_name, avatar_url), creators(slug, name, color, emoji)")
         .eq("user_id", profile.id)
         .order("created_at", { ascending: false });
       if (error) throw error;
