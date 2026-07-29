@@ -84,6 +84,19 @@ function AdminPage() {
     },
   });
 
+  const engQ = useQuery({
+    queryKey: ["admin-kpis-engagement"],
+    enabled,
+    refetchInterval: 60_000,
+    queryFn: async () => {
+      const { data, error } = await (supabase.rpc as any)("admin_kpis_engagement");
+      if (error) throw error;
+      return data as EngagementKpis;
+    },
+  });
+
+
+
   const adminsQ = useQuery({
     queryKey: ["admin-team"],
     enabled,
