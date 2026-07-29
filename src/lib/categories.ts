@@ -39,6 +39,41 @@ export const PLACE_SUBCATEGORIES = [
 ] as const;
 export type PlaceSubcategory = (typeof PLACE_SUBCATEGORIES)[number];
 
+export const SUBCATEGORIES: Record<ItemType, readonly string[]> = {
+  place: PLACE_SUBCATEGORIES,
+  recipe: [
+    "Salad", "Soup", "Pasta", "Rice & grains", "Meat", "Fish & seafood",
+    "Vegetarian", "Vegan", "Breakfast", "Dessert", "Baking", "Snack",
+    "Drink", "Sauce & dressing", "Other",
+  ],
+  book: [
+    "Fiction", "Non-fiction", "Thriller", "Mystery", "Sci-fi", "Fantasy",
+    "Romance", "Biography", "History", "Business", "Self-help", "Poetry",
+    "Kids", "Other",
+  ],
+  movie: [
+    "Action", "Comedy", "Drama", "Thriller", "Horror", "Sci-fi",
+    "Documentary", "Romance", "Animation", "Kids", "Other",
+  ],
+  tv: [
+    "Drama", "Comedy", "Documentary", "Reality", "Crime", "Sci-fi",
+    "Kids", "Sport", "Other",
+  ],
+  podcast: [
+    "Comedy", "News", "History", "Business", "Interview", "True crime",
+    "Society", "Sport", "Tech", "Other",
+  ],
+  event: [
+    "Concert", "Exhibition", "Theatre", "Comedy", "Sport", "Talk",
+    "Festival", "Film", "Other",
+  ],
+};
+
+export function subcategoriesFor(type: ItemType | null | undefined): readonly string[] {
+  if (!type) return [];
+  return SUBCATEGORIES[type] ?? [];
+}
+
 // Map Google Places primaryTypeDisplayName (or free text) to our subcategory.
 export function normalizePlaceSubcategory(input: string | null | undefined): PlaceSubcategory | null {
   if (!input) return null;
