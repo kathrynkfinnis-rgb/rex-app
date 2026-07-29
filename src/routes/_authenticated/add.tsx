@@ -15,6 +15,7 @@ import { SearchPicker, type AnyHit } from "@/components/SearchPicker";
 import type { SearchHit } from "@/lib/search.functions";
 import { getPlacePhotoUrl } from "@/lib/places.functions";
 import { useServerFn } from "@tanstack/react-start";
+import { RecipeEditor } from "@/components/RecipeEditor";
 
 export const Route = createFileRoute("/_authenticated/add")({
   head: () => ({
