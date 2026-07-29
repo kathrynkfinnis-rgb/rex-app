@@ -724,6 +724,7 @@ export type Database = {
     }
     Functions: {
       admin_kpis_content: { Args: never; Returns: Json }
+      admin_kpis_engagement: { Args: never; Returns: Json }
       admin_kpis_users: { Args: never; Returns: Json }
       are_friends: { Args: { _a: string; _b: string }; Returns: boolean }
       get_shared_recommendation: {
