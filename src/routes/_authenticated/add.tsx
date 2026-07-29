@@ -157,8 +157,9 @@ function AddPage() {
       if (recErr) throw recErr;
 
       toast.success("Added to your feed");
-      navigate({ to: "/item/$id", params: { id: itemId! } });
+      setJustAdded({ itemId: itemId!, title: title.trim() });
     } catch (err) {
+
       toast.error(err instanceof Error ? err.message : "Couldn't save");
     } finally {
       setSaving(false);
