@@ -201,7 +201,7 @@ export function RecommendationCard({ rec }: { rec: FeedRow }) {
       <EditRecommendationDialog
         open={editing}
         onOpenChange={setEditing}
-        recommendation={{ id: rec.id, rating: rec.rating, note: rec.note, photo_url: rec.photo_url, photo_urls: rec.photo_urls ?? null }}
+        recommendation={{ id: rec.id, rating: rec.rating, note: rec.note, photo_url: rec.photo_url, photo_urls: rec.photo_urls ?? null, tags: rec.tags ?? null }}
         item={{ id: item.id, type: item.type, genre: item.genre, recipe_text: (item as any).recipe_text ?? null }}
       />
     )}
