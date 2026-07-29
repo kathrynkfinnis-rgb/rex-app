@@ -1,7 +1,7 @@
 import { createFileRoute, Link, useRouteContext } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
-import { Crown, Users, TrendingUp, MessageCircle, Heart, Bookmark, Megaphone, Sparkles, ArrowLeft } from "lucide-react";
+import { Crown, Users, TrendingUp, MessageCircle, Heart, Bookmark, Megaphone, Sparkles, ArrowLeft, Zap, Network, BarChart3 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 export const Route = createFileRoute("/_authenticated/admin")({
@@ -27,6 +27,20 @@ type ContentKpis = {
   blast_comments_total: number; blast_comments_7d: number;
   likes_total: number; likes_7d: number;
   saves_total: number; saves_7d: number;
+};
+type WeekPoint = { week: string; count: number };
+type EngagementKpis = {
+  total_users: number; activated_users: number; users_with_friend: number;
+  friendships_accepted: number; friendships_pending: number; friend_accept_rate: number;
+  avg_friends: number; recs_per_active_user: number;
+  recs_with_photo: number; recs_with_note: number; avg_rating: number;
+  lists_total: number; lists_published: number; wants_total: number;
+  items_total: number; places_geocoded: number; places_total: number;
+  blasts_answered: number; blasts_total: number; imports_total: number;
+  by_category: { type: string; count: number }[];
+  signups_by_week: WeekPoint[];
+  recs_by_week: WeekPoint[];
+  top_contributors: { username: string; display_name: string | null; count: number }[];
 };
 
 function AdminPage() {
@@ -70,6 +84,19 @@ function AdminPage() {
     },
   });
 
+  const engQ = useQuery({
+    queryKey: ["admin-kpis-engagement"],
+    enabled,
+    refetchInterval: 60_000,
+    queryFn: async () => {
+      const { data, error } = await (supabase.rpc as any)("admin_kpis_engagement");
+      if (error) throw error;
+      return data as EngagementKpis;
+    },
+  });
+
+
+
   const adminsQ = useQuery({
     queryKey: ["admin-team"],
     enabled,
@@ -110,6 +137,7 @@ function AdminPage() {
 
   const u = usersQ.data;
   const c = contentQ.data;
+  const e = engQ.data;
 
   return (
     <div className="px-4 pb-8 pt-20">
@@ -146,6 +174,77 @@ function AdminPage() {
           <Pair icon={<Bookmark className="h-4 w-4" />} label="Saves" total={c?.saves_total} recent={c?.saves_7d} />
         </div>
       </Section>
+
+      <Section title="Activation & funnel" icon={<Zap className="h-4 w-4" />}>
+        <div className="grid grid-cols-2 gap-2">
+          <Kpi label="Activation rate" value={ratio(e?.activated_users, e?.total_users)} sub={`${e?.activated_users ?? 0} posted ≥1 rec`} accent />
+          <Kpi label="Connected rate" value={ratio(e?.users_with_friend, e?.total_users)} sub={`${e?.users_with_friend ?? 0} have ≥1 friend`} />
+          <Kpi label="Recs / active user" value={e?.recs_per_active_user} sub="depth of use" />
+          <Kpi label="Avg crowns" value={e?.avg_rating} sub="rating quality" />
+          <Kpi label="Recs with photo" value={ratio(e?.recs_with_photo, c?.recs_total)} sub="richness" />
+          <Kpi label="Recs with note" value={ratio(e?.recs_with_note, c?.recs_total)} sub="richness" />
+          <Kpi label="Blast answer rate" value={ratio(e?.blasts_answered, e?.blasts_total)} sub="asks with ≥1 reply" />
+          <Kpi label="Places geocoded" value={ratio(e?.places_geocoded, e?.places_total)} sub="map coverage" />
+        </div>
+      </Section>
+
+      <Section title="Social graph" icon={<Network className="h-4 w-4" />}>
+        <div className="grid grid-cols-2 gap-2">
+          <Kpi label="Friendships" value={e?.friendships_accepted} sub="accepted" />
+          <Kpi label="Pending requests" value={e?.friendships_pending} />
+          <Kpi label="Accept rate" value={e?.friend_accept_rate != null ? `${e.friend_accept_rate}%` : undefined} />
+          <Kpi label="Avg friends / user" value={e?.avg_friends} />
+          <Kpi label="Lists created" value={e?.lists_total} sub={`${e?.lists_published ?? 0} published`} />
+          <Kpi label="Want-to saves" value={e?.wants_total} />
+          <Kpi label="Catalog items" value={e?.items_total} />
+          <Kpi label="Bulk imports" value={e?.imports_total} />
+        </div>
+      </Section>
+
+      <Section title="Trends · last 8 weeks" icon={<BarChart3 className="h-4 w-4" />}>
+        <div className="space-y-2">
+          <Spark label="Signups per week" points={e?.signups_by_week} />
+          <Spark label="Recs per week" points={e?.recs_by_week} />
+        </div>
+      </Section>
+
+      <Section title="Category mix" icon={<Sparkles className="h-4 w-4" />}>
+        <div className="rounded-xl border border-border bg-card p-3 space-y-1.5">
+          {(e?.by_category ?? []).map((row) => (
+            <div key={row.type} className="flex items-center gap-2">
+              <div className="w-20 shrink-0 text-xs capitalize">{row.type}</div>
+              <div className="h-2 flex-1 overflow-hidden rounded-full bg-muted">
+                <div
+                  className="h-full rounded-full bg-primary"
+                  style={{ width: `${pct(row.count, e?.by_category)}%` }}
+                />
+              </div>
+              <div className="w-8 text-right text-xs tabular-nums text-muted-foreground">{row.count}</div>
+            </div>
+          ))}
+          {(e?.by_category?.length ?? 0) === 0 && <p className="text-xs text-muted-foreground">No recommendations yet.</p>}
+        </div>
+      </Section>
+
+      <Section title="Top contributors" icon={<TrendingUp className="h-4 w-4" />}>
+        <div className="rounded-xl border border-border bg-card p-3 space-y-2">
+          {(e?.top_contributors ?? []).map((t, i) => (
+            <Link
+              key={t.username}
+              to="/profile/$username"
+              params={{ username: t.username }}
+              className="flex items-center gap-2 text-sm"
+            >
+              <span className="w-4 text-xs text-muted-foreground tabular-nums">{i + 1}</span>
+              <span className="flex-1 truncate font-medium">{t.display_name || t.username}</span>
+              <span className="text-xs tabular-nums text-muted-foreground">{t.count} recs</span>
+            </Link>
+          ))}
+          {(e?.top_contributors?.length ?? 0) === 0 && <p className="text-xs text-muted-foreground">No data yet.</p>}
+        </div>
+      </Section>
+
+
 
       <Section title="Admin team" icon={<Crown className="h-4 w-4" />}>
         <div className="space-y-2">
@@ -225,4 +324,35 @@ function Pair({ icon, label, total, recent }: { icon: React.ReactNode; label: st
 function ratio(a?: number, b?: number) {
   if (!a || !b) return "—";
   return `${Math.round((a / b) * 100)}%`;
+}
+
+function pct(count: number, rows?: { count: number }[]) {
+  const max = Math.max(1, ...(rows ?? []).map((r) => r.count));
+  return Math.max(4, Math.round((count / max) * 100));
+}
+
+function Spark({ label, points }: { label: string; points?: { week: string; count: number }[] }) {
+  const data = points ?? [];
+  const max = Math.max(1, ...data.map((d) => d.count));
+  return (
+    <div className="rounded-xl border border-border bg-card p-3">
+      <div className="text-[11px] uppercase tracking-wide text-muted-foreground">{label}</div>
+      {data.length === 0 ? (
+        <p className="mt-2 text-xs text-muted-foreground">No data yet.</p>
+      ) : (
+        <div className="mt-2 flex h-16 items-end gap-1">
+          {data.map((d) => (
+            <div key={d.week} className="flex flex-1 flex-col items-center gap-1">
+              <div
+                className="w-full rounded-t bg-primary/70"
+                style={{ height: `${Math.max(6, (d.count / max) * 100)}%` }}
+                title={`${d.week}: ${d.count}`}
+              />
+              <span className="text-[9px] text-muted-foreground">{d.week.slice(5)}</span>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
 }
