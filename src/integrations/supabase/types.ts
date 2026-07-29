@@ -252,6 +252,84 @@ export type Database = {
         }
         Relationships: []
       }
+      notification_preferences: {
+        Row: {
+          blast_comment: boolean
+          blast_new: boolean
+          created_at: string
+          email_enabled: boolean
+          friend_accepted: boolean
+          friend_new_rec: boolean
+          friend_request: boolean
+          rec_comment: boolean
+          rec_like: boolean
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          blast_comment?: boolean
+          blast_new?: boolean
+          created_at?: string
+          email_enabled?: boolean
+          friend_accepted?: boolean
+          friend_new_rec?: boolean
+          friend_request?: boolean
+          rec_comment?: boolean
+          rec_like?: boolean
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          blast_comment?: boolean
+          blast_new?: boolean
+          created_at?: string
+          email_enabled?: boolean
+          friend_accepted?: boolean
+          friend_new_rec?: boolean
+          friend_request?: boolean
+          rec_comment?: boolean
+          rec_like?: boolean
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      notifications: {
+        Row: {
+          actor_id: string | null
+          created_at: string
+          data: Json
+          entity_id: string | null
+          entity_type: string | null
+          id: string
+          read_at: string | null
+          type: string
+          user_id: string
+        }
+        Insert: {
+          actor_id?: string | null
+          created_at?: string
+          data?: Json
+          entity_id?: string | null
+          entity_type?: string | null
+          id?: string
+          read_at?: string | null
+          type: string
+          user_id: string
+        }
+        Update: {
+          actor_id?: string | null
+          created_at?: string
+          data?: Json
+          entity_id?: string | null
+          entity_type?: string | null
+          id?: string
+          read_at?: string | null
+          type?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       profiles: {
         Row: {
           avatar_url: string | null
@@ -543,6 +621,10 @@ export type Database = {
     }
     Functions: {
       are_friends: { Args: { _a: string; _b: string }; Returns: boolean }
+      notif_pref_enabled: {
+        Args: { _type: string; _user: string }
+        Returns: boolean
+      }
       search_profiles_for: {
         Args: { _caller: string; _limit?: number; _query: string }
         Returns: {
