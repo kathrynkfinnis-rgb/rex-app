@@ -365,6 +365,7 @@ export type Database = {
           item_id: string
           note: string | null
           photo_url: string | null
+          photo_urls: string[]
           rating: number
           updated_at: string
           user_id: string
@@ -376,6 +377,7 @@ export type Database = {
           item_id: string
           note?: string | null
           photo_url?: string | null
+          photo_urls?: string[]
           rating: number
           updated_at?: string
           user_id: string
@@ -387,6 +389,7 @@ export type Database = {
           item_id?: string
           note?: string | null
           photo_url?: string | null
+          photo_urls?: string[]
           rating?: number
           updated_at?: string
           user_id?: string
