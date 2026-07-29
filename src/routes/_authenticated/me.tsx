@@ -2,7 +2,6 @@ import { createFileRoute, useNavigate, Link } from "@tanstack/react-router";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
-import { RecommendationCard, type FeedRow } from "@/components/RecommendationCard";
 import { LogOut, Smartphone, BookOpen, FileUp, Bookmark, Crown } from "lucide-react";
 import { AvatarUploader } from "@/components/AvatarUploader";
 import { HitList } from "@/components/HitList";
@@ -48,19 +47,7 @@ function MePage() {
   });
 
 
-  const { data: myRecs } = useQuery({
-    queryKey: ["my-recs", user?.id],
-    queryFn: async () => {
-      if (!user) return [];
-      const { data } = await supabase
-        .from("recommendations")
-        .select("id, rating, note, created_at, photo_url, photo_urls, tags, user_id, item_id, items!inner(id, type, title, subtitle, image_url), profiles!recommendations_user_id_fkey(username, display_name, avatar_url)")
-        .eq("user_id", user.id)
-        .order("created_at", { ascending: false });
-      return (data ?? []) as unknown as FeedRow[];
-    },
-    enabled: !!user,
-  });
+
 
 
   async function signOut() {
@@ -113,16 +100,6 @@ function MePage() {
         {user ? <HitList userId={user.id} /> : null}
       </section>
 
-      <section className="p-4">
-        <h2 className="mb-3 text-xs font-semibold uppercase tracking-widest text-muted-foreground">Your recommendations</h2>
-        {myRecs && myRecs.length > 0 ? (
-          <div className="space-y-3">
-            {myRecs.map((r) => <RecommendationCard key={r.id} rec={r} />)}
-          </div>
-        ) : (
-          <p className="text-sm text-muted-foreground">You haven't posted any yet.</p>
-        )}
-      </section>
 
       <div className="space-y-2 p-5">
         <Link to="/import">
