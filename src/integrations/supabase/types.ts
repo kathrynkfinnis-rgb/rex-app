@@ -788,6 +788,7 @@ export type Database = {
         | "recipe"
         | "podcast"
         | "event"
+        | "other"
       list_visibility: "draft" | "friends" | "public"
     }
     CompositeTypes: {
@@ -918,7 +919,16 @@ export const Constants = {
     Enums: {
       app_role: ["admin", "moderator", "user"],
       friendship_status: ["pending", "accepted"],
-      item_type: ["place", "book", "movie", "tv", "recipe", "podcast", "event"],
+      item_type: [
+        "place",
+        "book",
+        "movie",
+        "tv",
+        "recipe",
+        "podcast",
+        "event",
+        "other",
+      ],
       list_visibility: ["draft", "friends", "public"],
     },
   },

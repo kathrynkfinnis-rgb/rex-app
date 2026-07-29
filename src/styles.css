@@ -57,6 +57,7 @@
   --color-cat-recipe: var(--cat-recipe);
   --color-cat-podcast: var(--cat-podcast);
   --color-cat-event: var(--cat-event);
+  --color-cat-other: var(--cat-other);
 }
 
 :root {
@@ -102,6 +103,7 @@
   --cat-recipe: oklch(0.66 0.15 55);
   --cat-podcast: oklch(0.58 0.16 310);
   --cat-event: oklch(0.6 0.16 340);
+  --cat-other: oklch(0.6 0.05 250);
 }
 
 .dark {
