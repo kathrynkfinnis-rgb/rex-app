@@ -37,6 +37,16 @@ export function RequestCard({ req }: { req: RequestRow }) {
   const author = req.profiles;
   const cat = req.type ? categoryMeta(req.type) : null;
   const Icon = cat?.icon ?? Sparkles;
+  const qc = useQueryClient();
+  const [confirmDelete, setConfirmDelete] = useState(false);
+  const [deleting, setDeleting] = useState(false);
+
+  const { data: uid } = useQuery({
+    queryKey: ["current-user-id"],
+    queryFn: async () => (await supabase.auth.getUser()).data.user?.id ?? null,
+    staleTime: 5 * 60 * 1000,
+  });
+  const isOwner = uid && uid === req.user_id;
 
   const { data: count } = useQuery({
     queryKey: ["request-comments-count", req.id],
@@ -49,6 +59,16 @@ export function RequestCard({ req }: { req: RequestRow }) {
     },
     staleTime: 30_000,
   });
+
+  async function handleDelete() {
+    setDeleting(true);
+    const { error } = await supabase.from("requests").delete().eq("id", req.id);
+    setDeleting(false);
+    if (error) { toast.error(error.message); return; }
+    toast.success("Blast deleted");
+    setConfirmDelete(false);
+    qc.invalidateQueries();
+  }
 
   return (
     <Link
