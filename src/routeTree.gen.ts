@@ -12,6 +12,8 @@ import { Route as rootRouteImport } from './routes/__root'
 import { Route as AuthRouteImport } from './routes/auth'
 import { Route as AuthenticatedRouteRouteImport } from './routes/_authenticated/route'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as AuthenticatedNotificationsRouteImport } from './routes/_authenticated/notifications'
+import { Route as AuthenticatedNotificationSettingsRouteImport } from './routes/_authenticated/notification-settings'
 import { Route as AuthenticatedMeRouteImport } from './routes/_authenticated/me'
 import { Route as AuthenticatedMapRouteImport } from './routes/_authenticated/map'
 import { Route as AuthenticatedImportGoodreadsRouteImport } from './routes/_authenticated/import-goodreads'
@@ -39,6 +41,18 @@ const IndexRoute = IndexRouteImport.update({
   path: '/',
   getParentRoute: () => rootRouteImport,
 } as any)
+const AuthenticatedNotificationsRoute =
+  AuthenticatedNotificationsRouteImport.update({
+    id: '/notifications',
+    path: '/notifications',
+    getParentRoute: () => AuthenticatedRouteRoute,
+  } as any)
+const AuthenticatedNotificationSettingsRoute =
+  AuthenticatedNotificationSettingsRouteImport.update({
+    id: '/notification-settings',
+    path: '/notification-settings',
+    getParentRoute: () => AuthenticatedRouteRoute,
+  } as any)
 const AuthenticatedMeRoute = AuthenticatedMeRouteImport.update({
   id: '/me',
   path: '/me',
@@ -114,6 +128,8 @@ export interface FileRoutesByFullPath {
   '/import-goodreads': typeof AuthenticatedImportGoodreadsRoute
   '/map': typeof AuthenticatedMapRoute
   '/me': typeof AuthenticatedMeRoute
+  '/notification-settings': typeof AuthenticatedNotificationSettingsRoute
+  '/notifications': typeof AuthenticatedNotificationsRoute
   '/ask/$id': typeof AuthenticatedAskIdRoute
   '/item/$id': typeof AuthenticatedItemIdRoute
   '/profile/$username': typeof AuthenticatedProfileUsernameRoute
@@ -130,6 +146,8 @@ export interface FileRoutesByTo {
   '/import-goodreads': typeof AuthenticatedImportGoodreadsRoute
   '/map': typeof AuthenticatedMapRoute
   '/me': typeof AuthenticatedMeRoute
+  '/notification-settings': typeof AuthenticatedNotificationSettingsRoute
+  '/notifications': typeof AuthenticatedNotificationsRoute
   '/ask/$id': typeof AuthenticatedAskIdRoute
   '/item/$id': typeof AuthenticatedItemIdRoute
   '/profile/$username': typeof AuthenticatedProfileUsernameRoute
@@ -148,6 +166,8 @@ export interface FileRoutesById {
   '/_authenticated/import-goodreads': typeof AuthenticatedImportGoodreadsRoute
   '/_authenticated/map': typeof AuthenticatedMapRoute
   '/_authenticated/me': typeof AuthenticatedMeRoute
+  '/_authenticated/notification-settings': typeof AuthenticatedNotificationSettingsRoute
+  '/_authenticated/notifications': typeof AuthenticatedNotificationsRoute
   '/_authenticated/ask/$id': typeof AuthenticatedAskIdRoute
   '/_authenticated/item/$id': typeof AuthenticatedItemIdRoute
   '/_authenticated/profile/$username': typeof AuthenticatedProfileUsernameRoute
@@ -166,6 +186,8 @@ export interface FileRouteTypes {
     | '/import-goodreads'
     | '/map'
     | '/me'
+    | '/notification-settings'
+    | '/notifications'
     | '/ask/$id'
     | '/item/$id'
     | '/profile/$username'
@@ -182,6 +204,8 @@ export interface FileRouteTypes {
     | '/import-goodreads'
     | '/map'
     | '/me'
+    | '/notification-settings'
+    | '/notifications'
     | '/ask/$id'
     | '/item/$id'
     | '/profile/$username'
@@ -199,6 +223,8 @@ export interface FileRouteTypes {
     | '/_authenticated/import-goodreads'
     | '/_authenticated/map'
     | '/_authenticated/me'
+    | '/_authenticated/notification-settings'
+    | '/_authenticated/notifications'
     | '/_authenticated/ask/$id'
     | '/_authenticated/item/$id'
     | '/_authenticated/profile/$username'
@@ -232,6 +258,20 @@ declare module '@tanstack/react-router' {
       fullPath: '/'
       preLoaderRoute: typeof IndexRouteImport
       parentRoute: typeof rootRouteImport
+    }
+    '/_authenticated/notifications': {
+      id: '/_authenticated/notifications'
+      path: '/notifications'
+      fullPath: '/notifications'
+      preLoaderRoute: typeof AuthenticatedNotificationsRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
+    '/_authenticated/notification-settings': {
+      id: '/_authenticated/notification-settings'
+      path: '/notification-settings'
+      fullPath: '/notification-settings'
+      preLoaderRoute: typeof AuthenticatedNotificationSettingsRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
     }
     '/_authenticated/me': {
       id: '/_authenticated/me'
@@ -341,6 +381,8 @@ interface AuthenticatedRouteRouteChildren {
   AuthenticatedImportGoodreadsRoute: typeof AuthenticatedImportGoodreadsRoute
   AuthenticatedMapRoute: typeof AuthenticatedMapRoute
   AuthenticatedMeRoute: typeof AuthenticatedMeRoute
+  AuthenticatedNotificationSettingsRoute: typeof AuthenticatedNotificationSettingsRoute
+  AuthenticatedNotificationsRoute: typeof AuthenticatedNotificationsRoute
   AuthenticatedItemIdRoute: typeof AuthenticatedItemIdRoute
   AuthenticatedProfileUsernameRoute: typeof AuthenticatedProfileUsernameRoute
 }
@@ -355,6 +397,9 @@ const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
   AuthenticatedImportGoodreadsRoute: AuthenticatedImportGoodreadsRoute,
   AuthenticatedMapRoute: AuthenticatedMapRoute,
   AuthenticatedMeRoute: AuthenticatedMeRoute,
+  AuthenticatedNotificationSettingsRoute:
+    AuthenticatedNotificationSettingsRoute,
+  AuthenticatedNotificationsRoute: AuthenticatedNotificationsRoute,
   AuthenticatedItemIdRoute: AuthenticatedItemIdRoute,
   AuthenticatedProfileUsernameRoute: AuthenticatedProfileUsernameRoute,
 }
