@@ -85,12 +85,14 @@ export function HitList({ userId }: { userId: string }) {
       });
     }
     for (const s of saved ?? []) {
+      const item = s.recommendations.items;
+      if (!item) continue;
       out.push({
         kind: "saved",
         id: s.id,
-        itemType: s.recommendations.items.type,
-        title: s.recommendations.items.title,
-        image: s.recommendations.items.image_url,
+        itemType: item.type,
+        title: item.title,
+        image: item.image_url,
         href: "/r/$id",
         params: { id: s.recommendations.id },
         listId: s.list_id,
