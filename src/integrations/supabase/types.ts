@@ -615,6 +615,27 @@ export type Database = {
           },
         ]
       }
+      user_roles: {
+        Row: {
+          created_at: string
+          id: string
+          role: Database["public"]["Enums"]["app_role"]
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          role: Database["public"]["Enums"]["app_role"]
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          role?: Database["public"]["Enums"]["app_role"]
+          user_id?: string
+        }
+        Relationships: []
+      }
       wants: {
         Row: {
           created_at: string
@@ -649,7 +670,16 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      admin_kpis_content: { Args: never; Returns: Json }
+      admin_kpis_users: { Args: never; Returns: Json }
       are_friends: { Args: { _a: string; _b: string }; Returns: boolean }
+      has_role: {
+        Args: {
+          _role: Database["public"]["Enums"]["app_role"]
+          _user_id: string
+        }
+        Returns: boolean
+      }
       notif_pref_enabled: {
         Args: { _type: string; _user: string }
         Returns: boolean
@@ -675,6 +705,7 @@ export type Database = {
       }
     }
     Enums: {
+      app_role: "admin" | "moderator" | "user"
       friendship_status: "pending" | "accepted"
       item_type:
         | "place"
@@ -811,6 +842,7 @@ export type CompositeTypes<
 export const Constants = {
   public: {
     Enums: {
+      app_role: ["admin", "moderator", "user"],
       friendship_status: ["pending", "accepted"],
       item_type: ["place", "book", "movie", "tv", "recipe", "podcast", "event"],
     },
