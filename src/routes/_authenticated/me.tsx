@@ -108,7 +108,7 @@ function MePage() {
 
       <section className="p-4">
         <h2 className="mb-3 flex items-center gap-2 text-xs font-semibold uppercase tracking-widest text-muted-foreground">
-          <Bookmark className="h-3.5 w-3.5" /> Hit List
+          <Bookmark className="h-3.5 w-3.5" /> My List
         </h2>
         {user ? <HitList userId={user.id} /> : null}
       </section>
