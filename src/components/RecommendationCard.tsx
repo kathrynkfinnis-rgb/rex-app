@@ -23,6 +23,7 @@ export type FeedRow = {
   created_at: string;
   photo_url: string | null;
   photo_urls?: string[] | null;
+  tags?: string[] | null;
   user_id: string;
   item_id: string;
   items: {
@@ -115,6 +116,15 @@ export function RecommendationCard({ rec }: { rec: FeedRow }) {
                 &ldquo;{rec.note}&rdquo;
               </p>
             )}
+            {rec.tags && rec.tags.length > 0 && (
+              <div className="mt-1 flex flex-wrap gap-1">
+                {rec.tags.map((t) => (
+                  <span key={t} className="rounded-full bg-primary/10 px-1.5 py-0.5 text-[10px] font-medium text-primary">
+                    #{t}
+                  </span>
+                ))}
+              </div>
+            )}
           </div>
         </div>
         {(() => {
@@ -191,7 +201,7 @@ export function RecommendationCard({ rec }: { rec: FeedRow }) {
       <EditRecommendationDialog
         open={editing}
         onOpenChange={setEditing}
-        recommendation={{ id: rec.id, rating: rec.rating, note: rec.note, photo_url: rec.photo_url, photo_urls: rec.photo_urls ?? null }}
+        recommendation={{ id: rec.id, rating: rec.rating, note: rec.note, photo_url: rec.photo_url, photo_urls: rec.photo_urls ?? null, tags: rec.tags ?? null }}
         item={{ id: item.id, type: item.type, genre: item.genre, recipe_text: (item as any).recipe_text ?? null }}
       />
     )}

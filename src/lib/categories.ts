@@ -29,6 +29,7 @@ export function categoryMeta(type: ItemType) {
 
 export const PLACE_SUBCATEGORIES = [
   "Restaurant",
+  "Private dining",
   "Bar",
   "Café",
   "Beauty",

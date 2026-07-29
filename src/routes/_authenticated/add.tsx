@@ -18,6 +18,7 @@ import { getPlacePhotoUrl } from "@/lib/places.functions";
 import { useServerFn } from "@tanstack/react-start";
 import { RecipeEditor } from "@/components/RecipeEditor";
 import { PhotoUploader } from "@/components/PhotoUploader";
+import { TagsInput } from "@/components/TagsInput";
 
 export const Route = createFileRoute("/_authenticated/add")({
   head: () => ({
@@ -46,6 +47,7 @@ function AddPage() {
   const [placeSub, setPlaceSub] = useState<string>("");
   const [justAdded, setJustAdded] = useState<{ itemId: string; title: string } | null>(null);
   const [photos, setPhotos] = useState<string[]>([]);
+  const [tags, setTags] = useState<string[]>([]);
   const { data: uid } = useQuery({
     queryKey: ["current-user-id"],
     queryFn: async () => (await supabase.auth.getUser()).data.user?.id ?? null,
@@ -165,6 +167,7 @@ function AddPage() {
         note: note.trim() || null,
         photo_url: photos[0] ?? null,
         photo_urls: photos,
+        tags,
       } as never);
       if (recErr) throw recErr;
 
@@ -422,6 +425,22 @@ function AddPage() {
             <PhotoUploader userId={uid} value={photos} onChange={setPhotos} />
           </div>
         )}
+
+        <div className="space-y-1.5">
+          <Label>Tags</Label>
+          <TagsInput
+            value={tags}
+            onChange={setTags}
+            placeholder={type === "place" ? "e.g. private dining, date night, dog friendly" : "Add tags (press enter)"}
+            suggestions={
+              type === "place"
+                ? ["private dining", "date night", "outdoor seating", "dog friendly", "kid friendly"]
+                : type === "recipe"
+                ? ["quick", "gluten free", "vegetarian", "meal prep"]
+                : []
+            }
+          />
+        </div>
 
         <Button
           type="button"

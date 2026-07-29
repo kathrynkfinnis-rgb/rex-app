@@ -22,6 +22,7 @@ import { subcategoriesFor, categoryMeta, type ItemType } from "@/lib/categories"
 import { cn } from "@/lib/utils";
 import { RecipeEditor } from "@/components/RecipeEditor";
 import { PhotoUploader } from "@/components/PhotoUploader";
+import { TagsInput } from "@/components/TagsInput";
 
 export function EditRecommendationDialog({
   open,
@@ -31,7 +32,7 @@ export function EditRecommendationDialog({
 }: {
   open: boolean;
   onOpenChange: (v: boolean) => void;
-  recommendation: { id: string; rating: number; note: string | null; photo_url?: string | null; photo_urls?: string[] | null };
+  recommendation: { id: string; rating: number; note: string | null; photo_url?: string | null; photo_urls?: string[] | null; tags?: string[] | null };
   item?: { id: string; type: ItemType; genre: string | null; recipe_text?: string | null } | null;
 }) {
   const qc = useQueryClient();
@@ -43,6 +44,7 @@ export function EditRecommendationDialog({
     ? [recommendation.photo_url]
     : []) as string[];
   const [photos, setPhotos] = useState<string[]>(initialPhotos);
+  const [tags, setTags] = useState<string[]>(recommendation.tags ?? []);
   const subOptions = item ? subcategoriesFor(item.type) : [];
   const [placeSub, setPlaceSub] = useState<string>(
     item && (subOptions as readonly string[]).includes(item.genre ?? "") ? (item.genre as string) : "",
@@ -83,6 +85,7 @@ export function EditRecommendationDialog({
           note: note.trim() ? note.trim() : null,
           photo_url: photos[0] ?? null,
           photo_urls: photos,
+          tags,
         } as never)
         .eq("id", recommendation.id);
       if (error) throw error;
@@ -189,6 +192,11 @@ export function EditRecommendationDialog({
                 rows={4}
                 placeholder="What did you think?"
               />
+            </div>
+
+            <div className="space-y-1.5">
+              <Label>Tags</Label>
+              <TagsInput value={tags} onChange={setTags} placeholder="e.g. private dining, date night" />
             </div>
 
             {uid && (
