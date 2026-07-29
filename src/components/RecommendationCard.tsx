@@ -176,7 +176,14 @@ export function RecommendationCard({ rec }: { rec: FeedRow }) {
         <div className="ml-auto flex items-center">
           <LikesComments recommendationId={rec.id} compact />
           <SavePostButton recommendationId={rec.id} />
+          <ShareButton
+            variant="icon"
+            url={`${SHARE_SITE}/r/${rec.id}`}
+            text={`${author?.display_name || author?.username || "A friend"} rates ${item.title} ${rec.rating}/10 👑 on REX 🦖`}
+            label="Share on WhatsApp"
+          />
         </div>
+
       </div>
 
     </article>
