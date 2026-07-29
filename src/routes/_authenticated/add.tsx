@@ -337,31 +337,34 @@ function AddPage() {
               </>
             )}
 
+        {subcategoriesFor(type).length > 0 && (
+          <div className="space-y-1.5">
+            <Label>{type === "place" ? "Type of place" : `Type of ${cat!.label.toLowerCase()}`}</Label>
+            <div className="flex flex-wrap gap-2">
+              {subcategoriesFor(type).map((s) => {
+                const active = placeSub === s;
+                return (
+                  <button
+                    key={s}
+                    type="button"
+                    onClick={() => setPlaceSub(active ? "" : s)}
+                    className={cn(
+                      "rounded-full px-3 py-1.5 text-sm ring-1 transition-colors",
+                      active
+                        ? "bg-primary text-primary-foreground ring-primary"
+                        : "bg-card text-foreground ring-border hover:bg-muted",
+                    )}
+                  >
+                    {s}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        )}
+
         {type === "place" && (
           <>
-            <div className="space-y-1.5">
-              <Label>Type of place</Label>
-              <div className="flex flex-wrap gap-2">
-                {PLACE_SUBCATEGORIES.map((s) => {
-                  const active = placeSub === s;
-                  return (
-                    <button
-                      key={s}
-                      type="button"
-                      onClick={() => setPlaceSub(active ? "" : s)}
-                      className={cn(
-                        "rounded-full px-3 py-1.5 text-sm ring-1 transition-colors",
-                        active
-                          ? "bg-primary text-primary-foreground ring-primary"
-                          : "bg-card text-foreground ring-border hover:bg-muted",
-                      )}
-                    >
-                      {s}
-                    </button>
-                  );
-                })}
-              </div>
-            </div>
             <div className="space-y-1.5">
               <Label htmlFor="address">Address</Label>
               <Input
