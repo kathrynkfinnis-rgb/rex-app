@@ -144,11 +144,11 @@ export function EditRecommendationDialog({
               <label className="mb-2 block text-sm font-medium">Rating</label>
               <CrownRatingInput value={rating} onChange={setRating} size="md" />
             </div>
-            {isPlace && (
+            {item && subOptions.length > 0 && (
               <div className="space-y-1.5">
-                <Label>Type of place</Label>
+                <Label>{isPlace ? "Type of place" : `Type of ${categoryMeta(item.type).label.toLowerCase()}`}</Label>
                 <div className="flex flex-wrap gap-2">
-                  {PLACE_SUBCATEGORIES.map((s) => {
+                  {subOptions.map((s) => {
                     const active = placeSub === s;
                     return (
                       <button
@@ -168,7 +168,7 @@ export function EditRecommendationDialog({
                   })}
                 </div>
                 <p className="text-xs text-muted-foreground">
-                  Changing this updates the place for everyone who saved it.
+                  Changing this updates the tag for everyone who saved it.
                 </p>
               </div>
             )}
