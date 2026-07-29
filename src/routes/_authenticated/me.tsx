@@ -100,16 +100,6 @@ function MePage() {
         {user ? <HitList userId={user.id} /> : null}
       </section>
 
-      <section className="p-4">
-        <h2 className="mb-3 text-xs font-semibold uppercase tracking-widest text-muted-foreground">Your recommendations</h2>
-        {myRecs && myRecs.length > 0 ? (
-          <div className="space-y-3">
-            {myRecs.map((r) => <RecommendationCard key={r.id} rec={r} />)}
-          </div>
-        ) : (
-          <p className="text-sm text-muted-foreground">You haven't posted any yet.</p>
-        )}
-      </section>
 
       <div className="space-y-2 p-5">
         <Link to="/import">
