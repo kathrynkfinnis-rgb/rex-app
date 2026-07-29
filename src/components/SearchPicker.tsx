@@ -1,13 +1,14 @@
 import { useEffect, useState } from "react";
 import { useServerFn } from "@tanstack/react-start";
 import { Input } from "@/components/ui/input";
-import { Search, Loader2, Pencil, MapPin } from "lucide-react";
+import { Search, Loader2, Pencil, MapPin, Ticket } from "lucide-react";
 import { searchMovies, searchTv, searchPodcasts, type SearchHit } from "@/lib/search.functions";
 import { searchBooksClient } from "@/lib/search-client";
 import { searchPlaces, type PlaceHit } from "@/lib/places.functions";
+import { searchEvents, type EventHit } from "@/lib/events.functions";
 import type { ItemType } from "@/lib/categories";
 
-export type AnyHit = SearchHit | PlaceHit;
+export type AnyHit = SearchHit | PlaceHit | EventHit;
 
 type Props = {
   type: ItemType;
