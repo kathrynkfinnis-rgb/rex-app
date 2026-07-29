@@ -47,19 +47,7 @@ function MePage() {
   });
 
 
-  const { data: myRecs } = useQuery({
-    queryKey: ["my-recs", user?.id],
-    queryFn: async () => {
-      if (!user) return [];
-      const { data } = await supabase
-        .from("recommendations")
-        .select("id, rating, note, created_at, photo_url, photo_urls, tags, user_id, item_id, items!inner(id, type, title, subtitle, image_url), profiles!recommendations_user_id_fkey(username, display_name, avatar_url)")
-        .eq("user_id", user.id)
-        .order("created_at", { ascending: false });
-      return (data ?? []) as unknown as FeedRow[];
-    },
-    enabled: !!user,
-  });
+
 
 
   async function signOut() {
