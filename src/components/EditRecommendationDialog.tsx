@@ -22,6 +22,7 @@ import { subcategoriesFor, categoryMeta, type ItemType } from "@/lib/categories"
 import { cn } from "@/lib/utils";
 import { RecipeEditor } from "@/components/RecipeEditor";
 import { PhotoUploader } from "@/components/PhotoUploader";
+import { TagsInput } from "@/components/TagsInput";
 
 export function EditRecommendationDialog({
   open,
