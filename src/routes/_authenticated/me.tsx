@@ -3,11 +3,9 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { RecommendationCard, type FeedRow } from "@/components/RecommendationCard";
-import { toast } from "sonner";
-import { LogOut, Smartphone, BookOpen, FileUp, Bookmark, BookmarkCheck, Crown } from "lucide-react";
+import { LogOut, Smartphone, BookOpen, FileUp, Bookmark, Crown } from "lucide-react";
 import { AvatarUploader } from "@/components/AvatarUploader";
-import { categoryMeta, type ItemType } from "@/lib/categories";
-import { cn } from "@/lib/utils";
+import { HitList } from "@/components/HitList";
 
 export const Route = createFileRoute("/_authenticated/me")({
   head: () => ({
