@@ -185,7 +185,9 @@ function ItemPage() {
         <h2 className="font-display text-2xl">What friends say</h2>
         {recs.length === 0 && <p className="mt-2 text-sm text-muted-foreground">No takes yet.</p>}
         <div className="mt-3 space-y-3">
-          {recs.map((r: any) => (
+          {recs.map((r: any) => {
+            const photos = (r.photo_urls && r.photo_urls.length ? r.photo_urls : r.photo_url ? [r.photo_url] : []) as string[];
+            return (
             <div key={r.id} className="rounded-2xl bg-card p-4 ring-1 ring-border">
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2">
@@ -196,12 +198,20 @@ function ItemPage() {
 
               </div>
               {r.note && <p className="mt-2 text-sm leading-snug">&ldquo;{r.note}&rdquo;</p>}
+              {photos.length > 0 && (
+                <div className={photos.length === 1 ? "mt-3" : "mt-3 grid grid-cols-2 gap-1"}>
+                  {photos.slice(0, 4).map((url) => (
+                    <img key={url} src={url} alt="" className="w-full rounded-lg object-cover ring-1 ring-border" style={{ maxHeight: photos.length === 1 ? 360 : undefined, aspectRatio: photos.length === 1 ? undefined : "1 / 1" }} />
+                  ))}
+                </div>
+              )}
               <p className="mt-1 text-[11px] text-muted-foreground">{formatDistanceToNow(new Date(r.created_at), { addSuffix: true })}</p>
               <div className="mt-2 border-t border-border pt-2">
                 <LikesComments recommendationId={r.id} />
               </div>
             </div>
-          ))}
+            );
+          })}
         </div>
 
         {checks.length > 0 && (
