@@ -1,12 +1,12 @@
 import { Link, useRouterState } from "@tanstack/react-router";
-import { Home, Map, Plus, Users, Mic } from "lucide-react";
+import { Home, Map, Plus, Users, Bookmark } from "lucide-react";
 import { cn } from "@/lib/utils";
 
-const items: { to: "/feed" | "/map" | "/add" | "/creators" | "/friends"; icon: typeof Home; label: string; primary?: boolean }[] = [
+const items: { to: "/feed" | "/map" | "/add" | "/me" | "/friends"; icon: typeof Home; label: string; primary?: boolean }[] = [
   { to: "/feed", icon: Home, label: "Feed" },
   { to: "/map", icon: Map, label: "Map" },
   { to: "/add", icon: Plus, label: "Add", primary: true },
-  { to: "/creators", icon: Mic, label: "Creators" },
+  { to: "/me", icon: Bookmark, label: "My List" },
   { to: "/friends", icon: Users, label: "Friends" },
 ];
 
