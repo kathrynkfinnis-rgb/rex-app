@@ -52,6 +52,24 @@ function MePage() {
     enabled: !!user,
   });
 
+  const { data: myWants } = useQuery({
+    queryKey: ["my-wants", user?.id],
+    queryFn: async () => {
+      if (!user) return [];
+      const { data } = await supabase
+        .from("wants")
+        .select("id, created_at, item_id, items!inner(id, type, title, subtitle, image_url)")
+        .eq("user_id", user.id)
+        .order("created_at", { ascending: false });
+      return (data ?? []) as unknown as Array<{
+        id: string;
+        item_id: string;
+        items: { id: string; type: ItemType; title: string; subtitle: string | null; image_url: string | null };
+      }>;
+    },
+    enabled: !!user,
+  });
+
   async function signOut() {
     await qc.cancelQueries();
     qc.clear();
