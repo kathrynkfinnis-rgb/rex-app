@@ -69,6 +69,10 @@ export const SUBCATEGORIES: Record<ItemType, readonly string[]> = {
     "Concert", "Exhibition", "Theatre", "Comedy", "Sport", "Talk",
     "Festival", "Film", "Other",
   ],
+  other: [
+    "Product", "Gadget", "App", "Service", "Newsletter", "Video",
+    "Article", "Game", "Hidden gem", "Other",
+  ],
 };
 
 export function subcategoriesFor(type: ItemType | null | undefined): readonly string[] {
