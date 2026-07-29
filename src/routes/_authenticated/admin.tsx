@@ -325,3 +325,34 @@ function ratio(a?: number, b?: number) {
   if (!a || !b) return "—";
   return `${Math.round((a / b) * 100)}%`;
 }
+
+function pct(count: number, rows?: { count: number }[]) {
+  const max = Math.max(1, ...(rows ?? []).map((r) => r.count));
+  return Math.max(4, Math.round((count / max) * 100));
+}
+
+function Spark({ label, points }: { label: string; points?: { week: string; count: number }[] }) {
+  const data = points ?? [];
+  const max = Math.max(1, ...data.map((d) => d.count));
+  return (
+    <div className="rounded-xl border border-border bg-card p-3">
+      <div className="text-[11px] uppercase tracking-wide text-muted-foreground">{label}</div>
+      {data.length === 0 ? (
+        <p className="mt-2 text-xs text-muted-foreground">No data yet.</p>
+      ) : (
+        <div className="mt-2 flex h-16 items-end gap-1">
+          {data.map((d) => (
+            <div key={d.week} className="flex flex-1 flex-col items-center gap-1">
+              <div
+                className="w-full rounded-t bg-primary/70"
+                style={{ height: `${Math.max(6, (d.count / max) * 100)}%` }}
+                title={`${d.week}: ${d.count}`}
+              />
+              <span className="text-[9px] text-muted-foreground">{d.week.slice(5)}</span>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
