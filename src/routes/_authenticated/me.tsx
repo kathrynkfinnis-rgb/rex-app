@@ -2,7 +2,6 @@ import { createFileRoute, useNavigate, Link } from "@tanstack/react-router";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
-import { RecommendationCard, type FeedRow } from "@/components/RecommendationCard";
 import { LogOut, Smartphone, BookOpen, FileUp, Bookmark, Crown } from "lucide-react";
 import { AvatarUploader } from "@/components/AvatarUploader";
 import { HitList } from "@/components/HitList";
