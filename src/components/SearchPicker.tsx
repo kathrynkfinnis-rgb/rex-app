@@ -103,6 +103,10 @@ export function SearchPicker({ type, onPick, onManual, near }: Props) {
                   <div className="flex h-14 w-10 flex-none items-center justify-center rounded-md bg-secondary text-secondary-foreground ring-1 ring-border">
                     <MapPin className="h-5 w-5" />
                   </div>
+                ) : isEvent && !r.image_url ? (
+                  <div className="flex h-14 w-10 flex-none items-center justify-center rounded-md bg-secondary text-secondary-foreground ring-1 ring-border">
+                    <Ticket className="h-5 w-5" />
+                  </div>
                 ) : r.image_url ? (
                   <img
                     src={r.image_url}
