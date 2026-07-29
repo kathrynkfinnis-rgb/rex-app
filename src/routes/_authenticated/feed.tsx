@@ -157,6 +157,9 @@ function FeedPage() {
         {!searching && (
           <div className="scrollbar-none mt-3 flex gap-2 overflow-x-auto -mx-5 px-5">
             <Chip active={filter === "all"} onClick={() => setFilter("all")}>All</Chip>
+            <Chip active={filter === "asks"} onClick={() => setFilter("asks")}>
+              <Sparkles className="h-3.5 w-3.5" /> Asks
+            </Chip>
             {CATEGORIES.map((c) => (
               <Chip key={c.type} active={filter === c.type} onClick={() => setFilter(c.type)}>
                 <c.icon className="h-3.5 w-3.5" />
@@ -165,7 +168,7 @@ function FeedPage() {
             ))}
           </div>
         )}
-        {!searching && filter !== "all" && subcategories.length > 0 && (
+        {!searching && filter !== "all" && filter !== "asks" && subcategories.length > 0 && (
           <div className="scrollbar-none mt-2 flex gap-2 overflow-x-auto -mx-5 px-5">
             <SubChip active={subFilter === "all"} onClick={() => setSubFilter("all")}>All {categoryMeta(filter).plural.toLowerCase()}</SubChip>
             {subcategories.map((g) => (
@@ -181,19 +184,36 @@ function FeedPage() {
         <SearchResults query={query} feed={data ?? []} scope={searchScope} />
       ) : (
         <div className="space-y-3 px-4 py-4">
+          <Link
+            to="/ask"
+            className="flex items-center gap-3 rounded-2xl bg-gradient-to-br from-accent/15 to-card p-3 ring-1 ring-accent/40 transition-transform active:scale-[0.99]"
+          >
+            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-accent/20 text-accent-foreground">
+              <Sparkles className="h-5 w-5" />
+            </div>
+            <div className="min-w-0 flex-1">
+              <p className="font-medium">Ask friends for a rec</p>
+              <p className="truncate text-xs text-muted-foreground">Put out a blast — friends can chime in.</p>
+            </div>
+            <Plus className="h-4 w-4 text-muted-foreground" />
+          </Link>
           {isLoading && (
             <>
               <SkeletonCard />
               <SkeletonCard />
             </>
           )}
-          {!isLoading && (data?.length ?? 0) === 0 && <EmptyState />}
-          {!isLoading && (data?.length ?? 0) > 0 && visible.length === 0 && (
+          {!isLoading && visible.length === 0 && filter !== "asks" && <EmptyState />}
+          {!isLoading && visible.length === 0 && filter === "asks" && (
             <p className="rounded-2xl border border-dashed border-border bg-card p-6 text-center text-sm text-muted-foreground">
-              No {subFilter.toLowerCase()} recs in your feed yet.
+              No asks yet — be the first to ask your friends.
             </p>
           )}
-          {visible.map((rec) => <RecommendationCard key={rec.id} rec={rec} />)}
+          {visible.map((entry) =>
+            entry.kind === "rec"
+              ? <RecommendationCard key={`r-${entry.row.id}`} rec={entry.row} />
+              : <RequestCard key={`q-${entry.row.id}`} req={entry.row} />,
+          )}
         </div>
       )}
 
