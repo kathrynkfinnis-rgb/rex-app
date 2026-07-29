@@ -79,7 +79,12 @@ export function EditRecommendationDialog({
     mutationFn: async () => {
       const { error } = await supabase
         .from("recommendations")
-        .update({ rating, note: note.trim() ? note.trim() : null })
+        .update({
+          rating,
+          note: note.trim() ? note.trim() : null,
+          photo_url: photos[0] ?? null,
+          photo_urls: photos,
+        } as never)
         .eq("id", recommendation.id);
       if (error) throw error;
       if (isPlace && item) {
