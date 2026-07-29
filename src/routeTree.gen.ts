@@ -12,6 +12,7 @@ import { Route as rootRouteImport } from './routes/__root'
 import { Route as AuthRouteImport } from './routes/auth'
 import { Route as AuthenticatedRouteRouteImport } from './routes/_authenticated/route'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as RIdRouteImport } from './routes/r.$id'
 import { Route as AuthenticatedNotificationsRouteImport } from './routes/_authenticated/notifications'
 import { Route as AuthenticatedNotificationSettingsRouteImport } from './routes/_authenticated/notification-settings'
 import { Route as AuthenticatedMeRouteImport } from './routes/_authenticated/me'
@@ -40,6 +41,11 @@ const AuthenticatedRouteRoute = AuthenticatedRouteRouteImport.update({
 const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const RIdRoute = RIdRouteImport.update({
+  id: '/r/$id',
+  path: '/r/$id',
   getParentRoute: () => rootRouteImport,
 } as any)
 const AuthenticatedNotificationsRoute =
@@ -137,6 +143,7 @@ export interface FileRoutesByFullPath {
   '/me': typeof AuthenticatedMeRoute
   '/notification-settings': typeof AuthenticatedNotificationSettingsRoute
   '/notifications': typeof AuthenticatedNotificationsRoute
+  '/r/$id': typeof RIdRoute
   '/ask/$id': typeof AuthenticatedAskIdRoute
   '/item/$id': typeof AuthenticatedItemIdRoute
   '/profile/$username': typeof AuthenticatedProfileUsernameRoute
@@ -156,6 +163,7 @@ export interface FileRoutesByTo {
   '/me': typeof AuthenticatedMeRoute
   '/notification-settings': typeof AuthenticatedNotificationSettingsRoute
   '/notifications': typeof AuthenticatedNotificationsRoute
+  '/r/$id': typeof RIdRoute
   '/ask/$id': typeof AuthenticatedAskIdRoute
   '/item/$id': typeof AuthenticatedItemIdRoute
   '/profile/$username': typeof AuthenticatedProfileUsernameRoute
@@ -177,6 +185,7 @@ export interface FileRoutesById {
   '/_authenticated/me': typeof AuthenticatedMeRoute
   '/_authenticated/notification-settings': typeof AuthenticatedNotificationSettingsRoute
   '/_authenticated/notifications': typeof AuthenticatedNotificationsRoute
+  '/r/$id': typeof RIdRoute
   '/_authenticated/ask/$id': typeof AuthenticatedAskIdRoute
   '/_authenticated/item/$id': typeof AuthenticatedItemIdRoute
   '/_authenticated/profile/$username': typeof AuthenticatedProfileUsernameRoute
@@ -198,6 +207,7 @@ export interface FileRouteTypes {
     | '/me'
     | '/notification-settings'
     | '/notifications'
+    | '/r/$id'
     | '/ask/$id'
     | '/item/$id'
     | '/profile/$username'
@@ -217,6 +227,7 @@ export interface FileRouteTypes {
     | '/me'
     | '/notification-settings'
     | '/notifications'
+    | '/r/$id'
     | '/ask/$id'
     | '/item/$id'
     | '/profile/$username'
@@ -237,6 +248,7 @@ export interface FileRouteTypes {
     | '/_authenticated/me'
     | '/_authenticated/notification-settings'
     | '/_authenticated/notifications'
+    | '/r/$id'
     | '/_authenticated/ask/$id'
     | '/_authenticated/item/$id'
     | '/_authenticated/profile/$username'
@@ -246,6 +258,7 @@ export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   AuthenticatedRouteRoute: typeof AuthenticatedRouteRouteWithChildren
   AuthRoute: typeof AuthRoute
+  RIdRoute: typeof RIdRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -269,6 +282,13 @@ declare module '@tanstack/react-router' {
       path: '/'
       fullPath: '/'
       preLoaderRoute: typeof IndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/r/$id': {
+      id: '/r/$id'
+      path: '/r/$id'
+      fullPath: '/r/$id'
+      preLoaderRoute: typeof RIdRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/_authenticated/notifications': {
@@ -432,6 +452,7 @@ const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   AuthenticatedRouteRoute: AuthenticatedRouteRouteWithChildren,
   AuthRoute: AuthRoute,
+  RIdRoute: RIdRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
