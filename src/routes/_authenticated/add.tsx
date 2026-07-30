@@ -161,7 +161,7 @@ function AddPage() {
             address: type === "place" || type === "event" ? address.trim() || null : null,
             lat: type === "place" || type === "event" ? coords?.lat ?? null : null,
             lng: type === "place" || type === "event" ? coords?.lng ?? null : null,
-            genre: placeSub || (picked?.genre ?? null),
+            genre: joinGenres(placeSubs) ?? (picked?.genre ?? null),
             ...(type === "recipe" && recipeText.trim() ? { recipe_text: recipeText } : {}),
           } as never)
           .select("id")
