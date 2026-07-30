@@ -21,10 +21,13 @@ import { PhotoUploader } from "@/components/PhotoUploader";
 import { TagsInput } from "@/components/TagsInput";
 
 export const Route = createFileRoute("/_authenticated/add")({
+  validateSearch: (search: Record<string, unknown>) => ({
+    trip: typeof search.trip === "string" ? search.trip : undefined,
+  }),
   head: () => ({
     meta: [
       { title: "Add a Rex — REX" },
-      { name: "description", content: "Post a Rex for a place, book, movie, show, or recipe." },
+      { name: "description", content: "Post a Rex for a place, trip, book, movie, show, or recipe." },
     ],
   }),
   component: AddPage,
@@ -32,7 +35,8 @@ export const Route = createFileRoute("/_authenticated/add")({
 
 function AddPage() {
   const navigate = useNavigate();
-  const [type, setType] = useState<ItemType | null>(null);
+  const { trip: tripId } = Route.useSearch();
+  const [type, setType] = useState<ItemType | null>(tripId ? "place" : null);
   const [title, setTitle] = useState("");
   const [subtitle, setSubtitle] = useState("");
   const [address, setAddress] = useState("");
@@ -45,7 +49,7 @@ function AddPage() {
   const [picked, setPicked] = useState<AnyHit | null>(null);
   const [manualMode, setManualMode] = useState(false);
   const [placeSub, setPlaceSub] = useState<string>("");
-  const [justAdded, setJustAdded] = useState<{ itemId: string; title: string } | null>(null);
+  const [justAdded, setJustAdded] = useState<{ itemId: string; recId: string; title: string; isTrip: boolean } | null>(null);
   const [photos, setPhotos] = useState<string[]>([]);
   const [tags, setTags] = useState<string[]>([]);
   const { data: uid } = useQuery({
@@ -55,9 +59,10 @@ function AddPage() {
   });
 
   const cat = type ? categoryMeta(type) : null;
-  const needsSearch = type !== null && type !== "recipe" && type !== "other";
+  const needsSearch = type !== null && type !== "recipe" && type !== "other" && type !== "trip";
   const showForm = !needsSearch || picked || manualMode;
   const photoFn = useServerFn(getPlacePhotoUrl);
+
 
   function resetForm() {
     setType(null);
