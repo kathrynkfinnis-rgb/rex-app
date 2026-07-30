@@ -66,5 +66,10 @@ export const geocodeMissingPlaces = createServerFn({ method: "POST" })
         // skip
       }
     }
-    return { updated, checked: rows.length };
+    const { count } = await supabase
+      .from("items")
+      .select("id", { count: "exact", head: true })
+      .in("type", ["place", "event"])
+      .is("lat", null);
+    return { updated, checked: rows.length, remaining: count ?? 0 };
   });
