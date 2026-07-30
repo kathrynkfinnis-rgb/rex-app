@@ -55,10 +55,7 @@ export function SavePostButton({
     onSuccess: (row) => {
       qc.setQueryData(["saved-post", recommendationId, userId], row);
       qc.invalidateQueries({ queryKey: ["my-saved-posts"] });
-      toast.success("Added to My Lists", {
-        description: "Filed under your default list.",
-        action: { label: "Choose list", onClick: () => setPickerOpen(true) },
-      });
+      setPickerOpen(true);
     },
     onError: (e: any) => toast.error(e.message || "Couldn't save"),
   });
