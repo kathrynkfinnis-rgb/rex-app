@@ -60,7 +60,6 @@ export function HitList({ userId }: { userId: string }) {
   const qc = useQueryClient();
   const [newListFor, setNewListFor] = useState<string | null>(null);
   const [newName, setNewName] = useState("");
-  const [newEmoji, setNewEmoji] = useState("");
   const [newVisibility, setNewVisibility] = useState<Visibility>("draft");
   const [collabList, setCollabList] = useState<ListRow | null>(null);
   const [filter, setFilter] = useState<string>("all");
@@ -272,14 +271,12 @@ export function HitList({ userId }: { userId: string }) {
       user_id: userId,
       item_type: newListFor,
       name: newName.trim(),
-      emoji: newEmoji.trim() || null,
       visibility: newVisibility,
     });
     if (error) return toast.error(error.message);
     toast.success("List created");
     setNewListFor(null);
     setNewName("");
-    setNewEmoji("");
     setNewVisibility("draft");
     qc.invalidateQueries({ queryKey: ["my-hitlist-lists", userId] });
   }
@@ -310,7 +307,6 @@ export function HitList({ userId }: { userId: string }) {
   function startNewList(type: string) {
     setNewListFor(type);
     setNewName("");
-    setNewEmoji("");
     setNewVisibility("draft");
   }
 
@@ -491,7 +487,6 @@ export function HitList({ userId }: { userId: string }) {
                 onClick={() => {
                   setNewListFor(cat.type);
                   setNewName("");
-                  setNewEmoji("");
                   setNewVisibility("draft");
                 }}
               >
@@ -668,15 +663,6 @@ export function HitList({ userId }: { userId: string }) {
                 value={newName}
                 onChange={(e) => setNewName(e.target.value)}
                 placeholder="e.g. Tokyo list"
-              />
-            </div>
-            <div>
-              <label className="mb-1 block text-xs font-medium">Emoji (optional)</label>
-              <Input
-                value={newEmoji}
-                onChange={(e) => setNewEmoji(e.target.value)}
-                placeholder="🏯"
-                maxLength={4}
               />
             </div>
             <div>
