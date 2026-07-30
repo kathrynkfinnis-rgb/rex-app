@@ -148,9 +148,9 @@ function FeedPage() {
               searchScope === "people"
                 ? "Search people…"
                 : searchScope === "lists"
-                  ? "Search lists…"
+                  ? "Search collections…"
                   : searchScope === "all"
-                    ? "Search Rex, people, lists, books, films, places…"
+                    ? "Search Rex, people, collections, books, films, places…"
                     : `Search ${categoryMeta(searchScope).plural.toLowerCase()}…`
             }
             aria-label="Search"
@@ -174,7 +174,7 @@ function FeedPage() {
               <User className="h-3.5 w-3.5" /> People
             </ScopeChip>
             <ScopeChip active={searchScope === "lists"} onClick={() => setSearchScope("lists")}>
-              <ListIcon className="h-3.5 w-3.5" /> Lists
+              <ListIcon className="h-3.5 w-3.5" /> Collections
             </ScopeChip>
             {CATEGORIES.map((c) => (
               <ScopeChip key={c.type} active={searchScope === c.type} onClick={() => setSearchScope(c.type)}>
@@ -396,7 +396,7 @@ function SearchResults({ query, feed, scope }: { query: string; feed: FeedRow[];
       )}
 
       {(lists.data?.length ?? 0) > 0 && (
-        <Section title={<span className="flex items-center gap-1.5"><ListIcon className="h-3.5 w-3.5" /> Lists</span>}>
+        <Section title={<span className="flex items-center gap-1.5"><ListIcon className="h-3.5 w-3.5" /> Collections</span>}>
           <ul className="space-y-2">
             {lists.data!.map((l: any) => {
               const VIcon = l.visibility === "public" ? Globe2 : l.visibility === "friends" ? UsersIcon : Lock;
