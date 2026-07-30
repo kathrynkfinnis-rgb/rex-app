@@ -28,13 +28,16 @@ function MapPage() {
   const [geocoding, setGeocoding] = useState(false);
   const ranAuto = useRef(false);
 
+  const [cat, setCat] = useState<ItemType | "all">("all");
+  const [sub, setSub] = useState<string | null>(null);
+
   const { data } = useQuery({
     queryKey: ["map-places"],
     queryFn: async () => {
       const { data, error } = await supabase
         .from("items")
-        .select("id, title, subtitle, address, lat, lng, image_url, recommendations(id, rating, user_id, profiles(display_name, username))")
-        .eq("type", "place")
+        .select("id, title, subtitle, type, genre, address, lat, lng, image_url, recommendations(id, rating, user_id, profiles(display_name, username))")
+        .in("type", ["place", "event"])
         .order("created_at", { ascending: false })
         .limit(200);
       if (error) throw error;
@@ -42,8 +45,33 @@ function MapPage() {
     },
   });
 
-  const withLoc = (data ?? []).filter((p: any) => p.lat != null && p.lng != null);
-  const withoutLoc = (data ?? []).filter((p: any) => p.lat == null || p.lng == null);
+  const all = data ?? [];
+
+  const cats = useMemo(() => {
+    const present = new Set(all.map((p: any) => p.type));
+    return CATEGORIES.filter((c) => present.has(c.type));
+  }, [all]);
+
+  const byCat = useMemo(
+    () => (cat === "all" ? all : all.filter((p: any) => p.type === cat)),
+    [all, cat],
+  );
+
+  const subs = useMemo(() => {
+    const set = new Set<string>();
+    byCat.forEach((p: any) => p.genre && set.add(p.genre));
+    return [...set].sort();
+  }, [byCat]);
+
+  const filtered = useMemo(
+    () => (sub ? byCat.filter((p: any) => p.genre === sub) : byCat),
+    [byCat, sub],
+  );
+
+  const withLoc = filtered.filter((p: any) => p.lat != null && p.lng != null);
+  const withoutLoc = filtered.filter((p: any) => p.lat == null || p.lng == null);
+  const allWithoutLoc = all.filter((p: any) => p.lat == null || p.lng == null);
+
 
   const runGeocode = async () => {
     setGeocoding(true);
