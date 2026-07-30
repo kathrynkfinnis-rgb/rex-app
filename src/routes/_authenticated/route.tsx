@@ -66,7 +66,7 @@ function AuthedLayout() {
         </div>
       </div>
 
-      <div className="mx-auto max-w-md">
+      <div className="mx-auto max-w-md lg:max-w-5xl">
         <Outlet />
       </div>
       <BottomNav />
