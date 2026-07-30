@@ -128,6 +128,11 @@ export function RecommendationCard({ rec }: { rec: FeedRow }) {
               <div className="ml-auto shrink-0"><CrownRatingDisplay value={rec.rating} size="xs" showNumber /></div>
             </div>
             <h3 className="mt-0.5 truncate font-display text-base leading-tight">{item.title}</h3>
+            {isTrip && (
+              <p className="text-xs font-medium text-primary">
+                {tripStops ?? 0} {tripStops === 1 ? "stop" : "stops"} · tap to see the itinerary
+              </p>
+            )}
             {item.subtitle && (
               <p className="truncate text-xs text-muted-foreground">{item.subtitle}</p>
             )}
