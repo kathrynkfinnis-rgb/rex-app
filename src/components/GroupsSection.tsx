@@ -14,7 +14,6 @@ export function GroupsSection({ userId }: { userId: string }) {
   const qc = useQueryClient();
   const [creating, setCreating] = useState(false);
   const [name, setName] = useState("");
-  const [emoji, setEmoji] = useState("");
 
   const { data: groups = [] } = useQuery({
     queryKey: ["groups", userId],
@@ -55,7 +54,7 @@ export function GroupsSection({ userId }: { userId: string }) {
     if (!trimmed) return;
     const { data, error } = await supabase
       .from("groups")
-      .insert({ owner_id: userId, name: trimmed.slice(0, 60), emoji: emoji.trim() || null })
+      .insert({ owner_id: userId, name: trimmed.slice(0, 60) })
       .select("id")
       .single();
     if (error || !data) return toast.error(error?.message ?? "Couldn't create the group");
@@ -64,7 +63,6 @@ export function GroupsSection({ userId }: { userId: string }) {
     toast.success("Group created — now add friends");
     setCreating(false);
     setName("");
-    setEmoji("");
     qc.invalidateQueries({ queryKey: ["groups", userId] });
     qc.invalidateQueries({ queryKey: ["my-groups"] });
   }
@@ -127,10 +125,6 @@ export function GroupsSection({ userId }: { userId: string }) {
                 maxLength={60}
                 placeholder="e.g. Book club"
               />
-            </div>
-            <div>
-              <label className="mb-1 block text-xs font-medium">Emoji (optional)</label>
-              <Input value={emoji} onChange={(e) => setEmoji(e.target.value)} maxLength={4} placeholder="📚" />
             </div>
           </div>
           <DialogFooter>

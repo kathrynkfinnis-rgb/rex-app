@@ -37,7 +37,6 @@ export function AddToListDialog({
   const cat = categoryMeta(itemType);
   const [creating, setCreating] = useState(false);
   const [newName, setNewName] = useState("");
-  const [newEmoji, setNewEmoji] = useState("");
   const [newMixed, setNewMixed] = useState(false);
   const [busy, setBusy] = useState(false);
 
@@ -77,7 +76,6 @@ export function AddToListDialog({
   function reset() {
     setCreating(false);
     setNewName("");
-    setNewEmoji("");
     setNewMixed(false);
   }
 
@@ -102,7 +100,6 @@ export function AddToListDialog({
         user_id: userId,
         item_type: newMixed ? "mixed" : itemType,
         name: newName.trim(),
-        emoji: newEmoji.trim() || null,
         visibility: "draft",
       })
       .select("id, name")
@@ -179,22 +176,13 @@ export function AddToListDialog({
 
         {creating ? (
           <div className="space-y-2 rounded-2xl bg-muted/50 p-3">
-            <div className="flex gap-2">
-              <Input
-                value={newEmoji}
-                onChange={(e) => setNewEmoji(e.target.value)}
-                placeholder="🎯"
-                maxLength={4}
-                className="w-14 shrink-0 text-center"
-              />
-              <Input
-                autoFocus
-                value={newName}
-                onChange={(e) => setNewName(e.target.value)}
-                placeholder={`e.g. Tokyo ${cat.plural.toLowerCase()}`}
-                onKeyDown={(e) => e.key === "Enter" && createAndMove()}
-              />
-            </div>
+            <Input
+              autoFocus
+              value={newName}
+              onChange={(e) => setNewName(e.target.value)}
+              placeholder={`e.g. Tokyo ${cat.plural.toLowerCase()}`}
+              onKeyDown={(e) => e.key === "Enter" && createAndMove()}
+            />
             <button
               type="button"
               onClick={() => setNewMixed((m) => !m)}
