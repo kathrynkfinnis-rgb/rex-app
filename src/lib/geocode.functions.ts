@@ -12,7 +12,7 @@ export const geocodeMissingPlaces = createServerFn({ method: "POST" })
   .handler(async ({ data, context }) => {
     const lovable = process.env.LOVABLE_API_KEY;
     const gmk = process.env.GOOGLE_MAPS_API_KEY;
-    if (!lovable || !gmk) return { updated: 0, checked: 0, reason: "no_key" as const };
+    if (!lovable || !gmk) return { updated: 0, checked: 0, remaining: 0, reason: "no_key" as const };
 
     const { supabase } = context;
     const limit = data.limit ?? 25;
@@ -21,11 +21,11 @@ export const geocodeMissingPlaces = createServerFn({ method: "POST" })
     const { data: rows, error } = await supabase
       .from("items")
       .select("id, title, subtitle, address")
-      .eq("type", "place")
+      .in("type", ["place", "event"])
       .is("lat", null)
       .order("created_at", { ascending: false })
       .limit(limit);
-    if (error || !rows) return { updated: 0, checked: 0 };
+    if (error || !rows) return { updated: 0, checked: 0, remaining: 0 };
 
     const headers = {
       Authorization: `Bearer ${lovable}`,
@@ -66,5 +66,10 @@ export const geocodeMissingPlaces = createServerFn({ method: "POST" })
         // skip
       }
     }
-    return { updated, checked: rows.length };
+    const { count } = await supabase
+      .from("items")
+      .select("id", { count: "exact", head: true })
+      .in("type", ["place", "event"])
+      .is("lat", null);
+    return { updated, checked: rows.length, remaining: count ?? 0 };
   });
