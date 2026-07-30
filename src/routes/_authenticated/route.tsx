@@ -3,7 +3,7 @@ import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { BottomNav } from "@/components/BottomNav";
 import { NotificationBell } from "@/components/NotificationBell";
-import { MessageSquarePlus } from "lucide-react";
+import { MessageSquareText } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 
@@ -59,7 +59,7 @@ function AuthedLayout() {
             aria-label="Send feedback"
             className="pointer-events-auto flex h-10 w-10 items-center justify-center rounded-full bg-card text-foreground shadow-md ring-2 ring-background transition-transform active:scale-95"
           >
-            <MessageSquarePlus className="h-5 w-5" />
+            <MessageSquareText className="h-5 w-5" />
           </Link>
           <NotificationBell userId={user.id} />
           <ProfileButton />
