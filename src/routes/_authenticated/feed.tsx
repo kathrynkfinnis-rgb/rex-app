@@ -76,7 +76,8 @@ function FeedPage() {
     queryFn: async () => {
       let q = supabase
         .from("recommendations")
-        .select("id, rating, note, created_at, photo_url, photo_urls, tags, user_id, item_id, items!inner(id, type, title, subtitle, image_url, genre), profiles!recommendations_user_id_fkey(username, display_name, avatar_url), creators(slug, name, color, emoji)")
+        .select("id, rating, note, created_at, photo_url, photo_urls, tags, user_id, item_id, trip_id, items!inner(id, type, title, subtitle, image_url, genre), profiles!recommendations_user_id_fkey(username, display_name, avatar_url), creators(slug, name, color, emoji)")
+        .is("trip_id", null)
         .order("created_at", { ascending: false })
         .limit(50);
       if (filter !== "all" && filter !== "asks") q = q.eq("items.type", filter);
