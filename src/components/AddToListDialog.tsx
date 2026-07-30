@@ -49,16 +49,29 @@ export function AddToListDialog({
     queryKey: ["lists-for-type", userId],
     enabled: !!userId && open,
     queryFn: async () => {
-      const { data } = await supabase
-        .from("hitlist_lists")
-        .select("id, name, emoji, item_type")
-        .eq("user_id", userId!)
-        .order("created_at", { ascending: true });
-      return (data ?? []) as ListRow[];
+      const [own, shared] = await Promise.all([
+        supabase
+          .from("hitlist_lists")
+          .select("id, name, emoji, item_type")
+          .eq("user_id", userId!)
+          .order("created_at", { ascending: true }),
+        supabase
+          .from("list_collaborators")
+          .select("hitlist_lists!inner(id, name, emoji, item_type)")
+          .eq("user_id", userId!),
+      ]);
+      const sharedLists = ((shared.data ?? []) as any[]).map((r) => r.hitlist_lists);
+      const seen = new Set<string>();
+      return [...((own.data ?? []) as any[]), ...sharedLists].filter((l) => {
+        if (!l || seen.has(l.id)) return false;
+        seen.add(l.id);
+        return true;
+      }) as ListRow[];
     },
   });
 
   const allLists = lists ?? [];
+
   const table = kind === "want" ? "wants" : "saved_posts";
 
   function refresh() {
