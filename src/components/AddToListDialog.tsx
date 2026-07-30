@@ -65,6 +65,8 @@ export function AddToListDialog({
     qc.invalidateQueries({ queryKey: ["my-saved-posts"] });
     qc.invalidateQueries({ queryKey: ["my-hitlist-lists"] });
     qc.invalidateQueries({ queryKey: ["lists-for-type"] });
+    qc.invalidateQueries({ queryKey: ["saved-post"] });
+    qc.invalidateQueries({ queryKey: ["want"] });
   }
 
   async function moveTo(listId: string | null, label: string) {
