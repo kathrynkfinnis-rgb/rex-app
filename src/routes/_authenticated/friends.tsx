@@ -6,6 +6,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { UserAvatar } from "@/components/UserAvatar";
 import { searchProfiles, suggestedFriends } from "@/lib/friends.functions";
 import { GroupsSection } from "@/components/GroupsSection";
+import { TopRexxersCard } from "@/components/TopRexxers";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -181,36 +182,86 @@ function FriendsPage() {
   }
 
   return (
-    <div>
-      <header className="border-b border-border bg-background px-5 pb-4 pt-[calc(env(safe-area-inset-top)+1rem)]">
-        <h1 className="font-display text-3xl">Friends</h1>
-        <p className="mt-1 text-sm text-muted-foreground">Add the friends whose taste you trust.</p>
-      </header>
+    <div className="lg:flex lg:gap-6 lg:px-6 lg:pb-6">
+      <div className="flex-1 lg:max-w-md">
+        <header className="border-b border-border bg-background px-5 pb-4 pt-[calc(env(safe-area-inset-top)+1rem)]">
+          <h1 className="font-display text-3xl">Friends</h1>
+          <p className="mt-1 text-sm text-muted-foreground">Add the friends whose taste you trust.</p>
+        </header>
 
-      <div className="p-5">
-        <div className="flex gap-2">
-          <Input
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            placeholder="Search by username"
-            className="h-12 rounded-xl"
-            onKeyDown={(e) => e.key === "Enter" && doSearch()}
-          />
-          <Button onClick={doSearch} disabled={searching} className="h-12 rounded-xl">
-            <Search className="h-4 w-4" />
+        <div className="p-5">
+          <div className="flex gap-2">
+            <Input
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              placeholder="Search by username"
+              className="h-12 rounded-xl"
+              onKeyDown={(e) => e.key === "Enter" && doSearch()}
+            />
+            <Button onClick={doSearch} disabled={searching} className="h-12 rounded-xl">
+              <Search className="h-4 w-4" />
+            </Button>
+          </div>
+          {searchResults.length > 0 && (
+            <ul className="mt-3 space-y-2">
+              {searchResults.map((p) => {
+                const already = (friendships ?? []).some(
+                  (f: any) => f.requester_id === p.id || f.addressee_id === p.id,
+                );
+                return (
+                  <li key={p.id} className="flex items-center justify-between rounded-2xl bg-card p-3 ring-1 ring-border">
+                    <div>
+                      <p className="font-medium">{p.display_name || p.username}</p>
+                      <p className="text-xs text-muted-foreground">@{p.username}</p>
+                    </div>
+                    <Button
+                      size="sm"
+                      onClick={() => sendRequest(p.id)}
+                      disabled={already}
+                      variant={already ? "outline" : "default"}
+                      className="rounded-full"
+                    >
+                      {already ? "Sent" : <><UserPlus className="mr-1 h-3.5 w-3.5" /> Add</>}
+                    </Button>
+                  </li>
+                );
+              })}
+            </ul>
+          )}
+
+          <Button
+            onClick={shareInvite}
+            variant="outline"
+            className="mt-4 h-12 w-full gap-2 rounded-full"
+          >
+            <Share2 className="h-4 w-4" /> Share invite link
           </Button>
         </div>
-        {searchResults.length > 0 && (
-          <ul className="mt-3 space-y-2">
-            {searchResults.map((p) => {
+
+        <div className="px-5 pb-5 lg:hidden">
+          <TopRexxersCard />
+        </div>
+
+        {uid && <GroupsSection userId={uid} />}
+
+        {suggestions && suggestions.length > 0 && (
+
+          <Section title="People you may know">
+            {suggestions.map((p: any) => {
               const already = (friendships ?? []).some(
                 (f: any) => f.requester_id === p.id || f.addressee_id === p.id,
               );
               return (
-                <li key={p.id} className="flex items-center justify-between rounded-2xl bg-card p-3 ring-1 ring-border">
-                  <div>
-                    <p className="font-medium">{p.display_name || p.username}</p>
-                    <p className="text-xs text-muted-foreground">@{p.username}</p>
+                <div key={p.id} className="flex items-center justify-between rounded-2xl bg-card p-3 ring-1 ring-border">
+                  <div className="flex items-center gap-3 min-w-0">
+                    <UserAvatar url={p.avatar_url} name={p.display_name || p.username} size="md" />
+                    <div className="min-w-0">
+                      <p className="truncate font-medium">{p.display_name || p.username}</p>
+                      <p className="flex items-center gap-1 truncate text-xs text-muted-foreground">
+                        <Users className="h-3 w-3" />
+                        {p.mutual_count} mutual{p.mutual_count === 1 ? "" : "s"} · @{p.username}
+                      </p>
+                    </div>
                   </div>
                   <Button
                     size="sm"
@@ -221,118 +272,80 @@ function FriendsPage() {
                   >
                     {already ? "Sent" : <><UserPlus className="mr-1 h-3.5 w-3.5" /> Add</>}
                   </Button>
-                </li>
+                </div>
               );
             })}
-          </ul>
+          </Section>
         )}
 
-        <Button
-          onClick={shareInvite}
-          variant="outline"
-          className="mt-4 h-12 w-full gap-2 rounded-full"
-        >
-          <Share2 className="h-4 w-4" /> Share invite link
-        </Button>
+        {incoming.length > 0 && (
+          <Section title="Requests for you">
+            {incoming.map((f: any) => (
+              <div key={f.id} className="flex items-center justify-between rounded-2xl bg-card p-3 ring-1 ring-border">
+                <div>
+                  <p className="font-medium">{f.requester?.display_name || f.requester?.username}</p>
+                  <p className="text-xs text-muted-foreground">@{f.requester?.username}</p>
+                </div>
+                <div className="flex gap-1.5">
+                  <Button size="icon" onClick={() => respond(f.id, true)} className="h-9 w-9 rounded-full">
+                    <Check className="h-4 w-4" />
+                  </Button>
+                  <Button size="icon" variant="outline" onClick={() => respond(f.id, false)} className="h-9 w-9 rounded-full">
+                    <X className="h-4 w-4" />
+                  </Button>
+                </div>
+              </div>
+            ))}
+          </Section>
+        )}
+
+        {outgoing.length > 0 && (
+          <Section title="Pending">
+            {outgoing.map((f: any) => (
+              <div key={f.id} className="flex items-center justify-between rounded-2xl bg-card p-3 ring-1 ring-border">
+                <div>
+                  <p className="font-medium">{f.addressee?.display_name || f.addressee?.username}</p>
+                  <p className="text-xs text-muted-foreground">@{f.addressee?.username}</p>
+                </div>
+                <span className="text-xs text-muted-foreground">Waiting…</span>
+              </div>
+            ))}
+          </Section>
+        )}
+
+        {topList.length > 0 && (
+          <Section title={`Top friends (${topList.length}) · private`}>
+            {topList.map((f: any) => (
+              <FriendRow key={`top-${f.id}`} friend={f.other} isTop onToggleTop={toggleTop} />
+            ))}
+          </Section>
+        )}
+
+        <Section title={`Your friends${accepted.length ? ` (${accepted.length})` : ""}`}>
+          {accepted.length === 0 ? (
+            <p className="text-sm text-muted-foreground">No friends yet. Search above to add someone.</p>
+          ) : (
+            accepted.map((f: any) => {
+              const other = f.requester_id === uid ? f.addressee : f.requester;
+              if (!other?.username) return null;
+              return (
+                <FriendRow
+                  key={f.id}
+                  friend={other}
+                  isTop={topIds.has(other.id)}
+                  onToggleTop={toggleTop}
+                />
+              );
+            })
+          )}
+        </Section>
       </div>
 
-      {uid && <GroupsSection userId={uid} />}
-
-      {suggestions && suggestions.length > 0 && (
-
-        <Section title="People you may know">
-          {suggestions.map((p: any) => {
-            const already = (friendships ?? []).some(
-              (f: any) => f.requester_id === p.id || f.addressee_id === p.id,
-            );
-            return (
-              <div key={p.id} className="flex items-center justify-between rounded-2xl bg-card p-3 ring-1 ring-border">
-                <div className="flex items-center gap-3 min-w-0">
-                  <UserAvatar url={p.avatar_url} name={p.display_name || p.username} size="md" />
-                  <div className="min-w-0">
-                    <p className="truncate font-medium">{p.display_name || p.username}</p>
-                    <p className="flex items-center gap-1 truncate text-xs text-muted-foreground">
-                      <Users className="h-3 w-3" />
-                      {p.mutual_count} mutual{p.mutual_count === 1 ? "" : "s"} · @{p.username}
-                    </p>
-                  </div>
-                </div>
-                <Button
-                  size="sm"
-                  onClick={() => sendRequest(p.id)}
-                  disabled={already}
-                  variant={already ? "outline" : "default"}
-                  className="rounded-full"
-                >
-                  {already ? "Sent" : <><UserPlus className="mr-1 h-3.5 w-3.5" /> Add</>}
-                </Button>
-              </div>
-            );
-          })}
-        </Section>
-      )}
-
-      {incoming.length > 0 && (
-        <Section title="Requests for you">
-          {incoming.map((f: any) => (
-            <div key={f.id} className="flex items-center justify-between rounded-2xl bg-card p-3 ring-1 ring-border">
-              <div>
-                <p className="font-medium">{f.requester?.display_name || f.requester?.username}</p>
-                <p className="text-xs text-muted-foreground">@{f.requester?.username}</p>
-              </div>
-              <div className="flex gap-1.5">
-                <Button size="icon" onClick={() => respond(f.id, true)} className="h-9 w-9 rounded-full">
-                  <Check className="h-4 w-4" />
-                </Button>
-                <Button size="icon" variant="outline" onClick={() => respond(f.id, false)} className="h-9 w-9 rounded-full">
-                  <X className="h-4 w-4" />
-                </Button>
-              </div>
-            </div>
-          ))}
-        </Section>
-      )}
-
-      {outgoing.length > 0 && (
-        <Section title="Pending">
-          {outgoing.map((f: any) => (
-            <div key={f.id} className="flex items-center justify-between rounded-2xl bg-card p-3 ring-1 ring-border">
-              <div>
-                <p className="font-medium">{f.addressee?.display_name || f.addressee?.username}</p>
-                <p className="text-xs text-muted-foreground">@{f.addressee?.username}</p>
-              </div>
-              <span className="text-xs text-muted-foreground">Waiting…</span>
-            </div>
-          ))}
-        </Section>
-      )}
-
-      {topList.length > 0 && (
-        <Section title={`Top friends (${topList.length}) · private`}>
-          {topList.map((f: any) => (
-            <FriendRow key={`top-${f.id}`} friend={f.other} isTop onToggleTop={toggleTop} />
-          ))}
-        </Section>
-      )}
-
-      <Section title={`Your friends${accepted.length ? ` (${accepted.length})` : ""}`}>
-        {accepted.length === 0 ? (
-          <p className="text-sm text-muted-foreground">No friends yet. Search above to add someone.</p>
-        ) : (
-          accepted.map((f: any) => {
-            const other = f.requester_id === uid ? f.addressee : f.requester;
-            if (!other?.username) return null;
-            return (
-              <FriendRow
-                key={f.id}
-                friend={other}
-                isTop={topIds.has(other.id)}
-                onToggleTop={toggleTop}
-              />
-            );
-          })
-        )}
-      </Section>
+      <aside className="hidden lg:block lg:w-80 lg:pt-6">
+        <div className="sticky top-24 space-y-4">
+          <TopRexxersCard />
+        </div>
+      </aside>
     </div>
   );
 }
