@@ -88,6 +88,16 @@ function FriendsPage() {
   const outgoing = (friendships ?? []).filter((f: any) => f.requester_id === uid && f.status === "pending");
   const accepted = (friendships ?? []).filter((f: any) => f.status === "accepted");
 
+  const { data: topSet } = useTopFriends();
+  const topIds = topSet ?? new Set<string>();
+  const toggleTopMut = useToggleTopFriend();
+  const toggleTop = (friendId: string, isTop: boolean) => toggleTopMut.mutate({ friendId, isTop });
+  const topList = accepted
+    .map((f: any) => ({ ...f, other: f.requester_id === uid ? f.addressee : f.requester }))
+    .filter((f: any) => f.other?.username && topIds.has(f.other.id));
+
+
+
   async function shareInvite() {
     const username = myProfile?.username;
     const origin = typeof window !== "undefined" ? window.location.origin : "";
