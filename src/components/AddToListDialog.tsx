@@ -13,7 +13,7 @@ type ListRow = { id: string; name: string; emoji: string | null; item_type: stri
 
 /**
  * Bubble sheet shown right after something is saved: pick one of your existing
- * lists (for this category, or any of your "mix of everything" lists), or spin
+ * collections (for this category, or any of your "mix of everything" collections), or spin
  * up a brand new one without leaving the screen.
  */
 export function AddToListDialog({
@@ -106,7 +106,7 @@ export function AddToListDialog({
       .single();
     if (error || !data) {
       setBusy(false);
-      return toast.error(error?.message ?? "Couldn't create list");
+      return toast.error(error?.message ?? "Couldn't create collection");
     }
     setBusy(false);
     reset();
@@ -119,7 +119,7 @@ export function AddToListDialog({
     const { error } = await supabase.from(table).delete().eq("id", entryId);
     setBusy(false);
     if (error) return toast.error(error.message);
-    toast.success("Removed from My Lists");
+    toast.success("Removed from My Collections");
     refresh();
     reset();
     onOpenChange(false);
@@ -206,7 +206,7 @@ export function AddToListDialog({
           </div>
         ) : (
           <Button variant="outline" className="w-full gap-1 rounded-full" onClick={() => setCreating(true)}>
-            <Plus className="h-4 w-4" /> New list
+            <Plus className="h-4 w-4" /> New collection
           </Button>
         )}
 
@@ -216,7 +216,7 @@ export function AddToListDialog({
           disabled={busy}
           className="mx-auto flex items-center gap-1.5 text-xs text-muted-foreground hover:text-destructive"
         >
-          <Trash2 className="h-3.5 w-3.5" /> Remove from My Lists
+          <Trash2 className="h-3.5 w-3.5" /> Remove from My Collections
         </button>
       </DialogContent>
     </Dialog>
