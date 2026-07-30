@@ -14,9 +14,9 @@ export const Route = createFileRoute("/_authenticated/you")({
   head: () => ({
     meta: [
       { title: "Your profile — REX" },
-      { name: "description", content: "Your Rexes, activity summary and account settings on REX." },
+      { name: "description", content: "Your Rex, activity summary and account settings on REX." },
       { property: "og:title", content: "Your profile — REX" },
-      { property: "og:description", content: "Your Rexes, activity summary and account settings on REX." },
+      { property: "og:description", content: "Your Rex, activity summary and account settings on REX." },
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary" },
     ],
@@ -132,7 +132,7 @@ function YouPage() {
         </div>
 
         <div className="mt-5 grid grid-cols-4 gap-2">
-          <Stat label="Rexes" value={total} />
+          <Stat label="Rex" value={total} />
           <Stat label="Avg crowns" value={avg ?? "—"} />
           <Stat label="Friends" value={activity?.friends ?? 0} />
           <Stat label="Lists" value={activity?.lists ?? 0} />
@@ -158,7 +158,7 @@ function YouPage() {
           <Sparkles className="h-3.5 w-3.5" /> Your activity
         </h2>
         <div className="grid grid-cols-2 gap-2">
-          <MiniStat icon={<Sparkles className="h-4 w-4" />} label="Rexes last 30 days" value={last30} />
+          <MiniStat icon={<Sparkles className="h-4 w-4" />} label="Rex last 30 days" value={last30} />
           <MiniStat icon={<MessageCircle className="h-4 w-4" />} label="Comments left" value={activity?.comments ?? 0} />
           <MiniStat icon={<Heart className="h-4 w-4" />} label="Posts liked" value={activity?.likes ?? 0} />
           <MiniStat icon={<Bookmark className="h-4 w-4" />} label="Saved to lists" value={activity?.wants ?? 0} />
@@ -189,7 +189,7 @@ function YouPage() {
       <section className="px-4 pb-2">
         <div className="mb-3 flex items-center justify-between">
           <h2 className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">
-            Your Rexes
+            Your Rex
           </h2>
           <Link to="/me" className="text-xs font-medium text-primary">My Lists →</Link>
         </div>
