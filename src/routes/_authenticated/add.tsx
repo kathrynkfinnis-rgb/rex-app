@@ -269,20 +269,66 @@ function AddPage() {
           </button>
           <h1 className="mt-3 font-display text-3xl">What are you Rexing?</h1>
         </header>
-        <div className="grid grid-cols-2 gap-2 p-4">
+        <div className="grid grid-cols-2 gap-2 p-4 pb-2">
           {CATEGORIES.map((c) => (
             <button
               key={c.type}
               onClick={() => setType(c.type)}
-              className="flex items-center gap-3 rounded-2xl bg-card p-3 ring-1 ring-border transition-transform active:scale-95"
+              className="relative flex items-center gap-3 rounded-2xl bg-card p-3 ring-1 ring-border transition-transform active:scale-95"
             >
               <div className={cn("flex h-10 w-10 shrink-0 items-center justify-center rounded-xl", c.tokenClass)}>
                 <c.icon className="h-5 w-5" />
               </div>
               <span className="min-w-0 truncate font-display text-base">{c.plural}</span>
+              {c.type === "trip" && (
+                <span
+                  role="button"
+                  tabIndex={0}
+                  aria-label="What's a trip?"
+                  onClick={(e) => { e.stopPropagation(); setShowTripInfo((s) => !s); }}
+                  onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); e.stopPropagation(); setShowTripInfo((s) => !s); } }}
+                  className="absolute right-1.5 top-1.5 flex h-5 w-5 items-center justify-center rounded-full bg-muted text-muted-foreground hover:text-foreground"
+                >
+                  <Info className="h-3 w-3" />
+                </span>
+              )}
             </button>
           ))}
         </div>
+
+        <div className="px-4 pb-2">
+          {showTripInfo ? (
+            <div className="relative rounded-2xl bg-primary/10 p-4 text-sm ring-1 ring-primary/30">
+              <div className="absolute -top-1.5 right-8 h-3 w-3 rotate-45 bg-primary/10 ring-1 ring-primary/30" />
+              <p className="font-display text-base">Place vs. Trip 🧳</p>
+              <p className="mt-1 text-muted-foreground">
+                A <strong className="text-foreground">Place</strong> is one spot — a restaurant, bar or hotel you'd
+                recommend on its own.
+              </p>
+              <p className="mt-1.5 text-muted-foreground">
+                A <strong className="text-foreground">Trip</strong> ties several places together — &ldquo;Lisbon, 3
+                days&rdquo;. It shows in the feed as one card, and tapping it opens a mini-feed of every Rex on that
+                trip.
+              </p>
+              <button
+                type="button"
+                onClick={() => setShowTripInfo(false)}
+                className="mt-2 text-xs font-medium text-primary underline"
+              >
+                Got it
+              </button>
+            </div>
+          ) : (
+            <button
+              type="button"
+              onClick={() => setShowTripInfo(true)}
+              className="flex items-center gap-1.5 text-xs text-muted-foreground underline"
+            >
+              <Info className="h-3.5 w-3.5" /> What's the difference between a Place and a Trip?
+            </button>
+          )}
+        </div>
+
 
         <div className="px-4 pb-4">
           <Link
