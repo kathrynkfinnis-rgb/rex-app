@@ -104,7 +104,14 @@ function ListPage() {
     },
   });
 
+  // Count a "read" once per visit for public collections (powers Shared Collections ranking).
+  useEffect(() => {
+    if (!id) return;
+    (supabase as any).rpc("increment_list_view", { _list: id });
+  }, [id]);
+
   if (isLoading) {
+
     return <div className="px-5 py-8 text-sm text-muted-foreground">Loading collection…</div>;
   }
 
