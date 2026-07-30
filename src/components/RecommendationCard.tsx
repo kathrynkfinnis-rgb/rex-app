@@ -11,6 +11,8 @@ import { Pencil } from "lucide-react";
 import { UserAvatar } from "@/components/UserAvatar";
 import { SavePostButton } from "@/components/SavePostButton";
 import { ShareButton } from "@/components/ShareButton";
+import { ShareToGroupButton } from "@/components/ShareToGroupButton";
+
 
 const SHARE_SITE = "https://pocket-app-pioneers.lovable.app";
 
