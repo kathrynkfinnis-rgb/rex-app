@@ -63,6 +63,18 @@ export function RecommendationCard({ rec }: { rec: FeedRow }) {
     queryFn: async () => (await supabase.auth.getUser()).data.user?.id ?? null,
     staleTime: 5 * 60 * 1000,
   });
+  const { data: tripStops } = useQuery({
+    queryKey: ["trip-stop-count", rec.id],
+    enabled: rec.items?.type === "trip",
+    staleTime: 60_000,
+    queryFn: async () => {
+      const { count } = await supabase
+        .from("recommendations")
+        .select("id", { count: "exact", head: true })
+        .eq("trip_id", rec.id);
+      return count ?? 0;
+    },
+  });
   if (!item) return null;
   const cat = categoryMeta(item.type);
   const Icon = cat.icon;
