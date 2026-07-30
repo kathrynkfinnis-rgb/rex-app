@@ -53,7 +53,7 @@ function AuthedLayout() {
   return (
     <div className="min-h-screen bg-background pb-24">
       <div className="fixed left-1/2 top-[calc(env(safe-area-inset-top)+0.75rem)] z-40 w-full max-w-md -translate-x-1/2 px-4 pointer-events-none">
-        <div className="flex items-center justify-between gap-2">
+        <div className="flex items-center justify-end gap-2">
           <Link
             to="/feedback"
             aria-label="Send feedback"
@@ -61,10 +61,8 @@ function AuthedLayout() {
           >
             <MessageSquarePlus className="h-5 w-5" />
           </Link>
-          <div className="flex gap-2">
-            <NotificationBell userId={user.id} />
-            <ProfileButton />
-          </div>
+          <NotificationBell userId={user.id} />
+          <ProfileButton />
         </div>
       </div>
 
