@@ -10,7 +10,9 @@ import { GroupsSection } from "@/components/GroupsSection";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { toast } from "sonner";
-import { UserPlus, Check, X, Search, Share2, Users } from "lucide-react";
+import { UserPlus, Check, X, Search, Share2, Users, Star } from "lucide-react";
+import { useTopFriends, useToggleTopFriend } from "@/lib/topFriends";
+
 
 export const Route = createFileRoute("/_authenticated/friends")({
   head: () => ({
@@ -85,6 +87,16 @@ function FriendsPage() {
   const incoming = (friendships ?? []).filter((f: any) => f.addressee_id === uid && f.status === "pending");
   const outgoing = (friendships ?? []).filter((f: any) => f.requester_id === uid && f.status === "pending");
   const accepted = (friendships ?? []).filter((f: any) => f.status === "accepted");
+
+  const { data: topSet } = useTopFriends();
+  const topIds = topSet ?? new Set<string>();
+  const toggleTopMut = useToggleTopFriend();
+  const toggleTop = (friendId: string, isTop: boolean) => toggleTopMut.mutate({ friendId, isTop });
+  const topList = accepted
+    .map((f: any) => ({ ...f, other: f.requester_id === uid ? f.addressee : f.requester }))
+    .filter((f: any) => f.other?.username && topIds.has(f.other.id));
+
+
 
   async function shareInvite() {
     const username = myProfile?.username;
@@ -295,6 +307,14 @@ function FriendsPage() {
         </Section>
       )}
 
+      {topList.length > 0 && (
+        <Section title={`Top friends (${topList.length}) · private`}>
+          {topList.map((f: any) => (
+            <FriendRow key={`top-${f.id}`} friend={f.other} isTop onToggleTop={toggleTop} />
+          ))}
+        </Section>
+      )}
+
       <Section title={`Your friends${accepted.length ? ` (${accepted.length})` : ""}`}>
         {accepted.length === 0 ? (
           <p className="text-sm text-muted-foreground">No friends yet. Search above to add someone.</p>
@@ -303,20 +323,12 @@ function FriendsPage() {
             const other = f.requester_id === uid ? f.addressee : f.requester;
             if (!other?.username) return null;
             return (
-              <Link
+              <FriendRow
                 key={f.id}
-                to="/profile/$username"
-                params={{ username: other.username }}
-                className="flex items-center justify-between rounded-2xl bg-card p-3 ring-1 ring-border transition-colors hover:bg-muted/60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-              >
-                <div className="flex items-center gap-3">
-                  <UserAvatar url={other.avatar_url} name={other.display_name || other.username} size="md" />
-                  <div>
-                    <p className="font-medium">{other.display_name || other.username}</p>
-                    <p className="text-xs text-muted-foreground">@{other.username}</p>
-                  </div>
-                </div>
-              </Link>
+                friend={other}
+                isTop={topIds.has(other.id)}
+                onToggleTop={toggleTop}
+              />
             );
           })
         )}
@@ -324,6 +336,42 @@ function FriendsPage() {
     </div>
   );
 }
+
+function FriendRow({
+  friend,
+  isTop,
+  onToggleTop,
+}: {
+  friend: any;
+  isTop: boolean;
+  onToggleTop: (friendId: string, isTop: boolean) => void;
+}) {
+  return (
+    <div className="flex items-center justify-between rounded-2xl bg-card p-3 ring-1 ring-border transition-colors hover:bg-muted/60">
+      <Link
+        to="/profile/$username"
+        params={{ username: friend.username }}
+        className="flex min-w-0 flex-1 items-center gap-3 focus-visible:outline-none"
+      >
+        <UserAvatar url={friend.avatar_url} name={friend.display_name || friend.username} size="md" />
+        <div className="min-w-0">
+          <p className="truncate font-medium">{friend.display_name || friend.username}</p>
+          <p className="truncate text-xs text-muted-foreground">@{friend.username}</p>
+        </div>
+      </Link>
+      <button
+        type="button"
+        aria-label={isTop ? "Remove from top friends" : "Add to top friends"}
+        aria-pressed={isTop}
+        onClick={() => onToggleTop(friend.id, isTop)}
+        className="ml-2 shrink-0 rounded-full p-2 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+      >
+        <Star className={isTop ? "h-5 w-5 fill-primary text-primary" : "h-5 w-5"} />
+      </button>
+    </div>
+  );
+}
+
 
 function Section({ title, children }: { title: string; children: React.ReactNode }) {
   return (
