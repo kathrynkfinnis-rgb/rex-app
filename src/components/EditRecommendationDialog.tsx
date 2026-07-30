@@ -46,8 +46,8 @@ export function EditRecommendationDialog({
   const [photos, setPhotos] = useState<string[]>(initialPhotos);
   const [tags, setTags] = useState<string[]>(recommendation.tags ?? []);
   const subOptions = item ? subcategoriesFor(item.type) : [];
-  const [placeSub, setPlaceSub] = useState<string>(
-    item && (subOptions as readonly string[]).includes(item.genre ?? "") ? (item.genre as string) : "",
+  const [placeSubs, setPlaceSubs] = useState<string[]>(
+    splitGenres(item?.genre).filter((g) => (subOptions as readonly string[]).includes(g)),
   );
   const [recipeText, setRecipeText] = useState(item?.recipe_text ?? "");
   const [confirmDelete, setConfirmDelete] = useState(false);
