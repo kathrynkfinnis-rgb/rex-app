@@ -159,7 +159,7 @@ export function LikesComments({
                     {formatDistanceToNow(new Date(c.created_at), { addSuffix: true })}
                   </span>
                 </div>
-                <p className="text-sm leading-snug whitespace-pre-wrap break-words">{c.body}</p>
+                <CommentText text={c.body} className="text-sm leading-snug" />
               </div>
               {c.user_id === uid && (
                 <button
