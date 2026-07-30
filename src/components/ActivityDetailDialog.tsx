@@ -9,6 +9,7 @@ import {
   DialogTitle,
   DialogDescription,
 } from "@/components/ui/dialog";
+import { Sparkles } from "lucide-react";
 import { UserAvatar } from "@/components/UserAvatar";
 import { categoryMeta, type ItemType } from "@/lib/categories";
 
@@ -34,16 +35,16 @@ type Entry = {
   title: string;
   sub?: string | null;
   when?: string | null;
-  emoji?: string | null;
+  icon?: React.ComponentType<{ className?: string }> | null;
   avatar?: { url: string | null; name: string | null } | null;
   to: string;
   params?: Record<string, string>;
 };
 
-function itemEmoji(type?: string | null) {
+function itemIcon(type?: string | null) {
   if (!type) return null;
   try {
-    return categoryMeta(type as ItemType).emoji ?? null;
+    return categoryMeta(type as ItemType).icon ?? null;
   } catch {
     return null;
   }
@@ -65,7 +66,7 @@ async function loadEntries(kind: ActivityKind, uid: string): Promise<Entry[]> {
       title: r.items?.title ?? "Rex",
       sub: `${r.rating}/10 crowns`,
       when: r.created_at,
-      emoji: itemEmoji(r.items?.type),
+      icon: itemIcon(r.items?.type),
       to: "/r/$id",
       params: { id: r.id },
     }));
@@ -84,7 +85,7 @@ async function loadEntries(kind: ActivityKind, uid: string): Promise<Entry[]> {
       title: c.recommendations?.items?.title ?? "Rex",
       sub: c.body,
       when: c.created_at,
-      emoji: itemEmoji(c.recommendations?.items?.type),
+      icon: itemIcon(c.recommendations?.items?.type),
       to: "/r/$id",
       params: { id: c.recommendation_id },
     }));
@@ -103,7 +104,7 @@ async function loadEntries(kind: ActivityKind, uid: string): Promise<Entry[]> {
       title: l.recommendations?.items?.title ?? "Rex",
       sub: l.recommendations ? `${l.recommendations.rating}/10 crowns` : null,
       when: l.created_at,
-      emoji: itemEmoji(l.recommendations?.items?.type),
+      icon: itemIcon(l.recommendations?.items?.type),
       to: "/r/$id",
       params: { id: l.recommendation_id },
     }));
@@ -122,7 +123,7 @@ async function loadEntries(kind: ActivityKind, uid: string): Promise<Entry[]> {
       title: w.items?.title ?? "Item",
       sub: w.items?.subtitle,
       when: w.created_at,
-      emoji: itemEmoji(w.items?.type),
+      icon: itemIcon(w.items?.type),
       to: "/item/$id",
       params: { id: w.item_id },
     }));
@@ -211,8 +212,10 @@ export function ActivityDetailDialog({
                 >
                   {e.avatar ? (
                     <UserAvatar url={e.avatar.url} name={e.avatar.name} size="xs" className="mt-0.5" />
+                  ) : e.icon ? (
+                    <e.icon className="mt-0.5 h-4 w-4 shrink-0 text-primary" />
                   ) : (
-                    <span className="mt-0.5 text-base leading-none">{e.emoji ?? "✨"}</span>
+                    <Sparkles className="mt-0.5 h-4 w-4 shrink-0 text-primary" />
                   )}
                   <div className="min-w-0 flex-1">
                     <p className="truncate text-sm font-semibold">{e.title}</p>
