@@ -9,6 +9,7 @@ import { Button } from "@/components/ui/button";
 import { UserAvatar } from "@/components/UserAvatar";
 import { SearchPicker, type AnyHit } from "@/components/SearchPicker";
 import { MentionInput, CommentText } from "@/components/MentionInput";
+import { CrownRatingInput } from "@/components/CrownRating";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 
