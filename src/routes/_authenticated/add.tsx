@@ -92,7 +92,7 @@ function AddPage() {
       if ("address" in hit && hit.address) setAddress(hit.address);
       if (isGooglePlace) {
         const guess = normalizePlaceSubcategory(hit.genre);
-        if (guess) setPlaceSub(guess);
+        if (guess) setPlaceSubs([guess]);
       }
       if ("lat" in hit && "lng" in hit && typeof hit.lat === "number" && typeof hit.lng === "number") {
         setCoords({ lat: hit.lat, lng: hit.lng });
