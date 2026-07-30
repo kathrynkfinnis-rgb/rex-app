@@ -221,6 +221,8 @@ function FeedPage() {
             </div>
             <Plus className="h-4 w-4 text-muted-foreground" />
           </Link>
+          <TopRexxersCard />
+
           {isLoading && (
             <>
               <SkeletonCard />
