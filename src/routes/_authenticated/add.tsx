@@ -36,7 +36,7 @@ export const Route = createFileRoute("/_authenticated/add")({
 function AddPage() {
   const navigate = useNavigate();
   const { trip: tripId } = Route.useSearch();
-  const [type, setType] = useState<ItemType | null>(tripId ? "place" : null);
+  const [type, setType] = useState<ItemType | null>(null);
   const [title, setTitle] = useState("");
   const [subtitle, setSubtitle] = useState("");
   const [address, setAddress] = useState("");
@@ -49,7 +49,7 @@ function AddPage() {
   const [picked, setPicked] = useState<AnyHit | null>(null);
   const [manualMode, setManualMode] = useState(false);
   const [placeSubs, setPlaceSubs] = useState<string[]>([]);
-  const [justAdded, setJustAdded] = useState<{ itemId: string; recId: string; title: string; isTrip: boolean } | null>(null);
+  const [justAdded, setJustAdded] = useState<{ itemId: string; recId: string; title: string; isTrip: boolean; inTrip: boolean } | null>(null);
   const [photos, setPhotos] = useState<string[]>([]);
   const [tags, setTags] = useState<string[]>([]);
   const [showTripInfo, setShowTripInfo] = useState(false);
@@ -186,13 +186,14 @@ function AddPage() {
         .single();
       if (recErr) throw recErr;
 
-      if (tripId) {
-        toast.success("Added to your trip");
-        navigate({ to: "/trip/$id", params: { id: tripId } });
-        return;
-      }
-      toast.success("Added to your feed");
-      setJustAdded({ itemId: itemId!, recId: rec.id, title: title.trim(), isTrip: type === "trip" });
+      toast.success(tripId ? "Added to your trip" : "Added to your feed");
+      setJustAdded({
+        itemId: itemId!,
+        recId: rec.id,
+        title: title.trim(),
+        isTrip: type === "trip",
+        inTrip: Boolean(tripId),
+      });
     } catch (err) {
 
       toast.error(err instanceof Error ? err.message : "Couldn't save");
@@ -212,6 +213,8 @@ function AddPage() {
           <p className="mt-2 text-muted-foreground">
             {justAdded.isTrip
               ? `"${justAdded.title}" is live — now add the places you loved on it.`
+              : justAdded.inTrip
+              ? `"${justAdded.title}" is now a Rex of its own and a stop on your trip.`
               : `"${justAdded.title}" is in your feed.`}
           </p>
         </div>
@@ -222,7 +225,26 @@ function AddPage() {
                 onClick={() => navigate({ to: "/trip/$id", params: { id: justAdded.recId } })}
                 className="h-14 w-full rounded-full text-base font-semibold shadow-lg shadow-primary/30"
               >
-                Add places to this trip
+                Add Rex to this trip
+              </Button>
+              <Button variant="ghost" onClick={() => navigate({ to: "/feed" })} className="h-12 w-full rounded-full">
+                Back to feed
+              </Button>
+            </>
+          ) : justAdded.inTrip ? (
+            <>
+              <Button
+                onClick={resetForm}
+                className="h-14 w-full rounded-full text-base font-semibold shadow-lg shadow-primary/30"
+              >
+                Add another Rex to this trip
+              </Button>
+              <Button
+                variant="outline"
+                onClick={() => navigate({ to: "/trip/$id", params: { id: tripId! } })}
+                className="h-12 w-full rounded-full"
+              >
+                View trip
               </Button>
               <Button variant="ghost" onClick={() => navigate({ to: "/feed" })} className="h-12 w-full rounded-full">
                 Back to feed
@@ -263,15 +285,22 @@ function AddPage() {
       <div>
         <header className="border-b border-border bg-background px-5 pb-4 pt-[calc(env(safe-area-inset-top)+1rem)]">
           <button
-            onClick={() => navigate({ to: "/feed" })}
+            onClick={() => (tripId ? navigate({ to: "/trip/$id", params: { id: tripId } }) : navigate({ to: "/feed" }))}
             className="flex items-center gap-2 text-sm text-muted-foreground"
           >
-            <ArrowLeft className="h-4 w-4" /> Back
+            <ArrowLeft className="h-4 w-4" /> {tripId ? "Back to trip" : "Back"}
           </button>
-          <h1 className="mt-3 font-display text-3xl">What are you Rexing?</h1>
+          <h1 className="mt-3 font-display text-3xl">
+            {tripId ? "What are you adding to this trip?" : "What are you Rexing?"}
+          </h1>
+          {tripId && (
+            <p className="mt-1 text-sm text-muted-foreground">
+              Restaurants, museums, bars, hotels — each becomes its own Rex and a stop on the trip.
+            </p>
+          )}
         </header>
         <div className="grid grid-cols-2 gap-2 p-4 pb-2">
-          {CATEGORIES.map((c) => (
+          {CATEGORIES.filter((c) => !(tripId && c.type === "trip")).map((c) => (
             <button
               key={c.type}
               onClick={() => setType(c.type)}

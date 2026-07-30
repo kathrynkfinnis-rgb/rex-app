@@ -125,7 +125,7 @@ function TripPage() {
               onClick={() => navigate({ to: "/add", search: { trip: t.id } })}
               className="h-12 w-full gap-2 rounded-full font-semibold shadow-lg shadow-primary/30"
             >
-              <Plus className="h-4 w-4" /> Add a place to this trip
+              <Plus className="h-4 w-4" /> Add Rex to this trip
             </Button>
           )}
 
@@ -136,7 +136,7 @@ function TripPage() {
           {!stops.isLoading && (stops.data?.length ?? 0) === 0 && (
             <p className="rounded-2xl border border-dashed border-border bg-card p-6 text-center text-sm text-muted-foreground">
               {isOwner
-                ? "No stops yet — add the places, restaurants and bars that made this trip."
+                ? "No stops yet — add the restaurants, museums, bars and hotels that made this trip. Each one becomes its own Rex too."
                 : "No stops added to this trip yet."}
             </p>
           )}
