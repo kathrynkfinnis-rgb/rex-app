@@ -36,7 +36,7 @@ function MapPage() {
     queryFn: async () => {
       const { data, error } = await supabase
         .from("items")
-        .select("id, title, subtitle, type, genre, address, lat, lng, image_url, recommendations(id, rating, user_id, profiles(display_name, username))")
+        .select("id, title, subtitle, type, genre, address, lat, lng, image_url, recommendations(id, rating, note, user_id, profiles(display_name, username, avatar_url))")
         .in("type", ["place", "event"])
         .order("created_at", { ascending: false })
         .limit(200);
@@ -170,7 +170,22 @@ function MapPage() {
             <GoogleMap
               key={`${cat}-${sub ?? ""}`}
               radiusMiles={10}
-              places={withLoc.map((p: any) => ({ id: p.id, title: p.title, lat: Number(p.lat), lng: Number(p.lng) }))}
+              places={withLoc.map((p: any) => {
+                const recs = (p.recommendations ?? []) as any[];
+                const top = [...recs].sort((a, b) => (b.rating ?? 0) - (a.rating ?? 0))[0];
+                return {
+                  id: p.id,
+                  title: p.title,
+                  lat: Number(p.lat),
+                  lng: Number(p.lng),
+                  subtitle: p.subtitle ?? p.genre ?? null,
+                  avatarUrl: top?.profiles?.avatar_url ?? null,
+                  byName: top?.profiles?.display_name ?? top?.profiles?.username ?? null,
+                  rating: top?.rating ?? null,
+                  note: top?.note ?? null,
+                };
+              })}
+
               onSelect={(id) => navigate({ to: "/item/$id", params: { id } })}
             />
           </Suspense>

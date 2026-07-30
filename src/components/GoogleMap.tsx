@@ -1,6 +1,116 @@
 import { useEffect, useRef, useState } from "react";
 
-type Place = { id: string; title: string; lat: number; lng: number };
+type Place = {
+  id: string;
+  title: string;
+  lat: number;
+  lng: number;
+  avatarUrl?: string | null;
+  byName?: string | null;
+  rating?: number | null;
+  note?: string | null;
+  subtitle?: string | null;
+};
+
+const PIN_W = 52;
+const PIN_H = 62;
+
+function initialsOf(name?: string | null) {
+  const n = (name || "?").trim();
+  const parts = n.split(/\s+/).slice(0, 2);
+  return parts.map((p) => p[0]?.toUpperCase() ?? "").join("") || "?";
+}
+
+function drawPin(img: HTMLImageElement | null, initials: string): string {
+  const dpr = 2;
+  const c = document.createElement("canvas");
+  c.width = PIN_W * dpr;
+  c.height = PIN_H * dpr;
+  const ctx = c.getContext("2d")!;
+  ctx.scale(dpr, dpr);
+
+  const cx = PIN_W / 2;
+  const cy = 24;
+  const r = 20;
+
+  // teardrop tail
+  ctx.beginPath();
+  ctx.moveTo(cx - 9, cy + 15);
+  ctx.quadraticCurveTo(cx, PIN_H - 2, cx + 9, cy + 15);
+  ctx.closePath();
+  ctx.fillStyle = "#4f7c3a";
+  ctx.fill();
+
+  // ring
+  ctx.beginPath();
+  ctx.arc(cx, cy, r, 0, Math.PI * 2);
+  ctx.fillStyle = "#4f7c3a";
+  ctx.fill();
+
+  ctx.save();
+  ctx.beginPath();
+  ctx.arc(cx, cy, r - 3, 0, Math.PI * 2);
+  ctx.clip();
+  if (img) {
+    const s = Math.min(img.width, img.height);
+    ctx.drawImage(img, (img.width - s) / 2, (img.height - s) / 2, s, s, cx - (r - 3), cy - (r - 3), (r - 3) * 2, (r - 3) * 2);
+  } else {
+    ctx.fillStyle = "#e6efdc";
+    ctx.fillRect(cx - r, cy - r, r * 2, r * 2);
+    ctx.fillStyle = "#31502a";
+    ctx.font = "bold 15px system-ui, sans-serif";
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+    ctx.fillText(initials, cx, cy + 1);
+  }
+  ctx.restore();
+  return c.toDataURL("image/png");
+}
+
+const iconCache = new Map<string, Promise<string>>();
+
+function avatarIcon(url: string | null | undefined, name?: string | null): Promise<string> {
+  const key = `${url || ""}|${initialsOf(name)}`;
+  const cached = iconCache.get(key);
+  if (cached) return cached;
+  const p = new Promise<string>((resolve) => {
+    if (!url) return resolve(drawPin(null, initialsOf(name)));
+    const img = new Image();
+    img.crossOrigin = "anonymous";
+    img.onload = () => {
+      try {
+        resolve(drawPin(img, initialsOf(name)));
+      } catch {
+        resolve(drawPin(null, initialsOf(name)));
+      }
+    };
+    img.onerror = () => resolve(drawPin(null, initialsOf(name)));
+    img.src = url;
+  });
+  iconCache.set(key, p);
+  return p;
+}
+
+function escapeHtml(s: string) {
+  return s.replace(/[&<>"']/g, (ch) =>
+    ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[ch] as string,
+  );
+}
+
+function bubbleHtml(p: Place) {
+  const crowns = p.rating ? `<div style="font-size:12px;color:#4f7c3a;margin-top:2px">👑 ${p.rating}/10</div>` : "";
+  const by = p.byName ? `<div style="font-size:12px;color:#6b7280">Rex by ${escapeHtml(p.byName)}</div>` : "";
+  const note = p.note
+    ? `<div style="font-size:12px;color:#374151;margin-top:4px;max-width:220px">“${escapeHtml(p.note.slice(0, 160))}${p.note.length > 160 ? "…" : ""}”</div>`
+    : "";
+  const sub = p.subtitle ? `<div style="font-size:11px;color:#9ca3af">${escapeHtml(p.subtitle)}</div>` : "";
+  return `<div style="font-family:system-ui,sans-serif;padding:2px 2px 4px">
+    <div style="font-weight:600;font-size:13px;color:#111827">${escapeHtml(p.title)}</div>
+    ${sub}${by}${crowns}${note}
+    <div style="font-size:11px;color:#9ca3af;margin-top:6px">Tap the pin to open</div>
+  </div>`;
+}
+
 
 declare global {
   interface Window {
@@ -44,6 +154,8 @@ export function GoogleMap({
   const mapRef = useRef<any>(null);
   const markersRef = useRef<any[]>([]);
   const userLayerRef = useRef<any[]>([]);
+  const infoRef = useRef<any>(null);
+
   const [error, setError] = useState<string | null>(null);
   const [ready, setReady] = useState(false);
   const [userCentered, setUserCentered] = useState(false);
@@ -123,20 +235,47 @@ export function GoogleMap({
 
   useEffect(() => {
     if (!ready || !mapRef.current || !window.google?.maps) return;
+    let cancelled = false;
+    const g = window.google.maps;
     markersRef.current.forEach((m) => m.setMap(null));
     markersRef.current = [];
     if (!places.length) return;
-    const bounds = new window.google.maps.LatLngBounds();
+    if (!infoRef.current) infoRef.current = new g.InfoWindow({ disableAutoPan: true });
+    const info = infoRef.current;
+    const bounds = new g.LatLngBounds();
     places.forEach((p) => {
-      const marker = new window.google.maps.Marker({
+      const marker = new g.Marker({
         position: { lat: p.lat, lng: p.lng },
         map: mapRef.current,
         title: p.title,
+        icon: {
+          url: drawPin(null, initialsOf(p.byName)),
+          scaledSize: new g.Size(PIN_W, PIN_H),
+          anchor: new g.Point(PIN_W / 2, PIN_H - 2),
+        },
       });
-      if (onSelect) marker.addListener("click", () => onSelect(p.id));
+      avatarIcon(p.avatarUrl, p.byName).then((url) => {
+        if (cancelled) return;
+        marker.setIcon({
+          url,
+          scaledSize: new g.Size(PIN_W, PIN_H),
+          anchor: new g.Point(PIN_W / 2, PIN_H - 2),
+        });
+      });
+      marker.addListener("mouseover", () => {
+        info.setContent(bubbleHtml(p));
+        info.open({ map: mapRef.current, anchor: marker });
+      });
+      marker.addListener("mouseout", () => info.close());
+      marker.addListener("click", () => {
+        info.setContent(bubbleHtml(p));
+        info.open({ map: mapRef.current, anchor: marker });
+        if (onSelect) onSelect(p.id);
+      });
       markersRef.current.push(marker);
       bounds.extend(marker.getPosition());
     });
+
     // The user's own 10-mile view wins when we have their location.
     if (userCentered) return;
     if (places.length === 1) {
