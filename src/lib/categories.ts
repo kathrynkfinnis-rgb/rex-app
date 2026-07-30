@@ -1,6 +1,6 @@
-import { MapPin, Book, Film, Tv, ChefHat, Mic, Ticket, Sparkles } from "lucide-react";
+import { MapPin, Book, Film, Tv, ChefHat, Mic, Ticket, Sparkles, Luggage } from "lucide-react";
 
-export type ItemType = "place" | "book" | "movie" | "tv" | "recipe" | "podcast" | "event" | "other";
+export type ItemType = "place" | "trip" | "book" | "movie" | "tv" | "recipe" | "podcast" | "event" | "other";
 
 export const CATEGORIES: {
   type: ItemType;
