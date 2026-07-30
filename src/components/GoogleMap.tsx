@@ -154,6 +154,8 @@ export function GoogleMap({
   const mapRef = useRef<any>(null);
   const markersRef = useRef<any[]>([]);
   const userLayerRef = useRef<any[]>([]);
+  const infoRef = useRef<any>(null);
+
   const [error, setError] = useState<string | null>(null);
   const [ready, setReady] = useState(false);
   const [userCentered, setUserCentered] = useState(false);
