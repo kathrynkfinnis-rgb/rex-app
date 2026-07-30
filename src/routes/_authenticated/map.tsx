@@ -74,21 +74,22 @@ function MapPage() {
 
 
   const runGeocode = async () => {
+    if (geocoding) return;
     setGeocoding(true);
     try {
-      const res: any = await geocode({ data: { limit: 25 } });
-      await qc.invalidateQueries({ queryKey: ["map-places"] });
-      // If more remain, keep going (up to a few passes) so imported lists resolve.
-      if (res?.updated > 0 && res?.checked === 25) {
-        setTimeout(() => {
-          ranAuto.current = false;
-        }, 100);
+      // Keep going in passes so a whole imported list resolves in one go.
+      for (let pass = 0; pass < 8; pass++) {
+        const res: any = await geocode({ data: { limit: 25 } });
+        await qc.invalidateQueries({ queryKey: ["map-places"] });
+        if (!res || res.reason === "no_key") break;
+        if (!res.remaining || res.updated === 0) break;
       }
     } finally {
       setGeocoding(false);
     }
   };
 
+  // Auto-locate any place/event missing coordinates every time Places opens.
   useEffect(() => {
     if (ranAuto.current) return;
     if (!data) return;
