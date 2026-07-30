@@ -44,6 +44,10 @@ export type PlaceSubcategory = (typeof PLACE_SUBCATEGORIES)[number];
 
 export const SUBCATEGORIES: Record<ItemType, readonly string[]> = {
   place: PLACE_SUBCATEGORIES,
+  trip: [
+    "City break", "Beach", "Road trip", "Countryside", "Ski", "Adventure",
+    "Family", "Weekend away", "Honeymoon", "Work trip", "Other",
+  ],
   recipe: [
     "Salad", "Soup", "Pasta", "Rice & grains", "Meat", "Fish & seafood",
     "Vegetarian", "Vegan", "Breakfast", "Dessert", "Baking", "Snack",
