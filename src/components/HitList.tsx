@@ -25,7 +25,7 @@ type Visibility = "draft" | "friends" | "public";
 type ItemLite = { id: string; type: ItemType; title: string; subtitle: string | null; image_url: string | null };
 type WantRow = { id: string; user_id: string; item_id: string; list_id: string | null; items: ItemLite };
 type SavedRow = { id: string; user_id: string; list_id: string | null; recommendations: FeedRow };
-type ListRow = { id: string; user_id: string; item_type: ItemType; name: string; emoji: string | null; visibility: Visibility };
+type ListRow = { id: string; user_id: string; item_type: string; name: string; emoji: string | null; visibility: Visibility };
 type Profile = { id: string; username: string; display_name: string | null; avatar_url: string | null };
 
 type Entry = {
@@ -58,11 +58,12 @@ function dedupe<T extends { id: string }>(rows: T[]) {
 
 export function HitList({ userId }: { userId: string }) {
   const qc = useQueryClient();
-  const [newListFor, setNewListFor] = useState<ItemType | null>(null);
+  const [newListFor, setNewListFor] = useState<string | null>(null);
   const [newName, setNewName] = useState("");
   const [newEmoji, setNewEmoji] = useState("");
   const [newVisibility, setNewVisibility] = useState<Visibility>("draft");
   const [collabList, setCollabList] = useState<ListRow | null>(null);
+  const [filter, setFilter] = useState<string>("all");
 
   const { data: lists } = useQuery({
     queryKey: ["my-hitlist-lists", userId],
@@ -207,9 +208,13 @@ export function HitList({ userId }: { userId: string }) {
     return map;
   }, [entries]);
 
+  const mixedLists = useMemo(() => (lists ?? []).filter((l) => l.item_type === "mixed"), [lists]);
+  const mixedIds = useMemo(() => new Set(mixedLists.map((l) => l.id)), [mixedLists]);
+
   const listsByCategory = useMemo(() => {
     const m = new Map<ItemType, ListRow[]>();
     for (const l of lists ?? []) {
+      if (l.item_type === "mixed") continue;
       const arr = m.get(l.item_type as ItemType) ?? [];
       arr.push(l);
       m.set(l.item_type as ItemType, arr);
@@ -227,9 +232,19 @@ export function HitList({ userId }: { userId: string }) {
     return m;
   }, [collaborators]);
 
-  const activeCategories = CATEGORIES.filter(
-    (c) => (byCategory.get(c.type)?.length ?? 0) > 0 || (listsByCategory.get(c.type)?.length ?? 0) > 0,
+  const allActiveCategories = CATEGORIES.filter(
+    (c) =>
+      (byCategory.get(c.type)?.filter((e) => !mixedIds.has(e.listId ?? "")).length ?? 0) > 0 ||
+      (listsByCategory.get(c.type)?.length ?? 0) > 0,
   );
+  const activeCategories =
+    filter === "all" || filter === "mixed"
+      ? filter === "mixed"
+        ? []
+        : allActiveCategories
+      : allActiveCategories.filter((c) => c.type === filter);
+  const showMixed = (filter === "all" || filter === "mixed") && mixedLists.length > 0;
+
 
   function invalidateEntries() {
     qc.invalidateQueries({ queryKey: ["my-wants", userId] });
@@ -292,8 +307,45 @@ export function HitList({ userId }: { userId: string }) {
 
   const isEmpty = entries.length === 0 && (lists?.length ?? 0) === 0;
 
+  function startNewList(type: string) {
+    setNewListFor(type);
+    setNewName("");
+    setNewEmoji("");
+    setNewVisibility("draft");
+  }
+
   return (
     <div className="space-y-6">
+      {!isEmpty && (
+        <div className="sticky top-0 z-10 -mx-1 space-y-2 bg-background/90 px-1 py-2 backdrop-blur">
+          <div className="flex flex-wrap gap-1.5">
+            <FilterChip label="All" active={filter === "all"} onClick={() => setFilter("all")} />
+            {mixedLists.length > 0 && (
+              <FilterChip label="✨ Mixed" active={filter === "mixed"} onClick={() => setFilter("mixed")} />
+            )}
+            {allActiveCategories.map((c) => (
+              <FilterChip
+                key={c.type}
+                label={`${c.hitDefaultEmoji} ${c.plural}`}
+                count={
+                  (byCategory.get(c.type)?.filter((e) => !mixedIds.has(e.listId ?? "")).length ?? 0) || undefined
+                }
+                active={filter === c.type}
+                onClick={() => setFilter(c.type)}
+              />
+            ))}
+            <Button
+              size="sm"
+              variant="outline"
+              className="h-7 gap-1 rounded-full px-2.5 text-xs"
+              onClick={() => startNewList(filter === "all" || filter === "mixed" ? "mixed" : filter)}
+            >
+              <Plus className="h-3.5 w-3.5" /> New list
+            </Button>
+          </div>
+        </div>
+      )}
+
       {isEmpty ? (
         <div className="rounded-2xl border border-dashed border-border p-5 text-center">
           <p className="text-sm text-muted-foreground">
@@ -309,16 +361,12 @@ export function HitList({ userId }: { userId: string }) {
             <DropdownMenuContent align="center" className="max-h-72 overflow-y-auto">
               <DropdownMenuLabel>What kind of list?</DropdownMenuLabel>
               <DropdownMenuSeparator />
+              <DropdownMenuItem onClick={() => startNewList("mixed")}>
+                <span className="mr-2">✨</span> Mix of everything
+              </DropdownMenuItem>
+              <DropdownMenuSeparator />
               {CATEGORIES.map((c) => (
-                <DropdownMenuItem
-                  key={c.type}
-                  onClick={() => {
-                    setNewListFor(c.type);
-                    setNewName("");
-                    setNewEmoji("");
-                    setNewVisibility("draft");
-                  }}
-                >
+                <DropdownMenuItem key={c.type} onClick={() => startNewList(c.type)}>
                   <span className="mr-2">{c.hitDefaultEmoji}</span>
                   {c.hitDefaultLabel}
                 </DropdownMenuItem>
@@ -327,6 +375,103 @@ export function HitList({ userId }: { userId: string }) {
           </DropdownMenu>
         </div>
       ) : null}
+
+      {showMixed && (
+        <div className="space-y-3">
+          <h3 className="font-display text-lg">
+            <span className="mr-2">✨</span>Mixed lists
+          </h3>
+          {mixedLists.map((list) => {
+            const inList = entries.filter((e) => e.listId === list.id);
+            const VMeta = VISIBILITY_META[list.visibility];
+            const VIcon = VMeta.icon;
+            const isOwner = list.user_id === userId;
+            return (
+              <div key={list.id} className="rounded-2xl border border-border bg-card/40 p-3">
+                <div className="mb-2 flex items-center justify-between gap-2">
+                  <p className="min-w-0 truncate font-medium">
+                    <span className="mr-1.5">{list.emoji ?? "✨"}</span>
+                    {list.name} <span className="text-xs text-muted-foreground">({inList.length})</span>
+                    {!isOwner ? (
+                      <span className="ml-1.5 rounded-full bg-primary/10 px-1.5 py-0.5 text-[10px] font-medium text-primary">
+                        Shared with you
+                      </span>
+                    ) : null}
+                  </p>
+                  <div className="flex items-center gap-1">
+                    <CollaboratorStack
+                      collaborators={collabsByList.get(list.id) ?? []}
+                      owner={people?.get(list.user_id) ?? null}
+                      onOpen={() => setCollabList(list)}
+                    />
+                    {isOwner ? (
+                      <>
+                        <DropdownMenu>
+                          <DropdownMenuTrigger asChild>
+                            <button
+                              type="button"
+                              className={cn(
+                                "inline-flex items-center gap-1 rounded-full px-2 py-1 text-[11px] font-medium ring-1 ring-border",
+                                list.visibility === "draft" && "bg-muted text-muted-foreground",
+                                list.visibility === "friends" && "bg-primary/10 text-primary",
+                                list.visibility === "public" && "bg-accent text-accent-foreground",
+                              )}
+                            >
+                              <VIcon className="h-3 w-3" /> {VMeta.label}
+                            </button>
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent align="end">
+                            <DropdownMenuLabel>Who can see this list</DropdownMenuLabel>
+                            {(["draft", "friends", "public"] as Visibility[]).map((v) => {
+                              const M = VISIBILITY_META[v];
+                              const I = M.icon;
+                              return (
+                                <DropdownMenuItem key={v} onClick={() => updateVisibility(list, v)}>
+                                  <I className="mr-2 h-4 w-4" />
+                                  <span className="flex-1">
+                                    {M.label}
+                                    <span className="ml-1 text-xs text-muted-foreground">— {M.hint}</span>
+                                  </span>
+                                  {list.visibility === v ? <Check className="ml-2 h-3.5 w-3.5" /> : null}
+                                </DropdownMenuItem>
+                              );
+                            })}
+                          </DropdownMenuContent>
+                        </DropdownMenu>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            if (confirm(`Delete list "${list.name}"? Items go back to default.`)) deleteList(list);
+                          }}
+                          className="rounded-full p-1.5 text-muted-foreground hover:bg-muted hover:text-destructive"
+                          aria-label="Delete list"
+                        >
+                          <Trash2 className="h-3.5 w-3.5" />
+                        </button>
+                      </>
+                    ) : null}
+                  </div>
+                </div>
+                {inList.length > 0 ? (
+                  <EntryList
+                    entries={inList}
+                    lists={mixedLists}
+                    currentUserId={userId}
+                    people={people}
+                    onMove={moveEntry}
+                    onRemove={removeEntry}
+                  />
+                ) : (
+                  <p className="text-xs text-muted-foreground">
+                    Empty — anything you save can be moved in here, whatever the category.
+                  </p>
+                )}
+              </div>
+            );
+          })}
+        </div>
+      )}
+
       {activeCategories.map((cat) => {
         const all = byCategory.get(cat.type) ?? [];
         const subs = listsByCategory.get(cat.type) ?? [];
@@ -356,7 +501,7 @@ export function HitList({ userId }: { userId: string }) {
 
             <EntryList
               entries={defaults}
-              lists={subs}
+              lists={[...subs, ...mixedLists]}
               cat={cat}
               currentUserId={userId}
               people={people}
@@ -440,7 +585,7 @@ export function HitList({ userId }: { userId: string }) {
                   {inList.length > 0 ? (
                     <EntryList
                       entries={inList}
-                      lists={subs}
+                      lists={[...subs, ...mixedLists]}
                       cat={cat}
                       currentUserId={userId}
                       people={people}
@@ -474,10 +619,48 @@ export function HitList({ userId }: { userId: string }) {
         <DialogContent>
           <DialogHeader>
             <DialogTitle>
-              New list{newListFor ? ` in ${categoryMeta(newListFor).plural}` : ""}
+              New list
+              {newListFor === "mixed"
+                ? " — anything goes"
+                : newListFor
+                ? ` in ${categoryMeta(newListFor as ItemType).plural}`
+                : ""}
             </DialogTitle>
           </DialogHeader>
           <div className="space-y-3">
+            <div>
+              <label className="mb-1.5 block text-xs font-medium">What goes in it</label>
+              <div className="flex flex-wrap gap-1.5">
+                <button
+                  type="button"
+                  onClick={() => setNewListFor("mixed")}
+                  className={cn(
+                    "rounded-full px-2.5 py-1 text-xs ring-1 transition",
+                    newListFor === "mixed"
+                      ? "bg-primary text-primary-foreground ring-primary"
+                      : "bg-card text-muted-foreground ring-border hover:bg-muted",
+                  )}
+                >
+                  ✨ Mix of everything
+                </button>
+                {CATEGORIES.map((c) => (
+                  <button
+                    key={c.type}
+                    type="button"
+                    onClick={() => setNewListFor(c.type)}
+                    className={cn(
+                      "rounded-full px-2.5 py-1 text-xs ring-1 transition",
+                      newListFor === c.type
+                        ? "bg-primary text-primary-foreground ring-primary"
+                        : "bg-card text-muted-foreground ring-border hover:bg-muted",
+                    )}
+                  >
+                    {c.hitDefaultEmoji} {c.plural}
+                  </button>
+                ))}
+              </div>
+            </div>
+
             <div>
               <label className="mb-1 block text-xs font-medium">Name</label>
               <Input
@@ -546,17 +729,18 @@ function EntryList({
 }: {
   entries: Entry[];
   lists: ListRow[];
-  cat: (typeof CATEGORIES)[number];
+  cat?: (typeof CATEGORIES)[number];
   currentUserId: string;
   people?: Map<string, Profile>;
   onMove: (entry: Entry, listId: string | null) => void;
   onRemove: (entry: Entry) => void;
 }) {
-  const Icon = cat.icon;
   if (entries.length === 0) return null;
   return (
     <div className="space-y-2">
       {entries.map((e) => {
+        const c = cat ?? categoryMeta(e.itemType);
+        const Icon = c.icon;
         const mine = e.userId === currentUserId;
         const who = mine ? null : people?.get(e.userId) ?? null;
         return (
@@ -569,7 +753,7 @@ function EntryList({
               params={e.params}
               className="flex min-w-0 flex-1 items-center gap-3"
             >
-              <div className={cn("flex h-12 w-12 shrink-0 items-center justify-center overflow-hidden rounded-xl", cat.tokenClass)}>
+              <div className={cn("flex h-12 w-12 shrink-0 items-center justify-center overflow-hidden rounded-xl", c.tokenClass)}>
                 {e.image ? (
                   <img src={e.image} alt="" className="h-full w-full object-cover" />
                 ) : (
@@ -585,7 +769,7 @@ function EntryList({
                       added by {who.display_name || who.username}
                     </>
                   ) : (
-                    <>{e.kind === "saved" ? "Saved post" : cat.wantVerb}</>
+                    <>{!cat ? `${c.label} · ` : ""}{e.kind === "saved" ? "Saved post" : c.wantVerb}</>
                   )}
                 </p>
               </div>
@@ -605,11 +789,11 @@ function EntryList({
                   <>
                     <DropdownMenuLabel>Move to</DropdownMenuLabel>
                     <DropdownMenuItem onClick={() => onMove(e, null)}>
-                      {cat.hitDefaultEmoji} {cat.hitDefaultLabel} (default)
+                      {c.hitDefaultEmoji} {c.hitDefaultLabel} (default)
                     </DropdownMenuItem>
                     {lists.map((l) => (
                       <DropdownMenuItem key={l.id} onClick={() => onMove(e, l.id)}>
-                        {l.emoji ?? cat.hitDefaultEmoji} {l.name}
+                        {l.emoji ?? (l.item_type === "mixed" ? "✨" : c.hitDefaultEmoji)} {l.name}
                       </DropdownMenuItem>
                     ))}
                     <DropdownMenuSeparator />
@@ -626,3 +810,32 @@ function EntryList({
     </div>
   );
 }
+
+function FilterChip({
+  label,
+  count,
+  active,
+  onClick,
+}: {
+  label: string;
+  count?: number;
+  active: boolean;
+  onClick: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className={cn(
+        "rounded-full px-3 py-1 text-xs font-medium ring-1 transition",
+        active
+          ? "bg-primary text-primary-foreground ring-primary"
+          : "bg-card text-muted-foreground ring-border hover:bg-muted",
+      )}
+    >
+      {label}
+      {count ? <span className="ml-1 opacity-70">{count}</span> : null}
+    </button>
+  );
+}
+
