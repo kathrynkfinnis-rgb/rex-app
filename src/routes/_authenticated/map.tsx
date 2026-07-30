@@ -1,13 +1,15 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
-import { MapPin, Compass, Loader2 } from "lucide-react";
+import { MapPin, Compass, Loader2, X } from "lucide-react";
 import { ClientOnly } from "@tanstack/react-router";
-import { lazy, Suspense, useEffect, useRef, useState } from "react";
+import { lazy, Suspense, useEffect, useMemo, useRef, useState } from "react";
 import { useServerFn } from "@tanstack/react-start";
 import { geocodeMissingPlaces } from "@/lib/geocode.functions";
+import { CATEGORIES, categoryMeta, type ItemType } from "@/lib/categories";
 
 const GoogleMap = lazy(() => import("@/components/GoogleMap").then((m) => ({ default: m.GoogleMap })));
+
 
 export const Route = createFileRoute("/_authenticated/map")({
   head: () => ({
@@ -26,13 +28,16 @@ function MapPage() {
   const [geocoding, setGeocoding] = useState(false);
   const ranAuto = useRef(false);
 
+  const [cat, setCat] = useState<ItemType | "all">("all");
+  const [sub, setSub] = useState<string | null>(null);
+
   const { data } = useQuery({
     queryKey: ["map-places"],
     queryFn: async () => {
       const { data, error } = await supabase
         .from("items")
-        .select("id, title, subtitle, address, lat, lng, image_url, recommendations(id, rating, user_id, profiles(display_name, username))")
-        .eq("type", "place")
+        .select("id, title, subtitle, type, genre, address, lat, lng, image_url, recommendations(id, rating, user_id, profiles(display_name, username))")
+        .in("type", ["place", "event"])
         .order("created_at", { ascending: false })
         .limit(200);
       if (error) throw error;
@@ -40,8 +45,33 @@ function MapPage() {
     },
   });
 
-  const withLoc = (data ?? []).filter((p: any) => p.lat != null && p.lng != null);
-  const withoutLoc = (data ?? []).filter((p: any) => p.lat == null || p.lng == null);
+  const all = data ?? [];
+
+  const cats = useMemo(() => {
+    const present = new Set(all.map((p: any) => p.type));
+    return CATEGORIES.filter((c) => present.has(c.type));
+  }, [all]);
+
+  const byCat = useMemo(
+    () => (cat === "all" ? all : all.filter((p: any) => p.type === cat)),
+    [all, cat],
+  );
+
+  const subs = useMemo(() => {
+    const set = new Set<string>();
+    byCat.forEach((p: any) => p.genre && set.add(p.genre));
+    return [...set].sort();
+  }, [byCat]);
+
+  const filtered = useMemo(
+    () => (sub ? byCat.filter((p: any) => p.genre === sub) : byCat),
+    [byCat, sub],
+  );
+
+  const withLoc = filtered.filter((p: any) => p.lat != null && p.lng != null);
+  const withoutLoc = filtered.filter((p: any) => p.lat == null || p.lng == null);
+  const allWithoutLoc = all.filter((p: any) => p.lat == null || p.lng == null);
+
 
   const runGeocode = async () => {
     setGeocoding(true);
@@ -62,11 +92,18 @@ function MapPage() {
   useEffect(() => {
     if (ranAuto.current) return;
     if (!data) return;
-    if (withoutLoc.length === 0) return;
+    if (allWithoutLoc.length === 0) return;
     ranAuto.current = true;
     runGeocode();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [data]);
+
+  const chip = (active: boolean) =>
+    `shrink-0 rounded-full px-3 py-1.5 text-xs font-medium ring-1 transition ${
+      active
+        ? "bg-primary text-primary-foreground ring-primary"
+        : "bg-card text-muted-foreground ring-border"
+    }`;
 
   return (
     <div>
@@ -76,17 +113,53 @@ function MapPage() {
             <h1 className="font-display text-3xl">Places</h1>
             <p className="mt-1 text-sm text-muted-foreground">Restaurants and spots your friends Rex.</p>
           </div>
-          {withoutLoc.length > 0 && (
+          {allWithoutLoc.length > 0 && (
             <button
               onClick={runGeocode}
               disabled={geocoding}
               className="mt-1 inline-flex items-center gap-1.5 rounded-full bg-primary/10 px-3 py-1.5 text-xs font-medium text-primary disabled:opacity-60"
             >
               {geocoding ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <MapPin className="h-3.5 w-3.5" />}
-              {geocoding ? "Locating…" : `Locate ${withoutLoc.length}`}
+              {geocoding ? "Locating…" : `Locate ${allWithoutLoc.length}`}
             </button>
           )}
         </div>
+
+        {cats.length > 1 && (
+          <div className="-mx-5 mt-3 flex gap-2 overflow-x-auto px-5 pb-0.5 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+            <button className={chip(cat === "all")} onClick={() => { setCat("all"); setSub(null); }}>
+              All
+            </button>
+            {cats.map((c) => (
+              <button
+                key={c.type}
+                className={chip(cat === c.type)}
+                onClick={() => { setCat(c.type); setSub(null); }}
+              >
+                {c.label}
+              </button>
+            ))}
+          </div>
+        )}
+
+        {subs.length > 0 && (
+          <div className="-mx-5 mt-2 flex gap-2 overflow-x-auto px-5 pb-0.5 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+            {subs.map((s) => (
+              <button
+                key={s}
+                className={chip(sub === s)}
+                onClick={() => setSub(sub === s ? null : s)}
+              >
+                {s}
+              </button>
+            ))}
+            {sub && (
+              <button className={chip(false)} onClick={() => setSub(null)}>
+                <X className="h-3 w-3" />
+              </button>
+            )}
+          </div>
+        )}
       </header>
 
 
@@ -95,13 +168,16 @@ function MapPage() {
           <div className="flex h-full flex-col items-center justify-center gap-2 text-center px-6">
             <Compass className="h-8 w-8 text-primary" />
             <p className="max-w-xs text-sm text-muted-foreground">
-              A map view lights up here once you add place Rexes with a location.
+              {cat !== "all" || sub
+                ? "No pins match this filter yet."
+                : "A map view lights up here once you add place Rexes with a location."}
             </p>
           </div>
         ) : (
           <ClientOnly fallback={<div className="h-full w-full animate-pulse bg-muted" />}>
             <Suspense fallback={<div className="h-full w-full animate-pulse bg-muted" />}>
               <GoogleMap
+                key={`${cat}-${sub ?? ""}`}
                 places={withLoc.map((p: any) => ({ id: p.id, title: p.title, lat: Number(p.lat), lng: Number(p.lng) }))}
                 onSelect={(id) => navigate({ to: "/item/$id", params: { id } })}
               />
@@ -113,19 +189,25 @@ function MapPage() {
       <div className="space-y-2 px-4 pb-4">
         {[...withLoc, ...withoutLoc].length === 0 ? (
           <div className="rounded-2xl border border-dashed border-border bg-card p-6 text-center">
-            <p className="text-sm text-muted-foreground">No places yet. Add one from the plus button.</p>
+            <p className="text-sm text-muted-foreground">
+              {cat !== "all" || sub ? "Nothing here for this filter." : "No places yet. Add one from the plus button."}
+            </p>
           </div>
         ) : (
-          [...withLoc, ...withoutLoc].map((p: any) => (
+          [...withLoc, ...withoutLoc].map((p: any) => {
+            const meta = categoryMeta((p.type ?? "place") as ItemType);
+            const Icon = meta.icon;
+            return (
             <Link
               key={p.id}
               to="/item/$id"
               params={{ id: p.id }}
               className="flex items-center gap-3 rounded-2xl bg-card p-3 ring-1 ring-border"
             >
-              <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-cat-place/15 text-cat-place">
-                <MapPin className="h-5 w-5" />
+              <div className={`flex h-12 w-12 shrink-0 items-center justify-center rounded-xl ${meta.tokenClass}`}>
+                <Icon className="h-5 w-5" />
               </div>
+
               <div className="min-w-0 flex-1">
                 <p className="truncate font-semibold">{p.title}</p>
                 <p className="truncate text-xs text-muted-foreground">
@@ -136,7 +218,9 @@ function MapPage() {
                 {p.recommendations?.length ?? 0} rec{(p.recommendations?.length ?? 0) === 1 ? "" : "s"}
               </span>
             </Link>
-          ))
+            );
+          })
+
         )}
       </div>
     </div>
