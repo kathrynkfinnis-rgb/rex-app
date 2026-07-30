@@ -293,32 +293,55 @@ function FeedPage() {
 
 function SearchResults({ query, feed, scope }: { query: string; feed: FeedRow[]; scope: SearchScope }) {
   const profilesFn = useServerFn(searchProfiles);
-  const booksFn = useServerFn(searchBooks);
-  const moviesFn = useServerFn(searchMovies);
-  const tvFn = useServerFn(searchTv);
-  const placesFn = useServerFn(searchPlaces);
-  const podcastsFn = useServerFn(searchPodcasts);
 
   const searchPeople = scope === "all" || scope === "people";
-  const searchCatalog = scope !== "people" && scope !== "lists";
+  const searchRex = scope !== "people" && scope !== "lists";
   const searchLists = scope === "all" || scope === "lists";
 
   const feedMatches = useMemo(() => {
-    if (scope === "lists") return [];
+    if (!searchRex) return [];
     const q = query.toLowerCase();
-    return feed
-      .filter((r) => {
-        if (scope !== "all" && scope !== "people" && r.items?.type !== scope) return false;
-        const t = r.items?.title?.toLowerCase() ?? "";
-        const s = r.items?.subtitle?.toLowerCase() ?? "";
-        const n = r.note?.toLowerCase() ?? "";
-        const u = r.profiles?.username?.toLowerCase() ?? "";
-        const d = r.profiles?.display_name?.toLowerCase() ?? "";
-        const c = r.creators?.name?.toLowerCase() ?? "";
-        return t.includes(q) || s.includes(q) || n.includes(q) || u.includes(q) || d.includes(q) || c.includes(q);
-      })
-      .slice(0, 10);
-  }, [feed, query, scope]);
+    return feed.filter((r) => {
+      if (scope !== "all" && r.items?.type !== scope) return false;
+      const t = r.items?.title?.toLowerCase() ?? "";
+      const s = r.items?.subtitle?.toLowerCase() ?? "";
+      const n = r.note?.toLowerCase() ?? "";
+      const u = r.profiles?.username?.toLowerCase() ?? "";
+      const d = r.profiles?.display_name?.toLowerCase() ?? "";
+      const c = r.creators?.name?.toLowerCase() ?? "";
+      return t.includes(q) || s.includes(q) || n.includes(q) || u.includes(q) || d.includes(q) || c.includes(q);
+    });
+  }, [feed, query, scope, searchRex]);
+
+  // Search all Rex you're allowed to see (not just what's already loaded in the feed).
+  const rex = useQuery({
+    queryKey: ["search-rex", query, scope],
+    enabled: searchRex,
+    staleTime: 30_000,
+    queryFn: async () => {
+      let q = supabase
+        .from("recommendations")
+        .select("id, rating, note, created_at, photo_url, photo_urls, tags, user_id, item_id, items!inner(id, type, title, subtitle, image_url, genre), profiles!recommendations_user_id_fkey(username, display_name, avatar_url), creators(slug, name, color, emoji)")
+        .or(`title.ilike.%${query}%,subtitle.ilike.%${query}%`, { referencedTable: "items" })
+        .order("created_at", { ascending: false })
+        .limit(30);
+      if (scope !== "all") q = q.eq("items.type", scope as ItemType);
+      const { data, error } = await q;
+      if (error) throw error;
+      return (data ?? []) as unknown as FeedRow[];
+    },
+  });
+
+  const allRex = useMemo(() => {
+    const seen = new Set<string>();
+    const out: FeedRow[] = [];
+    for (const r of [...feedMatches, ...(rex.data ?? [])]) {
+      if (seen.has(r.id)) continue;
+      seen.add(r.id);
+      out.push(r);
+    }
+    return out.slice(0, 30);
+  }, [feedMatches, rex.data]);
 
   const lists = useQuery({
     queryKey: ["search-lists", query],
@@ -353,68 +376,22 @@ function SearchResults({ query, feed, scope }: { query: string; feed: FeedRow[];
     enabled: searchPeople,
   });
 
-  const books = useQuery({
-    queryKey: ["search-books", query],
-    queryFn: () => booksFn({ data: { q: query } }),
-    staleTime: 60_000,
-    enabled: searchCatalog,
-  });
-  const movies = useQuery({
-    queryKey: ["search-movies", query],
-    queryFn: () => moviesFn({ data: { q: query } }),
-    staleTime: 60_000,
-    enabled: searchCatalog,
-  });
-  const tv = useQuery({
-    queryKey: ["search-tv", query],
-    queryFn: () => tvFn({ data: { q: query } }),
-    staleTime: 60_000,
-    enabled: searchCatalog,
-  });
-  const places = useQuery({
-    queryKey: ["search-places", query],
-    queryFn: () => placesFn({ data: { q: query, near: null } }),
-    staleTime: 60_000,
-    enabled: searchCatalog,
-  });
-  const podcasts = useQuery({
-    queryKey: ["search-podcasts", query],
-    queryFn: () => podcastsFn({ data: { q: query } }),
-    staleTime: 60_000,
-    enabled: searchCatalog,
-  });
-
-  const catalog: { type: ItemType; hits: (SearchHit | PlaceHit)[] }[] = [
-    { type: "book", hits: (books.data ?? []).slice(0, 6) },
-    { type: "movie", hits: (movies.data ?? []).slice(0, 6) },
-    { type: "tv", hits: (tv.data ?? []).slice(0, 6) },
-    { type: "podcast", hits: (podcasts.data ?? []).slice(0, 6) },
-    { type: "place", hits: (places.data ?? []).slice(0, 6) },
-  ];
-
-  const visibleCatalog = useMemo(() => {
-    if (!searchCatalog) return [];
-    if (scope === "all") return catalog;
-    return catalog.filter((c) => c.type === scope);
-  }, [catalog, scope, searchCatalog]);
-
   const anyLoading =
     (searchPeople && people.isLoading) ||
     (searchLists && lists.isLoading) ||
-    (searchCatalog && (books.isLoading || movies.isLoading || tv.isLoading || places.isLoading || podcasts.isLoading));
+    (searchRex && rex.isLoading);
   const nothing =
     !anyLoading &&
-    (scope === "people" || scope === "lists" ? true : feedMatches.length === 0) &&
+    allRex.length === 0 &&
     (people.data?.length ?? 0) === 0 &&
-    (lists.data?.length ?? 0) === 0 &&
-    visibleCatalog.every((c) => c.hits.length === 0);
+    (lists.data?.length ?? 0) === 0;
 
   return (
     <div className="space-y-6 px-4 py-4">
-      {scope !== "people" && scope !== "lists" && feedMatches.length > 0 && (
-        <Section title="In your feed">
+      {allRex.length > 0 && (
+        <Section title="Rex">
           <div className="space-y-3">
-            {feedMatches.map((rec) => <RecommendationCard key={rec.id} rec={rec} />)}
+            {allRex.map((rec) => <RecommendationCard key={rec.id} rec={rec} />)}
           </div>
         </Section>
       )}
@@ -452,7 +429,6 @@ function SearchResults({ query, feed, scope }: { query: string; feed: FeedRow[];
 
       {(people.data?.length ?? 0) > 0 && (
         <Section title="People">
-
           <ul className="space-y-2">
             {people.data!.map((p: any) => (
               <li key={p.id}>
@@ -478,17 +454,15 @@ function SearchResults({ query, feed, scope }: { query: string; feed: FeedRow[];
         </Section>
       )}
 
-      {visibleCatalog.map(({ type, hits }) => hits.length > 0 && (
-        <CatalogSection key={type} type={type} hits={hits} />
-      ))}
-
       {anyLoading && (
         <p className="text-center text-sm text-muted-foreground">Searching…</p>
       )}
       {nothing && (
         <div className="mt-6 rounded-2xl border border-dashed border-border bg-card p-6 text-center">
-          <p className="font-medium">No results for “{query}”</p>
-          <p className="mt-1 text-sm text-muted-foreground">Try a different spelling or add it yourself.</p>
+          <p className="font-medium">No Rex for “{query}”</p>
+          <p className="mt-1 text-sm text-muted-foreground">
+            Nobody you follow has Rexed this yet — add it yourself.
+          </p>
           <Button asChild variant="outline" className="mt-4 h-10 rounded-full">
             <Link to="/add"><Plus className="mr-1.5 h-4 w-4" /> Add a rec</Link>
           </Button>
@@ -498,42 +472,6 @@ function SearchResults({ query, feed, scope }: { query: string; feed: FeedRow[];
   );
 }
 
-function CatalogSection({ type, hits }: { type: ItemType; hits: (SearchHit | PlaceHit)[] }) {
-  const meta = categoryMeta(type);
-  const Icon = meta.icon;
-  return (
-    <Section title={
-      <span className="flex items-center gap-1.5">
-        <Icon className="h-3.5 w-3.5" /> {meta.plural}
-      </span>
-    }>
-      <ul className="space-y-2">
-        {hits.map((h) => (
-          <li key={`${h.external_source}-${h.external_id}`}>
-            <Link
-              to="/add"
-              className="flex items-center gap-3 rounded-2xl bg-card p-3 ring-1 ring-border transition-colors hover:bg-muted/60"
-            >
-              <div className="h-12 w-12 shrink-0 overflow-hidden rounded-lg bg-muted">
-                {h.image_url && (
-                  <img src={h.image_url} alt="" className="h-full w-full object-cover" loading="lazy" />
-                )}
-              </div>
-              <div className="min-w-0 flex-1">
-                <p className="truncate font-medium">{h.title}</p>
-                {h.subtitle && <p className="truncate text-xs text-muted-foreground">{h.subtitle}</p>}
-                {"address" in h && h.address && (
-                  <p className="truncate text-xs text-muted-foreground">{h.address}</p>
-                )}
-              </div>
-              <Plus className="h-4 w-4 shrink-0 text-muted-foreground" />
-            </Link>
-          </li>
-        ))}
-      </ul>
-    </Section>
-  );
-}
 
 function Section({ title, children }: { title: React.ReactNode; children: React.ReactNode }) {
   return (
