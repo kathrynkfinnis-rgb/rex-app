@@ -3,7 +3,9 @@ import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { BottomNav } from "@/components/BottomNav";
 import { NotificationBell } from "@/components/NotificationBell";
+import { MessageSquarePlus } from "lucide-react";
 import { cn } from "@/lib/utils";
+
 
 export const Route = createFileRoute("/_authenticated")({
   ssr: false,
@@ -51,11 +53,21 @@ function AuthedLayout() {
   return (
     <div className="min-h-screen bg-background pb-24">
       <div className="fixed left-1/2 top-[calc(env(safe-area-inset-top)+0.75rem)] z-40 w-full max-w-md -translate-x-1/2 px-4 pointer-events-none">
-        <div className="flex justify-end gap-2">
-          <NotificationBell userId={user.id} />
-          <ProfileButton />
+        <div className="flex items-center justify-between gap-2">
+          <Link
+            to="/feedback"
+            aria-label="Send feedback"
+            className="pointer-events-auto flex h-10 w-10 items-center justify-center rounded-full bg-card text-foreground shadow-md ring-2 ring-background transition-transform active:scale-95"
+          >
+            <MessageSquarePlus className="h-5 w-5" />
+          </Link>
+          <div className="flex gap-2">
+            <NotificationBell userId={user.id} />
+            <ProfileButton />
+          </div>
         </div>
       </div>
+
       <div className="mx-auto max-w-md">
         <Outlet />
       </div>
