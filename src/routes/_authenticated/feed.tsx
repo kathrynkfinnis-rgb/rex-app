@@ -187,27 +187,61 @@ function FeedPage() {
           </div>
         )}
         {!searching && (
-          <div className="scrollbar-none mt-3 flex gap-2 overflow-x-auto -mx-5 px-5">
-            <Chip active={filter === "all"} onClick={() => setFilter("all")}>All</Chip>
-            <Chip active={filter === "asks"} onClick={() => setFilter("asks")}>
-              <Sparkles className="h-3.5 w-3.5" /> Asks
-            </Chip>
-            {CATEGORIES.map((c) => (
-              <Chip key={c.type} active={filter === c.type} onClick={() => setFilter(c.type)}>
-                <c.icon className="h-3.5 w-3.5" />
-                {c.plural}
-              </Chip>
-            ))}
-          </div>
-        )}
-        {!searching && filter !== "all" && filter !== "asks" && subcategories.length > 0 && (
-          <div className="scrollbar-none mt-2 flex gap-2 overflow-x-auto -mx-5 px-5">
-            <SubChip active={subFilter === "all"} onClick={() => setSubFilter("all")}>All {categoryMeta(filter).plural.toLowerCase()}</SubChip>
-            {subcategories.map((g) => (
-              <SubChip key={g} active={subFilter === g} onClick={() => setSubFilter(g)}>
-                {g}
-              </SubChip>
-            ))}
+          <div className="mt-3">
+            <button
+              type="button"
+              onClick={() => setShowFilters((s) => !s)}
+              aria-expanded={showFilters}
+              aria-controls="feed-filters"
+              className={cn(
+                "flex w-full items-center justify-between rounded-2xl border px-4 py-3 text-sm font-medium transition-colors",
+                showFilters
+                  ? "border-primary bg-primary text-primary-foreground"
+                  : "border-border bg-card text-foreground hover:bg-muted/40",
+              )}
+            >
+              <span className="flex items-center gap-2">
+                <ListIcon className="h-4 w-4" />
+                {filter === "all" ? "Filters" : `Filters: ${categoryMeta(filter).plural}${subFilter !== "all" ? ` · ${subFilter}` : ""}`}
+              </span>
+              <span className="text-xs opacity-80">{showFilters ? "Hide" : "Show"}</span>
+            </button>
+
+            {showFilters && (
+              <div id="feed-filters" className="mt-2 space-y-3 rounded-2xl border border-border bg-card p-3">
+                <div className="space-y-1.5">
+                  <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Category</p>
+                  <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
+                    <StackedChip active={filter === "all"} onClick={() => { setFilter("all"); setSubFilter("all"); }}>All</StackedChip>
+                    <StackedChip active={filter === "asks"} onClick={() => { setFilter("asks"); setSubFilter("all"); }}>
+                      <Sparkles className="h-3.5 w-3.5" /> Asks
+                    </StackedChip>
+                    {CATEGORIES.map((c) => (
+                      <StackedChip key={c.type} active={filter === c.type} onClick={() => { setFilter(c.type); setSubFilter("all"); }}>
+                        <c.icon className="h-3.5 w-3.5" />
+                        {c.plural}
+                      </StackedChip>
+                    ))}
+                  </div>
+                </div>
+
+                {filter !== "all" && filter !== "asks" && subcategories.length > 0 && (
+                  <div className="space-y-1.5 border-t border-border pt-3">
+                    <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Subcategory</p>
+                    <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
+                      <StackedChip active={subFilter === "all"} onClick={() => setSubFilter("all")}>
+                        All {categoryMeta(filter).plural.toLowerCase()}
+                      </StackedChip>
+                      {subcategories.map((g) => (
+                        <StackedChip key={g} active={subFilter === g} onClick={() => setSubFilter(g)}>
+                          {g}
+                        </StackedChip>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
           </div>
         )}
       </header>
