@@ -729,17 +729,18 @@ function EntryList({
 }: {
   entries: Entry[];
   lists: ListRow[];
-  cat: (typeof CATEGORIES)[number];
+  cat?: (typeof CATEGORIES)[number];
   currentUserId: string;
   people?: Map<string, Profile>;
   onMove: (entry: Entry, listId: string | null) => void;
   onRemove: (entry: Entry) => void;
 }) {
-  const Icon = cat.icon;
   if (entries.length === 0) return null;
   return (
     <div className="space-y-2">
       {entries.map((e) => {
+        const c = cat ?? categoryMeta(e.itemType);
+        const Icon = c.icon;
         const mine = e.userId === currentUserId;
         const who = mine ? null : people?.get(e.userId) ?? null;
         return (
@@ -752,7 +753,7 @@ function EntryList({
               params={e.params}
               className="flex min-w-0 flex-1 items-center gap-3"
             >
-              <div className={cn("flex h-12 w-12 shrink-0 items-center justify-center overflow-hidden rounded-xl", cat.tokenClass)}>
+              <div className={cn("flex h-12 w-12 shrink-0 items-center justify-center overflow-hidden rounded-xl", c.tokenClass)}>
                 {e.image ? (
                   <img src={e.image} alt="" className="h-full w-full object-cover" />
                 ) : (
@@ -768,7 +769,7 @@ function EntryList({
                       added by {who.display_name || who.username}
                     </>
                   ) : (
-                    <>{e.kind === "saved" ? "Saved post" : cat.wantVerb}</>
+                    <>{!cat ? `${c.label} · ` : ""}{e.kind === "saved" ? "Saved post" : c.wantVerb}</>
                   )}
                 </p>
               </div>
@@ -788,11 +789,11 @@ function EntryList({
                   <>
                     <DropdownMenuLabel>Move to</DropdownMenuLabel>
                     <DropdownMenuItem onClick={() => onMove(e, null)}>
-                      {cat.hitDefaultEmoji} {cat.hitDefaultLabel} (default)
+                      {c.hitDefaultEmoji} {c.hitDefaultLabel} (default)
                     </DropdownMenuItem>
                     {lists.map((l) => (
                       <DropdownMenuItem key={l.id} onClick={() => onMove(e, l.id)}>
-                        {l.emoji ?? cat.hitDefaultEmoji} {l.name}
+                        {l.emoji ?? (l.item_type === "mixed" ? "✨" : c.hitDefaultEmoji)} {l.name}
                       </DropdownMenuItem>
                     ))}
                     <DropdownMenuSeparator />
@@ -809,3 +810,32 @@ function EntryList({
     </div>
   );
 }
+
+function FilterChip({
+  label,
+  count,
+  active,
+  onClick,
+}: {
+  label: string;
+  count?: number;
+  active: boolean;
+  onClick: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className={cn(
+        "rounded-full px-3 py-1 text-xs font-medium ring-1 transition",
+        active
+          ? "bg-primary text-primary-foreground ring-primary"
+          : "bg-card text-muted-foreground ring-border hover:bg-muted",
+      )}
+    >
+      {label}
+      {count ? <span className="ml-1 opacity-70">{count}</span> : null}
+    </button>
+  );
+}
+
