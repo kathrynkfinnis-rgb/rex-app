@@ -31,6 +31,7 @@ export type FeedRow = {
   tags?: string[] | null;
   user_id: string;
   item_id: string;
+  trip_id?: string | null;
   items: {
     id: string;
     type: ItemType;
