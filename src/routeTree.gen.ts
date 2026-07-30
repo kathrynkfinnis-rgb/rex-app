@@ -14,6 +14,7 @@ import { Route as AuthenticatedRouteRouteImport } from './routes/_authenticated/
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as RIdRouteImport } from './routes/r.$id'
 import { Route as AuthenticatedYouRouteImport } from './routes/_authenticated/you'
+import { Route as AuthenticatedSharedCollectionsRouteImport } from './routes/_authenticated/shared-collections'
 import { Route as AuthenticatedNotificationsRouteImport } from './routes/_authenticated/notifications'
 import { Route as AuthenticatedNotificationSettingsRouteImport } from './routes/_authenticated/notification-settings'
 import { Route as AuthenticatedMeRouteImport } from './routes/_authenticated/me'
@@ -58,6 +59,12 @@ const AuthenticatedYouRoute = AuthenticatedYouRouteImport.update({
   path: '/you',
   getParentRoute: () => AuthenticatedRouteRoute,
 } as any)
+const AuthenticatedSharedCollectionsRoute =
+  AuthenticatedSharedCollectionsRouteImport.update({
+    id: '/shared-collections',
+    path: '/shared-collections',
+    getParentRoute: () => AuthenticatedRouteRoute,
+  } as any)
 const AuthenticatedNotificationsRoute =
   AuthenticatedNotificationsRouteImport.update({
     id: '/notifications',
@@ -173,6 +180,7 @@ export interface FileRoutesByFullPath {
   '/me': typeof AuthenticatedMeRoute
   '/notification-settings': typeof AuthenticatedNotificationSettingsRoute
   '/notifications': typeof AuthenticatedNotificationsRoute
+  '/shared-collections': typeof AuthenticatedSharedCollectionsRoute
   '/you': typeof AuthenticatedYouRoute
   '/r/$id': typeof RIdRoute
   '/ask/$id': typeof AuthenticatedAskIdRoute
@@ -198,6 +206,7 @@ export interface FileRoutesByTo {
   '/me': typeof AuthenticatedMeRoute
   '/notification-settings': typeof AuthenticatedNotificationSettingsRoute
   '/notifications': typeof AuthenticatedNotificationsRoute
+  '/shared-collections': typeof AuthenticatedSharedCollectionsRoute
   '/you': typeof AuthenticatedYouRoute
   '/r/$id': typeof RIdRoute
   '/ask/$id': typeof AuthenticatedAskIdRoute
@@ -225,6 +234,7 @@ export interface FileRoutesById {
   '/_authenticated/me': typeof AuthenticatedMeRoute
   '/_authenticated/notification-settings': typeof AuthenticatedNotificationSettingsRoute
   '/_authenticated/notifications': typeof AuthenticatedNotificationsRoute
+  '/_authenticated/shared-collections': typeof AuthenticatedSharedCollectionsRoute
   '/_authenticated/you': typeof AuthenticatedYouRoute
   '/r/$id': typeof RIdRoute
   '/_authenticated/ask/$id': typeof AuthenticatedAskIdRoute
@@ -252,6 +262,7 @@ export interface FileRouteTypes {
     | '/me'
     | '/notification-settings'
     | '/notifications'
+    | '/shared-collections'
     | '/you'
     | '/r/$id'
     | '/ask/$id'
@@ -277,6 +288,7 @@ export interface FileRouteTypes {
     | '/me'
     | '/notification-settings'
     | '/notifications'
+    | '/shared-collections'
     | '/you'
     | '/r/$id'
     | '/ask/$id'
@@ -303,6 +315,7 @@ export interface FileRouteTypes {
     | '/_authenticated/me'
     | '/_authenticated/notification-settings'
     | '/_authenticated/notifications'
+    | '/_authenticated/shared-collections'
     | '/_authenticated/you'
     | '/r/$id'
     | '/_authenticated/ask/$id'
@@ -356,6 +369,13 @@ declare module '@tanstack/react-router' {
       path: '/you'
       fullPath: '/you'
       preLoaderRoute: typeof AuthenticatedYouRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
+    '/_authenticated/shared-collections': {
+      id: '/_authenticated/shared-collections'
+      path: '/shared-collections'
+      fullPath: '/shared-collections'
+      preLoaderRoute: typeof AuthenticatedSharedCollectionsRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
     '/_authenticated/notifications': {
@@ -507,6 +527,7 @@ interface AuthenticatedRouteRouteChildren {
   AuthenticatedMeRoute: typeof AuthenticatedMeRoute
   AuthenticatedNotificationSettingsRoute: typeof AuthenticatedNotificationSettingsRoute
   AuthenticatedNotificationsRoute: typeof AuthenticatedNotificationsRoute
+  AuthenticatedSharedCollectionsRoute: typeof AuthenticatedSharedCollectionsRoute
   AuthenticatedYouRoute: typeof AuthenticatedYouRoute
   AuthenticatedAskIdRoute: typeof AuthenticatedAskIdRoute
   AuthenticatedGroupIdRoute: typeof AuthenticatedGroupIdRoute
@@ -531,6 +552,7 @@ const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
   AuthenticatedNotificationSettingsRoute:
     AuthenticatedNotificationSettingsRoute,
   AuthenticatedNotificationsRoute: AuthenticatedNotificationsRoute,
+  AuthenticatedSharedCollectionsRoute: AuthenticatedSharedCollectionsRoute,
   AuthenticatedYouRoute: AuthenticatedYouRoute,
   AuthenticatedAskIdRoute: AuthenticatedAskIdRoute,
   AuthenticatedGroupIdRoute: AuthenticatedGroupIdRoute,

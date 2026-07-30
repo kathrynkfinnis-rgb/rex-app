@@ -275,6 +275,7 @@ export type Database = {
           item_type: string
           name: string
           user_id: string
+          view_count: number
           visibility: Database["public"]["Enums"]["list_visibility"]
         }
         Insert: {
@@ -284,6 +285,7 @@ export type Database = {
           item_type: string
           name: string
           user_id: string
+          view_count?: number
           visibility?: Database["public"]["Enums"]["list_visibility"]
         }
         Update: {
@@ -293,6 +295,7 @@ export type Database = {
           item_type?: string
           name?: string
           user_id?: string
+          view_count?: number
           visibility?: Database["public"]["Enums"]["list_visibility"]
         }
         Relationships: []
@@ -962,6 +965,7 @@ export type Database = {
         }
         Returns: boolean
       }
+      increment_list_view: { Args: { _list: string }; Returns: undefined }
       is_group_member: {
         Args: { _group: string; _user: string }
         Returns: boolean
@@ -977,6 +981,21 @@ export type Database = {
       notif_pref_enabled: {
         Args: { _type: string; _user: string }
         Returns: boolean
+      }
+      public_collections: {
+        Args: { _limit?: number }
+        Returns: {
+          created_at: string
+          emoji: string
+          id: string
+          item_count: number
+          name: string
+          owner_avatar_url: string
+          owner_display_name: string
+          owner_id: string
+          owner_username: string
+          view_count: number
+        }[]
       }
       search_profiles_for: {
         Args: { _caller: string; _limit?: number; _query: string }

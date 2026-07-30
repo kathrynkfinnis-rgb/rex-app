@@ -1,5 +1,6 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
+import { useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { categoryMeta, type ItemType } from "@/lib/categories";
 import { ArrowLeft, Globe2, Lock, Users } from "lucide-react";
@@ -103,7 +104,14 @@ function ListPage() {
     },
   });
 
+  // Count a "read" once per visit for public collections (powers Shared Collections ranking).
+  useEffect(() => {
+    if (!id) return;
+    (supabase as any).rpc("increment_list_view", { _list: id });
+  }, [id]);
+
   if (isLoading) {
+
     return <div className="px-5 py-8 text-sm text-muted-foreground">Loading collection…</div>;
   }
 
