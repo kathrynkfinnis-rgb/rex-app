@@ -336,7 +336,7 @@ export function HitList({ userId }: { userId: string }) {
               className="h-7 gap-1 rounded-full px-2.5 text-xs"
               onClick={() => startNewList(filter === "all" || filter === "mixed" ? "mixed" : filter)}
             >
-              <Plus className="h-3.5 w-3.5" /> New list
+              <Plus className="h-3.5 w-3.5" /> New collection
             </Button>
           </div>
         </div>
@@ -614,7 +614,7 @@ export function HitList({ userId }: { userId: string }) {
         <DialogContent>
           <DialogHeader>
             <DialogTitle>
-              New list
+              New collection
               {newListFor === "mixed"
                 ? " — anything goes"
                 : newListFor
@@ -662,7 +662,7 @@ export function HitList({ userId }: { userId: string }) {
                 autoFocus
                 value={newName}
                 onChange={(e) => setNewName(e.target.value)}
-                placeholder="e.g. Tokyo list"
+                placeholder="e.g. Tokyo collection"
               />
             </div>
             <div>
@@ -690,7 +690,7 @@ export function HitList({ userId }: { userId: string }) {
               </div>
               <p className="mt-1.5 text-[11px] text-muted-foreground">{VISIBILITY_META[newVisibility].hint}</p>
               <p className="mt-1 text-[11px] text-muted-foreground">
-                You can invite friends to add to any list once it's created.
+                You can invite friends to add to any collection once it's created.
               </p>
             </div>
           </div>
@@ -786,7 +786,7 @@ function EntryList({
                   </>
                 ) : null}
                 <DropdownMenuItem className="text-destructive" onClick={() => onRemove(e)}>
-                  <Trash2 className="mr-2 h-4 w-4" /> Remove from list
+                  <Trash2 className="mr-2 h-4 w-4" /> Remove from collection
                 </DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>
