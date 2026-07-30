@@ -4,7 +4,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
-import { Check, Plus, Trash2, Sparkles } from "lucide-react";
+import { Check, Plus, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { categoryMeta, type ItemType } from "@/lib/categories";
@@ -37,7 +37,6 @@ export function AddToListDialog({
   const cat = categoryMeta(itemType);
   const [creating, setCreating] = useState(false);
   const [newName, setNewName] = useState("");
-  const [newMixed, setNewMixed] = useState(false);
   const [busy, setBusy] = useState(false);
 
   const { data: userId } = useQuery({
@@ -47,21 +46,19 @@ export function AddToListDialog({
   });
 
   const { data: lists } = useQuery({
-    queryKey: ["lists-for-type", userId, itemType],
+    queryKey: ["lists-for-type", userId],
     enabled: !!userId && open,
     queryFn: async () => {
       const { data } = await supabase
         .from("hitlist_lists")
         .select("id, name, emoji, item_type")
         .eq("user_id", userId!)
-        .in("item_type", [itemType, "mixed"])
         .order("created_at", { ascending: true });
       return (data ?? []) as ListRow[];
     },
   });
 
-  const catLists = (lists ?? []).filter((l) => l.item_type !== "mixed");
-  const mixedLists = (lists ?? []).filter((l) => l.item_type === "mixed");
+  const allLists = lists ?? [];
   const table = kind === "want" ? "wants" : "saved_posts";
 
   function refresh() {
@@ -76,7 +73,6 @@ export function AddToListDialog({
   function reset() {
     setCreating(false);
     setNewName("");
-    setNewMixed(false);
   }
 
   async function moveTo(listId: string | null, label: string) {
@@ -98,7 +94,7 @@ export function AddToListDialog({
       .from("hitlist_lists")
       .insert({
         user_id: userId,
-        item_type: newMixed ? "mixed" : itemType,
+        item_type: "mixed",
         name: newName.trim(),
         visibility: "draft",
       })
@@ -143,27 +139,12 @@ export function AddToListDialog({
             onClick={() => moveTo(null, cat.hitDefaultLabel)}
           />
 
-          {catLists.length > 0 && (
+          {allLists.length > 0 && (
             <p className="px-1 pt-2 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
-              Your {cat.plural.toLowerCase()} collections
+              Your collections
             </p>
           )}
-          {catLists.map((l) => (
-            <ListOption
-              key={l.id}
-              emoji={l.emoji ?? cat.hitDefaultEmoji}
-              name={l.name}
-              active={currentListId === l.id}
-              onClick={() => moveTo(l.id, l.name)}
-            />
-          ))}
-
-          {mixedLists.length > 0 && (
-            <p className="px-1 pt-2 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
-              Mixed collections
-            </p>
-          )}
-          {mixedLists.map((l) => (
+          {allLists.map((l) => (
             <ListOption
               key={l.id}
               emoji={l.emoji ?? "✨"}
@@ -180,21 +161,9 @@ export function AddToListDialog({
               autoFocus
               value={newName}
               onChange={(e) => setNewName(e.target.value)}
-                placeholder={`e.g. Tokyo ${cat.plural.toLowerCase()}`}
+                placeholder="e.g. Tokyo favourites"
                 onKeyDown={(e) => e.key === "Enter" && createAndMove()}
             />
-            <button
-              type="button"
-              onClick={() => setNewMixed((m) => !m)}
-              className={cn(
-                "flex w-full items-center gap-2 rounded-xl px-2.5 py-2 text-left text-xs ring-1 transition",
-                newMixed ? "bg-primary/10 text-primary ring-primary" : "bg-background text-muted-foreground ring-border",
-              )}
-            >
-              <Sparkles className="h-3.5 w-3.5" />
-              <span className="flex-1">Let this collection hold any category</span>
-              {newMixed ? <Check className="h-3.5 w-3.5" /> : null}
-            </button>
             <div className="flex gap-2">
               <Button variant="ghost" className="flex-1 rounded-full" onClick={reset}>
                 Cancel

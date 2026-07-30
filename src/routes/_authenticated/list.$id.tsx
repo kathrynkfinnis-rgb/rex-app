@@ -136,7 +136,6 @@ function ListPage() {
           <span className="inline-flex items-center gap-1 rounded-full bg-muted px-2 py-0.5">
             <V.icon className="h-3 w-3" /> {V.label}
           </span>
-          <span>{categoryMeta(list.item_type as ItemType).plural}</span>
           {owner?.username && (
             <Link to="/profile/$username" params={{ username: owner.username }} className="text-primary">
               @{owner.username}
