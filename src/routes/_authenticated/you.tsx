@@ -129,6 +129,13 @@ function YouPage() {
             <p className="truncate font-display text-2xl">{profile?.display_name || profile?.username}</p>
             <p className="truncate text-sm text-muted-foreground">@{profile?.username}</p>
           </div>
+          {user && profile?.username ? (
+            <EditProfileDialog
+              userId={user.id}
+              username={profile.username}
+              displayName={profile.display_name}
+            />
+          ) : null}
         </div>
 
         <div className="mt-5 grid grid-cols-4 gap-2">
