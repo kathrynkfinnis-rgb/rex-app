@@ -6,6 +6,8 @@ import {
   LogOut, Smartphone, BookOpen, FileUp, Crown, Bell, Bookmark,
   Sparkles, Users, MessageCircle, Heart,
 } from "lucide-react";
+import { useState } from "react";
+import { ActivityDetailDialog, type ActivityKind } from "@/components/ActivityDetailDialog";
 import { AvatarUploader } from "@/components/AvatarUploader";
 import { EditProfileDialog } from "@/components/EditProfileDialog";
 import { RecommendationCard, type FeedRow } from "@/components/RecommendationCard";
@@ -28,6 +30,8 @@ export const Route = createFileRoute("/_authenticated/you")({
 function YouPage() {
   const navigate = useNavigate();
   const qc = useQueryClient();
+  const [detail, setDetail] = useState<ActivityKind | null>(null);
+  const [showAllRecs, setShowAllRecs] = useState(false);
 
   const { data: user } = useQuery({
     queryKey: ["me-user"],
@@ -166,12 +170,12 @@ function YouPage() {
           <Sparkles className="h-3.5 w-3.5" /> Your activity
         </h2>
         <div className="grid grid-cols-2 gap-2">
-          <MiniStat icon={<Sparkles className="h-4 w-4" />} label="Rex last 30 days" value={last30} />
-          <MiniStat icon={<MessageCircle className="h-4 w-4" />} label="Comments left" value={activity?.comments ?? 0} />
-          <MiniStat icon={<Heart className="h-4 w-4" />} label="Posts liked" value={activity?.likes ?? 0} />
-          <MiniStat icon={<Bookmark className="h-4 w-4" />} label="Saved to collections" value={activity?.wants ?? 0} />
-          <MiniStat icon={<Users className="h-4 w-4" />} label="Blasts posted" value={activity?.blasts ?? 0} />
-          <MiniStat icon={<Crown className="h-4 w-4" />} label="Friends" value={activity?.friends ?? 0} />
+          <MiniStat icon={<Sparkles className="h-4 w-4" />} label="Rex last 30 days" value={last30} onClick={() => setDetail("recent")} />
+          <MiniStat icon={<MessageCircle className="h-4 w-4" />} label="Comments left" value={activity?.comments ?? 0} onClick={() => setDetail("comments")} />
+          <MiniStat icon={<Heart className="h-4 w-4" />} label="Posts liked" value={activity?.likes ?? 0} onClick={() => setDetail("likes")} />
+          <MiniStat icon={<Bookmark className="h-4 w-4" />} label="Saved to collections" value={activity?.wants ?? 0} onClick={() => setDetail("wants")} />
+          <MiniStat icon={<Users className="h-4 w-4" />} label="Blasts posted" value={activity?.blasts ?? 0} onClick={() => setDetail("blasts")} />
+          <MiniStat icon={<Crown className="h-4 w-4" />} label="Friends" value={activity?.friends ?? 0} onClick={() => setDetail("friends")} />
         </div>
 
         {mix.length > 0 && (
@@ -197,7 +201,7 @@ function YouPage() {
       <section className="px-4 pb-2">
         <div className="mb-3 flex items-center justify-between">
           <h2 className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">
-            Your Rex
+            Your Rex{total ? ` (${total})` : ""}
           </h2>
           <Link to="/me" className="text-xs font-medium text-primary">My Collections →</Link>
         </div>
@@ -205,11 +209,19 @@ function YouPage() {
           <div className="h-40 animate-pulse rounded-2xl bg-muted" />
         ) : total > 0 ? (
           <div className="space-y-3">
-            {recs!.slice(0, 10).map((r) => <RecommendationCard key={r.id} rec={r} />)}
+            {(showAllRecs ? recs! : recs!.slice(0, 10)).map((r) => (
+              <RecommendationCard key={r.id} rec={r} />
+            ))}
             {total > 10 && (
-              <p className="pt-1 text-center text-xs text-muted-foreground">
-                Showing your 10 most recent of {total}.
-              </p>
+              <div className="pt-1 text-center">
+                <Button
+                  variant="outline"
+                  className="rounded-full"
+                  onClick={() => setShowAllRecs((v) => !v)}
+                >
+                  {showAllRecs ? "Show less" : `See all ${total} Rex`}
+                </Button>
+              </div>
             )}
           </div>
         ) : (
