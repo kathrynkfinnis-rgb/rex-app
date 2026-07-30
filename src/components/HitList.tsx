@@ -475,10 +475,48 @@ export function HitList({ userId }: { userId: string }) {
         <DialogContent>
           <DialogHeader>
             <DialogTitle>
-              New list{newListFor ? ` in ${categoryMeta(newListFor).plural}` : ""}
+              New list
+              {newListFor === "mixed"
+                ? " — anything goes"
+                : newListFor
+                ? ` in ${categoryMeta(newListFor as ItemType).plural}`
+                : ""}
             </DialogTitle>
           </DialogHeader>
           <div className="space-y-3">
+            <div>
+              <label className="mb-1.5 block text-xs font-medium">What goes in it</label>
+              <div className="flex flex-wrap gap-1.5">
+                <button
+                  type="button"
+                  onClick={() => setNewListFor("mixed")}
+                  className={cn(
+                    "rounded-full px-2.5 py-1 text-xs ring-1 transition",
+                    newListFor === "mixed"
+                      ? "bg-primary text-primary-foreground ring-primary"
+                      : "bg-card text-muted-foreground ring-border hover:bg-muted",
+                  )}
+                >
+                  ✨ Mix of everything
+                </button>
+                {CATEGORIES.map((c) => (
+                  <button
+                    key={c.type}
+                    type="button"
+                    onClick={() => setNewListFor(c.type)}
+                    className={cn(
+                      "rounded-full px-2.5 py-1 text-xs ring-1 transition",
+                      newListFor === c.type
+                        ? "bg-primary text-primary-foreground ring-primary"
+                        : "bg-card text-muted-foreground ring-border hover:bg-muted",
+                    )}
+                  >
+                    {c.hitDefaultEmoji} {c.plural}
+                  </button>
+                ))}
+              </div>
+            </div>
+
             <div>
               <label className="mb-1 block text-xs font-medium">Name</label>
               <Input
