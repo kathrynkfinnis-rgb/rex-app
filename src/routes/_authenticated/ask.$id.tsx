@@ -254,6 +254,25 @@ function AskDetailPage() {
             <button onClick={() => setSuggested(null)} className="text-xs text-muted-foreground underline">Remove</button>
           </div>
         )}
+        {suggested && (
+          <div className="mb-3 rounded-xl bg-card p-3 ring-1 ring-border">
+            <label className="flex items-center gap-2 text-sm font-medium">
+              <input
+                type="checkbox"
+                checked={alsoRex}
+                onChange={(e) => setAlsoRex(e.target.checked)}
+                className="h-4 w-4 accent-[hsl(var(--primary))]"
+              />
+              Also post as a Rex 🦖
+            </label>
+            {alsoRex && (
+              <div className="mt-2">
+                <p className="mb-1 text-xs text-muted-foreground">Your rating</p>
+                <CrownRatingInput value={rating} onChange={setRating} size="md" />
+              </div>
+            )}
+          </div>
+        )}
         {suggestOpen && req.type && req.type !== "recipe" && (
           <div className="mb-3">
             <SearchPicker type={req.type as ItemType} onPick={handlePickSuggestion} onManual={() => setSuggestOpen(false)} near={null} />
