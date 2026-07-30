@@ -6,6 +6,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { UserAvatar } from "@/components/UserAvatar";
 import { searchProfiles, suggestedFriends } from "@/lib/friends.functions";
 import { GroupsSection } from "@/components/GroupsSection";
+import { TopRexxersCard } from "@/components/TopRexxers";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
