@@ -204,37 +204,56 @@ function AddPage() {
     return (
       <div className="flex min-h-[70vh] flex-col items-center justify-center gap-6 p-6 text-center">
         <div className="flex h-20 w-20 items-center justify-center rounded-full bg-primary/15 text-4xl">
-          🦖
+          {justAdded.isTrip ? "🧳" : "🦖"}
         </div>
         <div>
           <h1 className="font-display text-3xl">Nice one!</h1>
           <p className="mt-2 text-muted-foreground">
-            "{justAdded.title}" is in your feed.
+            {justAdded.isTrip
+              ? `"${justAdded.title}" is live — now add the places you loved on it.`
+              : `"${justAdded.title}" is in your feed.`}
           </p>
         </div>
         <div className="flex w-full max-w-sm flex-col gap-2">
-          <Button
-            onClick={resetForm}
-            className="h-14 w-full rounded-full text-base font-semibold shadow-lg shadow-primary/30"
-          >
-            Add another
-          </Button>
-          <Button
-            variant="outline"
-            onClick={() => navigate({ to: "/item/$id", params: { id: justAdded.itemId } })}
-            className="h-12 w-full rounded-full"
-          >
-            View Rex
-          </Button>
-          <Button
-            variant="ghost"
-            onClick={() => navigate({ to: "/feed" })}
-            className="h-12 w-full rounded-full"
-          >
-            Back to feed
-          </Button>
+          {justAdded.isTrip ? (
+            <>
+              <Button
+                onClick={() => navigate({ to: "/trip/$id", params: { id: justAdded.recId } })}
+                className="h-14 w-full rounded-full text-base font-semibold shadow-lg shadow-primary/30"
+              >
+                Add places to this trip
+              </Button>
+              <Button variant="ghost" onClick={() => navigate({ to: "/feed" })} className="h-12 w-full rounded-full">
+                Back to feed
+              </Button>
+            </>
+          ) : (
+            <>
+              <Button
+                onClick={resetForm}
+                className="h-14 w-full rounded-full text-base font-semibold shadow-lg shadow-primary/30"
+              >
+                Add another
+              </Button>
+              <Button
+                variant="outline"
+                onClick={() => navigate({ to: "/item/$id", params: { id: justAdded.itemId } })}
+                className="h-12 w-full rounded-full"
+              >
+                View Rex
+              </Button>
+              <Button
+                variant="ghost"
+                onClick={() => navigate({ to: "/feed" })}
+                className="h-12 w-full rounded-full"
+              >
+                Back to feed
+              </Button>
+            </>
+          )}
         </div>
       </div>
+
     );
   }
 
