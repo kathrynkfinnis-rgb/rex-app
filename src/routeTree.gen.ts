@@ -29,6 +29,7 @@ import { Route as AuthenticatedAddRouteImport } from './routes/_authenticated/ad
 import { Route as AuthenticatedAskIndexRouteImport } from './routes/_authenticated/ask.index'
 import { Route as AuthenticatedProfileUsernameRouteImport } from './routes/_authenticated/profile.$username'
 import { Route as AuthenticatedItemIdRouteImport } from './routes/_authenticated/item.$id'
+import { Route as AuthenticatedGroupIdRouteImport } from './routes/_authenticated/group.$id'
 import { Route as AuthenticatedAskIdRouteImport } from './routes/_authenticated/ask.$id'
 
 const AuthRoute = AuthRouteImport.update({
@@ -134,6 +135,11 @@ const AuthenticatedItemIdRoute = AuthenticatedItemIdRouteImport.update({
   path: '/item/$id',
   getParentRoute: () => AuthenticatedRouteRoute,
 } as any)
+const AuthenticatedGroupIdRoute = AuthenticatedGroupIdRouteImport.update({
+  id: '/group/$id',
+  path: '/group/$id',
+  getParentRoute: () => AuthenticatedRouteRoute,
+} as any)
 const AuthenticatedAskIdRoute = AuthenticatedAskIdRouteImport.update({
   id: '/ask/$id',
   path: '/ask/$id',
@@ -158,6 +164,7 @@ export interface FileRoutesByFullPath {
   '/you': typeof AuthenticatedYouRoute
   '/r/$id': typeof RIdRoute
   '/ask/$id': typeof AuthenticatedAskIdRoute
+  '/group/$id': typeof AuthenticatedGroupIdRoute
   '/item/$id': typeof AuthenticatedItemIdRoute
   '/profile/$username': typeof AuthenticatedProfileUsernameRoute
   '/ask/': typeof AuthenticatedAskIndexRoute
@@ -180,6 +187,7 @@ export interface FileRoutesByTo {
   '/you': typeof AuthenticatedYouRoute
   '/r/$id': typeof RIdRoute
   '/ask/$id': typeof AuthenticatedAskIdRoute
+  '/group/$id': typeof AuthenticatedGroupIdRoute
   '/item/$id': typeof AuthenticatedItemIdRoute
   '/profile/$username': typeof AuthenticatedProfileUsernameRoute
   '/ask': typeof AuthenticatedAskIndexRoute
@@ -204,6 +212,7 @@ export interface FileRoutesById {
   '/_authenticated/you': typeof AuthenticatedYouRoute
   '/r/$id': typeof RIdRoute
   '/_authenticated/ask/$id': typeof AuthenticatedAskIdRoute
+  '/_authenticated/group/$id': typeof AuthenticatedGroupIdRoute
   '/_authenticated/item/$id': typeof AuthenticatedItemIdRoute
   '/_authenticated/profile/$username': typeof AuthenticatedProfileUsernameRoute
   '/_authenticated/ask/': typeof AuthenticatedAskIndexRoute
@@ -228,6 +237,7 @@ export interface FileRouteTypes {
     | '/you'
     | '/r/$id'
     | '/ask/$id'
+    | '/group/$id'
     | '/item/$id'
     | '/profile/$username'
     | '/ask/'
@@ -250,6 +260,7 @@ export interface FileRouteTypes {
     | '/you'
     | '/r/$id'
     | '/ask/$id'
+    | '/group/$id'
     | '/item/$id'
     | '/profile/$username'
     | '/ask'
@@ -273,6 +284,7 @@ export interface FileRouteTypes {
     | '/_authenticated/you'
     | '/r/$id'
     | '/_authenticated/ask/$id'
+    | '/_authenticated/group/$id'
     | '/_authenticated/item/$id'
     | '/_authenticated/profile/$username'
     | '/_authenticated/ask/'
@@ -427,6 +439,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedItemIdRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
+    '/_authenticated/group/$id': {
+      id: '/_authenticated/group/$id'
+      path: '/group/$id'
+      fullPath: '/group/$id'
+      preLoaderRoute: typeof AuthenticatedGroupIdRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
     '/_authenticated/ask/$id': {
       id: '/_authenticated/ask/$id'
       path: '/ask/$id'
@@ -452,6 +471,7 @@ interface AuthenticatedRouteRouteChildren {
   AuthenticatedNotificationsRoute: typeof AuthenticatedNotificationsRoute
   AuthenticatedYouRoute: typeof AuthenticatedYouRoute
   AuthenticatedAskIdRoute: typeof AuthenticatedAskIdRoute
+  AuthenticatedGroupIdRoute: typeof AuthenticatedGroupIdRoute
   AuthenticatedItemIdRoute: typeof AuthenticatedItemIdRoute
   AuthenticatedProfileUsernameRoute: typeof AuthenticatedProfileUsernameRoute
   AuthenticatedAskIndexRoute: typeof AuthenticatedAskIndexRoute
@@ -473,6 +493,7 @@ const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
   AuthenticatedNotificationsRoute: AuthenticatedNotificationsRoute,
   AuthenticatedYouRoute: AuthenticatedYouRoute,
   AuthenticatedAskIdRoute: AuthenticatedAskIdRoute,
+  AuthenticatedGroupIdRoute: AuthenticatedGroupIdRoute,
   AuthenticatedItemIdRoute: AuthenticatedItemIdRoute,
   AuthenticatedProfileUsernameRoute: AuthenticatedProfileUsernameRoute,
   AuthenticatedAskIndexRoute: AuthenticatedAskIndexRoute,

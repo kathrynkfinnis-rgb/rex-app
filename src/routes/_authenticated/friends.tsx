@@ -5,6 +5,8 @@ import { useServerFn } from "@tanstack/react-start";
 import { supabase } from "@/integrations/supabase/client";
 import { UserAvatar } from "@/components/UserAvatar";
 import { searchProfiles, suggestedFriends } from "@/lib/friends.functions";
+import { GroupsSection } from "@/components/GroupsSection";
+
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { toast } from "sonner";
@@ -222,7 +224,10 @@ function FriendsPage() {
         </Button>
       </div>
 
+      {uid && <GroupsSection userId={uid} />}
+
       {suggestions && suggestions.length > 0 && (
+
         <Section title="People you may know">
           {suggestions.map((p: any) => {
             const already = (friendships ?? []).some(
