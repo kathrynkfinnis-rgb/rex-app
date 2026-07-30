@@ -3,7 +3,7 @@ import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 
-import { CATEGORIES, type ItemType, categoryMeta, PLACE_SUBCATEGORIES, normalizePlaceSubcategory, subcategoriesFor } from "@/lib/categories";
+import { CATEGORIES, type ItemType, categoryMeta, PLACE_SUBCATEGORIES, normalizePlaceSubcategory, subcategoriesFor, joinGenres } from "@/lib/categories";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -48,7 +48,7 @@ function AddPage() {
   const [coords, setCoords] = useState<{ lat: number; lng: number } | null>(null);
   const [picked, setPicked] = useState<AnyHit | null>(null);
   const [manualMode, setManualMode] = useState(false);
-  const [placeSub, setPlaceSub] = useState<string>("");
+  const [placeSubs, setPlaceSubs] = useState<string[]>([]);
   const [justAdded, setJustAdded] = useState<{ itemId: string; recId: string; title: string; isTrip: boolean } | null>(null);
   const [photos, setPhotos] = useState<string[]>([]);
   const [tags, setTags] = useState<string[]>([]);
@@ -76,7 +76,7 @@ function AddPage() {
     setCoords(null);
     setPicked(null);
     setManualMode(false);
-    setPlaceSub("");
+    setPlaceSubs([]);
     setJustAdded(null);
     setPhotos([]);
   }
@@ -92,7 +92,7 @@ function AddPage() {
       if ("address" in hit && hit.address) setAddress(hit.address);
       if (isGooglePlace) {
         const guess = normalizePlaceSubcategory(hit.genre);
-        if (guess) setPlaceSub(guess);
+        if (guess) setPlaceSubs([guess]);
       }
       if ("lat" in hit && "lng" in hit && typeof hit.lat === "number" && typeof hit.lng === "number") {
         setCoords({ lat: hit.lat, lng: hit.lng });
@@ -161,7 +161,7 @@ function AddPage() {
             address: type === "place" || type === "event" ? address.trim() || null : null,
             lat: type === "place" || type === "event" ? coords?.lat ?? null : null,
             lng: type === "place" || type === "event" ? coords?.lng ?? null : null,
-            genre: placeSub || (picked?.genre ?? null),
+            genre: joinGenres(placeSubs) ?? (picked?.genre ?? null),
             ...(type === "recipe" && recipeText.trim() ? { recipe_text: recipeText } : {}),
           } as never)
           .select("id")
@@ -442,15 +442,20 @@ function AddPage() {
 
         {subcategoriesFor(type).length > 0 && (
           <div className="space-y-1.5">
-            <Label>{type === "place" ? "Type of place" : `Type of ${cat!.label.toLowerCase()}`}</Label>
+            <Label>
+              {type === "place" ? "Type of place" : `Type of ${cat!.label.toLowerCase()}`}
+              <span className="ml-1 font-normal text-muted-foreground">(pick any that apply)</span>
+            </Label>
             <div className="flex flex-wrap gap-2">
               {subcategoriesFor(type).map((s) => {
-                const active = placeSub === s;
+                const active = placeSubs.includes(s);
                 return (
                   <button
                     key={s}
                     type="button"
-                    onClick={() => setPlaceSub(active ? "" : s)}
+                    onClick={() =>
+                      setPlaceSubs((prev) => (prev.includes(s) ? prev.filter((p) => p !== s) : [...prev, s]))
+                    }
                     className={cn(
                       "rounded-full px-3 py-1.5 text-sm ring-1 transition-colors",
                       active

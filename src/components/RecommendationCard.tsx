@@ -4,7 +4,7 @@ import { useQuery } from "@tanstack/react-query";
 import { CrownRatingDisplay } from "@/components/CrownRating";
 import { LikesComments } from "@/components/LikesComments";
 import { EditRecommendationDialog } from "@/components/EditRecommendationDialog";
-import { categoryMeta, type ItemType } from "@/lib/categories";
+import { categoryMeta, splitGenres, type ItemType } from "@/lib/categories";
 import { supabase } from "@/integrations/supabase/client";
 import { formatDistanceToNow } from "date-fns";
 import { Pencil } from "lucide-react";
@@ -120,11 +120,11 @@ export function RecommendationCard({ rec }: { rec: FeedRow }) {
               <span className={`inline-flex shrink-0 items-center gap-1 rounded-full px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wider ${cat.tokenClass}`}>
                 <Icon className="h-2.5 w-2.5" /> {cat.label}
               </span>
-              {item.genre && (
-                <span className="inline-flex shrink-0 items-center rounded-full bg-secondary/70 px-1.5 py-0.5 text-[9px] font-medium uppercase tracking-wider text-secondary-foreground truncate max-w-[80px]">
-                  {item.genre}
+              {splitGenres(item.genre).slice(0, 2).map((g) => (
+                <span key={g} className="inline-flex shrink-0 items-center rounded-full bg-secondary/70 px-1.5 py-0.5 text-[9px] font-medium uppercase tracking-wider text-secondary-foreground truncate max-w-[80px]">
+                  {g}
                 </span>
-              )}
+              ))}
               <div className="ml-auto shrink-0"><CrownRatingDisplay value={rec.rating} size="xs" showNumber /></div>
             </div>
             <h3 className="mt-0.5 truncate font-display text-base leading-tight">{item.title}</h3>

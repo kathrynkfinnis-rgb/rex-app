@@ -18,7 +18,7 @@ import { Label } from "@/components/ui/label";
 import { CrownRatingInput } from "@/components/CrownRating";
 import { Loader2, Trash2 } from "lucide-react";
 import { toast } from "sonner";
-import { subcategoriesFor, categoryMeta, type ItemType } from "@/lib/categories";
+import { subcategoriesFor, categoryMeta, splitGenres, joinGenres, type ItemType } from "@/lib/categories";
 import { cn } from "@/lib/utils";
 import { RecipeEditor } from "@/components/RecipeEditor";
 import { PhotoUploader } from "@/components/PhotoUploader";
@@ -46,8 +46,8 @@ export function EditRecommendationDialog({
   const [photos, setPhotos] = useState<string[]>(initialPhotos);
   const [tags, setTags] = useState<string[]>(recommendation.tags ?? []);
   const subOptions = item ? subcategoriesFor(item.type) : [];
-  const [placeSub, setPlaceSub] = useState<string>(
-    item && (subOptions as readonly string[]).includes(item.genre ?? "") ? (item.genre as string) : "",
+  const [placeSubs, setPlaceSubs] = useState<string[]>(
+    splitGenres(item?.genre).filter((g: string) => (subOptions as readonly string[]).includes(g)),
   );
   const [recipeText, setRecipeText] = useState(item?.recipe_text ?? "");
   const [confirmDelete, setConfirmDelete] = useState(false);
@@ -90,7 +90,7 @@ export function EditRecommendationDialog({
         .eq("id", recommendation.id);
       if (error) throw error;
       if (item && subOptions.length > 0) {
-        const nextGenre = placeSub || null;
+        const nextGenre = joinGenres(placeSubs);
         if ((item.genre ?? null) !== nextGenre) {
           const { error: itemErr } = await supabase
             .from("items")
@@ -152,12 +152,12 @@ export function EditRecommendationDialog({
                 <Label>{isPlace ? "Type of place" : `Type of ${categoryMeta(item.type).label.toLowerCase()}`}</Label>
                 <div className="flex flex-wrap gap-2">
                   {subOptions.map((s) => {
-                    const active = placeSub === s;
+                    const active = placeSubs.includes(s);
                     return (
                       <button
                         key={s}
                         type="button"
-                        onClick={() => setPlaceSub(active ? "" : s)}
+                        onClick={() => setPlaceSubs((prev) => (prev.includes(s) ? prev.filter((p) => p !== s) : [...prev, s]))}
                         className={cn(
                           "rounded-full px-3 py-1.5 text-sm ring-1 transition-colors",
                           active

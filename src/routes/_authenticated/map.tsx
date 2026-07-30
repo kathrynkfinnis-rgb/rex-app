@@ -8,7 +8,7 @@ import { ClientOnly } from "@tanstack/react-router";
 import { lazy, Suspense, useEffect, useMemo, useRef, useState } from "react";
 import { useServerFn } from "@tanstack/react-start";
 import { geocodeMissingPlaces } from "@/lib/geocode.functions";
-import { CATEGORIES, categoryMeta, type ItemType } from "@/lib/categories";
+import { CATEGORIES, categoryMeta, splitGenres, hasGenre, type ItemType } from "@/lib/categories";
 
 const GoogleMap = lazy(() => import("@/components/GoogleMap").then((m) => ({ default: m.GoogleMap })));
 
@@ -63,7 +63,7 @@ function MapPage() {
 
   const subs = useMemo(() => {
     const set = new Set<string>();
-    byCat.forEach((p: any) => p.genre && set.add(p.genre));
+    byCat.forEach((p: any) => splitGenres(p.genre).forEach((g) => set.add(g)));
     return [...set].sort();
   }, [byCat]);
 
@@ -71,7 +71,7 @@ function MapPage() {
   const topIds = topSet ?? new Set<string>();
 
   const filtered = useMemo(() => {
-    const base = sub ? byCat.filter((p: any) => p.genre === sub) : byCat;
+    const base = sub ? byCat.filter((p: any) => hasGenre(p.genre, sub)) : byCat;
     if (!topOnly) return base;
     return base.filter((p: any) =>
       (p.recommendations ?? []).some((r: any) => topIds.has(r.user_id)),

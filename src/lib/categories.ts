@@ -98,3 +98,18 @@ export function normalizePlaceSubcategory(input: string | null | undefined): Pla
   if (/(gym|park|museum|gallery|cinema|theater|theatre|club|stadium|attraction)/.test(s)) return "Activity";
   return "Other";
 }
+
+// A single item can carry multiple subcategories, stored comma-separated in items.genre.
+export function splitGenres(genre: string | null | undefined): string[] {
+  if (!genre) return [];
+  return genre.split(",").map((g) => g.trim()).filter(Boolean);
+}
+
+export function joinGenres(genres: string[]): string | null {
+  const clean = Array.from(new Set(genres.map((g) => g.trim()).filter(Boolean)));
+  return clean.length ? clean.join(", ") : null;
+}
+
+export function hasGenre(genre: string | null | undefined, wanted: string): boolean {
+  return splitGenres(genre).some((g) => g.toLowerCase() === wanted.toLowerCase());
+}

@@ -3,7 +3,7 @@ import { useEffect, useMemo, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { supabase } from "@/integrations/supabase/client";
-import { CATEGORIES, categoryMeta, type ItemType } from "@/lib/categories";
+import { CATEGORIES, categoryMeta, splitGenres, hasGenre, type ItemType } from "@/lib/categories";
 import { RecommendationCard, type FeedRow } from "@/components/RecommendationCard";
 
 import { RequestCard, type RequestRow } from "@/components/RequestCard";
@@ -107,8 +107,7 @@ function FeedPage() {
     if (filter === "all" || filter === "asks" || !data) return [] as string[];
     const set = new Set<string>();
     for (const r of data) {
-      const g = r.items?.genre?.trim();
-      if (g) set.add(g);
+      for (const g of splitGenres(r.items?.genre)) set.add(g);
     }
     return Array.from(set).sort((a, b) => a.localeCompare(b));
   }, [data, filter]);
@@ -119,7 +118,7 @@ function FeedPage() {
       return (requests ?? []).map((r) => ({ kind: "req" as const, row: r, created_at: r.created_at }));
     }
     const recs = (data ?? [])
-      .filter((r) => subFilter === "all" || (r.items?.genre ?? "").toLowerCase() === subFilter.toLowerCase())
+      .filter((r) => subFilter === "all" || hasGenre(r.items?.genre, subFilter))
       .map((r) => ({ kind: "rec" as const, row: r, created_at: r.created_at }));
     const reqs = subFilter === "all"
       ? (requests ?? []).map((r) => ({ kind: "req" as const, row: r, created_at: r.created_at }))
