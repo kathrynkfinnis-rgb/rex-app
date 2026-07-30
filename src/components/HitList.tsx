@@ -251,7 +251,7 @@ export function HitList({ userId }: { userId: string }) {
     if (!newListFor || !newName.trim()) return;
     const { error } = await supabase.from("hitlist_lists").insert({
       user_id: userId,
-      item_type: newListFor,
+      item_type: "mixed",
       name: newName.trim(),
       visibility: newVisibility,
     });
