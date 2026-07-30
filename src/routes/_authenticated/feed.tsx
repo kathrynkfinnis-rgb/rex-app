@@ -36,6 +36,7 @@ function FeedPage() {
   const [rawQuery, setRawQuery] = useState("");
   const [query, setQuery] = useState("");
   const [searchScope, setSearchScope] = useState<SearchScope>("all");
+  const [showFilters, setShowFilters] = useState(false);
 
   // Live updates: refetch the feed and asks whenever anything changes.
   useEffect(() => {
