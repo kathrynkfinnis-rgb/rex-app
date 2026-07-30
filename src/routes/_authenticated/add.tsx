@@ -213,6 +213,8 @@ function AddPage() {
           <p className="mt-2 text-muted-foreground">
             {justAdded.isTrip
               ? `"${justAdded.title}" is live — now add the places you loved on it.`
+              : justAdded.inTrip
+              ? `"${justAdded.title}" is now a Rex of its own and a stop on your trip.`
               : `"${justAdded.title}" is in your feed.`}
           </p>
         </div>
@@ -223,7 +225,26 @@ function AddPage() {
                 onClick={() => navigate({ to: "/trip/$id", params: { id: justAdded.recId } })}
                 className="h-14 w-full rounded-full text-base font-semibold shadow-lg shadow-primary/30"
               >
-                Add places to this trip
+                Add Rex to this trip
+              </Button>
+              <Button variant="ghost" onClick={() => navigate({ to: "/feed" })} className="h-12 w-full rounded-full">
+                Back to feed
+              </Button>
+            </>
+          ) : justAdded.inTrip ? (
+            <>
+              <Button
+                onClick={resetForm}
+                className="h-14 w-full rounded-full text-base font-semibold shadow-lg shadow-primary/30"
+              >
+                Add another Rex to this trip
+              </Button>
+              <Button
+                variant="outline"
+                onClick={() => navigate({ to: "/trip/$id", params: { id: tripId! } })}
+                className="h-12 w-full rounded-full"
+              >
+                View trip
               </Button>
               <Button variant="ghost" onClick={() => navigate({ to: "/feed" })} className="h-12 w-full rounded-full">
                 Back to feed
