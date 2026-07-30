@@ -179,8 +179,6 @@ function ItemPage() {
         </Button>
       </section>
 
-      <ItemEnrichment itemId={id} />
-
       <section className="border-t border-border p-5">
         <h2 className="font-display text-2xl">What friends say</h2>
         {recs.length === 0 && <p className="mt-2 text-sm text-muted-foreground">No takes yet.</p>}
@@ -229,6 +227,8 @@ function ItemPage() {
           </>
         )}
       </section>
+
+      <ItemEnrichment itemId={id} />
     </div>
   );
 }
