@@ -222,7 +222,10 @@ function FriendsPage() {
         </Button>
       </div>
 
+      {uid && <GroupsSection userId={uid} />}
+
       {suggestions && suggestions.length > 0 && (
+
         <Section title="People you may know">
           {suggestions.map((p: any) => {
             const already = (friendships ?? []).some(
