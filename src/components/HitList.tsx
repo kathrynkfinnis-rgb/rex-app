@@ -501,7 +501,7 @@ export function HitList({ userId }: { userId: string }) {
 
             <EntryList
               entries={defaults}
-              lists={subs}
+              lists={[...subs, ...mixedLists]}
               cat={cat}
               currentUserId={userId}
               people={people}
