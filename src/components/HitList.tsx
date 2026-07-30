@@ -585,7 +585,7 @@ export function HitList({ userId }: { userId: string }) {
                   {inList.length > 0 ? (
                     <EntryList
                       entries={inList}
-                      lists={subs}
+                      lists={[...subs, ...mixedLists]}
                       cat={cat}
                       currentUserId={userId}
                       people={people}
