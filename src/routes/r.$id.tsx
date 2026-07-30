@@ -1,4 +1,5 @@
 import { createFileRoute, Link, notFound } from "@tanstack/react-router";
+import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { CrownRatingDisplay } from "@/components/CrownRating";
 import { categoryMeta, type ItemType } from "@/lib/categories";
@@ -77,6 +78,12 @@ export const Route = createFileRoute("/r/$id")({
 function SharePage() {
   const { rec } = Route.useLoaderData();
   const { id } = Route.useParams();
+  const { data: session, isPending } = useQuery({
+    queryKey: ["share-session"],
+    queryFn: async () => (await supabase.auth.getSession()).data.session,
+    staleTime: 60_000,
+  });
+  const signedIn = !!session;
   const cat = categoryMeta(rec.item_type);
   const Icon = cat.icon;
   const who = rec.author_display_name || rec.author_username || "A friend";
@@ -133,27 +140,37 @@ function SharePage() {
           </div>
         </div>
 
-        <div className="rounded-3xl bg-primary/10 p-5 text-center ring-1 ring-primary/20">
-          <div className="text-lg font-semibold">Get more Rex like this on REX 🦖</div>
-          <p className="mt-1 text-sm text-muted-foreground">
-            The little book of books, films, shows, restaurants & places your friends actually love.
-          </p>
-          <div className="mt-4 grid gap-2">
-            <Link
-              to="/auth"
-              search={{ mode: "signup", ref: rec.author_username ?? undefined } as any}
-              className="block rounded-full bg-primary px-5 py-3 text-center font-semibold text-primary-foreground shadow-sm active:scale-[0.99]"
-            >
-              Join REX {rec.author_username ? `& follow @${rec.author_username}` : "free"}
-            </Link>
-            <Link
-              to="/auth"
-              className="block rounded-full border border-border bg-background px-5 py-3 text-center text-sm font-medium"
-            >
-              I already have an account
-            </Link>
+        {isPending ? null : signedIn ? (
+          <Link
+            to="/item/$id"
+            params={{ id: rec.item_id }}
+            className="block rounded-full bg-primary px-5 py-3 text-center font-semibold text-primary-foreground shadow-sm active:scale-[0.99]"
+          >
+            Open in REX 🦖
+          </Link>
+        ) : (
+          <div className="rounded-3xl bg-primary/10 p-5 text-center ring-1 ring-primary/20">
+            <div className="text-lg font-semibold">Get more Rex like this on REX 🦖</div>
+            <p className="mt-1 text-sm text-muted-foreground">
+              The little book of books, films, shows, restaurants & places your friends actually love.
+            </p>
+            <div className="mt-4 grid gap-2">
+              <Link
+                to="/auth"
+                search={{ mode: "signup", ref: rec.author_username ?? undefined } as any}
+                className="block rounded-full bg-primary px-5 py-3 text-center font-semibold text-primary-foreground shadow-sm active:scale-[0.99]"
+              >
+                Join REX {rec.author_username ? `& follow @${rec.author_username}` : "free"}
+              </Link>
+              <Link
+                to="/auth"
+                className="block rounded-full border border-border bg-background px-5 py-3 text-center text-sm font-medium"
+              >
+                I already have an account
+              </Link>
+            </div>
           </div>
-        </div>
+        )}
 
         <div className="flex justify-center pt-1">
           <ShareButton url={shareUrl} text={shareText} label="Share this rec" />
