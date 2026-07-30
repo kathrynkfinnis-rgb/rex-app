@@ -154,6 +154,18 @@ function MapPage() {
           </div>
         )}
 
+        {topIds.size > 0 && (
+          <div className="mt-2">
+            <button
+              className={`${chip(topOnly)} inline-flex items-center gap-1.5`}
+              onClick={() => setTopOnly((v) => !v)}
+            >
+              <Star className={topOnly ? "h-3.5 w-3.5 fill-current" : "h-3.5 w-3.5"} />
+              Top friends only
+            </button>
+          </div>
+        )}
+
         {subs.length > 0 && (
           <div className="-mx-5 mt-2 flex gap-2 overflow-x-auto px-5 pb-0.5 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
             {subs.map((s) => (
@@ -179,11 +191,14 @@ function MapPage() {
         <ClientOnly fallback={<div className="h-full w-full animate-pulse bg-muted" />}>
           <Suspense fallback={<div className="h-full w-full animate-pulse bg-muted" />}>
             <GoogleMap
-              key={`${cat}-${sub ?? ""}`}
+              key={`${cat}-${sub ?? ""}-${topOnly ? "top" : "all"}`}
               radiusMiles={10}
               places={withLoc.map((p: any) => {
-                const recs = (p.recommendations ?? []) as any[];
-                const top = [...recs].sort((a, b) => (b.rating ?? 0) - (a.rating ?? 0))[0];
+                const recs = [...((p.recommendations ?? []) as any[])].sort(
+                  (a, b) => (b.rating ?? 0) - (a.rating ?? 0),
+                );
+                // A top friend's Rex owns the pin when they've recommended this spot.
+                const top = recs.find((r: any) => topIds.has(r.user_id)) ?? recs[0];
                 return {
                   id: p.id,
                   title: p.title,
@@ -196,6 +211,7 @@ function MapPage() {
                   note: top?.note ?? null,
                 };
               })}
+
 
               onSelect={(id) => navigate({ to: "/item/$id", params: { id } })}
             />
