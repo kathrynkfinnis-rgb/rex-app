@@ -285,15 +285,22 @@ function AddPage() {
       <div>
         <header className="border-b border-border bg-background px-5 pb-4 pt-[calc(env(safe-area-inset-top)+1rem)]">
           <button
-            onClick={() => navigate({ to: "/feed" })}
+            onClick={() => (tripId ? navigate({ to: "/trip/$id", params: { id: tripId } }) : navigate({ to: "/feed" }))}
             className="flex items-center gap-2 text-sm text-muted-foreground"
           >
-            <ArrowLeft className="h-4 w-4" /> Back
+            <ArrowLeft className="h-4 w-4" /> {tripId ? "Back to trip" : "Back"}
           </button>
-          <h1 className="mt-3 font-display text-3xl">What are you Rexing?</h1>
+          <h1 className="mt-3 font-display text-3xl">
+            {tripId ? "What are you adding to this trip?" : "What are you Rexing?"}
+          </h1>
+          {tripId && (
+            <p className="mt-1 text-sm text-muted-foreground">
+              Restaurants, museums, bars, hotels — each becomes its own Rex and a stop on the trip.
+            </p>
+          )}
         </header>
         <div className="grid grid-cols-2 gap-2 p-4 pb-2">
-          {CATEGORIES.map((c) => (
+          {CATEGORIES.filter((c) => !(tripId && c.type === "trip")).map((c) => (
             <button
               key={c.type}
               onClick={() => setType(c.type)}
