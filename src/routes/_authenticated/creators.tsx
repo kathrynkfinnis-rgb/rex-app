@@ -124,7 +124,7 @@ function CreatorsPage() {
                     <p className="font-medium truncate">{creator.name}</p>
                     <p className="text-xs text-muted-foreground truncate">
                       @{creator.slug}
-                      {creator.rec_count > 0 && ` · ${creator.rec_count} recommendation${creator.rec_count === 1 ? "" : "s"}`}
+                      {creator.rec_count > 0 && ` · ${creator.rec_count} Rex${creator.rec_count === 1 ? "" : "es"}`}
                     </p>
                   </div>
                 </div>

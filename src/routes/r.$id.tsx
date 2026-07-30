@@ -36,8 +36,8 @@ export const Route = createFileRoute("/r/$id")({
     if (!rec) {
       return {
         meta: [
-          { title: "REX — a recommendation from a friend" },
-          { name: "description", content: "See what your friends are recommending on REX." },
+          { title: "REX — a Rex from a friend" },
+          { name: "description", content: "See what your friends are Rexing on REX." },
         ],
       };
     }
@@ -46,7 +46,7 @@ export const Route = createFileRoute("/r/$id")({
     const title = `${who} rates ${rec.item_title} ${rec.rating}/10 👑`;
     const desc = rec.note
       ? `"${rec.note.replace(/\s+/g, " ").slice(0, 155)}"`
-      : `A ${cat.label.toLowerCase()} recommendation on REX 🦖 — the little book of things your friends actually love.`;
+      : `A ${cat.label.toLowerCase()} Rex on REX 🦖 — the little book of things your friends actually love.`;
     const image =
       (rec.photo_urls && rec.photo_urls[0]) || rec.photo_url || rec.item_image_url || undefined;
     const url = `${SITE}/r/${params.id}`;
@@ -134,7 +134,7 @@ function SharePage() {
         </div>
 
         <div className="rounded-3xl bg-primary/10 p-5 text-center ring-1 ring-primary/20">
-          <div className="text-lg font-semibold">Get more recs like this on REX 🦖</div>
+          <div className="text-lg font-semibold">Get more Rexes like this on REX 🦖</div>
           <p className="mt-1 text-sm text-muted-foreground">
             The little book of books, films, shows, restaurants & places your friends actually love.
           </p>

@@ -13,7 +13,7 @@ export const Route = createFileRoute("/_authenticated/map")({
   head: () => ({
     meta: [
       { title: "Map — REX" },
-      { name: "description", content: "Places your friends recommend, on a map." },
+      { name: "description", content: "Places your friends Rex, on a map." },
     ],
   }),
   component: MapPage,
@@ -74,7 +74,7 @@ function MapPage() {
         <div className="flex items-start justify-between gap-3">
           <div>
             <h1 className="font-display text-3xl">Places</h1>
-            <p className="mt-1 text-sm text-muted-foreground">Restaurants and spots your friends recommend.</p>
+            <p className="mt-1 text-sm text-muted-foreground">Restaurants and spots your friends Rex.</p>
           </div>
           {withoutLoc.length > 0 && (
             <button
@@ -95,7 +95,7 @@ function MapPage() {
           <div className="flex h-full flex-col items-center justify-center gap-2 text-center px-6">
             <Compass className="h-8 w-8 text-primary" />
             <p className="max-w-xs text-sm text-muted-foreground">
-              A map view lights up here once you add place recommendations with a location.
+              A map view lights up here once you add place Rexes with a location.
             </p>
           </div>
         ) : (

@@ -43,7 +43,7 @@ export function AlsoRecommendedBy({
 
   return (
     <p className="border-t border-border px-3 py-1.5 text-[11px] text-muted-foreground">
-      Also recommended by{" "}
+      Also Rexed by{" "}
       {shown.map((p, i) => (
         <span key={p.username}>
           {i > 0 && (i === shown.length - 1 && extra === 0 ? " and " : ", ")}

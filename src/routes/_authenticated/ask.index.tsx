@@ -14,7 +14,7 @@ export const Route = createFileRoute("/_authenticated/ask/")({
   head: () => ({
     meta: [
       { title: "Ask friends — REX" },
-      { name: "description", content: "Ask your friends for a recommendation." },
+      { name: "description", content: "Ask your friends for a Rex." },
     ],
   }),
   component: AskPage,
@@ -62,7 +62,7 @@ function AskPage() {
           <h1 className="font-display text-3xl">Ask friends</h1>
         </div>
         <p className="mt-2 text-sm text-muted-foreground">
-          Put out a blast for a recommendation — friends will see it in their feed and can chime in.
+          Put out a blast for a Rex — friends will see it in their feed and can chime in.
         </p>
       </header>
 

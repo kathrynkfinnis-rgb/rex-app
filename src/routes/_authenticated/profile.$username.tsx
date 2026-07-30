@@ -9,7 +9,7 @@ export const Route = createFileRoute("/_authenticated/profile/$username")({
   head: ({ params }) => ({
     meta: [
       { title: `@${params.username} — REX` },
-      { name: "description", content: `Recommendations from @${params.username} on REX.` },
+      { name: "description", content: `Rexes from @${params.username} on REX.` },
     ],
   }),
   component: ProfilePage,
@@ -79,7 +79,7 @@ function ProfilePage() {
               <p className="truncate text-sm text-muted-foreground">@{profile.username}</p>
               {recs && recs.length > 0 && (
                 <div className="mt-2 flex items-center gap-3 text-sm text-muted-foreground">
-                  <span>{recs.length} rec{recs.length === 1 ? "" : "s"}</span>
+                  <span>{recs.length} Rex{recs.length === 1 ? "" : "es"}</span>
                   {avgRating != null && (
                     <span className="flex items-center gap-1">
                       avg <CrownRatingDisplay value={Math.round(avgRating)} size="xs" showNumber />
@@ -95,7 +95,7 @@ function ProfilePage() {
       {profile && (
         <section className="p-4">
           <h2 className="mb-3 text-xs font-semibold uppercase tracking-widest text-muted-foreground">
-            Recommendations
+            Rexes
           </h2>
           {loadingRecs ? (
             <div className="h-40 animate-pulse rounded-2xl bg-muted" />

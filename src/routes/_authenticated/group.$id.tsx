@@ -176,7 +176,7 @@ function GroupPage() {
           <div className="rounded-2xl bg-card p-6 text-center ring-1 ring-border">
             <Users className="mx-auto mb-2 h-6 w-6 text-muted-foreground" />
             <p className="text-sm text-muted-foreground">
-              Nothing shared yet — tap the group icon on any recommendation to send it here.
+              Nothing shared yet — tap the group icon on any Rex to send it here.
             </p>
           </div>
         ) : (
