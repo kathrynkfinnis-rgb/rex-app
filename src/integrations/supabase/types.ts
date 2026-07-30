@@ -312,6 +312,38 @@ export type Database = {
         }
         Relationships: []
       }
+      list_collaborators: {
+        Row: {
+          added_by: string
+          created_at: string
+          id: string
+          list_id: string
+          user_id: string
+        }
+        Insert: {
+          added_by: string
+          created_at?: string
+          id?: string
+          list_id: string
+          user_id: string
+        }
+        Update: {
+          added_by?: string
+          created_at?: string
+          id?: string
+          list_id?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "list_collaborators_list_id_fkey"
+            columns: ["list_id"]
+            isOneToOne: false
+            referencedRelation: "hitlist_lists"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       notification_preferences: {
         Row: {
           blast_comment: boolean
@@ -757,6 +789,10 @@ export type Database = {
       admin_kpis_engagement: { Args: never; Returns: Json }
       admin_kpis_users: { Args: never; Returns: Json }
       are_friends: { Args: { _a: string; _b: string }; Returns: boolean }
+      can_edit_list: {
+        Args: { _list: string; _user: string }
+        Returns: boolean
+      }
       get_shared_recommendation: {
         Args: { rec_id: string }
         Returns: {
@@ -782,6 +818,10 @@ export type Database = {
           _role: Database["public"]["Enums"]["app_role"]
           _user_id: string
         }
+        Returns: boolean
+      }
+      is_list_owner: {
+        Args: { _list: string; _user: string }
         Returns: boolean
       }
       notif_pref_enabled: {
