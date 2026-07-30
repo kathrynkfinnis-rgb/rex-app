@@ -54,12 +54,9 @@ export function WantButton({
     try {
       const { error } = await supabase.from("wants").insert({ user_id: uid, item_id: itemId });
       if (error) throw error;
-      toast.success(`Added to My Lists — ${cat.hitDefaultLabel.toLowerCase()}`, {
-        description: "Filed under your default list.",
-        action: { label: "Choose list", onClick: () => setPickerOpen(true) },
-      });
-      qc.invalidateQueries({ queryKey: ["want", itemId, uid] });
+      await qc.invalidateQueries({ queryKey: ["want", itemId, uid] });
       qc.invalidateQueries({ queryKey: ["my-wants", uid] });
+      setPickerOpen(true);
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "Couldn't save");
     } finally {
