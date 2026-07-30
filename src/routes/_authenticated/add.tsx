@@ -368,6 +368,21 @@ function AddPage() {
       </header>
 
       <div className="space-y-5 p-5">
+        {tripId && (
+          <div className="rounded-2xl bg-primary/10 p-3 text-sm ring-1 ring-primary/30">
+            🧳 This Rex will be added as a stop on your trip.
+          </div>
+        )}
+        {type === "trip" && (
+          <div className="rounded-2xl bg-primary/10 p-4 text-sm ring-1 ring-primary/30">
+            <p className="font-display text-base">What's a trip?</p>
+            <p className="mt-1 text-muted-foreground">
+              Name the trip (e.g. &ldquo;Lisbon, 3 days&rdquo;) and post it. You'll then add each place you loved as a
+              stop — friends see one trip card in the feed and can tap in for the full itinerary.
+            </p>
+          </div>
+        )}
+
         {needsSearch && !showForm && (
           <SearchPicker
             type={type}
