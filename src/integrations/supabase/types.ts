@@ -113,29 +113,32 @@ export type Database = {
         Row: {
           created_at: string
           id: string
+          is_anonymous: boolean
           kind: string
           message: string
           page: string | null
           status: string
-          user_id: string
+          user_id: string | null
         }
         Insert: {
           created_at?: string
           id?: string
+          is_anonymous?: boolean
           kind?: string
           message: string
           page?: string | null
           status?: string
-          user_id: string
+          user_id?: string | null
         }
         Update: {
           created_at?: string
           id?: string
+          is_anonymous?: boolean
           kind?: string
           message?: string
           page?: string | null
           status?: string
-          user_id?: string
+          user_id?: string | null
         }
         Relationships: []
       }

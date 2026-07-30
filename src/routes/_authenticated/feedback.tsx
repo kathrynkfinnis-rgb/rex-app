@@ -1,12 +1,16 @@
 import { useState } from "react";
 import { createFileRoute, Link, useRouteContext } from "@tanstack/react-router";
+import { useServerFn } from "@tanstack/react-start";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { ChevronLeft, MessageSquarePlus, Bug, Lightbulb, Heart } from "lucide-react";
+import { ChevronLeft, MessageSquarePlus, Bug, Lightbulb, Heart, EyeOff } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
+import { Switch } from "@/components/ui/switch";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
+import { sendAnonymousFeedback } from "@/lib/feedback.functions";
+
 
 export const Route = createFileRoute("/_authenticated/feedback")({
   head: () => ({
@@ -33,6 +37,8 @@ function FeedbackPage() {
   const qc = useQueryClient();
   const [kind, setKind] = useState<string>("idea");
   const [message, setMessage] = useState("");
+  const [anonymous, setAnonymous] = useState(false);
+  const sendAnon = useServerFn(sendAnonymousFeedback);
 
   const { data: mine = [] } = useQuery({
     queryKey: ["feedback", user.id],
@@ -50,21 +56,27 @@ function FeedbackPage() {
 
   const send = useMutation({
     mutationFn: async () => {
+      const page = typeof window !== "undefined" ? window.location.pathname : null;
+      if (anonymous) {
+        await sendAnon({ data: { kind: kind as "idea" | "bug" | "love", message: message.trim(), page } });
+        return;
+      }
       const { error } = await supabase.from("feedback").insert({
         user_id: user.id,
         kind,
         message: message.trim(),
-        page: typeof window !== "undefined" ? window.location.pathname : null,
+        page,
       });
       if (error) throw error;
     },
     onSuccess: () => {
       setMessage("");
-      toast.success("Thanks — feedback sent 🦖");
+      toast.success(anonymous ? "Sent anonymously — thank you 🦖" : "Thanks — feedback sent 🦖");
       qc.invalidateQueries({ queryKey: ["feedback", user.id] });
     },
     onError: () => toast.error("Couldn't send that, try again"),
   });
+
 
   return (
     <div className="px-4 pb-24 pt-20">
@@ -102,9 +114,25 @@ function FeedbackPage() {
         value={message}
         onChange={(e) => setMessage(e.target.value)}
         rows={5}
+        maxLength={2000}
         placeholder="What's on your mind?"
         className="mb-3"
       />
+
+      <div className="mb-3 flex items-start gap-3 rounded-xl border border-border bg-card p-3">
+        <EyeOff className="mt-0.5 h-4 w-4 shrink-0 text-muted-foreground" />
+        <div className="min-w-0 flex-1">
+          <label htmlFor="anon" className="text-sm font-medium">
+            Send anonymously
+          </label>
+          <p className="text-xs text-muted-foreground">
+            {anonymous
+              ? "Your name won't be stored with this message — it also won't appear in your feedback list below."
+              : "Your name is attached so we can follow up."}
+          </p>
+        </div>
+        <Switch id="anon" checked={anonymous} onCheckedChange={setAnonymous} />
+      </div>
 
       <Button
         className="w-full"
@@ -112,8 +140,9 @@ function FeedbackPage() {
         onClick={() => send.mutate()}
       >
         <MessageSquarePlus className="mr-2 h-4 w-4" />
-        {send.isPending ? "Sending…" : "Send feedback"}
+        {send.isPending ? "Sending…" : anonymous ? "Send anonymously" : "Send feedback"}
       </Button>
+
 
       {mine.length > 0 && (
         <section className="mt-8">
