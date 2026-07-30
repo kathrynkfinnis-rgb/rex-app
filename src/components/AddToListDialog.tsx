@@ -104,7 +104,7 @@ export function AddToListDialog({
     const { error } = await supabase.from(table).delete().eq("id", entryId);
     setBusy(false);
     if (error) return toast.error(error.message);
-    toast.success("Removed from My List");
+    toast.success("Removed from My Lists");
     refresh();
     onOpenChange(false);
   }
@@ -162,7 +162,7 @@ export function AddToListDialog({
           disabled={busy}
           className="mx-auto flex items-center gap-1.5 text-xs text-muted-foreground hover:text-destructive"
         >
-          <Trash2 className="h-3.5 w-3.5" /> Remove from My List
+          <Trash2 className="h-3.5 w-3.5" /> Remove from My Lists
         </button>
       </DialogContent>
     </Dialog>

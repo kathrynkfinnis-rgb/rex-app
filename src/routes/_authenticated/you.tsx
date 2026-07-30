@@ -191,7 +191,7 @@ function YouPage() {
           <h2 className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">
             Your Rexes
           </h2>
-          <Link to="/me" className="text-xs font-medium text-primary">My List →</Link>
+          <Link to="/me" className="text-xs font-medium text-primary">My Lists →</Link>
         </div>
         {loadingRecs ? (
           <div className="h-40 animate-pulse rounded-2xl bg-muted" />
