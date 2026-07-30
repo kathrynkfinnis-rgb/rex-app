@@ -131,7 +131,7 @@ export function AddToListDialog({
         <DialogHeader className="text-left">
           <DialogTitle className="font-display text-2xl">Where should it go?</DialogTitle>
           <DialogDescription className="truncate">
-            {title ? `Saved “${title}”` : `Saved to your ${cat.label.toLowerCase()} list`}
+            {title ? `Saved "${title}"` : `Saved to your ${cat.label.toLowerCase()} collection`}
           </DialogDescription>
         </DialogHeader>
 
@@ -145,7 +145,7 @@ export function AddToListDialog({
 
           {catLists.length > 0 && (
             <p className="px-1 pt-2 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
-              Your {cat.plural.toLowerCase()} lists
+              Your {cat.plural.toLowerCase()} collections
             </p>
           )}
           {catLists.map((l) => (
@@ -160,7 +160,7 @@ export function AddToListDialog({
 
           {mixedLists.length > 0 && (
             <p className="px-1 pt-2 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
-              Mixed lists
+              Mixed collections
             </p>
           )}
           {mixedLists.map((l) => (
@@ -180,8 +180,8 @@ export function AddToListDialog({
               autoFocus
               value={newName}
               onChange={(e) => setNewName(e.target.value)}
-              placeholder={`e.g. Tokyo ${cat.plural.toLowerCase()}`}
-              onKeyDown={(e) => e.key === "Enter" && createAndMove()}
+                placeholder={`e.g. Tokyo ${cat.plural.toLowerCase()}`}
+                onKeyDown={(e) => e.key === "Enter" && createAndMove()}
             />
             <button
               type="button"
