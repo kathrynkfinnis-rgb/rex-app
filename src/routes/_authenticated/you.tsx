@@ -261,9 +261,12 @@ function YouPage() {
           <LogOut className="h-4 w-4" /> Sign out
         </Button>
       </div>
+
+      <ActivityDetailDialog kind={detail} userId={user?.id} onClose={() => setDetail(null)} />
     </div>
   );
 }
+
 
 function Stat({ label, value }: { label: string; value: number | string }) {
   return (
