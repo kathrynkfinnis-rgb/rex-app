@@ -12,7 +12,7 @@ export const geocodeMissingPlaces = createServerFn({ method: "POST" })
   .handler(async ({ data, context }) => {
     const lovable = process.env.LOVABLE_API_KEY;
     const gmk = process.env.GOOGLE_MAPS_API_KEY;
-    if (!lovable || !gmk) return { updated: 0, checked: 0, reason: "no_key" as const };
+    if (!lovable || !gmk) return { updated: 0, checked: 0, remaining: 0, reason: "no_key" as const };
 
     const { supabase } = context;
     const limit = data.limit ?? 25;
