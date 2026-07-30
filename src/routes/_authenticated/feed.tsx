@@ -594,6 +594,22 @@ function ScopeChip({ active, onClick, children }: { active: boolean; onClick: ()
   );
 }
 
+function StackedChip({ active, onClick, children }: { active: boolean; onClick: () => void; children: React.ReactNode }) {
+  return (
+    <button
+      onClick={onClick}
+      className={cn(
+        "flex items-center justify-center gap-1.5 rounded-xl border px-3 py-2.5 text-sm font-medium transition-colors text-center",
+        active
+          ? "border-primary bg-primary text-primary-foreground"
+          : "border-border bg-background text-foreground hover:bg-muted/40",
+      )}
+    >
+      {children}
+    </button>
+  );
+}
+
 function SkeletonCard() {
 
   return <div className="h-40 animate-pulse rounded-2xl bg-muted" />;
