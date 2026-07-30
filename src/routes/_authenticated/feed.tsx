@@ -13,8 +13,6 @@ import { Input } from "@/components/ui/input";
 import { UserPlus, Mic, Plus, Search, X, User, Sparkles, ListChecks as ListIcon, Lock, Users as UsersIcon, Globe2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { searchProfiles } from "@/lib/friends.functions";
-import { searchBooks, searchMovies, searchTv, searchPodcasts, type SearchHit } from "@/lib/search.functions";
-import { searchPlaces, type PlaceHit } from "@/lib/places.functions";
 
 type SearchScope = "all" | "people" | "lists" | ItemType;
 
