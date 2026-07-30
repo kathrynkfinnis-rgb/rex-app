@@ -73,9 +73,8 @@ function SharedCollectionsPage() {
                 {c.owner_username && (
                   <span className="inline-flex items-center gap-1">
                     <UserAvatar
-                      username={c.owner_username}
-                      displayName={c.owner_display_name}
-                      avatarUrl={c.owner_avatar_url}
+                      url={c.owner_avatar_url}
+                      name={c.owner_display_name ?? c.owner_username}
                       size="xs"
                     />
                     @{c.owner_username}

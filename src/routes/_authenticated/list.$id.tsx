@@ -1,5 +1,6 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
+import { useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { categoryMeta, type ItemType } from "@/lib/categories";
 import { ArrowLeft, Globe2, Lock, Users } from "lucide-react";
