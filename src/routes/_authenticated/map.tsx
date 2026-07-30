@@ -36,7 +36,7 @@ function MapPage() {
     queryFn: async () => {
       const { data, error } = await supabase
         .from("items")
-        .select("id, title, subtitle, type, genre, address, lat, lng, image_url, recommendations(id, rating, user_id, profiles(display_name, username))")
+        .select("id, title, subtitle, type, genre, address, lat, lng, image_url, recommendations(id, rating, note, user_id, profiles(display_name, username, avatar_url))")
         .in("type", ["place", "event"])
         .order("created_at", { ascending: false })
         .limit(200);
