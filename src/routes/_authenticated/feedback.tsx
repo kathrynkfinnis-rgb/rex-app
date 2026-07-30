@@ -139,7 +139,7 @@ function FeedbackPage() {
         disabled={!message.trim() || send.isPending}
         onClick={() => send.mutate()}
       >
-        <MessageSquarePlus className="mr-2 h-4 w-4" />
+        <MessageSquareText className="mr-2 h-4 w-4" />
         {send.isPending ? "Sending…" : anonymous ? "Send anonymously" : "Send feedback"}
       </Button>
 
