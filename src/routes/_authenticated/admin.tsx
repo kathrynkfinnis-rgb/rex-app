@@ -176,7 +176,7 @@ function AdminPage() {
           <Kpi label="Pending requests" value={e?.friendships_pending} />
           <Kpi label="Accept rate" value={e?.friend_accept_rate != null ? `${e.friend_accept_rate}%` : undefined} />
           <Kpi label="Avg friends / user" value={e?.avg_friends} />
-          <Kpi label="Lists created" value={e?.lists_total} sub={`${e?.lists_published ?? 0} published`} />
+          <Kpi label="Collections created" value={e?.lists_total} sub={`${e?.lists_published ?? 0} published`} />
           <Kpi label="Want-to saves" value={e?.wants_total} />
           <Kpi label="Catalog items" value={e?.items_total} />
           <Kpi label="Bulk imports" value={e?.imports_total} />

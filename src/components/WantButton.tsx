@@ -78,7 +78,7 @@ export function WantButton({
         )}
       >
         {active ? <BookmarkCheck className="h-4 w-4" /> : <Bookmark className="h-4 w-4" />}
-        {active ? "On your list — change" : verb}
+        {active ? "On your collection — change" : verb}
       </Button>
 
       <AddToListDialog

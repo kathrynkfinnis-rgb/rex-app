@@ -397,7 +397,7 @@ function ImportPage() {
                   rel="noreferrer"
                   className="underline"
                 >
-                  Google Takeout → Saved Places / Lists
+                  Google Takeout → Saved Places / Collections
                 </a>
               </div>
               <input

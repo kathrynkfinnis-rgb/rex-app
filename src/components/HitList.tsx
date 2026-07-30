@@ -261,7 +261,7 @@ export function HitList({ userId }: { userId: string }) {
     const table = entry.kind === "want" ? "wants" : "saved_posts";
     const { error } = await supabase.from(table).delete().eq("id", entry.id);
     if (error) return toast.error(error.message);
-    toast.success("Removed from My Lists");
+    toast.success("Removed from My Collections");
     invalidateEntries();
   }
 
@@ -274,7 +274,7 @@ export function HitList({ userId }: { userId: string }) {
       visibility: newVisibility,
     });
     if (error) return toast.error(error.message);
-    toast.success("List created");
+    toast.success("Collection created");
     setNewListFor(null);
     setNewName("");
     setNewVisibility("draft");
@@ -286,7 +286,7 @@ export function HitList({ userId }: { userId: string }) {
     if (error) return toast.error(error.message);
     toast.success(
       visibility === "draft"
-        ? "List moved back to draft"
+        ? "Collection moved back to draft"
         : visibility === "friends"
         ? "Shared with friends"
         : "Published — anyone on REX can see it",
@@ -297,7 +297,7 @@ export function HitList({ userId }: { userId: string }) {
   async function deleteList(list: ListRow) {
     const { error } = await supabase.from("hitlist_lists").delete().eq("id", list.id);
     if (error) return toast.error(error.message);
-    toast.success("List deleted");
+    toast.success("Collection deleted");
     qc.invalidateQueries({ queryKey: ["my-hitlist-lists", userId] });
     invalidateEntries();
   }
@@ -336,7 +336,7 @@ export function HitList({ userId }: { userId: string }) {
               className="h-7 gap-1 rounded-full px-2.5 text-xs"
               onClick={() => startNewList(filter === "all" || filter === "mixed" ? "mixed" : filter)}
             >
-              <Plus className="h-3.5 w-3.5" /> New list
+              <Plus className="h-3.5 w-3.5" /> New collection
             </Button>
           </div>
         </div>
@@ -345,17 +345,17 @@ export function HitList({ userId }: { userId: string }) {
       {isEmpty ? (
         <div className="rounded-2xl border border-dashed border-border p-5 text-center">
           <p className="text-sm text-muted-foreground">
-            Nothing on your list yet — tap the bookmark on any post, or hit "Want to…" on an item page.
+            Nothing in your collection yet — tap the bookmark on any post, or hit "Want to…" on an item page.
           </p>
-          <p className="mt-3 text-sm text-muted-foreground">Or start a list from scratch:</p>
+          <p className="mt-3 text-sm text-muted-foreground">Or start a collection from scratch:</p>
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <Button size="sm" className="mt-3 gap-1 rounded-full">
-                <Plus className="h-4 w-4" /> New list
+                <Plus className="h-4 w-4" /> New collection
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="center" className="max-h-72 overflow-y-auto">
-              <DropdownMenuLabel>What kind of list?</DropdownMenuLabel>
+              <DropdownMenuLabel>What kind of collection?</DropdownMenuLabel>
               <DropdownMenuSeparator />
               <DropdownMenuItem onClick={() => startNewList("mixed")}>
                 <span className="mr-2">✨</span> Mix of everything
@@ -375,7 +375,7 @@ export function HitList({ userId }: { userId: string }) {
       {showMixed && (
         <div className="space-y-3">
           <h3 className="font-display text-lg">
-            <span className="mr-2">✨</span>Mixed lists
+            <span className="mr-2">✨</span>Mixed collections
           </h3>
           {mixedLists.map((list) => {
             const inList = entries.filter((e) => e.listId === list.id);
@@ -417,7 +417,7 @@ export function HitList({ userId }: { userId: string }) {
                             </button>
                           </DropdownMenuTrigger>
                           <DropdownMenuContent align="end">
-                            <DropdownMenuLabel>Who can see this list</DropdownMenuLabel>
+                            <DropdownMenuLabel>Who can see this collection</DropdownMenuLabel>
                             {(["draft", "friends", "public"] as Visibility[]).map((v) => {
                               const M = VISIBILITY_META[v];
                               const I = M.icon;
@@ -440,7 +440,7 @@ export function HitList({ userId }: { userId: string }) {
                             if (confirm(`Delete list "${list.name}"? Items go back to default.`)) deleteList(list);
                           }}
                           className="rounded-full p-1.5 text-muted-foreground hover:bg-muted hover:text-destructive"
-                          aria-label="Delete list"
+                          aria-label="Delete collection"
                         >
                           <Trash2 className="h-3.5 w-3.5" />
                         </button>
@@ -490,7 +490,7 @@ export function HitList({ userId }: { userId: string }) {
                   setNewVisibility("draft");
                 }}
               >
-                <Plus className="h-3.5 w-3.5" /> New list
+                <Plus className="h-3.5 w-3.5" /> New collection
               </Button>
             </div>
 
@@ -546,7 +546,7 @@ export function HitList({ userId }: { userId: string }) {
                               </button>
                             </DropdownMenuTrigger>
                             <DropdownMenuContent align="end">
-                              <DropdownMenuLabel>Who can see this list</DropdownMenuLabel>
+                              <DropdownMenuLabel>Who can see this collection</DropdownMenuLabel>
                               {(["draft", "friends", "public"] as Visibility[]).map((v) => {
                                 const M = VISIBILITY_META[v];
                                 const I = M.icon;
@@ -569,7 +569,7 @@ export function HitList({ userId }: { userId: string }) {
                               if (confirm(`Delete list "${list.name}"? Items go back to default.`)) deleteList(list);
                             }}
                             className="rounded-full p-1.5 text-muted-foreground hover:bg-muted hover:text-destructive"
-                            aria-label="Delete list"
+                            aria-label="Delete collection"
                           >
                             <Trash2 className="h-3.5 w-3.5" />
                           </button>
@@ -614,7 +614,7 @@ export function HitList({ userId }: { userId: string }) {
         <DialogContent>
           <DialogHeader>
             <DialogTitle>
-              New list
+              New collection
               {newListFor === "mixed"
                 ? " — anything goes"
                 : newListFor
@@ -662,7 +662,7 @@ export function HitList({ userId }: { userId: string }) {
                 autoFocus
                 value={newName}
                 onChange={(e) => setNewName(e.target.value)}
-                placeholder="e.g. Tokyo list"
+                placeholder="e.g. Tokyo collection"
               />
             </div>
             <div>
@@ -690,7 +690,7 @@ export function HitList({ userId }: { userId: string }) {
               </div>
               <p className="mt-1.5 text-[11px] text-muted-foreground">{VISIBILITY_META[newVisibility].hint}</p>
               <p className="mt-1 text-[11px] text-muted-foreground">
-                You can invite friends to add to any list once it's created.
+                You can invite friends to add to any collection once it's created.
               </p>
             </div>
           </div>
@@ -786,7 +786,7 @@ function EntryList({
                   </>
                 ) : null}
                 <DropdownMenuItem className="text-destructive" onClick={() => onRemove(e)}>
-                  <Trash2 className="mr-2 h-4 w-4" /> Remove from list
+                  <Trash2 className="mr-2 h-4 w-4" /> Remove from collection
                 </DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>
