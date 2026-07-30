@@ -13,9 +13,9 @@ export const Route = createFileRoute("/_authenticated/group/$id")({
   head: () => ({
     meta: [
       { title: "Group — REX" },
-      { name: "description", content: "A private group where you and your friends share recommendations." },
+      { name: "description", content: "A private group where you and your friends share Rexes." },
       { property: "og:title", content: "Group — REX" },
-      { property: "og:description", content: "A private group where you and your friends share recommendations." },
+      { property: "og:description", content: "A private group where you and your friends share Rexes." },
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary" },
     ],
