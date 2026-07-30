@@ -5,6 +5,8 @@ import { useServerFn } from "@tanstack/react-start";
 import { supabase } from "@/integrations/supabase/client";
 import { CATEGORIES, categoryMeta, type ItemType } from "@/lib/categories";
 import { RecommendationCard, type FeedRow } from "@/components/RecommendationCard";
+import { TopRexxersCard } from "@/components/TopRexxers";
+
 import { RequestCard, type RequestRow } from "@/components/RequestCard";
 import { TRexLogo } from "@/components/TRexLogo";
 import { Button } from "@/components/ui/button";
