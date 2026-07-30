@@ -18,16 +18,27 @@ import { cn } from "@/lib/utils";
 import { CATEGORIES, categoryMeta, type ItemType } from "@/lib/categories";
 import { toast } from "sonner";
 import type { FeedRow } from "@/components/RecommendationCard";
+import { CollaboratorStack, CollaboratorsDialog, type Collaborator } from "@/components/ListCollaborators";
+import { UserAvatar } from "@/components/UserAvatar";
 
 type Visibility = "draft" | "friends" | "public";
 type ItemLite = { id: string; type: ItemType; title: string; subtitle: string | null; image_url: string | null };
-type WantRow = { id: string; item_id: string; list_id: string | null; items: ItemLite };
-type SavedRow = { id: string; list_id: string | null; recommendations: FeedRow };
+type WantRow = { id: string; user_id: string; item_id: string; list_id: string | null; items: ItemLite };
+type SavedRow = { id: string; user_id: string; list_id: string | null; recommendations: FeedRow };
 type ListRow = { id: string; user_id: string; item_type: ItemType; name: string; emoji: string | null; visibility: Visibility };
+type Profile = { id: string; username: string; display_name: string | null; avatar_url: string | null };
 
-type Entry =
-  | { kind: "want"; id: string; itemType: ItemType; title: string; image: string | null; href: string; params: any; listId: string | null }
-  | { kind: "saved"; id: string; itemType: ItemType; title: string; image: string | null; href: string; params: any; listId: string | null };
+type Entry = {
+  kind: "want" | "saved";
+  id: string;
+  userId: string;
+  itemType: ItemType;
+  title: string;
+  image: string | null;
+  href: string;
+  params: any;
+  listId: string | null;
+};
 
 const VISIBILITY_META: Record<Visibility, { label: string; icon: typeof Lock; hint: string }> = {
   draft: { label: "Draft", icon: Lock, hint: "Only you" },
@@ -35,46 +46,121 @@ const VISIBILITY_META: Record<Visibility, { label: string; icon: typeof Lock; hi
   public: { label: "Public", icon: Globe2, hint: "Anyone on REX (friends can share on)" },
 };
 
+const WANT_SELECT = "id, user_id, item_id, list_id, items!inner(id, type, title, subtitle, image_url)";
+const SAVED_SELECT =
+  "id, user_id, list_id, recommendations!inner(id, rating, note, created_at, photo_url, photo_urls, user_id, item_id, items!inner(id, type, title, subtitle, image_url, genre), profiles!recommendations_user_id_fkey(username, display_name, avatar_url))";
+
+function dedupe<T extends { id: string }>(rows: T[]) {
+  const m = new Map<string, T>();
+  for (const r of rows) m.set(r.id, r);
+  return [...m.values()];
+}
+
 export function HitList({ userId }: { userId: string }) {
   const qc = useQueryClient();
   const [newListFor, setNewListFor] = useState<ItemType | null>(null);
   const [newName, setNewName] = useState("");
   const [newEmoji, setNewEmoji] = useState("");
   const [newVisibility, setNewVisibility] = useState<Visibility>("draft");
-
-  const { data: wants } = useQuery({
-    queryKey: ["my-wants", userId],
-    queryFn: async () => {
-      const { data } = await supabase
-        .from("wants")
-        .select("id, item_id, list_id, items!inner(id, type, title, subtitle, image_url)")
-        .eq("user_id", userId)
-        .order("created_at", { ascending: false });
-      return (data ?? []) as unknown as WantRow[];
-    },
-  });
-
-  const { data: saved } = useQuery({
-    queryKey: ["my-saved-posts", userId],
-    queryFn: async () => {
-      const { data } = await supabase
-        .from("saved_posts")
-        .select("id, list_id, recommendations!inner(id, rating, note, created_at, photo_url, photo_urls, user_id, item_id, items!inner(id, type, title, subtitle, image_url, genre), profiles!recommendations_user_id_fkey(username, display_name, avatar_url))")
-        .eq("user_id", userId)
-        .order("created_at", { ascending: false });
-      return (data ?? []) as unknown as SavedRow[];
-    },
-  });
+  const [collabList, setCollabList] = useState<ListRow | null>(null);
 
   const { data: lists } = useQuery({
     queryKey: ["my-hitlist-lists", userId],
     queryFn: async () => {
+      const [own, shared] = await Promise.all([
+        supabase
+          .from("hitlist_lists")
+          .select("id, user_id, item_type, name, emoji, visibility")
+          .eq("user_id", userId)
+          .order("created_at", { ascending: true }),
+        supabase
+          .from("list_collaborators")
+          .select("hitlist_lists!inner(id, user_id, item_type, name, emoji, visibility)")
+          .eq("user_id", userId),
+      ]);
+      const sharedLists = ((shared.data ?? []) as any[]).map((r) => r.hitlist_lists);
+      return dedupe([...((own.data ?? []) as any[]), ...sharedLists]) as ListRow[];
+    },
+  });
+
+  const listIds = useMemo(() => (lists ?? []).map((l) => l.id), [lists]);
+
+  const { data: collaborators } = useQuery({
+    queryKey: ["list-collaborators", userId, listIds.join(",")],
+    enabled: listIds.length > 0,
+    queryFn: async () => {
       const { data } = await supabase
-        .from("hitlist_lists")
-        .select("id, user_id, item_type, name, emoji, visibility")
+        .from("list_collaborators")
+        .select("id, list_id, user_id, profiles:user_id(id, username, display_name, avatar_url)")
+        .in("list_id", listIds);
+      return ((data ?? []) as any[]).map((r) => ({
+        id: r.id,
+        list_id: r.list_id,
+        user_id: r.user_id,
+        profile: (r.profiles ?? null) as Profile | null,
+      })) as Collaborator[];
+    },
+  });
+
+  const { data: wants } = useQuery({
+    queryKey: ["my-wants", userId, listIds.join(",")],
+    queryFn: async () => {
+      const mine = await supabase
+        .from("wants")
+        .select(WANT_SELECT)
         .eq("user_id", userId)
-        .order("created_at", { ascending: true });
-      return (data ?? []) as unknown as ListRow[];
+        .order("created_at", { ascending: false });
+      let sharedRows: any[] = [];
+      if (listIds.length > 0) {
+        const shared = await supabase
+          .from("wants")
+          .select(WANT_SELECT)
+          .in("list_id", listIds)
+          .order("created_at", { ascending: false });
+        sharedRows = shared.data ?? [];
+      }
+      return dedupe([...((mine.data ?? []) as any[]), ...sharedRows]) as unknown as WantRow[];
+    },
+  });
+
+  const { data: saved } = useQuery({
+    queryKey: ["my-saved-posts", userId, listIds.join(",")],
+    queryFn: async () => {
+      const mine = await supabase
+        .from("saved_posts")
+        .select(SAVED_SELECT)
+        .eq("user_id", userId)
+        .order("created_at", { ascending: false });
+      let sharedRows: any[] = [];
+      if (listIds.length > 0) {
+        const shared = await supabase
+          .from("saved_posts")
+          .select(SAVED_SELECT)
+          .in("list_id", listIds)
+          .order("created_at", { ascending: false });
+        sharedRows = shared.data ?? [];
+      }
+      return dedupe([...((mine.data ?? []) as any[]), ...sharedRows]) as unknown as SavedRow[];
+    },
+  });
+
+  const ownerIds = useMemo(() => [...new Set((lists ?? []).map((l) => l.user_id))], [lists]);
+  const contributorIds = useMemo(
+    () => [...new Set([...(wants ?? []).map((w) => w.user_id), ...(saved ?? []).map((s) => s.user_id), ...ownerIds])],
+    [wants, saved, ownerIds],
+  );
+
+  const { data: people } = useQuery({
+    queryKey: ["list-people", contributorIds.join(",")],
+    enabled: contributorIds.length > 0,
+    queryFn: async () => {
+      const { data } = await supabase
+        .from("profiles")
+        .select("id, username, display_name, avatar_url")
+        .in("id", contributorIds);
+      const m = new Map<string, Profile>();
+      for (const p of (data ?? []) as Profile[]) m.set(p.id, p);
+      return m;
     },
   });
 
@@ -84,6 +170,7 @@ export function HitList({ userId }: { userId: string }) {
       out.push({
         kind: "want",
         id: w.id,
+        userId: w.user_id,
         itemType: w.items.type,
         title: w.items.title,
         image: w.items.image_url,
@@ -98,6 +185,7 @@ export function HitList({ userId }: { userId: string }) {
       out.push({
         kind: "saved",
         id: s.id,
+        userId: s.user_id,
         itemType: item.type,
         title: item.title,
         image: item.image_url,
@@ -129,15 +217,30 @@ export function HitList({ userId }: { userId: string }) {
     return m;
   }, [lists]);
 
+  const collabsByList = useMemo(() => {
+    const m = new Map<string, Collaborator[]>();
+    for (const c of collaborators ?? []) {
+      const arr = m.get(c.list_id) ?? [];
+      arr.push(c);
+      m.set(c.list_id, arr);
+    }
+    return m;
+  }, [collaborators]);
+
   const activeCategories = CATEGORIES.filter(
     (c) => (byCategory.get(c.type)?.length ?? 0) > 0 || (listsByCategory.get(c.type)?.length ?? 0) > 0,
   );
+
+  function invalidateEntries() {
+    qc.invalidateQueries({ queryKey: ["my-wants", userId] });
+    qc.invalidateQueries({ queryKey: ["my-saved-posts", userId] });
+  }
 
   async function moveEntry(entry: Entry, newListId: string | null) {
     const table = entry.kind === "want" ? "wants" : "saved_posts";
     const { error } = await supabase.from(table).update({ list_id: newListId }).eq("id", entry.id);
     if (error) return toast.error(error.message);
-    qc.invalidateQueries({ queryKey: entry.kind === "want" ? ["my-wants", userId] : ["my-saved-posts", userId] });
+    invalidateEntries();
   }
 
   async function removeEntry(entry: Entry) {
@@ -145,7 +248,7 @@ export function HitList({ userId }: { userId: string }) {
     const { error } = await supabase.from(table).delete().eq("id", entry.id);
     if (error) return toast.error(error.message);
     toast.success("Removed from My List");
-    qc.invalidateQueries({ queryKey: entry.kind === "want" ? ["my-wants", userId] : ["my-saved-posts", userId] });
+    invalidateEntries();
   }
 
   async function createList() {
@@ -184,8 +287,7 @@ export function HitList({ userId }: { userId: string }) {
     if (error) return toast.error(error.message);
     toast.success("List deleted");
     qc.invalidateQueries({ queryKey: ["my-hitlist-lists", userId] });
-    qc.invalidateQueries({ queryKey: ["my-wants", userId] });
-    qc.invalidateQueries({ queryKey: ["my-saved-posts", userId] });
+    invalidateEntries();
   }
 
   if (entries.length === 0 && (lists?.length ?? 0) === 0) {
@@ -201,7 +303,7 @@ export function HitList({ userId }: { userId: string }) {
       {activeCategories.map((cat) => {
         const all = byCategory.get(cat.type) ?? [];
         const subs = listsByCategory.get(cat.type) ?? [];
-        const defaults = all.filter((e) => !e.listId);
+        const defaults = all.filter((e) => !e.listId && e.userId === userId);
         return (
           <div key={cat.type} className="space-y-3">
             <div className="flex items-center justify-between">
@@ -229,6 +331,8 @@ export function HitList({ userId }: { userId: string }) {
               entries={defaults}
               lists={subs}
               cat={cat}
+              currentUserId={userId}
+              people={people}
               onMove={moveEntry}
               onRemove={removeEntry}
             />
@@ -237,6 +341,8 @@ export function HitList({ userId }: { userId: string }) {
               const inList = all.filter((e) => e.listId === list.id);
               const VMeta = VISIBILITY_META[list.visibility];
               const VIcon = VMeta.icon;
+              const isOwner = list.user_id === userId;
+              const listCollabs = collabsByList.get(list.id) ?? [];
               return (
                 <div key={list.id} className="rounded-2xl border border-border bg-card/40 p-3">
                   <div className="mb-2 flex items-center justify-between gap-2">
@@ -244,50 +350,64 @@ export function HitList({ userId }: { userId: string }) {
                       <span className="mr-1.5">{list.emoji ?? cat.hitDefaultEmoji}</span>
                       {list.name}{" "}
                       <span className="text-xs text-muted-foreground">({inList.length})</span>
+                      {!isOwner ? (
+                        <span className="ml-1.5 rounded-full bg-primary/10 px-1.5 py-0.5 text-[10px] font-medium text-primary">
+                          Shared with you
+                        </span>
+                      ) : null}
                     </p>
                     <div className="flex items-center gap-1">
-                      <DropdownMenu>
-                        <DropdownMenuTrigger asChild>
+                      <CollaboratorStack
+                        collaborators={listCollabs}
+                        owner={people?.get(list.user_id) ?? null}
+                        onOpen={() => setCollabList(list)}
+                      />
+                      {isOwner ? (
+                        <>
+                          <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                              <button
+                                type="button"
+                                className={cn(
+                                  "inline-flex items-center gap-1 rounded-full px-2 py-1 text-[11px] font-medium ring-1 ring-border",
+                                  list.visibility === "draft" && "bg-muted text-muted-foreground",
+                                  list.visibility === "friends" && "bg-primary/10 text-primary",
+                                  list.visibility === "public" && "bg-accent text-accent-foreground",
+                                )}
+                              >
+                                <VIcon className="h-3 w-3" /> {VMeta.label}
+                              </button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent align="end">
+                              <DropdownMenuLabel>Who can see this list</DropdownMenuLabel>
+                              {(["draft", "friends", "public"] as Visibility[]).map((v) => {
+                                const M = VISIBILITY_META[v];
+                                const I = M.icon;
+                                return (
+                                  <DropdownMenuItem key={v} onClick={() => updateVisibility(list, v)}>
+                                    <I className="mr-2 h-4 w-4" />
+                                    <span className="flex-1">
+                                      {M.label}
+                                      <span className="ml-1 text-xs text-muted-foreground">— {M.hint}</span>
+                                    </span>
+                                    {list.visibility === v ? <Check className="ml-2 h-3.5 w-3.5" /> : null}
+                                  </DropdownMenuItem>
+                                );
+                              })}
+                            </DropdownMenuContent>
+                          </DropdownMenu>
                           <button
                             type="button"
-                            className={cn(
-                              "inline-flex items-center gap-1 rounded-full px-2 py-1 text-[11px] font-medium ring-1 ring-border",
-                              list.visibility === "draft" && "bg-muted text-muted-foreground",
-                              list.visibility === "friends" && "bg-primary/10 text-primary",
-                              list.visibility === "public" && "bg-accent text-accent-foreground",
-                            )}
+                            onClick={() => {
+                              if (confirm(`Delete list "${list.name}"? Items go back to default.`)) deleteList(list);
+                            }}
+                            className="rounded-full p-1.5 text-muted-foreground hover:bg-muted hover:text-destructive"
+                            aria-label="Delete list"
                           >
-                            <VIcon className="h-3 w-3" /> {VMeta.label}
+                            <Trash2 className="h-3.5 w-3.5" />
                           </button>
-                        </DropdownMenuTrigger>
-                        <DropdownMenuContent align="end">
-                          <DropdownMenuLabel>Who can see this list</DropdownMenuLabel>
-                          {(["draft", "friends", "public"] as Visibility[]).map((v) => {
-                            const M = VISIBILITY_META[v];
-                            const I = M.icon;
-                            return (
-                              <DropdownMenuItem key={v} onClick={() => updateVisibility(list, v)}>
-                                <I className="mr-2 h-4 w-4" />
-                                <span className="flex-1">
-                                  {M.label}
-                                  <span className="ml-1 text-xs text-muted-foreground">— {M.hint}</span>
-                                </span>
-                                {list.visibility === v ? <Check className="ml-2 h-3.5 w-3.5" /> : null}
-                              </DropdownMenuItem>
-                            );
-                          })}
-                        </DropdownMenuContent>
-                      </DropdownMenu>
-                      <button
-                        type="button"
-                        onClick={() => {
-                          if (confirm(`Delete list "${list.name}"? Items go back to default.`)) deleteList(list);
-                        }}
-                        className="rounded-full p-1.5 text-muted-foreground hover:bg-muted hover:text-destructive"
-                        aria-label="Delete list"
-                      >
-                        <Trash2 className="h-3.5 w-3.5" />
-                      </button>
+                        </>
+                      ) : null}
                     </div>
                   </div>
                   {inList.length > 0 ? (
@@ -295,6 +415,8 @@ export function HitList({ userId }: { userId: string }) {
                       entries={inList}
                       lists={subs}
                       cat={cat}
+                      currentUserId={userId}
+                      people={people}
                       onMove={moveEntry}
                       onRemove={removeEntry}
                     />
@@ -307,6 +429,19 @@ export function HitList({ userId }: { userId: string }) {
           </div>
         );
       })}
+
+      {collabList ? (
+        <CollaboratorsDialog
+          open={!!collabList}
+          onOpenChange={(o) => !o && setCollabList(null)}
+          listId={collabList.id}
+          listName={collabList.name}
+          ownerId={collabList.user_id}
+          owner={people?.get(collabList.user_id) ?? null}
+          collaborators={collabsByList.get(collabList.id) ?? []}
+          currentUserId={userId}
+        />
+      ) : null}
 
       <Dialog open={!!newListFor} onOpenChange={(o) => !o && setNewListFor(null)}>
         <DialogContent>
@@ -358,6 +493,9 @@ export function HitList({ userId }: { userId: string }) {
                 })}
               </div>
               <p className="mt-1.5 text-[11px] text-muted-foreground">{VISIBILITY_META[newVisibility].hint}</p>
+              <p className="mt-1 text-[11px] text-muted-foreground">
+                You can invite friends to add to any list once it's created.
+              </p>
             </div>
           </div>
           <DialogFooter>
@@ -374,12 +512,16 @@ function EntryList({
   entries,
   lists,
   cat,
+  currentUserId,
+  people,
   onMove,
   onRemove,
 }: {
   entries: Entry[];
   lists: ListRow[];
   cat: (typeof CATEGORIES)[number];
+  currentUserId: string;
+  people?: Map<string, Profile>;
   onMove: (entry: Entry, listId: string | null) => void;
   onRemove: (entry: Entry) => void;
 }) {
@@ -387,58 +529,73 @@ function EntryList({
   if (entries.length === 0) return null;
   return (
     <div className="space-y-2">
-      {entries.map((e) => (
-        <div
-          key={`${e.kind}-${e.id}`}
-          className="flex items-center gap-3 rounded-2xl bg-card p-3 ring-1 ring-border"
-        >
-          <Link
-            to={e.href as any}
-            params={e.params}
-            className="flex min-w-0 flex-1 items-center gap-3"
+      {entries.map((e) => {
+        const mine = e.userId === currentUserId;
+        const who = mine ? null : people?.get(e.userId) ?? null;
+        return (
+          <div
+            key={`${e.kind}-${e.id}`}
+            className="flex items-center gap-3 rounded-2xl bg-card p-3 ring-1 ring-border"
           >
-            <div className={cn("flex h-12 w-12 shrink-0 items-center justify-center overflow-hidden rounded-xl", cat.tokenClass)}>
-              {e.image ? (
-                <img src={e.image} alt="" className="h-full w-full object-cover" />
-              ) : (
-                <Icon className="h-5 w-5" />
-              )}
-            </div>
-            <div className="min-w-0 flex-1">
-              <p className="truncate font-medium">{e.title}</p>
-              <p className="truncate text-xs text-muted-foreground">
-                {e.kind === "saved" ? "Saved post" : cat.wantVerb}
-              </p>
-            </div>
-          </Link>
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <button
-                type="button"
-                aria-label="More"
-                className="rounded-full p-2 text-muted-foreground hover:bg-muted"
-              >
-                <MoreHorizontal className="h-4 w-4" />
-              </button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end">
-              <DropdownMenuLabel>Move to</DropdownMenuLabel>
-              <DropdownMenuItem onClick={() => onMove(e, null)}>
-                {cat.hitDefaultEmoji} {cat.hitDefaultLabel} (default)
-              </DropdownMenuItem>
-              {lists.map((l) => (
-                <DropdownMenuItem key={l.id} onClick={() => onMove(e, l.id)}>
-                  {l.emoji ?? cat.hitDefaultEmoji} {l.name}
+            <Link
+              to={e.href as any}
+              params={e.params}
+              className="flex min-w-0 flex-1 items-center gap-3"
+            >
+              <div className={cn("flex h-12 w-12 shrink-0 items-center justify-center overflow-hidden rounded-xl", cat.tokenClass)}>
+                {e.image ? (
+                  <img src={e.image} alt="" className="h-full w-full object-cover" />
+                ) : (
+                  <Icon className="h-5 w-5" />
+                )}
+              </div>
+              <div className="min-w-0 flex-1">
+                <p className="truncate font-medium">{e.title}</p>
+                <p className="flex items-center gap-1 truncate text-xs text-muted-foreground">
+                  {who ? (
+                    <>
+                      <UserAvatar url={who.avatar_url} name={who.display_name || who.username} size="xs" className="h-4 w-4 text-[9px]" />
+                      added by {who.display_name || who.username}
+                    </>
+                  ) : (
+                    <>{e.kind === "saved" ? "Saved post" : cat.wantVerb}</>
+                  )}
+                </p>
+              </div>
+            </Link>
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <button
+                  type="button"
+                  aria-label="More"
+                  className="rounded-full p-2 text-muted-foreground hover:bg-muted"
+                >
+                  <MoreHorizontal className="h-4 w-4" />
+                </button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                {mine ? (
+                  <>
+                    <DropdownMenuLabel>Move to</DropdownMenuLabel>
+                    <DropdownMenuItem onClick={() => onMove(e, null)}>
+                      {cat.hitDefaultEmoji} {cat.hitDefaultLabel} (default)
+                    </DropdownMenuItem>
+                    {lists.map((l) => (
+                      <DropdownMenuItem key={l.id} onClick={() => onMove(e, l.id)}>
+                        {l.emoji ?? cat.hitDefaultEmoji} {l.name}
+                      </DropdownMenuItem>
+                    ))}
+                    <DropdownMenuSeparator />
+                  </>
+                ) : null}
+                <DropdownMenuItem className="text-destructive" onClick={() => onRemove(e)}>
+                  <Trash2 className="mr-2 h-4 w-4" /> Remove from list
                 </DropdownMenuItem>
-              ))}
-              <DropdownMenuSeparator />
-              <DropdownMenuItem className="text-destructive" onClick={() => onRemove(e)}>
-                <Trash2 className="mr-2 h-4 w-4" /> Remove from My List
-              </DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
-        </div>
-      ))}
+              </DropdownMenuContent>
+            </DropdownMenu>
+          </div>
+        );
+      })}
     </div>
   );
 }
