@@ -307,8 +307,45 @@ export function HitList({ userId }: { userId: string }) {
 
   const isEmpty = entries.length === 0 && (lists?.length ?? 0) === 0;
 
+  function startNewList(type: string) {
+    setNewListFor(type);
+    setNewName("");
+    setNewEmoji("");
+    setNewVisibility("draft");
+  }
+
   return (
     <div className="space-y-6">
+      {!isEmpty && (
+        <div className="sticky top-0 z-10 -mx-1 space-y-2 bg-background/90 px-1 py-2 backdrop-blur">
+          <div className="flex flex-wrap gap-1.5">
+            <FilterChip label="All" active={filter === "all"} onClick={() => setFilter("all")} />
+            {mixedLists.length > 0 && (
+              <FilterChip label="✨ Mixed" active={filter === "mixed"} onClick={() => setFilter("mixed")} />
+            )}
+            {allActiveCategories.map((c) => (
+              <FilterChip
+                key={c.type}
+                label={`${c.hitDefaultEmoji} ${c.plural}`}
+                count={
+                  (byCategory.get(c.type)?.filter((e) => !mixedIds.has(e.listId ?? "")).length ?? 0) || undefined
+                }
+                active={filter === c.type}
+                onClick={() => setFilter(c.type)}
+              />
+            ))}
+            <Button
+              size="sm"
+              variant="outline"
+              className="h-7 gap-1 rounded-full px-2.5 text-xs"
+              onClick={() => startNewList(filter === "all" || filter === "mixed" ? "mixed" : filter)}
+            >
+              <Plus className="h-3.5 w-3.5" /> New list
+            </Button>
+          </div>
+        </div>
+      )}
+
       {isEmpty ? (
         <div className="rounded-2xl border border-dashed border-border p-5 text-center">
           <p className="text-sm text-muted-foreground">
@@ -324,16 +361,12 @@ export function HitList({ userId }: { userId: string }) {
             <DropdownMenuContent align="center" className="max-h-72 overflow-y-auto">
               <DropdownMenuLabel>What kind of list?</DropdownMenuLabel>
               <DropdownMenuSeparator />
+              <DropdownMenuItem onClick={() => startNewList("mixed")}>
+                <span className="mr-2">✨</span> Mix of everything
+              </DropdownMenuItem>
+              <DropdownMenuSeparator />
               {CATEGORIES.map((c) => (
-                <DropdownMenuItem
-                  key={c.type}
-                  onClick={() => {
-                    setNewListFor(c.type);
-                    setNewName("");
-                    setNewEmoji("");
-                    setNewVisibility("draft");
-                  }}
-                >
+                <DropdownMenuItem key={c.type} onClick={() => startNewList(c.type)}>
                   <span className="mr-2">{c.hitDefaultEmoji}</span>
                   {c.hitDefaultLabel}
                 </DropdownMenuItem>
@@ -342,6 +375,103 @@ export function HitList({ userId }: { userId: string }) {
           </DropdownMenu>
         </div>
       ) : null}
+
+      {showMixed && (
+        <div className="space-y-3">
+          <h3 className="font-display text-lg">
+            <span className="mr-2">✨</span>Mixed lists
+          </h3>
+          {mixedLists.map((list) => {
+            const inList = entries.filter((e) => e.listId === list.id);
+            const VMeta = VISIBILITY_META[list.visibility];
+            const VIcon = VMeta.icon;
+            const isOwner = list.user_id === userId;
+            return (
+              <div key={list.id} className="rounded-2xl border border-border bg-card/40 p-3">
+                <div className="mb-2 flex items-center justify-between gap-2">
+                  <p className="min-w-0 truncate font-medium">
+                    <span className="mr-1.5">{list.emoji ?? "✨"}</span>
+                    {list.name} <span className="text-xs text-muted-foreground">({inList.length})</span>
+                    {!isOwner ? (
+                      <span className="ml-1.5 rounded-full bg-primary/10 px-1.5 py-0.5 text-[10px] font-medium text-primary">
+                        Shared with you
+                      </span>
+                    ) : null}
+                  </p>
+                  <div className="flex items-center gap-1">
+                    <CollaboratorStack
+                      collaborators={collabsByList.get(list.id) ?? []}
+                      owner={people?.get(list.user_id) ?? null}
+                      onOpen={() => setCollabList(list)}
+                    />
+                    {isOwner ? (
+                      <>
+                        <DropdownMenu>
+                          <DropdownMenuTrigger asChild>
+                            <button
+                              type="button"
+                              className={cn(
+                                "inline-flex items-center gap-1 rounded-full px-2 py-1 text-[11px] font-medium ring-1 ring-border",
+                                list.visibility === "draft" && "bg-muted text-muted-foreground",
+                                list.visibility === "friends" && "bg-primary/10 text-primary",
+                                list.visibility === "public" && "bg-accent text-accent-foreground",
+                              )}
+                            >
+                              <VIcon className="h-3 w-3" /> {VMeta.label}
+                            </button>
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent align="end">
+                            <DropdownMenuLabel>Who can see this list</DropdownMenuLabel>
+                            {(["draft", "friends", "public"] as Visibility[]).map((v) => {
+                              const M = VISIBILITY_META[v];
+                              const I = M.icon;
+                              return (
+                                <DropdownMenuItem key={v} onClick={() => updateVisibility(list, v)}>
+                                  <I className="mr-2 h-4 w-4" />
+                                  <span className="flex-1">
+                                    {M.label}
+                                    <span className="ml-1 text-xs text-muted-foreground">— {M.hint}</span>
+                                  </span>
+                                  {list.visibility === v ? <Check className="ml-2 h-3.5 w-3.5" /> : null}
+                                </DropdownMenuItem>
+                              );
+                            })}
+                          </DropdownMenuContent>
+                        </DropdownMenu>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            if (confirm(`Delete list "${list.name}"? Items go back to default.`)) deleteList(list);
+                          }}
+                          className="rounded-full p-1.5 text-muted-foreground hover:bg-muted hover:text-destructive"
+                          aria-label="Delete list"
+                        >
+                          <Trash2 className="h-3.5 w-3.5" />
+                        </button>
+                      </>
+                    ) : null}
+                  </div>
+                </div>
+                {inList.length > 0 ? (
+                  <EntryList
+                    entries={inList}
+                    lists={mixedLists}
+                    currentUserId={userId}
+                    people={people}
+                    onMove={moveEntry}
+                    onRemove={removeEntry}
+                  />
+                ) : (
+                  <p className="text-xs text-muted-foreground">
+                    Empty — anything you save can be moved in here, whatever the category.
+                  </p>
+                )}
+              </div>
+            );
+          })}
+        </div>
+      )}
+
       {activeCategories.map((cat) => {
         const all = byCategory.get(cat.type) ?? [];
         const subs = listsByCategory.get(cat.type) ?? [];
