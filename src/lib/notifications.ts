@@ -28,7 +28,7 @@ export function notifCopy(n: NotificationRow): string {
     case "rec_like":
       return `${who} liked your Rex`;
     case "rec_saved":
-      return `${who} added your Rex to their list`;
+      return `${who} added your Rex to their collection`;
     case "rec_comment":
       return `${who} commented: "${(n.data?.preview as string) || ""}"`;
     case "friend_request":
@@ -62,7 +62,7 @@ export const PREF_LABELS: Record<
   { label: string; description: string }
 > = {
   rec_comment: { label: "Comments on my Rex", description: "When someone replies to a Rex you posted" },
-  rec_saved: { label: "Saves to lists", description: "When someone adds a Rex you posted to their list" },
+  rec_saved: { label: "Saves to collections", description: "When someone adds a Rex you posted to their collection" },
   rec_like: { label: "Likes on my Rex", description: "When someone likes a Rex you posted" },
   friend_request: { label: "New friend requests", description: "When someone wants to connect" },
   friend_accepted: { label: "Friend requests accepted", description: "When someone accepts your request" },
