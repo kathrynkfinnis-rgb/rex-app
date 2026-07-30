@@ -7,6 +7,7 @@ import {
   Sparkles, Users, MessageCircle, Heart,
 } from "lucide-react";
 import { AvatarUploader } from "@/components/AvatarUploader";
+import { EditProfileDialog } from "@/components/EditProfileDialog";
 import { RecommendationCard, type FeedRow } from "@/components/RecommendationCard";
 import { CATEGORIES } from "@/lib/categories";
 
