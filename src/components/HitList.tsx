@@ -25,7 +25,7 @@ type Visibility = "draft" | "friends" | "public";
 type ItemLite = { id: string; type: ItemType; title: string; subtitle: string | null; image_url: string | null };
 type WantRow = { id: string; user_id: string; item_id: string; list_id: string | null; items: ItemLite };
 type SavedRow = { id: string; user_id: string; list_id: string | null; recommendations: FeedRow };
-type ListRow = { id: string; user_id: string; item_type: ItemType; name: string; emoji: string | null; visibility: Visibility };
+type ListRow = { id: string; user_id: string; item_type: string; name: string; emoji: string | null; visibility: Visibility };
 type Profile = { id: string; username: string; display_name: string | null; avatar_url: string | null };
 
 type Entry = {
