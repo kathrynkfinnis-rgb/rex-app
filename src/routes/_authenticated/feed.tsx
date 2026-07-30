@@ -413,8 +413,7 @@ function SearchResults({ query, feed, scope }: { query: string; feed: FeedRow[];
                     <div className="min-w-0 flex-1">
                       <p className="truncate font-medium">{l.name}</p>
                       <p className="truncate text-xs text-muted-foreground">
-                        {categoryMeta(l.item_type).plural}
-                        {l.profiles?.username ? ` · @${l.profiles.username}` : ""}
+                        Collection{l.profiles?.username ? ` · @${l.profiles.username}` : ""}
                       </p>
                     </div>
                     <VIcon className="h-4 w-4 shrink-0 text-muted-foreground" />
