@@ -23,7 +23,7 @@ export const Route = createFileRoute("/_authenticated/feed")({
   head: () => ({
     meta: [
       { title: "Your feed — REX" },
-      { name: "description", content: "The latest Rexes from your friends." },
+      { name: "description", content: "The latest Rex from your friends." },
     ],
   }),
   component: FeedPage,
@@ -151,7 +151,7 @@ function FeedPage() {
                 : searchScope === "lists"
                   ? "Search lists…"
                   : searchScope === "all"
-                    ? "Search Rexes, people, lists, books, films, places…"
+                    ? "Search Rex, people, lists, books, films, places…"
                     : `Search ${categoryMeta(searchScope).plural.toLowerCase()}…`
             }
             aria-label="Search"

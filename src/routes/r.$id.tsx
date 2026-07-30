@@ -134,7 +134,7 @@ function SharePage() {
         </div>
 
         <div className="rounded-3xl bg-primary/10 p-5 text-center ring-1 ring-primary/20">
-          <div className="text-lg font-semibold">Get more Rexes like this on REX 🦖</div>
+          <div className="text-lg font-semibold">Get more Rex like this on REX 🦖</div>
           <p className="mt-1 text-sm text-muted-foreground">
             The little book of books, films, shows, restaurants & places your friends actually love.
           </p>

@@ -12,7 +12,7 @@ export const Route = createFileRoute("/_authenticated/notifications")({
   head: () => ({
     meta: [
       { title: "Notifications — REX" },
-      { name: "description", content: "See who's engaging with your Rexes and blasts." },
+      { name: "description", content: "See who's engaging with your Rex and blasts." },
     ],
   }),
   component: NotificationsPage,

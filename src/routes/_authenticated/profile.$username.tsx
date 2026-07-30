@@ -10,7 +10,7 @@ export const Route = createFileRoute("/_authenticated/profile/$username")({
   head: ({ params }) => ({
     meta: [
       { title: `@${params.username} — REX` },
-      { name: "description", content: `Rexes from @${params.username} on REX.` },
+      { name: "description", content: `Rex from @${params.username} on REX.` },
     ],
   }),
   component: ProfilePage,
@@ -100,7 +100,7 @@ function ProfilePage() {
       {profile && (
         <section className="p-4">
           <h2 className="mb-3 text-xs font-semibold uppercase tracking-widest text-muted-foreground">
-            Rexes
+            Rex
           </h2>
           {loadingRecs ? (
             <div className="h-40 animate-pulse rounded-2xl bg-muted" />

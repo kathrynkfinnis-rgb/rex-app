@@ -260,7 +260,7 @@ function AddPage() {
             </div>
             <div className="min-w-0 flex-1">
               <p className="font-display text-lg">Import a list</p>
-              <p className="text-sm text-muted-foreground">Pull Rexes from a Google Sheet or Word doc.</p>
+              <p className="text-sm text-muted-foreground">Pull Rex from a Google Sheet or Word doc.</p>
             </div>
           </Link>
         </div>

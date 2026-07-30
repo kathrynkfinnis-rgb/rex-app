@@ -221,7 +221,7 @@ function MapPage() {
           <div className="pointer-events-none absolute inset-x-3 bottom-3 rounded-xl bg-background/90 px-3 py-2 text-center text-xs text-muted-foreground backdrop-blur">
             {cat !== "all" || sub
               ? "No pins match this filter yet."
-              : "No place Rexes with a location yet — they'll appear here."}
+              : "No place Rex with a location yet — they'll appear here."}
           </div>
         )}
       </div>
