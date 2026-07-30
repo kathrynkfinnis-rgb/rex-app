@@ -2,7 +2,7 @@ import { useState } from "react";
 import { createFileRoute, Link, useRouteContext } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { ChevronLeft, MessageSquarePlus, Bug, Lightbulb, Heart, EyeOff } from "lucide-react";
+import { ChevronLeft, MessageSquareText, Bug, Lightbulb, Heart, EyeOff } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
