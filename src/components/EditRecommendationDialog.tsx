@@ -233,7 +233,7 @@ export function EditRecommendationDialog({
           <AlertDialogHeader>
             <AlertDialogTitle>Delete this post?</AlertDialogTitle>
             <AlertDialogDescription>
-              This will permanently remove your recommendation. This can't be undone.
+              This will permanently remove your Rex. This can't be undone.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>

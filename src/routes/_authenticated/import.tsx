@@ -35,8 +35,8 @@ import {
 export const Route = createFileRoute("/_authenticated/import")({
   head: () => ({
     meta: [
-      { title: "Import recommendations — REX" },
-      { name: "description", content: "Bring recommendations from Google Sheets or Word docs into REX." },
+      { title: "Import Rexes — REX" },
+      { name: "description", content: "Bring Rexes from Google Sheets or Word docs into REX." },
     ],
   }),
   component: ImportPage,
@@ -83,7 +83,7 @@ function ImportPage() {
     try {
       const { inserted } = await extract({ data: { text, source } });
       if (inserted === 0) {
-        toast.error("Couldn't find any recommendations in that");
+        toast.error("Couldn't find any Rexes in that");
       } else {
         toast.success(`Extracted ${inserted} candidate${inserted === 1 ? "" : "s"} — review below`);
         setPasted("");
@@ -335,7 +335,7 @@ function ImportPage() {
         >
           <ArrowLeft className="h-4 w-4" /> Back
         </button>
-        <h1 className="mt-3 font-display text-3xl">Import recommendations</h1>
+        <h1 className="mt-3 font-display text-3xl">Import Rexes</h1>
         <p className="mt-1 text-sm text-muted-foreground">
           Bring in a batch from a spreadsheet, doc, or pasted list. We'll extract each one and let you review before it hits your feed.
         </p>
@@ -375,7 +375,7 @@ function ImportPage() {
               className="h-11 w-full rounded-full"
             >
               {loading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
-              Extract recommendations
+              Extract Rexes
             </Button>
           </div>
         )}
@@ -507,7 +507,7 @@ function ImportPage() {
               className="h-11 w-full rounded-full"
             >
               {loading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
-              Extract recommendations
+              Extract Rexes
             </Button>
           </div>
         )}

@@ -8,9 +8,9 @@ export const Route = createFileRoute("/")({
   ssr: false,
   head: () => ({
     meta: [
-      { title: "REX — recommendations from friends you trust" },
+      { title: "REX — Rexes from friends you trust" },
       { name: "description", content: "The little shared book of restaurants, books, movies and shows your friends actually love." },
-      { property: "og:title", content: "REX — recommendations from friends you trust" },
+      { property: "og:title", content: "REX — Rexes from friends you trust" },
       { property: "og:description", content: "The little shared book of restaurants, books, movies and shows your friends actually love." },
     ],
   }),

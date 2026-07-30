@@ -148,7 +148,7 @@ function AdminPage() {
 
       <Section title="Content activity" icon={<TrendingUp className="h-4 w-4" />}>
         <div className="grid grid-cols-2 gap-2">
-          <Pair icon={<Sparkles className="h-4 w-4" />} label="Recommendations" total={c?.recs_total} recent={c?.recs_7d} />
+          <Pair icon={<Sparkles className="h-4 w-4" />} label="Rexes" total={c?.recs_total} recent={c?.recs_7d} />
           <Pair icon={<Megaphone className="h-4 w-4" />} label="Blasts" total={c?.blasts_total} recent={c?.blasts_7d} />
           <Pair icon={<MessageCircle className="h-4 w-4" />} label="Rec comments" total={c?.rec_comments_total} recent={c?.rec_comments_7d} />
           <Pair icon={<MessageCircle className="h-4 w-4" />} label="Blast comments" total={c?.blast_comments_total} recent={c?.blast_comments_7d} />
@@ -161,10 +161,10 @@ function AdminPage() {
         <div className="grid grid-cols-2 gap-2">
           <Kpi label="Activation rate" value={ratio(e?.activated_users, e?.total_users)} sub={`${e?.activated_users ?? 0} posted ≥1 rec`} accent />
           <Kpi label="Connected rate" value={ratio(e?.users_with_friend, e?.total_users)} sub={`${e?.users_with_friend ?? 0} have ≥1 friend`} />
-          <Kpi label="Recs / active user" value={e?.recs_per_active_user} sub="depth of use" />
+          <Kpi label="Rexes / active user" value={e?.recs_per_active_user} sub="depth of use" />
           <Kpi label="Avg crowns" value={e?.avg_rating} sub="rating quality" />
-          <Kpi label="Recs with photo" value={ratio(e?.recs_with_photo, c?.recs_total)} sub="richness" />
-          <Kpi label="Recs with note" value={ratio(e?.recs_with_note, c?.recs_total)} sub="richness" />
+          <Kpi label="Rexes with photo" value={ratio(e?.recs_with_photo, c?.recs_total)} sub="richness" />
+          <Kpi label="Rexes with note" value={ratio(e?.recs_with_note, c?.recs_total)} sub="richness" />
           <Kpi label="Blast answer rate" value={ratio(e?.blasts_answered, e?.blasts_total)} sub="asks with ≥1 reply" />
           <Kpi label="Places geocoded" value={ratio(e?.places_geocoded, e?.places_total)} sub="map coverage" />
         </div>
@@ -186,7 +186,7 @@ function AdminPage() {
       <Section title="Trends · last 8 weeks" icon={<BarChart3 className="h-4 w-4" />}>
         <div className="space-y-2">
           <Spark label="Signups per week" points={e?.signups_by_week} />
-          <Spark label="Recs per week" points={e?.recs_by_week} />
+          <Spark label="Rexes per week" points={e?.recs_by_week} />
         </div>
       </Section>
 
@@ -204,7 +204,7 @@ function AdminPage() {
               <div className="w-8 text-right text-xs tabular-nums text-muted-foreground">{row.count}</div>
             </div>
           ))}
-          {(e?.by_category?.length ?? 0) === 0 && <p className="text-xs text-muted-foreground">No recommendations yet.</p>}
+          {(e?.by_category?.length ?? 0) === 0 && <p className="text-xs text-muted-foreground">No Rexes yet.</p>}
         </div>
       </Section>
 
@@ -219,7 +219,7 @@ function AdminPage() {
             >
               <span className="w-4 text-xs text-muted-foreground tabular-nums">{i + 1}</span>
               <span className="flex-1 truncate font-medium">{t.display_name || t.username}</span>
-              <span className="text-xs tabular-nums text-muted-foreground">{t.count} recs</span>
+              <span className="text-xs tabular-nums text-muted-foreground">{t.count} Rexes</span>
             </Link>
           ))}
           {(e?.top_contributors?.length ?? 0) === 0 && <p className="text-xs text-muted-foreground">No data yet.</p>}

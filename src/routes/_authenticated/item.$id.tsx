@@ -19,8 +19,8 @@ import { parseRecipe } from "@/lib/recipe";
 export const Route = createFileRoute("/_authenticated/item/$id")({
   head: () => ({
     meta: [
-      { title: "Recommendation — REX" },
-      { name: "description", content: "See friends' takes on this recommendation." },
+      { title: "Rex — REX" },
+      { name: "description", content: "See friends' takes on this Rex." },
     ],
   }),
   component: ItemPage,
@@ -139,7 +139,7 @@ function ItemPage() {
           <div className="mt-4 flex items-center gap-2">
             <CrownRatingDisplay value={avg} size="md" />
             <span className="text-sm font-semibold tabular-nums">{avg.toFixed(1)}<span className="text-muted-foreground font-normal">/10</span></span>
-            <span className="text-sm text-muted-foreground">· {recs.length} rec{recs.length === 1 ? "" : "s"}</span>
+            <span className="text-sm text-muted-foreground">· {recs.length} Rex{recs.length === 1 ? "" : "es"}</span>
           </div>
         )}
         <div className="mt-4 grid grid-cols-1 gap-2 sm:grid-cols-2">

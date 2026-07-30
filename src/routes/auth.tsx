@@ -100,7 +100,7 @@ function AuthPage() {
           <TRexLogo className="h-5 w-5" /> REX
         </div>
         <h1 className="mt-4 font-display text-4xl leading-tight">
-          {mode === "signup" ? "Start recommending" : "Welcome back"}
+          {mode === "signup" ? "Start Rexing" : "Welcome back"}
         </h1>
         <p className="mt-2 text-muted-foreground">
           {mode === "signup"

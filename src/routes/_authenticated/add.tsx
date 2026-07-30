@@ -23,8 +23,8 @@ import { TagsInput } from "@/components/TagsInput";
 export const Route = createFileRoute("/_authenticated/add")({
   head: () => ({
     meta: [
-      { title: "Add a recommendation — REX" },
-      { name: "description", content: "Recommend a place, book, movie, show, or recipe." },
+      { title: "Add a Rex — REX" },
+      { name: "description", content: "Post a Rex for a place, book, movie, show, or recipe." },
     ],
   }),
   component: AddPage,
@@ -209,7 +209,7 @@ function AddPage() {
             onClick={() => navigate({ to: "/item/$id", params: { id: justAdded.itemId } })}
             className="h-12 w-full rounded-full"
           >
-            View recommendation
+            View Rex
           </Button>
           <Button
             variant="ghost"
@@ -233,7 +233,7 @@ function AddPage() {
           >
             <ArrowLeft className="h-4 w-4" /> Back
           </button>
-          <h1 className="mt-3 font-display text-3xl">What are you recommending?</h1>
+          <h1 className="mt-3 font-display text-3xl">What are you Rexing?</h1>
         </header>
         <div className="grid grid-cols-2 gap-2 p-4">
           {CATEGORIES.map((c) => (
@@ -260,7 +260,7 @@ function AddPage() {
             </div>
             <div className="min-w-0 flex-1">
               <p className="font-display text-lg">Import a list</p>
-              <p className="text-sm text-muted-foreground">Pull recommendations from a Google Sheet or Word doc.</p>
+              <p className="text-sm text-muted-foreground">Pull Rexes from a Google Sheet or Word doc.</p>
             </div>
           </Link>
         </div>
@@ -412,7 +412,7 @@ function AddPage() {
 
 
         <div className="space-y-1.5">
-          <Label htmlFor="note">Why do you recommend it?</Label>
+          <Label htmlFor="note">Why are you Rexing it?</Label>
           <Textarea
             id="note"
             value={note}
@@ -452,7 +452,7 @@ function AddPage() {
           disabled={saving || !title.trim()}
           className="h-14 w-full rounded-full text-base font-semibold shadow-lg shadow-primary/30"
         >
-          {saving ? "Saving…" : "Post recommendation"}
+          {saving ? "Saving…" : "Post Rex"}
         </Button>
           </>
         )}

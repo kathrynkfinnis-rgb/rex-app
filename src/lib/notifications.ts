@@ -24,7 +24,7 @@ export function notifCopy(n: NotificationRow): string {
   const who = n.actor?.display_name || n.actor?.username || "Someone";
   switch (n.type) {
     case "rec_like":
-      return `${who} liked your recommendation`;
+      return `${who} liked your Rex`;
     case "rec_comment":
       return `${who} commented: "${(n.data?.preview as string) || ""}"`;
     case "friend_request":
@@ -38,7 +38,7 @@ export function notifCopy(n: NotificationRow): string {
         ? `${who} suggested something on your blast "${n.data?.title || ""}"`
         : `${who} replied to your blast: "${(n.data?.preview as string) || ""}"`;
     case "friend_new_rec":
-      return `${who} recommended ${n.data?.title || "something new"}`;
+      return `${who} Rexed ${n.data?.title || "something new"}`;
     default:
       return "New activity";
   }
@@ -55,13 +55,13 @@ export const PREF_LABELS: Record<
   Exclude<keyof PrefRow, "user_id" | "created_at" | "updated_at" | "email_enabled">,
   { label: string; description: string }
 > = {
-  rec_comment: { label: "Comments on my recommendations", description: "When someone replies to a rec you posted" },
-  rec_like: { label: "Likes on my recommendations", description: "When someone likes a rec you posted" },
+  rec_comment: { label: "Comments on my Rexes", description: "When someone replies to a Rex you posted" },
+  rec_like: { label: "Likes on my Rexes", description: "When someone likes a Rex you posted" },
   friend_request: { label: "New friend requests", description: "When someone wants to connect" },
   friend_accepted: { label: "Friend requests accepted", description: "When someone accepts your request" },
   blast_new: { label: "New blasts from friends", description: "When a friend posts a want-a-rec" },
   blast_comment: { label: "Replies to my blasts", description: "Comments or suggestions on blasts you posted" },
-  friend_new_rec: { label: "New recs from friends", description: "Every time a friend posts a recommendation (can be noisy)" },
+  friend_new_rec: { label: "New Rexes from friends", description: "Every time a friend posts a Rex (can be noisy)" },
 };
 
 export type PrefRow = {
