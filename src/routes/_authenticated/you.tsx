@@ -143,7 +143,7 @@ function YouPage() {
           <Stat label="Rex" value={total} />
           <Stat label="Avg crowns" value={avg ?? "—"} />
           <Stat label="Friends" value={activity?.friends ?? 0} />
-          <Stat label="Lists" value={activity?.lists ?? 0} />
+          <Stat label="Collections" value={activity?.lists ?? 0} />
         </div>
       </header>
 
@@ -169,7 +169,7 @@ function YouPage() {
           <MiniStat icon={<Sparkles className="h-4 w-4" />} label="Rex last 30 days" value={last30} />
           <MiniStat icon={<MessageCircle className="h-4 w-4" />} label="Comments left" value={activity?.comments ?? 0} />
           <MiniStat icon={<Heart className="h-4 w-4" />} label="Posts liked" value={activity?.likes ?? 0} />
-          <MiniStat icon={<Bookmark className="h-4 w-4" />} label="Saved to lists" value={activity?.wants ?? 0} />
+          <MiniStat icon={<Bookmark className="h-4 w-4" />} label="Saved to collections" value={activity?.wants ?? 0} />
           <MiniStat icon={<Users className="h-4 w-4" />} label="Blasts posted" value={activity?.blasts ?? 0} />
           <MiniStat icon={<Crown className="h-4 w-4" />} label="Friends" value={activity?.friends ?? 0} />
         </div>
@@ -199,7 +199,7 @@ function YouPage() {
           <h2 className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">
             Your Rex
           </h2>
-          <Link to="/me" className="text-xs font-medium text-primary">My Lists →</Link>
+          <Link to="/me" className="text-xs font-medium text-primary">My Collections →</Link>
         </div>
         {loadingRecs ? (
           <div className="h-40 animate-pulse rounded-2xl bg-muted" />
