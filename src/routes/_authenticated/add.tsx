@@ -48,7 +48,7 @@ function AddPage() {
   const [coords, setCoords] = useState<{ lat: number; lng: number } | null>(null);
   const [picked, setPicked] = useState<AnyHit | null>(null);
   const [manualMode, setManualMode] = useState(false);
-  const [placeSub, setPlaceSub] = useState<string>("");
+  const [placeSubs, setPlaceSubs] = useState<string[]>([]);
   const [justAdded, setJustAdded] = useState<{ itemId: string; recId: string; title: string; isTrip: boolean } | null>(null);
   const [photos, setPhotos] = useState<string[]>([]);
   const [tags, setTags] = useState<string[]>([]);
