@@ -58,11 +58,12 @@ function dedupe<T extends { id: string }>(rows: T[]) {
 
 export function HitList({ userId }: { userId: string }) {
   const qc = useQueryClient();
-  const [newListFor, setNewListFor] = useState<ItemType | null>(null);
+  const [newListFor, setNewListFor] = useState<string | null>(null);
   const [newName, setNewName] = useState("");
   const [newEmoji, setNewEmoji] = useState("");
   const [newVisibility, setNewVisibility] = useState<Visibility>("draft");
   const [collabList, setCollabList] = useState<ListRow | null>(null);
+  const [filter, setFilter] = useState<string>("all");
 
   const { data: lists } = useQuery({
     queryKey: ["my-hitlist-lists", userId],
