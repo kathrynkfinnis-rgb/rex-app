@@ -192,7 +192,7 @@ export function RecommendationCard({ rec }: { rec: FeedRow }) {
         <span className="shrink-0">· {formatDistanceToNow(new Date(rec.created_at), { addSuffix: true }).replace("about ", "")}</span>
         <div className="ml-auto flex items-center">
           <LikesComments recommendationId={rec.id} compact />
-          <SavePostButton recommendationId={rec.id} />
+          <SavePostButton recommendationId={rec.id} itemType={(rec.items?.type ?? "other") as any} itemTitle={rec.items?.title} />
           <ShareToGroupButton recommendationId={rec.id} />
           <ShareButton
             variant="icon"
