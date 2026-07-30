@@ -1,4 +1,5 @@
 import { createFileRoute, Link, notFound } from "@tanstack/react-router";
+import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { CrownRatingDisplay } from "@/components/CrownRating";
 import { categoryMeta, type ItemType } from "@/lib/categories";
@@ -77,6 +78,12 @@ export const Route = createFileRoute("/r/$id")({
 function SharePage() {
   const { rec } = Route.useLoaderData();
   const { id } = Route.useParams();
+  const { data: session, isPending } = useQuery({
+    queryKey: ["share-session"],
+    queryFn: async () => (await supabase.auth.getSession()).data.session,
+    staleTime: 60_000,
+  });
+  const signedIn = !!session;
   const cat = categoryMeta(rec.item_type);
   const Icon = cat.icon;
   const who = rec.author_display_name || rec.author_username || "A friend";
