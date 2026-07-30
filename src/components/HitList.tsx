@@ -208,9 +208,13 @@ export function HitList({ userId }: { userId: string }) {
     return map;
   }, [entries]);
 
+  const mixedLists = useMemo(() => (lists ?? []).filter((l) => l.item_type === "mixed"), [lists]);
+  const mixedIds = useMemo(() => new Set(mixedLists.map((l) => l.id)), [mixedLists]);
+
   const listsByCategory = useMemo(() => {
     const m = new Map<ItemType, ListRow[]>();
     for (const l of lists ?? []) {
+      if (l.item_type === "mixed") continue;
       const arr = m.get(l.item_type as ItemType) ?? [];
       arr.push(l);
       m.set(l.item_type as ItemType, arr);
@@ -228,9 +232,19 @@ export function HitList({ userId }: { userId: string }) {
     return m;
   }, [collaborators]);
 
-  const activeCategories = CATEGORIES.filter(
-    (c) => (byCategory.get(c.type)?.length ?? 0) > 0 || (listsByCategory.get(c.type)?.length ?? 0) > 0,
+  const allActiveCategories = CATEGORIES.filter(
+    (c) =>
+      (byCategory.get(c.type)?.filter((e) => !mixedIds.has(e.listId ?? "")).length ?? 0) > 0 ||
+      (listsByCategory.get(c.type)?.length ?? 0) > 0,
   );
+  const activeCategories =
+    filter === "all" || filter === "mixed"
+      ? filter === "mixed"
+        ? []
+        : allActiveCategories
+      : allActiveCategories.filter((c) => c.type === filter);
+  const showMixed = (filter === "all" || filter === "mixed") && mixedLists.length > 0;
+
 
   function invalidateEntries() {
     qc.invalidateQueries({ queryKey: ["my-wants", userId] });
