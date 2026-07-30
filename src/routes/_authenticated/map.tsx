@@ -1,13 +1,15 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
-import { MapPin, Compass, Loader2 } from "lucide-react";
+import { MapPin, Compass, Loader2, X } from "lucide-react";
 import { ClientOnly } from "@tanstack/react-router";
-import { lazy, Suspense, useEffect, useRef, useState } from "react";
+import { lazy, Suspense, useEffect, useMemo, useRef, useState } from "react";
 import { useServerFn } from "@tanstack/react-start";
 import { geocodeMissingPlaces } from "@/lib/geocode.functions";
+import { CATEGORIES, categoryMeta, type ItemType } from "@/lib/categories";
 
 const GoogleMap = lazy(() => import("@/components/GoogleMap").then((m) => ({ default: m.GoogleMap })));
+
 
 export const Route = createFileRoute("/_authenticated/map")({
   head: () => ({
