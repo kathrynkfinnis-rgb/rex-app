@@ -274,14 +274,30 @@ function Stat({ label, value }: { label: string; value: number | string }) {
   );
 }
 
-function MiniStat({ icon, label, value }: { icon: React.ReactNode; label: string; value: number }) {
+function MiniStat({
+  icon,
+  label,
+  value,
+  onClick,
+}: {
+  icon: React.ReactNode;
+  label: string;
+  value: number;
+  onClick?: () => void;
+}) {
   return (
-    <div className="flex items-center gap-2 rounded-xl border border-border bg-card px-3 py-2.5">
+    <button
+      type="button"
+      onClick={onClick}
+      disabled={!onClick}
+      className="flex w-full items-center gap-2 rounded-xl border border-border bg-card px-3 py-2.5 text-left transition-all hover:border-primary/50 hover:bg-secondary/50 active:scale-[0.98] disabled:cursor-default disabled:hover:border-border disabled:hover:bg-card"
+    >
       <span className="text-primary">{icon}</span>
       <div className="min-w-0">
         <div className="font-display text-lg leading-none">{value}</div>
         <div className="truncate text-[11px] text-muted-foreground">{label}</div>
       </div>
-    </div>
+    </button>
   );
 }
+
