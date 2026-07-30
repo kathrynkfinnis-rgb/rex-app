@@ -956,6 +956,16 @@ export type Database = {
           username: string
         }[]
       }
+      top_rexxers_weekly: {
+        Args: { _limit?: number }
+        Returns: {
+          avatar_url: string
+          display_name: string
+          rex_count: number
+          user_id: string
+          username: string
+        }[]
+      }
     }
     Enums: {
       app_role: "admin" | "moderator" | "user"
