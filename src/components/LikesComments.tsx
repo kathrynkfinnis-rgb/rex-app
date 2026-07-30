@@ -148,8 +148,11 @@ export function LikesComments({
 
       {(open || !compact) && (
         <div className={cn("mt-2 space-y-2", compact && "border-t border-border pt-3")}>
+          {comments.length === 0 && (
+            <p className="px-1 pb-1 text-xs text-muted-foreground">No comments yet — be the first.</p>
+          )}
           {comments.map((c) => (
-            <div key={c.id} className="flex items-start gap-2 rounded-xl bg-secondary/40 px-3 py-2">
+            <div key={c.id} className="group flex items-start gap-2.5 rounded-2xl bg-secondary/50 px-3 py-2.5 transition-colors hover:bg-secondary/70">
               <UserAvatar url={c.profiles?.avatar_url} name={c.profiles?.display_name || c.profiles?.username} size="xs" className="mt-0.5" />
               <div className="min-w-0 flex-1">
                 <div className="flex items-baseline gap-1.5">
@@ -170,7 +173,7 @@ export function LikesComments({
                     e.stopPropagation();
                     deleteComment(c.id);
                   }}
-                  className="text-muted-foreground hover:text-destructive"
+                  className="text-muted-foreground opacity-0 transition-opacity hover:text-destructive focus:opacity-100 group-hover:opacity-100"
                   aria-label="Delete comment"
                 >
                   <Trash2 className="h-3.5 w-3.5" />
@@ -186,22 +189,23 @@ export function LikesComments({
               postComment();
             }}
             onClick={(e) => e.stopPropagation()}
-            className="flex items-center gap-2"
+            className="group flex items-center gap-2 rounded-full border border-border bg-card/60 py-1 pl-2 pr-1 shadow-sm transition-all focus-within:border-primary focus-within:bg-card focus-within:shadow-md"
           >
             <MentionInput
               value={body}
               onChange={setBody}
-              placeholder="Add a comment… use @ to tag a friend"
+              placeholder="Add a comment… @ to tag a friend"
               maxLength={1000}
+              className="rounded-full border-0 bg-transparent px-2 py-1.5 text-sm placeholder:text-muted-foreground/70 focus:border-0 focus:ring-0"
             />
 
             <button
               type="submit"
               disabled={submitting || !body.trim()}
-              className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-primary text-primary-foreground disabled:opacity-40"
+              className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-primary text-primary-foreground transition-all hover:brightness-95 active:scale-95 disabled:scale-100 disabled:bg-muted disabled:text-muted-foreground"
               aria-label="Post comment"
             >
-              <Send className="h-4 w-4" />
+              <Send className="h-3.5 w-3.5" />
             </button>
           </form>
         </div>
