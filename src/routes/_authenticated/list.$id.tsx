@@ -9,10 +9,10 @@ type Visibility = "draft" | "friends" | "public";
 export const Route = createFileRoute("/_authenticated/list/$id")({
   head: () => ({
     meta: [
-      { title: "List — REX 🦖💡" },
-      { name: "description", content: "A REX list of recommendations worth saving." },
-      { property: "og:title", content: "A REX list" },
-      { property: "og:description", content: "A REX list of recommendations worth saving." },
+      { title: "Collection — REX 🦖💡" },
+      { name: "description", content: "A REX collection of recommendations worth saving." },
+      { property: "og:title", content: "A REX collection" },
+      { property: "og:description", content: "A REX collection of recommendations worth saving." },
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary" },
     ],
@@ -104,13 +104,13 @@ function ListPage() {
   });
 
   if (isLoading) {
-    return <div className="px-5 py-8 text-sm text-muted-foreground">Loading list…</div>;
+    return <div className="px-5 py-8 text-sm text-muted-foreground">Loading collection…</div>;
   }
 
   if (!list) {
     return (
       <div className="px-5 py-10 text-center">
-        <h1 className="text-lg font-semibold">List not available</h1>
+        <h1 className="text-lg font-semibold">Collection not available</h1>
         <p className="mt-1 text-sm text-muted-foreground">It may be private or no longer exists.</p>
         <Link to="/feed" className="mt-4 inline-block text-sm font-medium text-primary">
           Back to feed
