@@ -9,6 +9,7 @@ import { Button } from "@/components/ui/button";
 import { UserAvatar } from "@/components/UserAvatar";
 import { SearchPicker, type AnyHit } from "@/components/SearchPicker";
 import { MentionInput, CommentText } from "@/components/MentionInput";
+import { CrownRatingInput } from "@/components/CrownRating";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 
@@ -29,6 +30,8 @@ function AskDetailPage() {
   const [body, setBody] = useState("");
   const [posting, setPosting] = useState(false);
   const [suggestOpen, setSuggestOpen] = useState(false);
+  const [rating, setRating] = useState(8);
+  const [alsoRex, setAlsoRex] = useState(true);
   const [suggested, setSuggested] = useState<{ id: string; title: string; subtitle: string | null; image_url: string | null; type: ItemType } | null>(null);
 
   const { data: me } = useQuery({
@@ -102,15 +105,41 @@ function AskDetailPage() {
     if (!body.trim() && !suggested) return;
     setPosting(true);
     try {
+      const text = body.trim() || (suggested ? `Try: ${suggested.title}` : "");
       const { error } = await supabase.from("request_comments").insert({
         request_id: id,
         user_id: me.id,
-        body: body.trim() || (suggested ? `Try: ${suggested.title}` : ""),
+        body: text,
         suggested_item_id: suggested?.id ?? null,
       });
       if (error) throw error;
+
+      // A reply with a suggestion becomes a Rex automatically
+      if (suggested && alsoRex) {
+        const { data: existingRex } = await supabase
+          .from("recommendations")
+          .select("id")
+          .eq("user_id", me.id)
+          .eq("item_id", suggested.id)
+          .maybeSingle();
+        if (existingRex) {
+          toast.success("Reply posted — you already have a Rex for this");
+        } else {
+          const { error: rexErr } = await supabase.from("recommendations").insert({
+            user_id: me.id,
+            item_id: suggested.id,
+            rating,
+            note: text || null,
+          });
+          if (rexErr) toast.error("Reply posted, but couldn't create the Rex");
+          else toast.success("Reply posted and added as a Rex 🦖");
+        }
+        qc.invalidateQueries({ queryKey: ["feed"] });
+      }
+
       setBody("");
       setSuggested(null);
+      setRating(8);
       qc.invalidateQueries({ queryKey: ["request", id] });
       qc.invalidateQueries({ queryKey: ["request-comments-count", id] });
     } catch (e) {
@@ -119,6 +148,7 @@ function AskDetailPage() {
       setPosting(false);
     }
   }
+
 
   async function deleteRequest() {
     if (!confirm("Delete this ask?")) return;
@@ -223,6 +253,25 @@ function AskDetailPage() {
               {suggested.subtitle && <p className="truncate text-xs text-muted-foreground">{suggested.subtitle}</p>}
             </div>
             <button onClick={() => setSuggested(null)} className="text-xs text-muted-foreground underline">Remove</button>
+          </div>
+        )}
+        {suggested && (
+          <div className="mb-3 rounded-xl bg-card p-3 ring-1 ring-border">
+            <label className="flex items-center gap-2 text-sm font-medium">
+              <input
+                type="checkbox"
+                checked={alsoRex}
+                onChange={(e) => setAlsoRex(e.target.checked)}
+                className="h-4 w-4 accent-[hsl(var(--primary))]"
+              />
+              Also post as a Rex 🦖
+            </label>
+            {alsoRex && (
+              <div className="mt-2">
+                <p className="mb-1 text-xs text-muted-foreground">Your rating</p>
+                <CrownRatingInput value={rating} onChange={setRating} size="md" />
+              </div>
+            )}
           </div>
         )}
         {suggestOpen && req.type && req.type !== "recipe" && (
