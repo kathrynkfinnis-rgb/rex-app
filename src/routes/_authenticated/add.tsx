@@ -76,7 +76,7 @@ function AddPage() {
     setCoords(null);
     setPicked(null);
     setManualMode(false);
-    setPlaceSub("");
+    setPlaceSubs([]);
     setJustAdded(null);
     setPhotos([]);
   }
