@@ -10,7 +10,9 @@ import { GroupsSection } from "@/components/GroupsSection";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { toast } from "sonner";
-import { UserPlus, Check, X, Search, Share2, Users } from "lucide-react";
+import { UserPlus, Check, X, Search, Share2, Users, Star } from "lucide-react";
+import { useTopFriends, useToggleTopFriend } from "@/lib/topFriends";
+
 
 export const Route = createFileRoute("/_authenticated/friends")({
   head: () => ({
