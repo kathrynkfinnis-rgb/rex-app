@@ -200,8 +200,9 @@ export function RecommendationCard({ rec }: { rec: FeedRow }) {
         </div>
 
       </div>
-
+      <AlsoRecommendedBy itemId={item.id} excludeUserId={rec.user_id} />
     </article>
+
     {isOwner && (
       <EditRecommendationDialog
         open={editing}
