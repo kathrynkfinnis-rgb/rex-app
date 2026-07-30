@@ -6,7 +6,8 @@ export type NotificationType =
   | "friend_accepted"
   | "blast_new"
   | "blast_comment"
-  | "friend_new_rec";
+  | "friend_new_rec"
+  | "mention";
 
 export type NotificationRow = {
   id: string;
@@ -40,6 +41,8 @@ export function notifCopy(n: NotificationRow): string {
       return n.data?.has_suggestion
         ? `${who} suggested something on your blast "${n.data?.title || ""}"`
         : `${who} replied to your blast: "${(n.data?.preview as string) || ""}"`;
+    case "mention":
+      return `${who} tagged you: "${(n.data?.preview as string) || ""}"`;
     case "friend_new_rec":
       return `${who} Rexed ${n.data?.title || "something new"}`;
     default:
@@ -65,6 +68,7 @@ export const PREF_LABELS: Record<
   friend_accepted: { label: "Friend requests accepted", description: "When someone accepts your request" },
   blast_new: { label: "New blasts from friends", description: "When a friend posts a want-a-rec" },
   blast_comment: { label: "Replies to my blasts", description: "Comments or suggestions on blasts you posted" },
+  mention: { label: "Tagged in a comment", description: "When a friend tags you with @ in a comment" },
   friend_new_rec: { label: "New Rexes from friends", description: "Every time a friend posts a Rex (can be noisy)" },
 };
 
@@ -78,6 +82,7 @@ export type PrefRow = {
   blast_new: boolean;
   blast_comment: boolean;
   friend_new_rec: boolean;
+  mention: boolean;
   email_enabled: boolean;
   created_at?: string;
   updated_at?: string;
@@ -92,5 +97,6 @@ export const DEFAULT_PREFS: Omit<PrefRow, "user_id" | "created_at" | "updated_at
   blast_new: true,
   blast_comment: true,
   friend_new_rec: false,
+  mention: true,
   email_enabled: false,
 };

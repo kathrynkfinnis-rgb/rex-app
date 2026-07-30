@@ -454,6 +454,7 @@ export type Database = {
           friend_accepted: boolean
           friend_new_rec: boolean
           friend_request: boolean
+          mention: boolean
           rec_comment: boolean
           rec_like: boolean
           rec_saved: boolean
@@ -468,6 +469,7 @@ export type Database = {
           friend_accepted?: boolean
           friend_new_rec?: boolean
           friend_request?: boolean
+          mention?: boolean
           rec_comment?: boolean
           rec_like?: boolean
           rec_saved?: boolean
@@ -482,6 +484,7 @@ export type Database = {
           friend_accepted?: boolean
           friend_new_rec?: boolean
           friend_request?: boolean
+          mention?: boolean
           rec_comment?: boolean
           rec_like?: boolean
           rec_saved?: boolean

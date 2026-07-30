@@ -6,6 +6,7 @@ import { cn } from "@/lib/utils";
 import { formatDistanceToNow } from "date-fns";
 import { toast } from "sonner";
 import { UserAvatar } from "@/components/UserAvatar";
+import { MentionInput, CommentText } from "@/components/MentionInput";
 
 type CommentRow = {
   id: string;
@@ -159,7 +160,7 @@ export function LikesComments({
                     {formatDistanceToNow(new Date(c.created_at), { addSuffix: true })}
                   </span>
                 </div>
-                <p className="text-sm leading-snug whitespace-pre-wrap break-words">{c.body}</p>
+                <CommentText text={c.body} className="text-sm leading-snug" />
               </div>
               {c.user_id === uid && (
                 <button
@@ -187,13 +188,13 @@ export function LikesComments({
             onClick={(e) => e.stopPropagation()}
             className="flex items-center gap-2"
           >
-            <input
+            <MentionInput
               value={body}
-              onChange={(e) => setBody(e.target.value)}
-              placeholder="Add a comment…"
+              onChange={setBody}
+              placeholder="Add a comment… use @ to tag a friend"
               maxLength={1000}
-              className="min-w-0 flex-1 rounded-full border border-border bg-background px-4 py-2 text-sm outline-none focus:border-primary"
             />
+
             <button
               type="submit"
               disabled={submitting || !body.trim()}
