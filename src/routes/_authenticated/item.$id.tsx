@@ -152,7 +152,7 @@ function ItemPage() {
           >
             <Check className="h-4 w-4" /> {cat.actionVerb}
           </Button>
-          <WantButton itemId={id} itemType={item.type as ItemType} />
+          <WantButton itemId={id} itemType={item.type as ItemType} itemTitle={item.title} />
         </div>
       </header>
 
