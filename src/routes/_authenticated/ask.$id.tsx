@@ -6,7 +6,6 @@ import { formatDistanceToNow } from "date-fns";
 import { supabase } from "@/integrations/supabase/client";
 import { categoryMeta, type ItemType } from "@/lib/categories";
 import { Button } from "@/components/ui/button";
-import { Textarea } from "@/components/ui/textarea";
 import { UserAvatar } from "@/components/UserAvatar";
 import { SearchPicker, type AnyHit } from "@/components/SearchPicker";
 import { MentionInput, CommentText } from "@/components/MentionInput";
