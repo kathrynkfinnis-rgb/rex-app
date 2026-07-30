@@ -181,6 +181,8 @@ export function RecommendationCard({ rec }: { rec: FeedRow }) {
             <span className="truncate font-medium text-foreground">
               {author.display_name || author.username}
             </span>
+            <TopRexxerCrown userId={rec.user_id} />
+
           </Link>
         ) : (
           <span className="font-medium text-foreground">Someone</span>
