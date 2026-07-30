@@ -340,7 +340,7 @@ function AddPage() {
               <FileUp className="h-6 w-6" />
             </div>
             <div className="min-w-0 flex-1">
-              <p className="font-display text-lg">Import a list</p>
+              <p className="font-display text-lg">Import a collection</p>
               <p className="text-sm text-muted-foreground">Pull Rex from a Google Sheet or Word doc.</p>
             </div>
           </Link>

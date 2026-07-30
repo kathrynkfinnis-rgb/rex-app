@@ -148,7 +148,7 @@ function ListPage() {
       <div className="space-y-2 px-4 py-4">
         {(entries ?? []).length === 0 && (
           <p className="rounded-2xl border border-dashed border-border bg-card p-6 text-center text-sm text-muted-foreground">
-            Nothing in this list yet.
+            Nothing in this collection yet.
           </p>
         )}
         {(entries ?? []).map((e) => (

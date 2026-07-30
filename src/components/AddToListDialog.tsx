@@ -192,7 +192,7 @@ export function AddToListDialog({
               )}
             >
               <Sparkles className="h-3.5 w-3.5" />
-              <span className="flex-1">Let this list hold any category</span>
+              <span className="flex-1">Let this collection hold any category</span>
               {newMixed ? <Check className="h-3.5 w-3.5" /> : null}
             </button>
             <div className="flex gap-2">
