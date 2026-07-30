@@ -9,6 +9,7 @@ import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { UserAvatar } from "@/components/UserAvatar";
 import { SearchPicker, type AnyHit } from "@/components/SearchPicker";
+import { MentionInput, CommentText } from "@/components/MentionInput";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 
@@ -191,7 +192,7 @@ function AskDetailPage() {
                   </button>
                 )}
               </div>
-              {c.body && <p className="mt-2 whitespace-pre-wrap text-sm leading-snug">{c.body}</p>}
+              {c.body && <CommentText text={c.body} className="mt-2 text-sm leading-snug" />}
               {c.items && (
                 <Link
                   to="/item/$id"
@@ -232,13 +233,15 @@ function AskDetailPage() {
           </div>
         )}
         <div className="flex items-end gap-2">
-          <Textarea
+          <MentionInput
             value={body}
-            onChange={(e) => setBody(e.target.value)}
+            onChange={setBody}
+            multiline
             rows={2}
-            placeholder="Add a suggestion or comment…"
-            className="min-h-[44px] flex-1 rounded-2xl"
+            placeholder="Add a suggestion or comment… use @ to tag a friend"
+            className="min-h-[44px]"
           />
+
           <div className="flex flex-col gap-2">
             {req.type && req.type !== "recipe" && !suggestOpen && !suggested && (
               <Button type="button" variant="outline" size="icon" className="rounded-full" onClick={() => setSuggestOpen(true)} aria-label="Attach suggestion">
