@@ -21,11 +21,11 @@ export const geocodeMissingPlaces = createServerFn({ method: "POST" })
     const { data: rows, error } = await supabase
       .from("items")
       .select("id, title, subtitle, address")
-      .eq("type", "place")
+      .in("type", ["place", "event"])
       .is("lat", null)
       .order("created_at", { ascending: false })
       .limit(limit);
-    if (error || !rows) return { updated: 0, checked: 0 };
+    if (error || !rows) return { updated: 0, checked: 0, remaining: 0 };
 
     const headers = {
       Authorization: `Bearer ${lovable}`,
