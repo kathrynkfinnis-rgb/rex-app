@@ -1,6 +1,7 @@
 export type NotificationType =
   | "rec_like"
   | "rec_comment"
+  | "rec_saved"
   | "friend_request"
   | "friend_accepted"
   | "blast_new"
@@ -25,6 +26,8 @@ export function notifCopy(n: NotificationRow): string {
   switch (n.type) {
     case "rec_like":
       return `${who} liked your Rex`;
+    case "rec_saved":
+      return `${who} added your Rex to their list`;
     case "rec_comment":
       return `${who} commented: "${(n.data?.preview as string) || ""}"`;
     case "friend_request":
@@ -56,6 +59,7 @@ export const PREF_LABELS: Record<
   { label: string; description: string }
 > = {
   rec_comment: { label: "Comments on my Rexes", description: "When someone replies to a Rex you posted" },
+  rec_saved: { label: "Saves to lists", description: "When someone adds a Rex you posted to their list" },
   rec_like: { label: "Likes on my Rexes", description: "When someone likes a Rex you posted" },
   friend_request: { label: "New friend requests", description: "When someone wants to connect" },
   friend_accepted: { label: "Friend requests accepted", description: "When someone accepts your request" },
@@ -67,6 +71,7 @@ export const PREF_LABELS: Record<
 export type PrefRow = {
   user_id: string;
   rec_like: boolean;
+  rec_saved: boolean;
   rec_comment: boolean;
   friend_request: boolean;
   friend_accepted: boolean;
@@ -80,6 +85,7 @@ export type PrefRow = {
 
 export const DEFAULT_PREFS: Omit<PrefRow, "user_id" | "created_at" | "updated_at"> = {
   rec_like: true,
+  rec_saved: true,
   rec_comment: true,
   friend_request: true,
   friend_accepted: true,

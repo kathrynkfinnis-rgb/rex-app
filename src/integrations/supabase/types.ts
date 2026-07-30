@@ -456,6 +456,7 @@ export type Database = {
           friend_request: boolean
           rec_comment: boolean
           rec_like: boolean
+          rec_saved: boolean
           updated_at: string
           user_id: string
         }
@@ -469,6 +470,7 @@ export type Database = {
           friend_request?: boolean
           rec_comment?: boolean
           rec_like?: boolean
+          rec_saved?: boolean
           updated_at?: string
           user_id: string
         }
@@ -482,6 +484,7 @@ export type Database = {
           friend_request?: boolean
           rec_comment?: boolean
           rec_like?: boolean
+          rec_saved?: boolean
           updated_at?: string
           user_id?: string
         }
