@@ -75,7 +75,11 @@ function ProfilePage() {
               )}
             </div>
             <div className="min-w-0 flex-1">
-              <p className="truncate font-display text-2xl">{profile.display_name || profile.username}</p>
+              <p className="flex items-center gap-1.5 truncate font-display text-2xl">
+                <span className="truncate">{profile.display_name || profile.username}</span>
+                <TopRexxerCrown userId={profile.id} className="h-4 w-4" />
+              </p>
+
               <p className="truncate text-sm text-muted-foreground">@{profile.username}</p>
               {recs && recs.length > 0 && (
                 <div className="mt-2 flex items-center gap-3 text-sm text-muted-foreground">
