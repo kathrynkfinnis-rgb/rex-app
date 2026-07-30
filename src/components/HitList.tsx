@@ -600,7 +600,7 @@ function EntryList({
                     </DropdownMenuItem>
                     {lists.map((l) => (
                       <DropdownMenuItem key={l.id} onClick={() => onMove(e, l.id)}>
-                        {l.emoji ?? (l.item_type === "mixed" ? "✨" : c.hitDefaultEmoji)} {l.name}
+                        {l.emoji ?? "✨"} {l.name}
                       </DropdownMenuItem>
                     ))}
                     <DropdownMenuSeparator />
