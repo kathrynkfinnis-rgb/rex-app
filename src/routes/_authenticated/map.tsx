@@ -218,7 +218,9 @@ function MapPage() {
                 {p.recommendations?.length ?? 0} rec{(p.recommendations?.length ?? 0) === 1 ? "" : "s"}
               </span>
             </Link>
-          ))
+            );
+          })
+
         )}
       </div>
     </div>
