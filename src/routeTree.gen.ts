@@ -21,6 +21,7 @@ import { Route as AuthenticatedMapRouteImport } from './routes/_authenticated/ma
 import { Route as AuthenticatedImportGoodreadsRouteImport } from './routes/_authenticated/import-goodreads'
 import { Route as AuthenticatedImportRouteImport } from './routes/_authenticated/import'
 import { Route as AuthenticatedFriendsRouteImport } from './routes/_authenticated/friends'
+import { Route as AuthenticatedFeedbackRouteImport } from './routes/_authenticated/feedback'
 import { Route as AuthenticatedFeedRouteImport } from './routes/_authenticated/feed'
 import { Route as AuthenticatedCreatorsRouteImport } from './routes/_authenticated/creators'
 import { Route as AuthenticatedAdminRouteImport } from './routes/_authenticated/admin'
@@ -92,6 +93,11 @@ const AuthenticatedFriendsRoute = AuthenticatedFriendsRouteImport.update({
   path: '/friends',
   getParentRoute: () => AuthenticatedRouteRoute,
 } as any)
+const AuthenticatedFeedbackRoute = AuthenticatedFeedbackRouteImport.update({
+  id: '/feedback',
+  path: '/feedback',
+  getParentRoute: () => AuthenticatedRouteRoute,
+} as any)
 const AuthenticatedFeedRoute = AuthenticatedFeedRouteImport.update({
   id: '/feed',
   path: '/feed',
@@ -141,6 +147,7 @@ export interface FileRoutesByFullPath {
   '/admin': typeof AuthenticatedAdminRoute
   '/creators': typeof AuthenticatedCreatorsRoute
   '/feed': typeof AuthenticatedFeedRoute
+  '/feedback': typeof AuthenticatedFeedbackRoute
   '/friends': typeof AuthenticatedFriendsRoute
   '/import': typeof AuthenticatedImportRoute
   '/import-goodreads': typeof AuthenticatedImportGoodreadsRoute
@@ -162,6 +169,7 @@ export interface FileRoutesByTo {
   '/admin': typeof AuthenticatedAdminRoute
   '/creators': typeof AuthenticatedCreatorsRoute
   '/feed': typeof AuthenticatedFeedRoute
+  '/feedback': typeof AuthenticatedFeedbackRoute
   '/friends': typeof AuthenticatedFriendsRoute
   '/import': typeof AuthenticatedImportRoute
   '/import-goodreads': typeof AuthenticatedImportGoodreadsRoute
@@ -185,6 +193,7 @@ export interface FileRoutesById {
   '/_authenticated/admin': typeof AuthenticatedAdminRoute
   '/_authenticated/creators': typeof AuthenticatedCreatorsRoute
   '/_authenticated/feed': typeof AuthenticatedFeedRoute
+  '/_authenticated/feedback': typeof AuthenticatedFeedbackRoute
   '/_authenticated/friends': typeof AuthenticatedFriendsRoute
   '/_authenticated/import': typeof AuthenticatedImportRoute
   '/_authenticated/import-goodreads': typeof AuthenticatedImportGoodreadsRoute
@@ -208,6 +217,7 @@ export interface FileRouteTypes {
     | '/admin'
     | '/creators'
     | '/feed'
+    | '/feedback'
     | '/friends'
     | '/import'
     | '/import-goodreads'
@@ -229,6 +239,7 @@ export interface FileRouteTypes {
     | '/admin'
     | '/creators'
     | '/feed'
+    | '/feedback'
     | '/friends'
     | '/import'
     | '/import-goodreads'
@@ -251,6 +262,7 @@ export interface FileRouteTypes {
     | '/_authenticated/admin'
     | '/_authenticated/creators'
     | '/_authenticated/feed'
+    | '/_authenticated/feedback'
     | '/_authenticated/friends'
     | '/_authenticated/import'
     | '/_authenticated/import-goodreads'
@@ -359,6 +371,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedFriendsRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
+    '/_authenticated/feedback': {
+      id: '/_authenticated/feedback'
+      path: '/feedback'
+      fullPath: '/feedback'
+      preLoaderRoute: typeof AuthenticatedFeedbackRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
     '/_authenticated/feed': {
       id: '/_authenticated/feed'
       path: '/feed'
@@ -423,6 +442,7 @@ interface AuthenticatedRouteRouteChildren {
   AuthenticatedAdminRoute: typeof AuthenticatedAdminRoute
   AuthenticatedCreatorsRoute: typeof AuthenticatedCreatorsRoute
   AuthenticatedFeedRoute: typeof AuthenticatedFeedRoute
+  AuthenticatedFeedbackRoute: typeof AuthenticatedFeedbackRoute
   AuthenticatedFriendsRoute: typeof AuthenticatedFriendsRoute
   AuthenticatedImportRoute: typeof AuthenticatedImportRoute
   AuthenticatedImportGoodreadsRoute: typeof AuthenticatedImportGoodreadsRoute
@@ -442,6 +462,7 @@ const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
   AuthenticatedAdminRoute: AuthenticatedAdminRoute,
   AuthenticatedCreatorsRoute: AuthenticatedCreatorsRoute,
   AuthenticatedFeedRoute: AuthenticatedFeedRoute,
+  AuthenticatedFeedbackRoute: AuthenticatedFeedbackRoute,
   AuthenticatedFriendsRoute: AuthenticatedFriendsRoute,
   AuthenticatedImportRoute: AuthenticatedImportRoute,
   AuthenticatedImportGoodreadsRoute: AuthenticatedImportGoodreadsRoute,
@@ -469,13 +490,3 @@ const rootRouteChildren: RootRouteChildren = {
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
   ._addFileTypes<FileRouteTypes>()
-
-import type { getRouter } from './router.tsx'
-import type { startInstance } from './start.ts'
-declare module '@tanstack/react-start' {
-  interface Register {
-    ssr: true
-    router: Awaited<ReturnType<typeof getRouter>>
-    config: Awaited<ReturnType<typeof startInstance.getOptions>>
-  }
-}
