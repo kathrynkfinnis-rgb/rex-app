@@ -233,20 +233,47 @@ export function GoogleMap({
 
   useEffect(() => {
     if (!ready || !mapRef.current || !window.google?.maps) return;
+    let cancelled = false;
+    const g = window.google.maps;
     markersRef.current.forEach((m) => m.setMap(null));
     markersRef.current = [];
     if (!places.length) return;
-    const bounds = new window.google.maps.LatLngBounds();
+    if (!infoRef.current) infoRef.current = new g.InfoWindow({ disableAutoPan: true });
+    const info = infoRef.current;
+    const bounds = new g.LatLngBounds();
     places.forEach((p) => {
-      const marker = new window.google.maps.Marker({
+      const marker = new g.Marker({
         position: { lat: p.lat, lng: p.lng },
         map: mapRef.current,
         title: p.title,
+        icon: {
+          url: drawPin(null, initialsOf(p.byName)),
+          scaledSize: new g.Size(PIN_W, PIN_H),
+          anchor: new g.Point(PIN_W / 2, PIN_H - 2),
+        },
       });
-      if (onSelect) marker.addListener("click", () => onSelect(p.id));
+      avatarIcon(p.avatarUrl, p.byName).then((url) => {
+        if (cancelled) return;
+        marker.setIcon({
+          url,
+          scaledSize: new g.Size(PIN_W, PIN_H),
+          anchor: new g.Point(PIN_W / 2, PIN_H - 2),
+        });
+      });
+      marker.addListener("mouseover", () => {
+        info.setContent(bubbleHtml(p));
+        info.open({ map: mapRef.current, anchor: marker });
+      });
+      marker.addListener("mouseout", () => info.close());
+      marker.addListener("click", () => {
+        info.setContent(bubbleHtml(p));
+        info.open({ map: mapRef.current, anchor: marker });
+        if (onSelect) onSelect(p.id);
+      });
       markersRef.current.push(marker);
       bounds.extend(marker.getPosition());
     });
+
     // The user's own 10-mile view wins when we have their location.
     if (userCentered) return;
     if (places.length === 1) {
