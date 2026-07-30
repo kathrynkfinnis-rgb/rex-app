@@ -290,16 +290,43 @@ export function HitList({ userId }: { userId: string }) {
     invalidateEntries();
   }
 
-  if (entries.length === 0 && (lists?.length ?? 0) === 0) {
-    return (
-      <p className="text-sm text-muted-foreground">
-        Nothing on your list yet — tap the bookmark on any post, or hit "Want to…" on an item page.
-      </p>
-    );
-  }
+  const isEmpty = entries.length === 0 && (lists?.length ?? 0) === 0;
 
   return (
     <div className="space-y-6">
+      {isEmpty ? (
+        <div className="rounded-2xl border border-dashed border-border p-5 text-center">
+          <p className="text-sm text-muted-foreground">
+            Nothing on your list yet — tap the bookmark on any post, or hit "Want to…" on an item page.
+          </p>
+          <p className="mt-3 text-sm text-muted-foreground">Or start a list from scratch:</p>
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button size="sm" className="mt-3 gap-1 rounded-full">
+                <Plus className="h-4 w-4" /> New list
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="center" className="max-h-72 overflow-y-auto">
+              <DropdownMenuLabel>What kind of list?</DropdownMenuLabel>
+              <DropdownMenuSeparator />
+              {CATEGORIES.map((c) => (
+                <DropdownMenuItem
+                  key={c.type}
+                  onClick={() => {
+                    setNewListFor(c.type);
+                    setNewName("");
+                    setNewEmoji("");
+                    setNewVisibility("draft");
+                  }}
+                >
+                  <span className="mr-2">{c.hitDefaultEmoji}</span>
+                  {c.hitDefaultLabel}
+                </DropdownMenuItem>
+              ))}
+            </DropdownMenuContent>
+          </DropdownMenu>
+        </div>
+      ) : null}
       {activeCategories.map((cat) => {
         const all = byCategory.get(cat.type) ?? [];
         const subs = listsByCategory.get(cat.type) ?? [];
