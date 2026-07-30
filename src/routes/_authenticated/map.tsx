@@ -63,10 +63,17 @@ function MapPage() {
     return [...set].sort();
   }, [byCat]);
 
-  const filtered = useMemo(
-    () => (sub ? byCat.filter((p: any) => p.genre === sub) : byCat),
-    [byCat, sub],
-  );
+  const { data: topSet } = useTopFriends();
+  const topIds = topSet ?? new Set<string>();
+
+  const filtered = useMemo(() => {
+    const base = sub ? byCat.filter((p: any) => p.genre === sub) : byCat;
+    if (!topOnly) return base;
+    return base.filter((p: any) =>
+      (p.recommendations ?? []).some((r: any) => topIds.has(r.user_id)),
+    );
+  }, [byCat, sub, topOnly, topSet]);
+
 
   const withLoc = filtered.filter((p: any) => p.lat != null && p.lng != null);
   const withoutLoc = filtered.filter((p: any) => p.lat == null || p.lng == null);
