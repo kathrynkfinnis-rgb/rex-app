@@ -165,25 +165,22 @@ function MapPage() {
 
 
       <div className="relative m-4 h-72 overflow-hidden rounded-2xl bg-muted ring-1 ring-border">
-        {withLoc.length === 0 ? (
-          <div className="flex h-full flex-col items-center justify-center gap-2 text-center px-6">
-            <Compass className="h-8 w-8 text-primary" />
-            <p className="max-w-xs text-sm text-muted-foreground">
-              {cat !== "all" || sub
-                ? "No pins match this filter yet."
-                : "A map view lights up here once you add place Rexes with a location."}
-            </p>
+        <ClientOnly fallback={<div className="h-full w-full animate-pulse bg-muted" />}>
+          <Suspense fallback={<div className="h-full w-full animate-pulse bg-muted" />}>
+            <GoogleMap
+              key={`${cat}-${sub ?? ""}`}
+              radiusMiles={10}
+              places={withLoc.map((p: any) => ({ id: p.id, title: p.title, lat: Number(p.lat), lng: Number(p.lng) }))}
+              onSelect={(id) => navigate({ to: "/item/$id", params: { id } })}
+            />
+          </Suspense>
+        </ClientOnly>
+        {withLoc.length === 0 && (
+          <div className="pointer-events-none absolute inset-x-3 bottom-3 rounded-xl bg-background/90 px-3 py-2 text-center text-xs text-muted-foreground backdrop-blur">
+            {cat !== "all" || sub
+              ? "No pins match this filter yet."
+              : "No place Rexes with a location yet — they'll appear here."}
           </div>
-        ) : (
-          <ClientOnly fallback={<div className="h-full w-full animate-pulse bg-muted" />}>
-            <Suspense fallback={<div className="h-full w-full animate-pulse bg-muted" />}>
-              <GoogleMap
-                key={`${cat}-${sub ?? ""}`}
-                places={withLoc.map((p: any) => ({ id: p.id, title: p.title, lat: Number(p.lat), lng: Number(p.lng) }))}
-                onSelect={(id) => navigate({ to: "/item/$id", params: { id } })}
-              />
-            </Suspense>
-          </ClientOnly>
         )}
       </div>
 
