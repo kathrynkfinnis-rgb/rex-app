@@ -37,6 +37,8 @@ function FeedbackPage() {
   const qc = useQueryClient();
   const [kind, setKind] = useState<string>("idea");
   const [message, setMessage] = useState("");
+  const [anonymous, setAnonymous] = useState(false);
+  const sendAnon = useServerFn(sendAnonymousFeedback);
 
   const { data: mine = [] } = useQuery({
     queryKey: ["feedback", user.id],
@@ -54,21 +56,27 @@ function FeedbackPage() {
 
   const send = useMutation({
     mutationFn: async () => {
+      const page = typeof window !== "undefined" ? window.location.pathname : null;
+      if (anonymous) {
+        await sendAnon({ data: { kind: kind as "idea" | "bug" | "love", message: message.trim(), page } });
+        return;
+      }
       const { error } = await supabase.from("feedback").insert({
         user_id: user.id,
         kind,
         message: message.trim(),
-        page: typeof window !== "undefined" ? window.location.pathname : null,
+        page,
       });
       if (error) throw error;
     },
     onSuccess: () => {
       setMessage("");
-      toast.success("Thanks — feedback sent 🦖");
+      toast.success(anonymous ? "Sent anonymously — thank you 🦖" : "Thanks — feedback sent 🦖");
       qc.invalidateQueries({ queryKey: ["feedback", user.id] });
     },
     onError: () => toast.error("Couldn't send that, try again"),
   });
+
 
   return (
     <div className="px-4 pb-24 pt-20">
