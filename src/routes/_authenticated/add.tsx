@@ -442,15 +442,20 @@ function AddPage() {
 
         {subcategoriesFor(type).length > 0 && (
           <div className="space-y-1.5">
-            <Label>{type === "place" ? "Type of place" : `Type of ${cat!.label.toLowerCase()}`}</Label>
+            <Label>
+              {type === "place" ? "Type of place" : `Type of ${cat!.label.toLowerCase()}`}
+              <span className="ml-1 font-normal text-muted-foreground">(pick any that apply)</span>
+            </Label>
             <div className="flex flex-wrap gap-2">
               {subcategoriesFor(type).map((s) => {
-                const active = placeSub === s;
+                const active = placeSubs.includes(s);
                 return (
                   <button
                     key={s}
                     type="button"
-                    onClick={() => setPlaceSub(active ? "" : s)}
+                    onClick={() =>
+                      setPlaceSubs((prev) => (prev.includes(s) ? prev.filter((p) => p !== s) : [...prev, s]))
+                    }
                     className={cn(
                       "rounded-full px-3 py-1.5 text-sm ring-1 transition-colors",
                       active
