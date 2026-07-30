@@ -29,6 +29,8 @@ function AskDetailPage() {
   const [body, setBody] = useState("");
   const [posting, setPosting] = useState(false);
   const [suggestOpen, setSuggestOpen] = useState(false);
+  const [rating, setRating] = useState(8);
+  const [alsoRex, setAlsoRex] = useState(true);
   const [suggested, setSuggested] = useState<{ id: string; title: string; subtitle: string | null; image_url: string | null; type: ItemType } | null>(null);
 
   const { data: me } = useQuery({
