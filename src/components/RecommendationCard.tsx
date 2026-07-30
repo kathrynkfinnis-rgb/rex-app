@@ -31,6 +31,7 @@ export type FeedRow = {
   tags?: string[] | null;
   user_id: string;
   item_id: string;
+  trip_id?: string | null;
   items: {
     id: string;
     type: ItemType;
@@ -62,10 +63,23 @@ export function RecommendationCard({ rec }: { rec: FeedRow }) {
     queryFn: async () => (await supabase.auth.getUser()).data.user?.id ?? null,
     staleTime: 5 * 60 * 1000,
   });
+  const { data: tripStops } = useQuery({
+    queryKey: ["trip-stop-count", rec.id],
+    enabled: rec.items?.type === "trip",
+    staleTime: 60_000,
+    queryFn: async () => {
+      const { count } = await supabase
+        .from("recommendations")
+        .select("id", { count: "exact", head: true })
+        .eq("trip_id", rec.id);
+      return count ?? 0;
+    },
+  });
   if (!item) return null;
   const cat = categoryMeta(item.type);
   const Icon = cat.icon;
   const isOwner = currentUserId && currentUserId === rec.user_id;
+  const isTrip = item.type === "trip";
   return (
     <>
     <article
@@ -88,11 +102,12 @@ export function RecommendationCard({ rec }: { rec: FeedRow }) {
         </button>
       )}
       <Link
-        to="/item/$id"
-        params={{ id: item.id }}
+        to={(isTrip ? "/trip/$id" : "/item/$id") as any}
+        params={{ id: isTrip ? rec.id : item.id } as any}
         className="block transition-shadow hover:shadow-md"
       >
         <div className="flex gap-3 p-3">
+
           <div className="flex h-14 w-14 shrink-0 items-center justify-center overflow-hidden rounded-lg bg-muted">
             {item.image_url ? (
               <img src={item.image_url} alt="" className="h-full w-full object-cover" />
@@ -113,6 +128,11 @@ export function RecommendationCard({ rec }: { rec: FeedRow }) {
               <div className="ml-auto shrink-0"><CrownRatingDisplay value={rec.rating} size="xs" showNumber /></div>
             </div>
             <h3 className="mt-0.5 truncate font-display text-base leading-tight">{item.title}</h3>
+            {isTrip && (
+              <p className="text-xs font-medium text-primary">
+                {tripStops ?? 0} {tripStops === 1 ? "stop" : "stops"} · tap to see the itinerary
+              </p>
+            )}
             {item.subtitle && (
               <p className="truncate text-xs text-muted-foreground">{item.subtitle}</p>
             )}

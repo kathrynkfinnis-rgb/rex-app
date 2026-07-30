@@ -9,7 +9,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { toast } from "sonner";
-import { ArrowLeft, MapPin, FileUp } from "lucide-react";
+import { ArrowLeft, MapPin, FileUp, Info } from "lucide-react";
 import { CrownRatingInput } from "@/components/CrownRating";
 import { cn } from "@/lib/utils";
 import { SearchPicker, type AnyHit } from "@/components/SearchPicker";
@@ -21,10 +21,13 @@ import { PhotoUploader } from "@/components/PhotoUploader";
 import { TagsInput } from "@/components/TagsInput";
 
 export const Route = createFileRoute("/_authenticated/add")({
+  validateSearch: (search: Record<string, unknown>) => ({
+    trip: typeof search.trip === "string" ? search.trip : undefined,
+  }),
   head: () => ({
     meta: [
       { title: "Add a Rex — REX" },
-      { name: "description", content: "Post a Rex for a place, book, movie, show, or recipe." },
+      { name: "description", content: "Post a Rex for a place, trip, book, movie, show, or recipe." },
     ],
   }),
   component: AddPage,
@@ -32,7 +35,8 @@ export const Route = createFileRoute("/_authenticated/add")({
 
 function AddPage() {
   const navigate = useNavigate();
-  const [type, setType] = useState<ItemType | null>(null);
+  const { trip: tripId } = Route.useSearch();
+  const [type, setType] = useState<ItemType | null>(tripId ? "place" : null);
   const [title, setTitle] = useState("");
   const [subtitle, setSubtitle] = useState("");
   const [address, setAddress] = useState("");
@@ -45,9 +49,10 @@ function AddPage() {
   const [picked, setPicked] = useState<AnyHit | null>(null);
   const [manualMode, setManualMode] = useState(false);
   const [placeSub, setPlaceSub] = useState<string>("");
-  const [justAdded, setJustAdded] = useState<{ itemId: string; title: string } | null>(null);
+  const [justAdded, setJustAdded] = useState<{ itemId: string; recId: string; title: string; isTrip: boolean } | null>(null);
   const [photos, setPhotos] = useState<string[]>([]);
   const [tags, setTags] = useState<string[]>([]);
+  const [showTripInfo, setShowTripInfo] = useState(false);
   const { data: uid } = useQuery({
     queryKey: ["current-user-id"],
     queryFn: async () => (await supabase.auth.getUser()).data.user?.id ?? null,
@@ -55,9 +60,10 @@ function AddPage() {
   });
 
   const cat = type ? categoryMeta(type) : null;
-  const needsSearch = type !== null && type !== "recipe" && type !== "other";
+  const needsSearch = type !== null && type !== "recipe" && type !== "other" && type !== "trip";
   const showForm = !needsSearch || picked || manualMode;
   const photoFn = useServerFn(getPlacePhotoUrl);
+
 
   function resetForm() {
     setType(null);
@@ -164,19 +170,29 @@ function AddPage() {
         itemId = item.id;
       }
 
-      const { error: recErr } = await supabase.from("recommendations").insert({
-        user_id: uid,
-        item_id: itemId!,
-        rating,
-        note: note.trim() || null,
-        photo_url: photos[0] ?? null,
-        photo_urls: photos,
-        tags,
-      } as never);
+      const { data: rec, error: recErr } = await supabase
+        .from("recommendations")
+        .insert({
+          user_id: uid,
+          item_id: itemId!,
+          rating,
+          note: note.trim() || null,
+          photo_url: photos[0] ?? null,
+          photo_urls: photos,
+          tags,
+          trip_id: tripId ?? null,
+        } as never)
+        .select("id")
+        .single();
       if (recErr) throw recErr;
 
+      if (tripId) {
+        toast.success("Added to your trip");
+        navigate({ to: "/trip/$id", params: { id: tripId } });
+        return;
+      }
       toast.success("Added to your feed");
-      setJustAdded({ itemId: itemId!, title: title.trim() });
+      setJustAdded({ itemId: itemId!, recId: rec.id, title: title.trim(), isTrip: type === "trip" });
     } catch (err) {
 
       toast.error(err instanceof Error ? err.message : "Couldn't save");
@@ -189,37 +205,56 @@ function AddPage() {
     return (
       <div className="flex min-h-[70vh] flex-col items-center justify-center gap-6 p-6 text-center">
         <div className="flex h-20 w-20 items-center justify-center rounded-full bg-primary/15 text-4xl">
-          🦖
+          {justAdded.isTrip ? "🧳" : "🦖"}
         </div>
         <div>
           <h1 className="font-display text-3xl">Nice one!</h1>
           <p className="mt-2 text-muted-foreground">
-            "{justAdded.title}" is in your feed.
+            {justAdded.isTrip
+              ? `"${justAdded.title}" is live — now add the places you loved on it.`
+              : `"${justAdded.title}" is in your feed.`}
           </p>
         </div>
         <div className="flex w-full max-w-sm flex-col gap-2">
-          <Button
-            onClick={resetForm}
-            className="h-14 w-full rounded-full text-base font-semibold shadow-lg shadow-primary/30"
-          >
-            Add another
-          </Button>
-          <Button
-            variant="outline"
-            onClick={() => navigate({ to: "/item/$id", params: { id: justAdded.itemId } })}
-            className="h-12 w-full rounded-full"
-          >
-            View Rex
-          </Button>
-          <Button
-            variant="ghost"
-            onClick={() => navigate({ to: "/feed" })}
-            className="h-12 w-full rounded-full"
-          >
-            Back to feed
-          </Button>
+          {justAdded.isTrip ? (
+            <>
+              <Button
+                onClick={() => navigate({ to: "/trip/$id", params: { id: justAdded.recId } })}
+                className="h-14 w-full rounded-full text-base font-semibold shadow-lg shadow-primary/30"
+              >
+                Add places to this trip
+              </Button>
+              <Button variant="ghost" onClick={() => navigate({ to: "/feed" })} className="h-12 w-full rounded-full">
+                Back to feed
+              </Button>
+            </>
+          ) : (
+            <>
+              <Button
+                onClick={resetForm}
+                className="h-14 w-full rounded-full text-base font-semibold shadow-lg shadow-primary/30"
+              >
+                Add another
+              </Button>
+              <Button
+                variant="outline"
+                onClick={() => navigate({ to: "/item/$id", params: { id: justAdded.itemId } })}
+                className="h-12 w-full rounded-full"
+              >
+                View Rex
+              </Button>
+              <Button
+                variant="ghost"
+                onClick={() => navigate({ to: "/feed" })}
+                className="h-12 w-full rounded-full"
+              >
+                Back to feed
+              </Button>
+            </>
+          )}
         </div>
       </div>
+
     );
   }
 
@@ -235,20 +270,66 @@ function AddPage() {
           </button>
           <h1 className="mt-3 font-display text-3xl">What are you Rexing?</h1>
         </header>
-        <div className="grid grid-cols-2 gap-2 p-4">
+        <div className="grid grid-cols-2 gap-2 p-4 pb-2">
           {CATEGORIES.map((c) => (
             <button
               key={c.type}
               onClick={() => setType(c.type)}
-              className="flex items-center gap-3 rounded-2xl bg-card p-3 ring-1 ring-border transition-transform active:scale-95"
+              className="relative flex items-center gap-3 rounded-2xl bg-card p-3 ring-1 ring-border transition-transform active:scale-95"
             >
               <div className={cn("flex h-10 w-10 shrink-0 items-center justify-center rounded-xl", c.tokenClass)}>
                 <c.icon className="h-5 w-5" />
               </div>
               <span className="min-w-0 truncate font-display text-base">{c.plural}</span>
+              {c.type === "trip" && (
+                <span
+                  role="button"
+                  tabIndex={0}
+                  aria-label="What's a trip?"
+                  onClick={(e) => { e.stopPropagation(); setShowTripInfo((s) => !s); }}
+                  onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); e.stopPropagation(); setShowTripInfo((s) => !s); } }}
+                  className="absolute right-1.5 top-1.5 flex h-5 w-5 items-center justify-center rounded-full bg-muted text-muted-foreground hover:text-foreground"
+                >
+                  <Info className="h-3 w-3" />
+                </span>
+              )}
             </button>
           ))}
         </div>
+
+        <div className="px-4 pb-2">
+          {showTripInfo ? (
+            <div className="relative rounded-2xl bg-primary/10 p-4 text-sm ring-1 ring-primary/30">
+              <div className="absolute -top-1.5 right-8 h-3 w-3 rotate-45 bg-primary/10 ring-1 ring-primary/30" />
+              <p className="font-display text-base">Place vs. Trip 🧳</p>
+              <p className="mt-1 text-muted-foreground">
+                A <strong className="text-foreground">Place</strong> is one spot — a restaurant, bar or hotel you'd
+                recommend on its own.
+              </p>
+              <p className="mt-1.5 text-muted-foreground">
+                A <strong className="text-foreground">Trip</strong> ties several places together — &ldquo;Lisbon, 3
+                days&rdquo;. It shows in the feed as one card, and tapping it opens a mini-feed of every Rex on that
+                trip.
+              </p>
+              <button
+                type="button"
+                onClick={() => setShowTripInfo(false)}
+                className="mt-2 text-xs font-medium text-primary underline"
+              >
+                Got it
+              </button>
+            </div>
+          ) : (
+            <button
+              type="button"
+              onClick={() => setShowTripInfo(true)}
+              className="flex items-center gap-1.5 text-xs text-muted-foreground underline"
+            >
+              <Info className="h-3.5 w-3.5" /> What's the difference between a Place and a Trip?
+            </button>
+          )}
+        </div>
+
 
         <div className="px-4 pb-4">
           <Link
@@ -287,6 +368,21 @@ function AddPage() {
       </header>
 
       <div className="space-y-5 p-5">
+        {tripId && (
+          <div className="rounded-2xl bg-primary/10 p-3 text-sm ring-1 ring-primary/30">
+            🧳 This Rex will be added as a stop on your trip.
+          </div>
+        )}
+        {type === "trip" && (
+          <div className="rounded-2xl bg-primary/10 p-4 text-sm ring-1 ring-primary/30">
+            <p className="font-display text-base">What's a trip?</p>
+            <p className="mt-1 text-muted-foreground">
+              Name the trip (e.g. &ldquo;Lisbon, 3 days&rdquo;) and post it. You'll then add each place you loved as a
+              stop — friends see one trip card in the feed and can tap in for the full itinerary.
+            </p>
+          </div>
+        )}
+
         {needsSearch && !showForm && (
           <SearchPicker
             type={type}

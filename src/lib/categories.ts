@@ -1,6 +1,6 @@
-import { MapPin, Book, Film, Tv, ChefHat, Mic, Ticket, Sparkles } from "lucide-react";
+import { MapPin, Book, Film, Tv, ChefHat, Mic, Ticket, Sparkles, Luggage } from "lucide-react";
 
-export type ItemType = "place" | "book" | "movie" | "tv" | "recipe" | "podcast" | "event" | "other";
+export type ItemType = "place" | "trip" | "book" | "movie" | "tv" | "recipe" | "podcast" | "event" | "other";
 
 export const CATEGORIES: {
   type: ItemType;
@@ -15,6 +15,7 @@ export const CATEGORIES: {
   hitDefaultLabel: string;
 }[] = [
   { type: "place", label: "Place", plural: "Places", icon: MapPin, tokenClass: "bg-cat-place/15 text-cat-place", subtitleLabel: "Address or neighborhood", actionVerb: "Been here", wantVerb: "Want to visit", hitDefaultEmoji: "✈️", hitDefaultLabel: "To visit" },
+  { type: "trip", label: "Trip", plural: "Trips", icon: Luggage, tokenClass: "bg-cat-place/15 text-cat-place", subtitleLabel: "Dates, or who you went with", actionVerb: "Went", wantVerb: "Want to go", hitDefaultEmoji: "🧳", hitDefaultLabel: "Trips to take" },
   { type: "book", label: "Book", plural: "Books", icon: Book, tokenClass: "bg-cat-book/15 text-cat-book", subtitleLabel: "Author", actionVerb: "Read it", wantVerb: "Want to read", hitDefaultEmoji: "📚", hitDefaultLabel: "To be read" },
   { type: "movie", label: "Movie", plural: "Movies", icon: Film, tokenClass: "bg-cat-movie/15 text-cat-movie", subtitleLabel: "Year or director", actionVerb: "Seen it", wantVerb: "Want to watch", hitDefaultEmoji: "🎬", hitDefaultLabel: "To watch" },
   { type: "tv", label: "TV", plural: "TV shows", icon: Tv, tokenClass: "bg-cat-tv/15 text-cat-tv", subtitleLabel: "Network or year", actionVerb: "Watched it", wantVerb: "Want to watch", hitDefaultEmoji: "📺", hitDefaultLabel: "To watch" },
@@ -43,6 +44,10 @@ export type PlaceSubcategory = (typeof PLACE_SUBCATEGORIES)[number];
 
 export const SUBCATEGORIES: Record<ItemType, readonly string[]> = {
   place: PLACE_SUBCATEGORIES,
+  trip: [
+    "City break", "Beach", "Road trip", "Countryside", "Ski", "Adventure",
+    "Family", "Weekend away", "Honeymoon", "Work trip", "Other",
+  ],
   recipe: [
     "Salad", "Soup", "Pasta", "Rice & grains", "Meat", "Fish & seafood",
     "Vegetarian", "Vegan", "Breakfast", "Dessert", "Baking", "Snack",

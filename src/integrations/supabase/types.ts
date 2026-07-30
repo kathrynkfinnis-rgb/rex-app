@@ -645,6 +645,7 @@ export type Database = {
           photo_urls: string[]
           rating: number
           tags: string[]
+          trip_id: string | null
           updated_at: string
           user_id: string
         }
@@ -658,6 +659,7 @@ export type Database = {
           photo_urls?: string[]
           rating: number
           tags?: string[]
+          trip_id?: string | null
           updated_at?: string
           user_id: string
         }
@@ -671,6 +673,7 @@ export type Database = {
           photo_urls?: string[]
           rating?: number
           tags?: string[]
+          trip_id?: string | null
           updated_at?: string
           user_id?: string
         }
@@ -687,6 +690,13 @@ export type Database = {
             columns: ["item_id"]
             isOneToOne: false
             referencedRelation: "items"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "recommendations_trip_id_fkey"
+            columns: ["trip_id"]
+            isOneToOne: false
+            referencedRelation: "recommendations"
             referencedColumns: ["id"]
           },
           {
@@ -1010,6 +1020,7 @@ export type Database = {
         | "podcast"
         | "event"
         | "other"
+        | "trip"
       list_visibility: "draft" | "friends" | "public"
     }
     CompositeTypes: {
@@ -1149,6 +1160,7 @@ export const Constants = {
         "podcast",
         "event",
         "other",
+        "trip",
       ],
       list_visibility: ["draft", "friends", "public"],
     },
