@@ -30,6 +30,8 @@ function MapPage() {
 
   const [cat, setCat] = useState<ItemType | "all">("all");
   const [sub, setSub] = useState<string | null>(null);
+  const [topOnly, setTopOnly] = useState(false);
+
 
   const { data } = useQuery({
     queryKey: ["map-places"],
