@@ -54,7 +54,7 @@ export function WantButton({
     try {
       const { error } = await supabase.from("wants").insert({ user_id: uid, item_id: itemId });
       if (error) throw error;
-      toast.success(`Added to My List — ${cat.hitDefaultLabel.toLowerCase()}`, {
+      toast.success(`Added to My Lists — ${cat.hitDefaultLabel.toLowerCase()}`, {
         description: "Filed under your default list.",
         action: { label: "Choose list", onClick: () => setPickerOpen(true) },
       });

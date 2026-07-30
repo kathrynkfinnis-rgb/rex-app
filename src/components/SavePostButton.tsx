@@ -55,7 +55,7 @@ export function SavePostButton({
     onSuccess: (row) => {
       qc.setQueryData(["saved-post", recommendationId, userId], row);
       qc.invalidateQueries({ queryKey: ["my-saved-posts"] });
-      toast.success("Added to My List", {
+      toast.success("Added to My Lists", {
         description: "Filed under your default list.",
         action: { label: "Choose list", onClick: () => setPickerOpen(true) },
       });
@@ -67,7 +67,7 @@ export function SavePostButton({
     <>
       <button
         type="button"
-        aria-label={saved ? "Change list" : "Save to My List"}
+        aria-label={saved ? "Change list" : "Save to My Lists"}
         aria-pressed={!!saved}
         onClick={(e) => {
           e.preventDefault();
