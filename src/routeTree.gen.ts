@@ -28,6 +28,7 @@ import { Route as AuthenticatedAdminRouteImport } from './routes/_authenticated/
 import { Route as AuthenticatedAddRouteImport } from './routes/_authenticated/add'
 import { Route as AuthenticatedAskIndexRouteImport } from './routes/_authenticated/ask.index'
 import { Route as AuthenticatedProfileUsernameRouteImport } from './routes/_authenticated/profile.$username'
+import { Route as AuthenticatedListIdRouteImport } from './routes/_authenticated/list.$id'
 import { Route as AuthenticatedItemIdRouteImport } from './routes/_authenticated/item.$id'
 import { Route as AuthenticatedGroupIdRouteImport } from './routes/_authenticated/group.$id'
 import { Route as AuthenticatedAskIdRouteImport } from './routes/_authenticated/ask.$id'
@@ -130,6 +131,11 @@ const AuthenticatedProfileUsernameRoute =
     path: '/profile/$username',
     getParentRoute: () => AuthenticatedRouteRoute,
   } as any)
+const AuthenticatedListIdRoute = AuthenticatedListIdRouteImport.update({
+  id: '/list/$id',
+  path: '/list/$id',
+  getParentRoute: () => AuthenticatedRouteRoute,
+} as any)
 const AuthenticatedItemIdRoute = AuthenticatedItemIdRouteImport.update({
   id: '/item/$id',
   path: '/item/$id',
@@ -166,6 +172,7 @@ export interface FileRoutesByFullPath {
   '/ask/$id': typeof AuthenticatedAskIdRoute
   '/group/$id': typeof AuthenticatedGroupIdRoute
   '/item/$id': typeof AuthenticatedItemIdRoute
+  '/list/$id': typeof AuthenticatedListIdRoute
   '/profile/$username': typeof AuthenticatedProfileUsernameRoute
   '/ask/': typeof AuthenticatedAskIndexRoute
 }
@@ -189,6 +196,7 @@ export interface FileRoutesByTo {
   '/ask/$id': typeof AuthenticatedAskIdRoute
   '/group/$id': typeof AuthenticatedGroupIdRoute
   '/item/$id': typeof AuthenticatedItemIdRoute
+  '/list/$id': typeof AuthenticatedListIdRoute
   '/profile/$username': typeof AuthenticatedProfileUsernameRoute
   '/ask': typeof AuthenticatedAskIndexRoute
 }
@@ -214,6 +222,7 @@ export interface FileRoutesById {
   '/_authenticated/ask/$id': typeof AuthenticatedAskIdRoute
   '/_authenticated/group/$id': typeof AuthenticatedGroupIdRoute
   '/_authenticated/item/$id': typeof AuthenticatedItemIdRoute
+  '/_authenticated/list/$id': typeof AuthenticatedListIdRoute
   '/_authenticated/profile/$username': typeof AuthenticatedProfileUsernameRoute
   '/_authenticated/ask/': typeof AuthenticatedAskIndexRoute
 }
@@ -239,6 +248,7 @@ export interface FileRouteTypes {
     | '/ask/$id'
     | '/group/$id'
     | '/item/$id'
+    | '/list/$id'
     | '/profile/$username'
     | '/ask/'
   fileRoutesByTo: FileRoutesByTo
@@ -262,6 +272,7 @@ export interface FileRouteTypes {
     | '/ask/$id'
     | '/group/$id'
     | '/item/$id'
+    | '/list/$id'
     | '/profile/$username'
     | '/ask'
   id:
@@ -286,6 +297,7 @@ export interface FileRouteTypes {
     | '/_authenticated/ask/$id'
     | '/_authenticated/group/$id'
     | '/_authenticated/item/$id'
+    | '/_authenticated/list/$id'
     | '/_authenticated/profile/$username'
     | '/_authenticated/ask/'
   fileRoutesById: FileRoutesById
@@ -432,6 +444,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedProfileUsernameRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
+    '/_authenticated/list/$id': {
+      id: '/_authenticated/list/$id'
+      path: '/list/$id'
+      fullPath: '/list/$id'
+      preLoaderRoute: typeof AuthenticatedListIdRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
     '/_authenticated/item/$id': {
       id: '/_authenticated/item/$id'
       path: '/item/$id'
@@ -473,6 +492,7 @@ interface AuthenticatedRouteRouteChildren {
   AuthenticatedAskIdRoute: typeof AuthenticatedAskIdRoute
   AuthenticatedGroupIdRoute: typeof AuthenticatedGroupIdRoute
   AuthenticatedItemIdRoute: typeof AuthenticatedItemIdRoute
+  AuthenticatedListIdRoute: typeof AuthenticatedListIdRoute
   AuthenticatedProfileUsernameRoute: typeof AuthenticatedProfileUsernameRoute
   AuthenticatedAskIndexRoute: typeof AuthenticatedAskIndexRoute
 }
@@ -495,6 +515,7 @@ const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
   AuthenticatedAskIdRoute: AuthenticatedAskIdRoute,
   AuthenticatedGroupIdRoute: AuthenticatedGroupIdRoute,
   AuthenticatedItemIdRoute: AuthenticatedItemIdRoute,
+  AuthenticatedListIdRoute: AuthenticatedListIdRoute,
   AuthenticatedProfileUsernameRoute: AuthenticatedProfileUsernameRoute,
   AuthenticatedAskIndexRoute: AuthenticatedAskIndexRoute,
 }

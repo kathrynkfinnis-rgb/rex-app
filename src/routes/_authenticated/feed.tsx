@@ -11,13 +11,13 @@ import { RequestCard, type RequestRow } from "@/components/RequestCard";
 import { TRexLogo } from "@/components/TRexLogo";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { UserPlus, Mic, Plus, Search, X, User, Sparkles } from "lucide-react";
+import { UserPlus, Mic, Plus, Search, X, User, Sparkles, ListChecks as ListIcon, Lock, Users as UsersIcon, Globe2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { searchProfiles } from "@/lib/friends.functions";
 import { searchBooks, searchMovies, searchTv, searchPodcasts, type SearchHit } from "@/lib/search.functions";
 import { searchPlaces, type PlaceHit } from "@/lib/places.functions";
 
-type SearchScope = "all" | "people" | ItemType;
+type SearchScope = "all" | "people" | "lists" | ItemType;
 
 export const Route = createFileRoute("/_authenticated/feed")({
   head: () => ({
@@ -148,9 +148,11 @@ function FeedPage() {
             placeholder={
               searchScope === "people"
                 ? "Search people…"
-                : searchScope === "all"
-                  ? "Search Rexes, people, books, films, places…"
-                  : `Search ${categoryMeta(searchScope).plural.toLowerCase()}…`
+                : searchScope === "lists"
+                  ? "Search lists…"
+                  : searchScope === "all"
+                    ? "Search Rexes, people, lists, books, films, places…"
+                    : `Search ${categoryMeta(searchScope).plural.toLowerCase()}…`
             }
             aria-label="Search"
             className="h-11 rounded-full border-border bg-card pl-9 pr-9"
@@ -171,6 +173,9 @@ function FeedPage() {
             <ScopeChip active={searchScope === "all"} onClick={() => setSearchScope("all")}>All</ScopeChip>
             <ScopeChip active={searchScope === "people"} onClick={() => setSearchScope("people")}>
               <User className="h-3.5 w-3.5" /> People
+            </ScopeChip>
+            <ScopeChip active={searchScope === "lists"} onClick={() => setSearchScope("lists")}>
+              <ListIcon className="h-3.5 w-3.5" /> Lists
             </ScopeChip>
             {CATEGORIES.map((c) => (
               <ScopeChip key={c.type} active={searchScope === c.type} onClick={() => setSearchScope(c.type)}>
@@ -258,9 +263,11 @@ function SearchResults({ query, feed, scope }: { query: string; feed: FeedRow[];
   const podcastsFn = useServerFn(searchPodcasts);
 
   const searchPeople = scope === "all" || scope === "people";
-  const searchCatalog = scope !== "people";
+  const searchCatalog = scope !== "people" && scope !== "lists";
+  const searchLists = scope === "all" || scope === "lists";
 
   const feedMatches = useMemo(() => {
+    if (scope === "lists") return [];
     const q = query.toLowerCase();
     return feed
       .filter((r) => {
@@ -275,6 +282,32 @@ function SearchResults({ query, feed, scope }: { query: string; feed: FeedRow[];
       })
       .slice(0, 10);
   }, [feed, query, scope]);
+
+  const lists = useQuery({
+    queryKey: ["search-lists", query],
+    enabled: searchLists,
+    staleTime: 30_000,
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("hitlist_lists")
+        .select("id, user_id, name, emoji, item_type, visibility")
+        .ilike("name", `%${query}%`)
+        .order("created_at", { ascending: false })
+        .limit(12);
+      if (error) throw error;
+      const rows = (data ?? []) as any[];
+      const ownerIds = [...new Set(rows.map((r) => r.user_id))];
+      const owners = new Map<string, any>();
+      if (ownerIds.length > 0) {
+        const { data: profs } = await supabase
+          .from("profiles")
+          .select("id, username, display_name")
+          .in("id", ownerIds);
+        for (const p of (profs ?? []) as any[]) owners.set(p.id, p);
+      }
+      return rows.map((r) => ({ ...r, profiles: owners.get(r.user_id) ?? null }));
+    },
+  });
 
   const people = useQuery({
     queryKey: ["search-people", query],
@@ -323,22 +356,25 @@ function SearchResults({ query, feed, scope }: { query: string; feed: FeedRow[];
   ];
 
   const visibleCatalog = useMemo(() => {
+    if (!searchCatalog) return [];
     if (scope === "all") return catalog;
     return catalog.filter((c) => c.type === scope);
-  }, [catalog, scope]);
+  }, [catalog, scope, searchCatalog]);
 
   const anyLoading =
     (searchPeople && people.isLoading) ||
+    (searchLists && lists.isLoading) ||
     (searchCatalog && (books.isLoading || movies.isLoading || tv.isLoading || places.isLoading || podcasts.isLoading));
   const nothing =
     !anyLoading &&
-    (scope === "people" ? true : feedMatches.length === 0) &&
+    (scope === "people" || scope === "lists" ? true : feedMatches.length === 0) &&
     (people.data?.length ?? 0) === 0 &&
+    (lists.data?.length ?? 0) === 0 &&
     visibleCatalog.every((c) => c.hits.length === 0);
 
   return (
     <div className="space-y-6 px-4 py-4">
-      {scope !== "people" && feedMatches.length > 0 && (
+      {scope !== "people" && scope !== "lists" && feedMatches.length > 0 && (
         <Section title="In your feed">
           <div className="space-y-3">
             {feedMatches.map((rec) => <RecommendationCard key={rec.id} rec={rec} />)}
@@ -346,8 +382,40 @@ function SearchResults({ query, feed, scope }: { query: string; feed: FeedRow[];
         </Section>
       )}
 
+      {(lists.data?.length ?? 0) > 0 && (
+        <Section title={<span className="flex items-center gap-1.5"><ListIcon className="h-3.5 w-3.5" /> Lists</span>}>
+          <ul className="space-y-2">
+            {lists.data!.map((l: any) => {
+              const VIcon = l.visibility === "public" ? Globe2 : l.visibility === "friends" ? UsersIcon : Lock;
+              return (
+                <li key={l.id}>
+                  <Link
+                    to="/list/$id"
+                    params={{ id: l.id }}
+                    className="flex items-center gap-3 rounded-2xl bg-card p-3 ring-1 ring-border transition-colors hover:bg-muted/60"
+                  >
+                    <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-secondary text-lg">
+                      {l.emoji || "📋"}
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <p className="truncate font-medium">{l.name}</p>
+                      <p className="truncate text-xs text-muted-foreground">
+                        {categoryMeta(l.item_type).plural}
+                        {l.profiles?.username ? ` · @${l.profiles.username}` : ""}
+                      </p>
+                    </div>
+                    <VIcon className="h-4 w-4 shrink-0 text-muted-foreground" />
+                  </Link>
+                </li>
+              );
+            })}
+          </ul>
+        </Section>
+      )}
+
       {(people.data?.length ?? 0) > 0 && (
         <Section title="People">
+
           <ul className="space-y-2">
             {people.data!.map((p: any) => (
               <li key={p.id}>
