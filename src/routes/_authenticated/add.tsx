@@ -36,7 +36,7 @@ export const Route = createFileRoute("/_authenticated/add")({
 function AddPage() {
   const navigate = useNavigate();
   const { trip: tripId } = Route.useSearch();
-  const [type, setType] = useState<ItemType | null>(tripId ? "place" : null);
+  const [type, setType] = useState<ItemType | null>(null);
   const [title, setTitle] = useState("");
   const [subtitle, setSubtitle] = useState("");
   const [address, setAddress] = useState("");
@@ -49,7 +49,7 @@ function AddPage() {
   const [picked, setPicked] = useState<AnyHit | null>(null);
   const [manualMode, setManualMode] = useState(false);
   const [placeSubs, setPlaceSubs] = useState<string[]>([]);
-  const [justAdded, setJustAdded] = useState<{ itemId: string; recId: string; title: string; isTrip: boolean } | null>(null);
+  const [justAdded, setJustAdded] = useState<{ itemId: string; recId: string; title: string; isTrip: boolean; inTrip: boolean } | null>(null);
   const [photos, setPhotos] = useState<string[]>([]);
   const [tags, setTags] = useState<string[]>([]);
   const [showTripInfo, setShowTripInfo] = useState(false);
@@ -186,13 +186,14 @@ function AddPage() {
         .single();
       if (recErr) throw recErr;
 
-      if (tripId) {
-        toast.success("Added to your trip");
-        navigate({ to: "/trip/$id", params: { id: tripId } });
-        return;
-      }
-      toast.success("Added to your feed");
-      setJustAdded({ itemId: itemId!, recId: rec.id, title: title.trim(), isTrip: type === "trip" });
+      toast.success(tripId ? "Added to your trip" : "Added to your feed");
+      setJustAdded({
+        itemId: itemId!,
+        recId: rec.id,
+        title: title.trim(),
+        isTrip: type === "trip",
+        inTrip: Boolean(tripId),
+      });
     } catch (err) {
 
       toast.error(err instanceof Error ? err.message : "Couldn't save");
