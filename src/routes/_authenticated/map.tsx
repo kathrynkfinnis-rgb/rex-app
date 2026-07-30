@@ -170,7 +170,22 @@ function MapPage() {
             <GoogleMap
               key={`${cat}-${sub ?? ""}`}
               radiusMiles={10}
-              places={withLoc.map((p: any) => ({ id: p.id, title: p.title, lat: Number(p.lat), lng: Number(p.lng) }))}
+              places={withLoc.map((p: any) => {
+                const recs = (p.recommendations ?? []) as any[];
+                const top = [...recs].sort((a, b) => (b.rating ?? 0) - (a.rating ?? 0))[0];
+                return {
+                  id: p.id,
+                  title: p.title,
+                  lat: Number(p.lat),
+                  lng: Number(p.lng),
+                  subtitle: p.subtitle ?? p.genre ?? null,
+                  avatarUrl: top?.profiles?.avatar_url ?? null,
+                  byName: top?.profiles?.display_name ?? top?.profiles?.username ?? null,
+                  rating: top?.rating ?? null,
+                  note: top?.note ?? null,
+                };
+              })}
+
               onSelect={(id) => navigate({ to: "/item/$id", params: { id } })}
             />
           </Suspense>
