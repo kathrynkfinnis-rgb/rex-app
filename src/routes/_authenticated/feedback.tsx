@@ -114,9 +114,25 @@ function FeedbackPage() {
         value={message}
         onChange={(e) => setMessage(e.target.value)}
         rows={5}
+        maxLength={2000}
         placeholder="What's on your mind?"
         className="mb-3"
       />
+
+      <div className="mb-3 flex items-start gap-3 rounded-xl border border-border bg-card p-3">
+        <EyeOff className="mt-0.5 h-4 w-4 shrink-0 text-muted-foreground" />
+        <div className="min-w-0 flex-1">
+          <label htmlFor="anon" className="text-sm font-medium">
+            Send anonymously
+          </label>
+          <p className="text-xs text-muted-foreground">
+            {anonymous
+              ? "Your name won't be stored with this message — it also won't appear in your feedback list below."
+              : "Your name is attached so we can follow up."}
+          </p>
+        </div>
+        <Switch id="anon" checked={anonymous} onCheckedChange={setAnonymous} />
+      </div>
 
       <Button
         className="w-full"
@@ -124,8 +140,9 @@ function FeedbackPage() {
         onClick={() => send.mutate()}
       >
         <MessageSquarePlus className="mr-2 h-4 w-4" />
-        {send.isPending ? "Sending…" : "Send feedback"}
+        {send.isPending ? "Sending…" : anonymous ? "Send anonymously" : "Send feedback"}
       </Button>
+
 
       {mine.length > 0 && (
         <section className="mt-8">
