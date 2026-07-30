@@ -101,14 +101,14 @@ export function CollaboratorsDialog({
       .from("list_collaborators")
       .insert({ list_id: listId, user_id: userId, added_by: currentUserId });
     if (error) return toast.error(error.message);
-    toast.success("Added to the list");
+    toast.success("Added to the collection");
     refresh();
   }
 
   async function remove(rowId: string, self: boolean) {
     const { error } = await supabase.from("list_collaborators").delete().eq("id", rowId);
     if (error) return toast.error(error.message);
-    toast.success(self ? "You left the list" : "Removed");
+    toast.success(self ? "You left the collection" : "Removed");
     refresh();
   }
 
@@ -135,7 +135,7 @@ export function CollaboratorsDialog({
               <UserAvatar url={c.profile?.avatar_url} name={c.profile?.display_name || c.profile?.username} size="sm" />
               <div className="min-w-0 flex-1">
                 <p className="truncate text-sm font-medium">{c.profile?.display_name || c.profile?.username}</p>
-                <p className="text-xs text-muted-foreground">Can add to this list</p>
+                <p className="text-xs text-muted-foreground">Can add to this collection</p>
               </div>
               {isOwner || c.user_id === currentUserId ? (
                 <button
