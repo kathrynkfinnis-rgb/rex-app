@@ -202,7 +202,11 @@ function FeedPage() {
             >
               <span className="flex items-center gap-2">
                 <ListIcon className="h-4 w-4" />
-                {filter === "all" ? "Filters" : `Filters: ${categoryMeta(filter).plural}${subFilter !== "all" ? ` · ${subFilter}` : ""}`}
+                {filter === "all"
+                  ? "Filters"
+                  : filter === "asks"
+                    ? `Filters: Asks${subFilter !== "all" ? ` · ${subFilter}` : ""}`
+                    : `Filters: ${categoryMeta(filter).plural}${subFilter !== "all" ? ` · ${subFilter}` : ""}`}
               </span>
               <span className="text-xs opacity-80">{showFilters ? "Hide" : "Show"}</span>
             </button>
