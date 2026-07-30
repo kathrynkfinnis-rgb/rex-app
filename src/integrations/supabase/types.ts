@@ -900,6 +900,10 @@ export type Database = {
         Args: { _list: string; _user: string }
         Returns: boolean
       }
+      can_view_list: {
+        Args: { _list: string; _user: string }
+        Returns: boolean
+      }
       get_shared_recommendation: {
         Args: { rec_id: string }
         Returns: {
