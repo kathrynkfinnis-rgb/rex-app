@@ -169,19 +169,29 @@ function AddPage() {
         itemId = item.id;
       }
 
-      const { error: recErr } = await supabase.from("recommendations").insert({
-        user_id: uid,
-        item_id: itemId!,
-        rating,
-        note: note.trim() || null,
-        photo_url: photos[0] ?? null,
-        photo_urls: photos,
-        tags,
-      } as never);
+      const { data: rec, error: recErr } = await supabase
+        .from("recommendations")
+        .insert({
+          user_id: uid,
+          item_id: itemId!,
+          rating,
+          note: note.trim() || null,
+          photo_url: photos[0] ?? null,
+          photo_urls: photos,
+          tags,
+          trip_id: tripId ?? null,
+        } as never)
+        .select("id")
+        .single();
       if (recErr) throw recErr;
 
+      if (tripId) {
+        toast.success("Added to your trip");
+        navigate({ to: "/trip/$id", params: { id: tripId } });
+        return;
+      }
       toast.success("Added to your feed");
-      setJustAdded({ itemId: itemId!, title: title.trim() });
+      setJustAdded({ itemId: itemId!, recId: rec.id, title: title.trim(), isTrip: type === "trip" });
     } catch (err) {
 
       toast.error(err instanceof Error ? err.message : "Couldn't save");
