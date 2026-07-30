@@ -286,8 +286,8 @@ export function HitList({ userId }: { userId: string }) {
 
   const isEmpty = entries.length === 0 && (lists?.length ?? 0) === 0;
 
-  function startNewList(type: string) {
-    setNewListFor(type);
+  function startNewList() {
+    setNewListFor("any");
     setNewName("");
     setNewVisibility("draft");
   }
@@ -298,16 +298,11 @@ export function HitList({ userId }: { userId: string }) {
         <div className="sticky top-0 z-10 -mx-1 space-y-2 bg-background/90 px-1 py-2 backdrop-blur">
           <div className="flex flex-wrap gap-1.5">
             <FilterChip label="All" active={filter === "all"} onClick={() => setFilter("all")} />
-            {mixedLists.length > 0 && (
-              <FilterChip label="✨ Mixed" active={filter === "mixed"} onClick={() => setFilter("mixed")} />
-            )}
             {allActiveCategories.map((c) => (
               <FilterChip
                 key={c.type}
                 label={`${c.hitDefaultEmoji} ${c.plural}`}
-                count={
-                  (byCategory.get(c.type)?.filter((e) => !mixedIds.has(e.listId ?? "")).length ?? 0) || undefined
-                }
+                count={byCategory.get(c.type)?.length || undefined}
                 active={filter === c.type}
                 onClick={() => setFilter(c.type)}
               />
@@ -316,7 +311,7 @@ export function HitList({ userId }: { userId: string }) {
               size="sm"
               variant="outline"
               className="h-7 gap-1 rounded-full px-2.5 text-xs"
-              onClick={() => startNewList(filter === "all" || filter === "mixed" ? "mixed" : filter)}
+              onClick={startNewList}
             >
               <Plus className="h-3.5 w-3.5" /> New collection
             </Button>
@@ -330,37 +325,17 @@ export function HitList({ userId }: { userId: string }) {
             Nothing in your collection yet — tap the bookmark on any post, or hit "Want to…" on an item page.
           </p>
           <p className="mt-3 text-sm text-muted-foreground">Or start a collection from scratch:</p>
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button size="sm" className="mt-3 gap-1 rounded-full">
-                <Plus className="h-4 w-4" /> New collection
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="center" className="max-h-72 overflow-y-auto">
-              <DropdownMenuLabel>What kind of collection?</DropdownMenuLabel>
-              <DropdownMenuSeparator />
-              <DropdownMenuItem onClick={() => startNewList("mixed")}>
-                <span className="mr-2">✨</span> Mix of everything
-              </DropdownMenuItem>
-              <DropdownMenuSeparator />
-              {CATEGORIES.map((c) => (
-                <DropdownMenuItem key={c.type} onClick={() => startNewList(c.type)}>
-                  <span className="mr-2">{c.hitDefaultEmoji}</span>
-                  {c.hitDefaultLabel}
-                </DropdownMenuItem>
-              ))}
-            </DropdownMenuContent>
-          </DropdownMenu>
+          <Button size="sm" className="mt-3 gap-1 rounded-full" onClick={startNewList}>
+            <Plus className="h-4 w-4" /> New collection
+          </Button>
         </div>
       ) : null}
 
-      {showMixed && (
+      {allLists.length > 0 && (
         <div className="space-y-3">
-          <h3 className="font-display text-lg">
-            <span className="mr-2">✨</span>Mixed collections
-          </h3>
-          {mixedLists.map((list) => {
-            const inList = entries.filter((e) => e.listId === list.id);
+          <h3 className="font-display text-lg">Your collections</h3>
+          {allLists.map((list) => {
+            const inList = entries.filter((e) => e.listId === list.id && matchesFilter(e));
             const VMeta = VISIBILITY_META[list.visibility];
             const VIcon = VMeta.icon;
             const isOwner = list.user_id === userId;
@@ -419,7 +394,7 @@ export function HitList({ userId }: { userId: string }) {
                         <button
                           type="button"
                           onClick={() => {
-                            if (confirm(`Delete list "${list.name}"? Items go back to default.`)) deleteList(list);
+                            if (confirm(`Delete collection "${list.name}"? Items go back to default.`)) deleteList(list);
                           }}
                           className="rounded-full p-1.5 text-muted-foreground hover:bg-muted hover:text-destructive"
                           aria-label="Delete collection"
@@ -433,7 +408,7 @@ export function HitList({ userId }: { userId: string }) {
                 {inList.length > 0 ? (
                   <EntryList
                     entries={inList}
-                    lists={mixedLists}
+                    lists={allLists}
                     currentUserId={userId}
                     people={people}
                     onMove={moveEntry}
@@ -451,9 +426,8 @@ export function HitList({ userId }: { userId: string }) {
       )}
 
       {activeCategories.map((cat) => {
-        const all = byCategory.get(cat.type) ?? [];
-        const subs = listsByCategory.get(cat.type) ?? [];
-        const defaults = all.filter((e) => !e.listId && e.userId === userId);
+        const defaults = (byCategory.get(cat.type) ?? []).filter((e) => !e.listId && e.userId === userId);
+        if (defaults.length === 0) return null;
         return (
           <div key={cat.type} className="space-y-3">
             <div className="flex items-center justify-between">
@@ -462,122 +436,21 @@ export function HitList({ userId }: { userId: string }) {
                 {cat.hitDefaultLabel}{" "}
                 <span className="text-sm text-muted-foreground">({defaults.length})</span>
               </h3>
-              <Button
-                variant="ghost"
-                size="sm"
-                className="h-8 gap-1 rounded-full text-xs"
-                onClick={() => {
-                  setNewListFor(cat.type);
-                  setNewName("");
-                  setNewVisibility("draft");
-                }}
-              >
-                <Plus className="h-3.5 w-3.5" /> New collection
-              </Button>
             </div>
 
             <EntryList
               entries={defaults}
-              lists={[...subs, ...mixedLists]}
+              lists={allLists}
               cat={cat}
               currentUserId={userId}
               people={people}
               onMove={moveEntry}
               onRemove={removeEntry}
             />
-
-            {subs.map((list) => {
-              const inList = all.filter((e) => e.listId === list.id);
-              const VMeta = VISIBILITY_META[list.visibility];
-              const VIcon = VMeta.icon;
-              const isOwner = list.user_id === userId;
-              const listCollabs = collabsByList.get(list.id) ?? [];
-              return (
-                <div key={list.id} className="rounded-2xl border border-border bg-card/40 p-3">
-                  <div className="mb-2 flex items-center justify-between gap-2">
-                    <p className="min-w-0 truncate font-medium">
-                      <span className="mr-1.5">{list.emoji ?? cat.hitDefaultEmoji}</span>
-                      {list.name}{" "}
-                      <span className="text-xs text-muted-foreground">({inList.length})</span>
-                      {!isOwner ? (
-                        <span className="ml-1.5 rounded-full bg-primary/10 px-1.5 py-0.5 text-[10px] font-medium text-primary">
-                          Shared with you
-                        </span>
-                      ) : null}
-                    </p>
-                    <div className="flex items-center gap-1">
-                      <CollaboratorStack
-                        collaborators={listCollabs}
-                        owner={people?.get(list.user_id) ?? null}
-                        onOpen={() => setCollabList(list)}
-                      />
-                      {isOwner ? (
-                        <>
-                          <DropdownMenu>
-                            <DropdownMenuTrigger asChild>
-                              <button
-                                type="button"
-                                className={cn(
-                                  "inline-flex items-center gap-1 rounded-full px-2 py-1 text-[11px] font-medium ring-1 ring-border",
-                                  list.visibility === "draft" && "bg-muted text-muted-foreground",
-                                  list.visibility === "friends" && "bg-primary/10 text-primary",
-                                  list.visibility === "public" && "bg-accent text-accent-foreground",
-                                )}
-                              >
-                                <VIcon className="h-3 w-3" /> {VMeta.label}
-                              </button>
-                            </DropdownMenuTrigger>
-                            <DropdownMenuContent align="end">
-                              <DropdownMenuLabel>Who can see this collection</DropdownMenuLabel>
-                              {(["draft", "friends", "public"] as Visibility[]).map((v) => {
-                                const M = VISIBILITY_META[v];
-                                const I = M.icon;
-                                return (
-                                  <DropdownMenuItem key={v} onClick={() => updateVisibility(list, v)}>
-                                    <I className="mr-2 h-4 w-4" />
-                                    <span className="flex-1">
-                                      {M.label}
-                                      <span className="ml-1 text-xs text-muted-foreground">— {M.hint}</span>
-                                    </span>
-                                    {list.visibility === v ? <Check className="ml-2 h-3.5 w-3.5" /> : null}
-                                  </DropdownMenuItem>
-                                );
-                              })}
-                            </DropdownMenuContent>
-                          </DropdownMenu>
-                          <button
-                            type="button"
-                            onClick={() => {
-                              if (confirm(`Delete list "${list.name}"? Items go back to default.`)) deleteList(list);
-                            }}
-                            className="rounded-full p-1.5 text-muted-foreground hover:bg-muted hover:text-destructive"
-                            aria-label="Delete collection"
-                          >
-                            <Trash2 className="h-3.5 w-3.5" />
-                          </button>
-                        </>
-                      ) : null}
-                    </div>
-                  </div>
-                  {inList.length > 0 ? (
-                    <EntryList
-                      entries={inList}
-                      lists={[...subs, ...mixedLists]}
-                      cat={cat}
-                      currentUserId={userId}
-                      people={people}
-                      onMove={moveEntry}
-                      onRemove={removeEntry}
-                    />
-                  ) : (
-                    <p className="text-xs text-muted-foreground">Empty — use ⋯ on an item to move it here.</p>
-                  )}
-                </div>
-              );
-            })}
           </div>
         );
       })}
+
 
       {collabList ? (
         <CollaboratorsDialog
