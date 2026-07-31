@@ -19,6 +19,7 @@ import { useServerFn } from "@tanstack/react-start";
 import { RecipeEditor } from "@/components/RecipeEditor";
 import { PhotoUploader } from "@/components/PhotoUploader";
 import { TagsInput } from "@/components/TagsInput";
+import { TripStopsBuilder, type DraftStop } from "@/components/TripStopsBuilder";
 
 export const Route = createFileRoute("/_authenticated/add")({
   validateSearch: (search: Record<string, unknown>) => ({
@@ -49,10 +50,11 @@ function AddPage() {
   const [picked, setPicked] = useState<AnyHit | null>(null);
   const [manualMode, setManualMode] = useState(false);
   const [placeSubs, setPlaceSubs] = useState<string[]>([]);
-  const [justAdded, setJustAdded] = useState<{ itemId: string; recId: string; title: string; isTrip: boolean; inTrip: boolean } | null>(null);
+  const [justAdded, setJustAdded] = useState<{ itemId: string; recId: string; title: string; isTrip: boolean; inTrip: boolean; stopCount?: number } | null>(null);
   const [photos, setPhotos] = useState<string[]>([]);
   const [tags, setTags] = useState<string[]>([]);
   const [showTripInfo, setShowTripInfo] = useState(false);
+  const [tripStops, setTripStops] = useState<DraftStop[]>([]);
   const { data: uid } = useQuery({
     queryKey: ["current-user-id"],
     queryFn: async () => (await supabase.auth.getUser()).data.user?.id ?? null,
@@ -80,6 +82,7 @@ function AddPage() {
     setTags([]);
     setJustAdded(null);
     setPhotos([]);
+    setTripStops([]);
   }
 
 
@@ -187,13 +190,67 @@ function AddPage() {
         .single();
       if (recErr) throw recErr;
 
-      toast.success(tripId ? "Added to your trip" : "Added to your feed");
+      let savedStops = 0;
+      if (type === "trip" && tripStops.length > 0) {
+        for (const stop of tripStops) {
+          let stopItemId: string | undefined;
+          if (stop.external_source && stop.external_id) {
+            const { data: existing } = await supabase
+              .from("items")
+              .select("id")
+              .eq("external_source", stop.external_source)
+              .eq("external_id", stop.external_id)
+              .maybeSingle();
+            stopItemId = existing?.id;
+          }
+          if (!stopItemId) {
+            const { data: stopItem, error: stopItemErr } = await supabase
+              .from("items")
+              .insert({
+                type: stop.type,
+                title: stop.title,
+                subtitle: stop.subtitle,
+                image_url: stop.image_url,
+                external_id: stop.external_id,
+                external_source: stop.external_source,
+                address: stop.address,
+                lat: stop.lat,
+                lng: stop.lng,
+                genre: stop.genre,
+              } as never)
+              .select("id")
+              .single();
+            if (stopItemErr) throw stopItemErr;
+            stopItemId = stopItem.id;
+          }
+          const { error: stopRecErr } = await supabase.from("recommendations").insert({
+            user_id: uid,
+            item_id: stopItemId!,
+            rating: stop.rating,
+            note: stop.note || null,
+            photo_urls: [],
+            tags: [],
+            trip_id: rec.id,
+          } as never);
+          if (stopRecErr) throw stopRecErr;
+          savedStops += 1;
+        }
+      }
+
+      toast.success(
+        tripId
+          ? "Added to your trip"
+          : savedStops > 0
+            ? `Trip posted with ${savedStops} ${savedStops === 1 ? "stop" : "stops"}`
+            : "Added to your feed",
+      );
       setJustAdded({
         itemId: itemId!,
         recId: rec.id,
         title: title.trim(),
         isTrip: type === "trip",
         inTrip: Boolean(tripId),
+        stopCount: savedStops,
       });
     } catch (err) {
 
@@ -213,7 +270,9 @@ function AddPage() {
           <h1 className="font-display text-3xl">Nice one!</h1>
           <p className="mt-2 text-muted-foreground">
             {justAdded.isTrip
-              ? `"${justAdded.title}" is live — now add the places you loved on it.`
+              ? justAdded.stopCount
+                ? `"${justAdded.title}" is live with ${justAdded.stopCount} ${justAdded.stopCount === 1 ? "stop" : "stops"} — each one is a Rex of its own too.`
+                : `"${justAdded.title}" is live — now add the places you loved on it.`
               : justAdded.inTrip
               ? `"${justAdded.title}" is now a Rex of its own and a stop on your trip.`
               : `"${justAdded.title}" is in your feed.`}
@@ -226,7 +285,7 @@ function AddPage() {
                 onClick={() => navigate({ to: "/trip/$id", params: { id: justAdded.recId } })}
                 className="h-14 w-full rounded-full text-base font-semibold shadow-lg shadow-primary/30"
               >
-                Add Rex to this trip
+                {justAdded.stopCount ? "View trip" : "Add Rex to this trip"}
               </Button>
               <Button variant="ghost" onClick={() => navigate({ to: "/feed" })} className="h-12 w-full rounded-full">
                 Back to feed
@@ -407,8 +466,8 @@ function AddPage() {
           <div className="rounded-2xl bg-primary/10 p-4 text-sm ring-1 ring-primary/30">
             <p className="font-display text-base">What's a trip?</p>
             <p className="mt-1 text-muted-foreground">
-              Name the trip (e.g. &ldquo;Lisbon, 3 days&rdquo;) and post it. You'll then add each place you loved as a
-              stop — friends see one trip card in the feed and can tap in for the full itinerary.
+              Name the trip (e.g. &ldquo;Lisbon, 3 days&rdquo;) and add the places you loved as stops below — friends
+              see one trip card in the feed and can tap in for the full itinerary.
             </p>
           </div>
         )}
@@ -561,6 +620,8 @@ function AddPage() {
           </div>
         )}
 
+        {type === "trip" && <TripStopsBuilder value={tripStops} onChange={setTripStops} />}
+
         <div className="space-y-1.5">
           <Label>Tags</Label>
           <TagsInput
@@ -583,7 +644,13 @@ function AddPage() {
           disabled={saving || !title.trim()}
           className="h-14 w-full rounded-full text-base font-semibold shadow-lg shadow-primary/30"
         >
-          {saving ? "Saving…" : "Post Rex"}
+          {saving
+            ? "Saving…"
+            : type === "trip"
+              ? tripStops.length > 0
+                ? `Post trip with ${tripStops.length} ${tripStops.length === 1 ? "stop" : "stops"}`
+                : "Post trip"
+              : "Post Rex"}
         </Button>
           </>
         )}
