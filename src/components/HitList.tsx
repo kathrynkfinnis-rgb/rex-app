@@ -406,7 +406,15 @@ export function HitList({ userId }: { userId: string }) {
             const VIcon = VMeta.icon;
             const isOwner = list.user_id === userId;
             return (
-              <div key={list.id} className="rounded-2xl border border-border bg-card/40 p-3">
+              <div
+                key={list.id}
+                data-drop-id={list.id}
+                className={cn(
+                  "rounded-2xl border border-border bg-card/40 p-3 transition",
+                  drag && "border-dashed",
+                  drag && overId === list.id && "border-primary bg-primary/10 ring-2 ring-primary/40",
+                )}
+              >
                 <div className="mb-2 flex items-center justify-between gap-2">
                   <p className="min-w-0 truncate font-medium">
                     <span className="mr-1.5">{list.emoji ?? "✨"}</span>
