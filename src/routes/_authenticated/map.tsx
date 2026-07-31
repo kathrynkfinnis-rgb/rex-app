@@ -192,6 +192,44 @@ function MapPage() {
           </div>
         )}
 
+        {(trips?.length ?? 0) > 0 && (
+          <div className="-mx-5 mt-2 flex gap-2 overflow-x-auto px-5 pb-0.5 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+            <span className="flex shrink-0 items-center gap-1 pr-0.5 text-xs font-semibold uppercase tracking-widest text-muted-foreground">
+              <Luggage className="h-3.5 w-3.5" /> Trips
+            </span>
+            {trips!.map((t: any) => (
+              <button
+                key={t.id}
+                className={chip(tripId === t.id)}
+                onClick={() => { setTripId(tripId === t.id ? null : t.id); setCat("all"); setSub(null); }}
+              >
+                {t.items?.title}
+              </button>
+            ))}
+            {tripId && (
+              <button className={chip(false)} onClick={() => setTripId(null)}>
+                <X className="h-3 w-3" />
+              </button>
+            )}
+          </div>
+        )}
+
+        {activeTrip && (
+          <div className="mt-2 flex items-center justify-between gap-3 rounded-xl bg-primary/5 px-3 py-2 text-xs ring-1 ring-primary/20">
+            <span className="min-w-0 truncate">
+              Showing the {filtered.length} stop{filtered.length === 1 ? "" : "s"} on{" "}
+              <span className="font-semibold">{activeTrip.items?.title}</span>
+            </span>
+            <Link
+              to="/trip/$id"
+              params={{ id: activeTrip.id }}
+              className="shrink-0 font-semibold text-primary underline"
+            >
+              Open trip
+            </Link>
+          </div>
+        )}
+
         {subs.length > 0 && (
           <div className="-mx-5 mt-2 flex gap-2 overflow-x-auto px-5 pb-0.5 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
             {subs.map((s) => (
@@ -217,14 +255,18 @@ function MapPage() {
         <ClientOnly fallback={<div className="h-full w-full animate-pulse bg-muted" />}>
           <Suspense fallback={<div className="h-full w-full animate-pulse bg-muted" />}>
             <GoogleMap
-              key={`${cat}-${sub ?? ""}-${topOnly ? "top" : "all"}`}
-              radiusMiles={10}
+              key={`${cat}-${sub ?? ""}-${topOnly ? "top" : "all"}-${tripId ?? ""}`}
+              radiusMiles={tripId ? undefined : 10}
               places={withLoc.map((p: any) => {
                 const recs = [...((p.recommendations ?? []) as any[])].sort(
                   (a, b) => (b.rating ?? 0) - (a.rating ?? 0),
                 );
-                // A top friend's Rex owns the pin when they've recommended this spot.
-                const top = recs.find((r: any) => topIds.has(r.user_id)) ?? recs[0];
+                // A trip stop's own Rex owns the pin; otherwise a top friend's.
+                const top =
+                  (tripId ? recs.find((r: any) => r.trip_id === tripId) : null) ??
+                  recs.find((r: any) => topIds.has(r.user_id)) ??
+                  recs[0];
+
                 return {
                   id: p.id,
                   title: p.title,
