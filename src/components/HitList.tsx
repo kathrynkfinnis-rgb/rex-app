@@ -13,7 +13,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { Lock, MoreHorizontal, Plus, Trash2, Users, Globe2, Check } from "lucide-react";
+import { Lock, MoreHorizontal, Plus, Trash2, Users, Globe2, Check, GripVertical } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { CATEGORIES, categoryMeta, type ItemType } from "@/lib/categories";
 import { toast } from "sonner";
