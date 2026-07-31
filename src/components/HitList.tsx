@@ -618,6 +618,8 @@ function EntryList({
   people,
   onMove,
   onRemove,
+  onDragStart,
+  draggingId,
 }: {
   entries: Entry[];
   lists: ListRow[];
@@ -626,6 +628,8 @@ function EntryList({
   people?: Map<string, Profile>;
   onMove: (entry: Entry, listId: string | null) => void;
   onRemove: (entry: Entry) => void;
+  onDragStart?: (entry: Entry, e: React.PointerEvent) => void;
+  draggingId?: string | null;
 }) {
   if (entries.length === 0) return null;
   return (
@@ -635,11 +639,26 @@ function EntryList({
         const Icon = c.icon;
         const mine = e.userId === currentUserId;
         const who = mine ? null : people?.get(e.userId) ?? null;
+        const key = `${e.kind}-${e.id}`;
         return (
           <div
-            key={`${e.kind}-${e.id}`}
-            className="flex items-center gap-3 rounded-2xl bg-card p-3 ring-1 ring-border"
+            key={key}
+            className={cn(
+              "flex items-center gap-2 rounded-2xl bg-card p-3 ring-1 ring-border transition",
+              draggingId === key && "opacity-40",
+            )}
           >
+            {mine && onDragStart ? (
+              <button
+                type="button"
+                aria-label="Drag to another collection"
+                onPointerDown={(ev) => onDragStart(e, ev)}
+                onClick={(ev) => ev.preventDefault()}
+                className="-ml-1 shrink-0 cursor-grab touch-none rounded-lg p-1 text-muted-foreground/60 hover:bg-muted hover:text-foreground active:cursor-grabbing"
+              >
+                <GripVertical className="h-4 w-4" />
+              </button>
+            ) : null}
             <Link
               to={e.href as any}
               params={e.params}
