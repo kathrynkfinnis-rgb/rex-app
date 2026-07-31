@@ -1,7 +1,7 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
-import { MapPin, Loader2, X, Star } from "lucide-react";
+import { MapPin, Loader2, X, Star, Luggage } from "lucide-react";
 import { useTopFriends } from "@/lib/topFriends";
 
 import { ClientOnly } from "@tanstack/react-router";
@@ -33,6 +33,7 @@ function MapPage() {
   const [cat, setCat] = useState<ItemType | "all">("all");
   const [sub, setSub] = useState<string | null>(null);
   const [topOnly, setTopOnly] = useState(false);
+  const [tripId, setTripId] = useState<string | null>(null);
 
 
   const { data } = useQuery({
@@ -40,12 +41,26 @@ function MapPage() {
     queryFn: async () => {
       const { data, error } = await supabase
         .from("items")
-        .select("id, title, subtitle, type, genre, address, lat, lng, image_url, recommendations(id, rating, note, user_id, profiles(display_name, username, avatar_url))")
+        .select("id, title, subtitle, type, genre, address, lat, lng, image_url, recommendations(id, rating, note, user_id, trip_id, profiles(display_name, username, avatar_url))")
         .in("type", ["place", "event"])
         .order("created_at", { ascending: false })
         .limit(200);
       if (error) throw error;
       return data ?? [];
+    },
+  });
+
+  const { data: trips } = useQuery({
+    queryKey: ["map-trips"],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("recommendations")
+        .select("id, created_at, items!inner(title, type), profiles!recommendations_user_id_fkey(display_name, username)")
+        .eq("items.type", "trip")
+        .order("created_at", { ascending: false })
+        .limit(50);
+      if (error) throw error;
+      return (data ?? []) as any[];
     },
   });
 
@@ -56,9 +71,17 @@ function MapPage() {
     return CATEGORIES.filter((c) => present.has(c.type));
   }, [all]);
 
+  const byTrip = useMemo(
+    () =>
+      tripId
+        ? all.filter((p: any) => (p.recommendations ?? []).some((r: any) => r.trip_id === tripId))
+        : all,
+    [all, tripId],
+  );
+
   const byCat = useMemo(
-    () => (cat === "all" ? all : all.filter((p: any) => p.type === cat)),
-    [all, cat],
+    () => (cat === "all" ? byTrip : byTrip.filter((p: any) => p.type === cat)),
+    [byTrip, cat],
   );
 
   const subs = useMemo(() => {
@@ -78,8 +101,13 @@ function MapPage() {
     );
   }, [byCat, sub, topOnly, topSet]);
 
+  const activeTrip = trips?.find((t: any) => t.id === tripId) ?? null;
 
-  const withLoc = filtered.filter((p: any) => p.lat != null && p.lng != null);
+
+
+  // Items come newest-first; a trip reads better in the order stops were added.
+  const located = filtered.filter((p: any) => p.lat != null && p.lng != null);
+  const withLoc = tripId ? [...located].reverse() : located;
   const withoutLoc = filtered.filter((p: any) => p.lat == null || p.lng == null);
   const allWithoutLoc = all.filter((p: any) => p.lat == null || p.lng == null);
 
@@ -166,6 +194,44 @@ function MapPage() {
           </div>
         )}
 
+        {(trips?.length ?? 0) > 0 && (
+          <div className="-mx-5 mt-2 flex gap-2 overflow-x-auto px-5 pb-0.5 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+            <span className="flex shrink-0 items-center gap-1 pr-0.5 text-xs font-semibold uppercase tracking-widest text-muted-foreground">
+              <Luggage className="h-3.5 w-3.5" /> Trips
+            </span>
+            {trips!.map((t: any) => (
+              <button
+                key={t.id}
+                className={chip(tripId === t.id)}
+                onClick={() => { setTripId(tripId === t.id ? null : t.id); setCat("all"); setSub(null); }}
+              >
+                {t.items?.title}
+              </button>
+            ))}
+            {tripId && (
+              <button className={chip(false)} onClick={() => setTripId(null)}>
+                <X className="h-3 w-3" />
+              </button>
+            )}
+          </div>
+        )}
+
+        {activeTrip && (
+          <div className="mt-2 flex items-center justify-between gap-3 rounded-xl bg-primary/5 px-3 py-2 text-xs ring-1 ring-primary/20">
+            <span className="min-w-0 truncate">
+              Showing the {filtered.length} stop{filtered.length === 1 ? "" : "s"} on{" "}
+              <span className="font-semibold">{activeTrip.items?.title}</span>
+            </span>
+            <Link
+              to="/trip/$id"
+              params={{ id: activeTrip.id }}
+              className="shrink-0 font-semibold text-primary underline"
+            >
+              Open trip
+            </Link>
+          </div>
+        )}
+
         {subs.length > 0 && (
           <div className="-mx-5 mt-2 flex gap-2 overflow-x-auto px-5 pb-0.5 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
             {subs.map((s) => (
@@ -191,14 +257,20 @@ function MapPage() {
         <ClientOnly fallback={<div className="h-full w-full animate-pulse bg-muted" />}>
           <Suspense fallback={<div className="h-full w-full animate-pulse bg-muted" />}>
             <GoogleMap
-              key={`${cat}-${sub ?? ""}-${topOnly ? "top" : "all"}`}
+              key={`${cat}-${sub ?? ""}-${topOnly ? "top" : "all"}-${tripId ?? ""}`}
               radiusMiles={10}
+              fitPlaces={!!tripId}
+              connect={!!tripId}
               places={withLoc.map((p: any) => {
                 const recs = [...((p.recommendations ?? []) as any[])].sort(
                   (a, b) => (b.rating ?? 0) - (a.rating ?? 0),
                 );
-                // A top friend's Rex owns the pin when they've recommended this spot.
-                const top = recs.find((r: any) => topIds.has(r.user_id)) ?? recs[0];
+                // A trip stop's own Rex owns the pin; otherwise a top friend's.
+                const top =
+                  (tripId ? recs.find((r: any) => r.trip_id === tripId) : null) ??
+                  recs.find((r: any) => topIds.has(r.user_id)) ??
+                  recs[0];
+
                 return {
                   id: p.id,
                   title: p.title,

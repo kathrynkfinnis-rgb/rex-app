@@ -145,20 +145,28 @@ export function GoogleMap({
   places,
   onSelect,
   radiusMiles = 10,
+  fitPlaces = false,
+  connect = false,
 }: {
   places: Place[];
   onSelect?: (id: string) => void;
   radiusMiles?: number;
+  /** Ignore the viewer's location and frame all pins instead (used for trips). */
+  fitPlaces?: boolean;
+  /** Draw a route line between the pins in order (used for trips). */
+  connect?: boolean;
 }) {
   const ref = useRef<HTMLDivElement>(null);
   const mapRef = useRef<any>(null);
   const markersRef = useRef<any[]>([]);
   const userLayerRef = useRef<any[]>([]);
+  const lineRef = useRef<any>(null);
   const infoRef = useRef<any>(null);
 
   const [error, setError] = useState<string | null>(null);
   const [ready, setReady] = useState(false);
   const [userCentered, setUserCentered] = useState(false);
+
 
   useEffect(() => {
     let cancelled = false;
@@ -182,7 +190,9 @@ export function GoogleMap({
 
   // Centre on the user's own location with a ~10 mile radius when the map opens.
   useEffect(() => {
+    if (fitPlaces) return;
     if (!ready || !mapRef.current || typeof navigator === "undefined" || !navigator.geolocation) return;
+
     let cancelled = false;
     navigator.geolocation.getCurrentPosition(
       (pos) => {
@@ -231,7 +241,7 @@ export function GoogleMap({
     return () => {
       cancelled = true;
     };
-  }, [ready, radiusMiles]);
+  }, [ready, radiusMiles, fitPlaces]);
 
   useEffect(() => {
     if (!ready || !mapRef.current || !window.google?.maps) return;
@@ -239,7 +249,12 @@ export function GoogleMap({
     const g = window.google.maps;
     markersRef.current.forEach((m) => m.setMap(null));
     markersRef.current = [];
+    if (lineRef.current) {
+      lineRef.current.setMap(null);
+      lineRef.current = null;
+    }
     if (!places.length) return;
+
     if (!infoRef.current) infoRef.current = new g.InfoWindow({ disableAutoPan: true });
     const info = infoRef.current;
     const bounds = new g.LatLngBounds();
@@ -276,15 +291,27 @@ export function GoogleMap({
       bounds.extend(marker.getPosition());
     });
 
+    if (connect && places.length > 1) {
+      lineRef.current = new g.Polyline({
+        map: mapRef.current,
+        path: places.map((p) => ({ lat: p.lat, lng: p.lng })),
+        strokeColor: "#4f7c3a",
+        strokeOpacity: 0.7,
+        strokeWeight: 2,
+        clickable: false,
+      });
+    }
+
     // The user's own 10-mile view wins when we have their location.
-    if (userCentered) return;
+    if (userCentered && !fitPlaces) return;
     if (places.length === 1) {
       mapRef.current.setCenter(bounds.getCenter());
       mapRef.current.setZoom(14);
     } else {
       mapRef.current.fitBounds(bounds, 48);
     }
-  }, [places, onSelect, ready, userCentered]);
+  }, [places, onSelect, ready, userCentered, fitPlaces, connect]);
+
 
   if (error) {
     return (
