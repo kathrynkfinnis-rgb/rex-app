@@ -105,11 +105,7 @@ function MapPage() {
 
 
 
-  const tripOrder = (p: any) =>
-    (p.recommendations ?? []).find((r: any) => r.trip_id === tripId)?.id ?? "";
-  const withLoc = filtered
-    .filter((p: any) => p.lat != null && p.lng != null)
-    .sort((a: any, b: any) => (tripId ? tripOrder(a).localeCompare(tripOrder(b)) : 0));
+  const withLoc = filtered.filter((p: any) => p.lat != null && p.lng != null);
   const withoutLoc = filtered.filter((p: any) => p.lat == null || p.lng == null);
   const allWithoutLoc = all.filter((p: any) => p.lat == null || p.lng == null);
 
