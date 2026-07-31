@@ -129,7 +129,14 @@ function TripPage() {
             </Button>
           )}
 
-          <h2 className="px-1 pt-1 font-display text-xl">On this trip</h2>
+          <div className="flex items-center justify-between px-1 pt-1">
+            <h2 className="font-display text-xl">Itinerary</h2>
+            {(stops.data?.some((s) => s.items?.type === "place" || s.items?.type === "event") ?? false) && (
+              <Link to="/map" className="text-sm font-semibold text-primary">
+                See on map
+              </Link>
+            )}
+          </div>
 
           {stops.isLoading && <div className="h-24 animate-pulse rounded-2xl bg-muted" />}
 
@@ -141,7 +148,36 @@ function TripPage() {
             </p>
           )}
 
-          {stops.data?.map((rec) => <RecommendationCard key={rec.id} rec={rec} />)}
+          {(stops.data?.length ?? 0) > 0 && (
+            <ol className="relative space-y-3 pl-9">
+              <span
+                aria-hidden
+                className="absolute bottom-6 left-[13px] top-6 w-px bg-gradient-to-b from-primary/40 via-border to-transparent"
+              />
+              {stops.data!.map((rec, i) => {
+                const meta = categoryMeta((rec.items?.type ?? "other") as ItemType);
+                const Icon = meta.icon;
+                return (
+                  <li key={rec.id} className="relative">
+                    <span className="absolute -left-9 top-3 flex h-7 w-7 items-center justify-center rounded-full bg-background text-[11px] font-bold text-primary ring-2 ring-primary/30">
+                      {i + 1}
+                    </span>
+                    <div className="mb-1 flex items-center gap-1.5 pl-0.5 text-[11px] font-semibold uppercase tracking-widest text-muted-foreground">
+                      <Icon className="h-3.5 w-3.5" />
+                      {meta.label}
+                      {rec.items?.genre && (
+                        <span className="normal-case tracking-normal text-muted-foreground/80">
+                          · {splitGenres(rec.items.genre).join(", ")}
+                        </span>
+                      )}
+                    </div>
+                    <RecommendationCard rec={rec} />
+                  </li>
+                );
+              })}
+            </ol>
+          )}
+
         </div>
       )}
     </div>
