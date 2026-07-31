@@ -19,6 +19,7 @@ import {
   Search,
   MapPin,
   Film,
+  Luggage,
 } from "lucide-react";
 import mammoth from "mammoth";
 import {
@@ -29,6 +30,7 @@ import {
   importImdbTitles,
   resolveStagingRow,
   approveStagingRow,
+  approveStagingAsTrip,
 } from "@/lib/import.functions";
 
 
@@ -52,6 +54,8 @@ function ImportPage() {
   const [pasted, setPasted] = useState("");
   const [gmapsUrl, setGmapsUrl] = useState("");
   const [loading, setLoading] = useState(false);
+  const [tripName, setTripName] = useState("");
+  const [tripLoading, setTripLoading] = useState(false);
 
   const fetchSheet = useServerFn(fetchSheetCsv);
   const extract = useServerFn(extractFromText);
@@ -60,6 +64,7 @@ function ImportPage() {
   const importImdb = useServerFn(importImdbTitles);
   const resolve = useServerFn(resolveStagingRow);
   const approve = useServerFn(approveStagingRow);
+  const makeTrip = useServerFn(approveStagingAsTrip);
 
 
   const { data: staging } = useQuery({
@@ -73,6 +78,27 @@ function ImportPage() {
       return data ?? [];
     },
   });
+
+  const placeRows = (staging ?? []).filter((r) => r.suggested_type === "place");
+
+  async function onMakeTrip() {
+    if (!tripName.trim() || placeRows.length === 0) return;
+    setTripLoading(true);
+    try {
+      const { tripId, added } = await makeTrip({
+        data: { ids: placeRows.map((r) => r.id), tripName: tripName.trim() },
+      });
+      toast.success(`Trip created with ${added} Rex`);
+      setTripName("");
+      qc.invalidateQueries({ queryKey: ["import-staging"] });
+      navigate({ to: "/trip/$id", params: { id: tripId } });
+    } catch (e: any) {
+      toast.error(e.message ?? "Couldn't create the trip");
+    } finally {
+      setTripLoading(false);
+    }
+  }
+
 
   async function runExtract(text: string, source: string) {
     if (!text.trim()) {
@@ -508,6 +534,32 @@ function ImportPage() {
             >
               {loading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
               Extract Rex
+            </Button>
+          </div>
+        )}
+
+        {placeRows.length >= 2 && (
+          <div className="space-y-3 rounded-2xl bg-primary/5 p-4 ring-1 ring-primary/30">
+            <div className="flex items-center gap-2 text-sm font-semibold">
+              <Luggage className="h-4 w-4 text-primary" />
+              {placeRows.length} place Rex in the queue
+            </div>
+            <p className="text-xs text-muted-foreground">
+              Were these all from one trip? Group them into a single Trip Rex — each place still becomes its own Rex, linked together under the trip.
+            </p>
+            <Input
+              value={tripName}
+              onChange={(e) => setTripName(e.target.value)}
+              placeholder="Trip name, e.g. Lisbon, May 2026"
+              className="h-11 bg-background"
+            />
+            <Button
+              onClick={onMakeTrip}
+              disabled={tripLoading || !tripName.trim()}
+              className="h-11 w-full rounded-full"
+            >
+              {tripLoading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Luggage className="mr-2 h-4 w-4" />}
+              Make a trip from these {placeRows.length}
             </Button>
           </div>
         )}
