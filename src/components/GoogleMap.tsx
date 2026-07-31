@@ -190,7 +190,9 @@ export function GoogleMap({
 
   // Centre on the user's own location with a ~10 mile radius when the map opens.
   useEffect(() => {
+    if (fitPlaces) return;
     if (!ready || !mapRef.current || typeof navigator === "undefined" || !navigator.geolocation) return;
+
     let cancelled = false;
     navigator.geolocation.getCurrentPosition(
       (pos) => {
