@@ -958,6 +958,47 @@ export type Database = {
           rating: number
         }[]
       }
+      get_shared_trip: {
+        Args: { trip_id: string }
+        Returns: {
+          author_avatar_url: string
+          author_display_name: string
+          author_username: string
+          created_at: string
+          id: string
+          item_id: string
+          item_image_url: string
+          item_subtitle: string
+          item_title: string
+          note: string
+          photo_url: string
+          photo_urls: string[]
+          rating: number
+        }[]
+      }
+      get_shared_trip_stops: {
+        Args: { trip_id: string }
+        Returns: {
+          author_avatar_url: string
+          author_display_name: string
+          author_username: string
+          created_at: string
+          id: string
+          item_address: string
+          item_genre: string
+          item_id: string
+          item_image_url: string
+          item_lat: number
+          item_lng: number
+          item_subtitle: string
+          item_title: string
+          item_type: string
+          note: string
+          photo_url: string
+          photo_urls: string[]
+          rating: number
+        }[]
+      }
       has_role: {
         Args: {
           _role: Database["public"]["Enums"]["app_role"]
