@@ -239,6 +239,72 @@ export function HitList({ userId }: { userId: string }) {
     invalidateEntries();
   }
 
+  // --- Drag & drop: pick a card up by its grip and drop it on any collection ---
+  const [drag, setDrag] = useState<{ entry: Entry; x: number; y: number } | null>(null);
+  const [overId, setOverId] = useState<string | null>(null);
+  const dragRef = useRef<{ entry: Entry } | null>(null);
+  const overRef = useRef<string | null>(null);
+
+  function startDrag(entry: Entry, e: React.PointerEvent) {
+    e.preventDefault();
+    e.stopPropagation();
+    dragRef.current = { entry };
+    overRef.current = null;
+    setOverId(null);
+    setDrag({ entry, x: e.clientX, y: e.clientY });
+  }
+
+  useEffect(() => {
+    if (!drag) return;
+
+    function pointAt(x: number, y: number) {
+      const el = document.elementFromPoint(x, y);
+      const zone = el?.closest("[data-drop-id]") as HTMLElement | null;
+      return zone?.dataset.dropId ?? null;
+    }
+
+    function onMove(ev: PointerEvent) {
+      ev.preventDefault();
+      setDrag((d) => (d ? { ...d, x: ev.clientX, y: ev.clientY } : d));
+      const id = pointAt(ev.clientX, ev.clientY);
+      overRef.current = id;
+      setOverId(id);
+      // auto-scroll near the viewport edges so you can reach far-away collections
+      const edge = 90;
+      if (ev.clientY < edge) window.scrollBy({ top: -14 });
+      else if (ev.clientY > window.innerHeight - edge) window.scrollBy({ top: 14 });
+    }
+
+    function onUp() {
+      const current = dragRef.current;
+      const target = overRef.current;
+      dragRef.current = null;
+      overRef.current = null;
+      setDrag(null);
+      setOverId(null);
+      if (!current || !target) return;
+      const nextListId = target.startsWith("default:") ? null : target;
+      if ((current.entry.listId ?? null) === nextListId) return;
+      moveEntry(current.entry, nextListId);
+      toast.success(
+        nextListId
+          ? `Moved to ${allLists.find((l) => l.id === nextListId)?.name ?? "collection"}`
+          : "Moved back to default",
+      );
+    }
+
+    window.addEventListener("pointermove", onMove, { passive: false });
+    window.addEventListener("pointerup", onUp);
+    window.addEventListener("pointercancel", onUp);
+    return () => {
+      window.removeEventListener("pointermove", onMove);
+      window.removeEventListener("pointerup", onUp);
+      window.removeEventListener("pointercancel", onUp);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [drag?.entry.id, allLists]);
+
+
   async function removeEntry(entry: Entry) {
     const table = entry.kind === "want" ? "wants" : "saved_posts";
     const { error } = await supabase.from(table).delete().eq("id", entry.id);
