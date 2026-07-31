@@ -487,10 +487,12 @@ export function HitList({ userId }: { userId: string }) {
                     people={people}
                     onMove={moveEntry}
                     onRemove={removeEntry}
+                    onDragStart={startDrag}
+                    draggingId={drag ? `${drag.entry.kind}-${drag.entry.id}` : null}
                   />
                 ) : (
                   <p className="text-xs text-muted-foreground">
-                    Empty — anything you save can be moved in here, whatever the category.
+                    {drag ? "Drop here to add it to this collection." : "Empty — drag any card in here, whatever the category."}
                   </p>
                 )}
               </div>
