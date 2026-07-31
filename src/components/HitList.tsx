@@ -505,7 +505,14 @@ export function HitList({ userId }: { userId: string }) {
         const defaults = (byCategory.get(cat.type) ?? []).filter((e) => !e.listId && e.userId === userId);
         if (defaults.length === 0) return null;
         return (
-          <div key={cat.type} className="space-y-3">
+          <div
+            key={cat.type}
+            data-drop-id={`default:${cat.type}`}
+            className={cn(
+              "space-y-3 rounded-2xl p-1 transition",
+              drag && overId === `default:${cat.type}` && "bg-primary/10 ring-2 ring-primary/40",
+            )}
+          >
             <div className="flex items-center justify-between">
               <h3 className="font-display text-lg">
                 <span className="mr-2">{cat.hitDefaultEmoji}</span>
@@ -522,6 +529,8 @@ export function HitList({ userId }: { userId: string }) {
               people={people}
               onMove={moveEntry}
               onRemove={removeEntry}
+              onDragStart={startDrag}
+              draggingId={drag ? `${drag.entry.kind}-${drag.entry.id}` : null}
             />
           </div>
         );
