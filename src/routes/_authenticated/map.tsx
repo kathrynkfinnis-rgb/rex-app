@@ -256,7 +256,9 @@ function MapPage() {
           <Suspense fallback={<div className="h-full w-full animate-pulse bg-muted" />}>
             <GoogleMap
               key={`${cat}-${sub ?? ""}-${topOnly ? "top" : "all"}-${tripId ?? ""}`}
-              radiusMiles={tripId ? undefined : 10}
+              radiusMiles={10}
+              fitPlaces={!!tripId}
+              connect={!!tripId}
               places={withLoc.map((p: any) => {
                 const recs = [...((p.recommendations ?? []) as any[])].sort(
                   (a, b) => (b.rating ?? 0) - (a.rating ?? 0),
