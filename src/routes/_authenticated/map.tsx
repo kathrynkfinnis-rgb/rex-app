@@ -105,7 +105,9 @@ function MapPage() {
 
 
 
-  const withLoc = filtered.filter((p: any) => p.lat != null && p.lng != null);
+  // Items come newest-first; a trip reads better in the order stops were added.
+  const located = filtered.filter((p: any) => p.lat != null && p.lng != null);
+  const withLoc = tripId ? [...located].reverse() : located;
   const withoutLoc = filtered.filter((p: any) => p.lat == null || p.lng == null);
   const allWithoutLoc = all.filter((p: any) => p.lat == null || p.lng == null);
 
