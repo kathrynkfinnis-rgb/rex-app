@@ -344,6 +344,66 @@ export const resolveStagingRow = createServerFn({ method: "POST" })
   });
 
 // -------- Approve: create item + recommendation --------
+async function approveRow(
+  supabase: any,
+  userId: string,
+  row: any,
+  opts: { rating?: number | null; note?: string | null; tripId?: string | null } = {},
+) {
+  if (!row.suggested_type) throw new Error("Set a type before approving");
+
+  let itemId = row.resolved_item_id as string | null;
+  if (!itemId && row.resolved_external_id && row.resolved_external_source) {
+    const { data: existing } = await supabase
+      .from("items")
+      .select("id")
+      .eq("external_source", row.resolved_external_source)
+      .eq("external_id", row.resolved_external_id)
+      .maybeSingle();
+    itemId = existing?.id ?? null;
+  }
+  if (!itemId) {
+    const { data: created, error: cErr } = await supabase
+      .from("items")
+      .insert({
+        type: row.suggested_type,
+        title: row.raw_title,
+        subtitle: row.resolved_subtitle ?? row.raw_creator ?? null,
+        image_url: row.resolved_image_url ?? null,
+        external_id: row.resolved_external_id ?? null,
+        external_source: row.resolved_external_source ?? null,
+        genre: row.resolved_genre ?? null,
+      })
+      .select("id")
+      .single();
+    if (cErr) throw new Error(cErr.message);
+    itemId = created.id;
+  }
+
+  const rating =
+    typeof opts.rating === "number"
+      ? opts.rating
+      : typeof row.raw_rating === "number"
+      ? Math.round(row.raw_rating)
+      : 8;
+
+  const { error: rErr } = await supabase.from("recommendations").insert({
+    user_id: userId,
+    item_id: itemId,
+    rating,
+    note: (opts.note ?? row.raw_note ?? null)?.slice(0, 2000) || null,
+    trip_id: opts.tripId ?? null,
+  });
+  if (rErr) throw new Error(rErr.message);
+
+  await supabase
+    .from("import_staging")
+    .update({ status: "imported", resolved_item_id: itemId })
+    .eq("id", row.id);
+
+  return itemId;
+}
+
 export const approveStagingRow = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((d: { id: string; rating?: number | null; note?: string | null }) =>
@@ -362,55 +422,64 @@ export const approveStagingRow = createServerFn({ method: "POST" })
       .eq("id", data.id)
       .single();
     if (error || !row) throw new Error(error?.message ?? "not found");
-    if (!row.suggested_type) throw new Error("Set a type before approving");
 
-    let itemId = row.resolved_item_id as string | null;
-    if (!itemId && row.resolved_external_id && row.resolved_external_source) {
-      const { data: existing } = await context.supabase
-        .from("items")
-        .select("id")
-        .eq("external_source", row.resolved_external_source)
-        .eq("external_id", row.resolved_external_id)
-        .maybeSingle();
-      itemId = existing?.id ?? null;
-    }
-    if (!itemId) {
-      const { data: created, error: cErr } = await context.supabase
-        .from("items")
-        .insert({
-          type: row.suggested_type,
-          title: row.raw_title,
-          subtitle: row.resolved_subtitle ?? row.raw_creator ?? null,
-          image_url: row.resolved_image_url ?? null,
-          external_id: row.resolved_external_id ?? null,
-          external_source: row.resolved_external_source ?? null,
-          genre: row.resolved_genre ?? null,
-        })
-        .select("id")
-        .single();
-      if (cErr) throw new Error(cErr.message);
-      itemId = created.id;
-    }
-
-    const rating =
-      typeof data.rating === "number"
-        ? data.rating
-        : typeof row.raw_rating === "number"
-        ? Math.round(row.raw_rating)
-        : 8;
-
-    const { error: rErr } = await context.supabase.from("recommendations").insert({
-      user_id: context.userId,
-      item_id: itemId,
-      rating,
-      note: (data.note ?? row.raw_note ?? null)?.slice(0, 2000) || null,
+    await approveRow(context.supabase, context.userId, row, {
+      rating: data.rating,
+      note: data.note,
     });
-    if (rErr) throw new Error(rErr.message);
-
-    await context.supabase
-      .from("import_staging")
-      .update({ status: "imported", resolved_item_id: itemId })
-      .eq("id", row.id);
-
     return { ok: true };
   });
+
+// -------- Approve a batch of staged place rows as a single Trip --------
+export const approveStagingAsTrip = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d: { ids: string[]; tripName: string; note?: string | null }) =>
+    z
+      .object({
+        ids: z.array(z.string().uuid()).min(1).max(100),
+        tripName: z.string().min(1).max(200),
+        note: z.string().max(2000).nullable().optional(),
+      })
+      .parse(d),
+  )
+  .handler(async ({ data, context }) => {
+    const { data: rows, error } = await context.supabase
+      .from("import_staging")
+      .select("*")
+      .in("id", data.ids)
+      .eq("status", "pending");
+    if (error) throw new Error(error.message);
+    if (!rows?.length) throw new Error("Nothing to import");
+
+    const { data: tripItem, error: tiErr } = await context.supabase
+      .from("items")
+      .insert({ type: "trip", title: data.tripName.trim().slice(0, 200) })
+      .select("id")
+      .single();
+    if (tiErr) throw new Error(tiErr.message);
+
+    const { data: tripRec, error: trErr } = await context.supabase
+      .from("recommendations")
+      .insert({
+        user_id: context.userId,
+        item_id: tripItem.id,
+        rating: 8,
+        note: data.note?.slice(0, 2000) || null,
+      })
+      .select("id")
+      .single();
+    if (trErr) throw new Error(trErr.message);
+
+    let added = 0;
+    for (const row of rows) {
+      try {
+        await approveRow(context.supabase, context.userId, row, { tripId: tripRec.id });
+        added++;
+      } catch {
+        // skip rows that can't be resolved; they stay in the queue
+      }
+    }
+
+    return { tripId: tripRec.id as string, added };
+  });
+
