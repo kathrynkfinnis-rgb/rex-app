@@ -145,20 +145,28 @@ export function GoogleMap({
   places,
   onSelect,
   radiusMiles = 10,
+  fitPlaces = false,
+  connect = false,
 }: {
   places: Place[];
   onSelect?: (id: string) => void;
   radiusMiles?: number;
+  /** Ignore the viewer's location and frame all pins instead (used for trips). */
+  fitPlaces?: boolean;
+  /** Draw a route line between the pins in order (used for trips). */
+  connect?: boolean;
 }) {
   const ref = useRef<HTMLDivElement>(null);
   const mapRef = useRef<any>(null);
   const markersRef = useRef<any[]>([]);
   const userLayerRef = useRef<any[]>([]);
+  const lineRef = useRef<any>(null);
   const infoRef = useRef<any>(null);
 
   const [error, setError] = useState<string | null>(null);
   const [ready, setReady] = useState(false);
   const [userCentered, setUserCentered] = useState(false);
+
 
   useEffect(() => {
     let cancelled = false;
