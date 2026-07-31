@@ -291,15 +291,27 @@ export function GoogleMap({
       bounds.extend(marker.getPosition());
     });
 
+    if (connect && places.length > 1) {
+      lineRef.current = new g.Polyline({
+        map: mapRef.current,
+        path: places.map((p) => ({ lat: p.lat, lng: p.lng })),
+        strokeColor: "#4f7c3a",
+        strokeOpacity: 0.7,
+        strokeWeight: 2,
+        clickable: false,
+      });
+    }
+
     // The user's own 10-mile view wins when we have their location.
-    if (userCentered) return;
+    if (userCentered && !fitPlaces) return;
     if (places.length === 1) {
       mapRef.current.setCenter(bounds.getCenter());
       mapRef.current.setZoom(14);
     } else {
       mapRef.current.fitBounds(bounds, 48);
     }
-  }, [places, onSelect, ready, userCentered]);
+  }, [places, onSelect, ready, userCentered, fitPlaces, connect]);
+
 
   if (error) {
     return (
