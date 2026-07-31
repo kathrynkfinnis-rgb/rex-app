@@ -959,7 +959,7 @@ export type Database = {
         }[]
       }
       get_shared_trip: {
-        Args: { trip_id: string }
+        Args: { _trip: string }
         Returns: {
           author_avatar_url: string
           author_display_name: string
@@ -977,7 +977,7 @@ export type Database = {
         }[]
       }
       get_shared_trip_stops: {
-        Args: { trip_id: string }
+        Args: { _trip: string }
         Returns: {
           author_avatar_url: string
           author_display_name: string
