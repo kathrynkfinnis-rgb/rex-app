@@ -241,7 +241,7 @@ export function GoogleMap({
     return () => {
       cancelled = true;
     };
-  }, [ready, radiusMiles]);
+  }, [ready, radiusMiles, fitPlaces]);
 
   useEffect(() => {
     if (!ready || !mapRef.current || !window.google?.maps) return;
@@ -249,7 +249,12 @@ export function GoogleMap({
     const g = window.google.maps;
     markersRef.current.forEach((m) => m.setMap(null));
     markersRef.current = [];
+    if (lineRef.current) {
+      lineRef.current.setMap(null);
+      lineRef.current = null;
+    }
     if (!places.length) return;
+
     if (!infoRef.current) infoRef.current = new g.InfoWindow({ disableAutoPan: true });
     const info = infoRef.current;
     const bounds = new g.LatLngBounds();
