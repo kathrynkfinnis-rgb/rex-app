@@ -33,6 +33,7 @@ function MapPage() {
   const [cat, setCat] = useState<ItemType | "all">("all");
   const [sub, setSub] = useState<string | null>(null);
   const [topOnly, setTopOnly] = useState(false);
+  const [tripId, setTripId] = useState<string | null>(null);
 
 
   const { data } = useQuery({
@@ -40,12 +41,26 @@ function MapPage() {
     queryFn: async () => {
       const { data, error } = await supabase
         .from("items")
-        .select("id, title, subtitle, type, genre, address, lat, lng, image_url, recommendations(id, rating, note, user_id, profiles(display_name, username, avatar_url))")
+        .select("id, title, subtitle, type, genre, address, lat, lng, image_url, recommendations(id, rating, note, user_id, trip_id, profiles(display_name, username, avatar_url))")
         .in("type", ["place", "event"])
         .order("created_at", { ascending: false })
         .limit(200);
       if (error) throw error;
       return data ?? [];
+    },
+  });
+
+  const { data: trips } = useQuery({
+    queryKey: ["map-trips"],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("recommendations")
+        .select("id, created_at, items!inner(title, type), profiles!recommendations_user_id_fkey(display_name, username)")
+        .eq("items.type", "trip")
+        .order("created_at", { ascending: false })
+        .limit(50);
+      if (error) throw error;
+      return (data ?? []) as any[];
     },
   });
 
@@ -56,9 +71,17 @@ function MapPage() {
     return CATEGORIES.filter((c) => present.has(c.type));
   }, [all]);
 
+  const byTrip = useMemo(
+    () =>
+      tripId
+        ? all.filter((p: any) => (p.recommendations ?? []).some((r: any) => r.trip_id === tripId))
+        : all,
+    [all, tripId],
+  );
+
   const byCat = useMemo(
-    () => (cat === "all" ? all : all.filter((p: any) => p.type === cat)),
-    [all, cat],
+    () => (cat === "all" ? byTrip : byTrip.filter((p: any) => p.type === cat)),
+    [byTrip, cat],
   );
 
   const subs = useMemo(() => {
@@ -77,6 +100,9 @@ function MapPage() {
       (p.recommendations ?? []).some((r: any) => topIds.has(r.user_id)),
     );
   }, [byCat, sub, topOnly, topSet]);
+
+  const activeTrip = trips?.find((t: any) => t.id === tripId) ?? null;
+
 
 
   const withLoc = filtered.filter((p: any) => p.lat != null && p.lng != null);
