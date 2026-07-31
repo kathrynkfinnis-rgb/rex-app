@@ -54,6 +54,8 @@ function ImportPage() {
   const [pasted, setPasted] = useState("");
   const [gmapsUrl, setGmapsUrl] = useState("");
   const [loading, setLoading] = useState(false);
+  const [tripName, setTripName] = useState("");
+  const [tripLoading, setTripLoading] = useState(false);
 
   const fetchSheet = useServerFn(fetchSheetCsv);
   const extract = useServerFn(extractFromText);
@@ -62,6 +64,7 @@ function ImportPage() {
   const importImdb = useServerFn(importImdbTitles);
   const resolve = useServerFn(resolveStagingRow);
   const approve = useServerFn(approveStagingRow);
+  const makeTrip = useServerFn(approveStagingAsTrip);
 
 
   const { data: staging } = useQuery({
@@ -75,6 +78,27 @@ function ImportPage() {
       return data ?? [];
     },
   });
+
+  const placeRows = (staging ?? []).filter((r) => r.suggested_type === "place");
+
+  async function onMakeTrip() {
+    if (!tripName.trim() || placeRows.length === 0) return;
+    setTripLoading(true);
+    try {
+      const { tripId, added } = await makeTrip({
+        data: { ids: placeRows.map((r) => r.id), tripName: tripName.trim() },
+      });
+      toast.success(`Trip created with ${added} Rex`);
+      setTripName("");
+      qc.invalidateQueries({ queryKey: ["import-staging"] });
+      navigate({ to: "/trip/$id", params: { id: tripId } });
+    } catch (e: any) {
+      toast.error(e.message ?? "Couldn't create the trip");
+    } finally {
+      setTripLoading(false);
+    }
+  }
+
 
   async function runExtract(text: string, source: string) {
     if (!text.trim()) {
