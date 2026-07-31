@@ -19,6 +19,7 @@ import { useServerFn } from "@tanstack/react-start";
 import { RecipeEditor } from "@/components/RecipeEditor";
 import { PhotoUploader } from "@/components/PhotoUploader";
 import { TagsInput } from "@/components/TagsInput";
+import { TripStopsBuilder, type DraftStop } from "@/components/TripStopsBuilder";
 
 export const Route = createFileRoute("/_authenticated/add")({
   validateSearch: (search: Record<string, unknown>) => ({
