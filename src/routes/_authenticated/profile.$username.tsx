@@ -84,7 +84,7 @@ function ProfilePage() {
               <p className="truncate text-sm text-muted-foreground">@{profile.username}</p>
               {recs && recs.length > 0 && (
                 <div className="mt-2 flex items-center gap-3 text-sm text-muted-foreground">
-                  <span>{recs.length} Rex{recs.length === 1 ? "" : "es"}</span>
+                  <span>{recs.length} Rex</span>
                   {avgRating != null && (
                     <span className="flex items-center gap-1">
                       avg <CrownRatingDisplay value={Math.round(avgRating)} size="xs" showNumber />

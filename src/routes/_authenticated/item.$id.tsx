@@ -139,7 +139,7 @@ function ItemPage() {
           <div className="mt-4 flex items-center gap-2">
             <CrownRatingDisplay value={avg} size="md" />
             <span className="text-sm font-semibold tabular-nums">{avg.toFixed(1)}<span className="text-muted-foreground font-normal">/10</span></span>
-            <span className="text-sm text-muted-foreground">· {recs.length} Rex{recs.length === 1 ? "" : "es"}</span>
+            <span className="text-sm text-muted-foreground">· {recs.length} Rex</span>
           </div>
         )}
         <div className="mt-4 grid grid-cols-1 gap-2 sm:grid-cols-2">

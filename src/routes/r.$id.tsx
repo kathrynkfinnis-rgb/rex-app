@@ -173,7 +173,7 @@ function SharePage() {
         )}
 
         <div className="flex justify-center pt-1">
-          <ShareButton url={shareUrl} text={shareText} label="Share this rec" />
+          <ShareButton url={shareUrl} text={shareText} label="Share this Rex" />
         </div>
       </main>
     </div>

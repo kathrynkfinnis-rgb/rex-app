@@ -327,7 +327,7 @@ function MapPage() {
                 </p>
               </div>
               <span className="text-xs font-medium text-muted-foreground">
-                {p.recommendations?.length ?? 0} rec{(p.recommendations?.length ?? 0) === 1 ? "" : "s"}
+                {p.recommendations?.length ?? 0} Rex
               </span>
             </Link>
             );
