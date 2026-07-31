@@ -606,6 +606,16 @@ export function HitList({ userId }: { userId: string }) {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {drag ? (
+        <div
+          className="pointer-events-none fixed z-50 flex max-w-[70vw] items-center gap-2 rounded-2xl bg-card px-3 py-2 text-sm font-medium shadow-lg ring-2 ring-primary"
+          style={{ left: drag.x + 12, top: drag.y - 20 }}
+        >
+          <GripVertical className="h-4 w-4 shrink-0 text-muted-foreground" />
+          <span className="truncate">{drag.entry.title}</span>
+        </div>
+      ) : null}
     </div>
   );
 }
