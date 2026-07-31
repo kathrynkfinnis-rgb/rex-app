@@ -9,6 +9,7 @@ import { Button } from "@/components/ui/button";
 import { ArrowLeft, Plus, Luggage } from "lucide-react";
 import { formatDistanceToNow } from "date-fns";
 import { categoryMeta, splitGenres, type ItemType } from "@/lib/categories";
+import { ShareButton } from "@/components/ShareButton";
 
 const SELECT =
   "id, rating, note, created_at, photo_url, photo_urls, tags, user_id, item_id, trip_id, items!inner(id, type, title, subtitle, image_url, genre), profiles!recommendations_user_id_fkey(username, display_name, avatar_url), creators(slug, name, color, emoji)";
@@ -85,6 +86,15 @@ function TripPage() {
               <span>·</span>
               <span>{formatDistanceToNow(new Date(t.created_at), { addSuffix: true }).replace("about ", "")}</span>
             </div>
+            <div className="mt-3">
+              <ShareButton
+                url={`https://pocket-app-pioneers.lovable.app/t/${t.id}`}
+                text={`${t.profiles?.display_name || t.profiles?.username || "A friend"}'s trip: ${t.items?.title} 🧳 on REX 🦖`}
+                label="Share this trip"
+                variant="primary"
+              />
+            </div>
+
             {t.profiles?.username && (
               <Link
                 to="/profile/$username"
