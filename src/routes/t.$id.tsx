@@ -101,7 +101,7 @@ export const Route = createFileRoute("/t/$id")({
 });
 
 function SharedTripPage() {
-  const { trip, stops } = Route.useLoaderData();
+  const { trip, stops } = Route.useLoaderData() as { trip: SharedTrip; stops: SharedStop[] };
   const { id } = Route.useParams();
   const { data: session, isPending } = useQuery({
     queryKey: ["share-session"],

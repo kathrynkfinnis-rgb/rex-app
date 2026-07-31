@@ -12,6 +12,7 @@ import { Route as rootRouteImport } from './routes/__root'
 import { Route as AuthRouteImport } from './routes/auth'
 import { Route as AuthenticatedRouteRouteImport } from './routes/_authenticated/route'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as TIdRouteImport } from './routes/t.$id'
 import { Route as RIdRouteImport } from './routes/r.$id'
 import { Route as AuthenticatedYouRouteImport } from './routes/_authenticated/you'
 import { Route as AuthenticatedSharedCollectionsRouteImport } from './routes/_authenticated/shared-collections'
@@ -47,6 +48,11 @@ const AuthenticatedRouteRoute = AuthenticatedRouteRouteImport.update({
 const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const TIdRoute = TIdRouteImport.update({
+  id: '/t/$id',
+  path: '/t/$id',
   getParentRoute: () => rootRouteImport,
 } as any)
 const RIdRoute = RIdRouteImport.update({
@@ -183,6 +189,7 @@ export interface FileRoutesByFullPath {
   '/shared-collections': typeof AuthenticatedSharedCollectionsRoute
   '/you': typeof AuthenticatedYouRoute
   '/r/$id': typeof RIdRoute
+  '/t/$id': typeof TIdRoute
   '/ask/$id': typeof AuthenticatedAskIdRoute
   '/group/$id': typeof AuthenticatedGroupIdRoute
   '/item/$id': typeof AuthenticatedItemIdRoute
@@ -209,6 +216,7 @@ export interface FileRoutesByTo {
   '/shared-collections': typeof AuthenticatedSharedCollectionsRoute
   '/you': typeof AuthenticatedYouRoute
   '/r/$id': typeof RIdRoute
+  '/t/$id': typeof TIdRoute
   '/ask/$id': typeof AuthenticatedAskIdRoute
   '/group/$id': typeof AuthenticatedGroupIdRoute
   '/item/$id': typeof AuthenticatedItemIdRoute
@@ -237,6 +245,7 @@ export interface FileRoutesById {
   '/_authenticated/shared-collections': typeof AuthenticatedSharedCollectionsRoute
   '/_authenticated/you': typeof AuthenticatedYouRoute
   '/r/$id': typeof RIdRoute
+  '/t/$id': typeof TIdRoute
   '/_authenticated/ask/$id': typeof AuthenticatedAskIdRoute
   '/_authenticated/group/$id': typeof AuthenticatedGroupIdRoute
   '/_authenticated/item/$id': typeof AuthenticatedItemIdRoute
@@ -265,6 +274,7 @@ export interface FileRouteTypes {
     | '/shared-collections'
     | '/you'
     | '/r/$id'
+    | '/t/$id'
     | '/ask/$id'
     | '/group/$id'
     | '/item/$id'
@@ -291,6 +301,7 @@ export interface FileRouteTypes {
     | '/shared-collections'
     | '/you'
     | '/r/$id'
+    | '/t/$id'
     | '/ask/$id'
     | '/group/$id'
     | '/item/$id'
@@ -318,6 +329,7 @@ export interface FileRouteTypes {
     | '/_authenticated/shared-collections'
     | '/_authenticated/you'
     | '/r/$id'
+    | '/t/$id'
     | '/_authenticated/ask/$id'
     | '/_authenticated/group/$id'
     | '/_authenticated/item/$id'
@@ -332,6 +344,7 @@ export interface RootRouteChildren {
   AuthenticatedRouteRoute: typeof AuthenticatedRouteRouteWithChildren
   AuthRoute: typeof AuthRoute
   RIdRoute: typeof RIdRoute
+  TIdRoute: typeof TIdRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -355,6 +368,13 @@ declare module '@tanstack/react-router' {
       path: '/'
       fullPath: '/'
       preLoaderRoute: typeof IndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/t/$id': {
+      id: '/t/$id'
+      path: '/t/$id'
+      fullPath: '/t/$id'
+      preLoaderRoute: typeof TIdRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/r/$id': {
@@ -571,17 +591,8 @@ const rootRouteChildren: RootRouteChildren = {
   AuthenticatedRouteRoute: AuthenticatedRouteRouteWithChildren,
   AuthRoute: AuthRoute,
   RIdRoute: RIdRoute,
+  TIdRoute: TIdRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
   ._addFileTypes<FileRouteTypes>()
-
-import type { getRouter } from './router.tsx'
-import type { startInstance } from './start.ts'
-declare module '@tanstack/react-start' {
-  interface Register {
-    ssr: true
-    router: Awaited<ReturnType<typeof getRouter>>
-    config: Awaited<ReturnType<typeof startInstance.getOptions>>
-  }
-}
