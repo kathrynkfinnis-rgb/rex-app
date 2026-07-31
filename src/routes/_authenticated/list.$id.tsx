@@ -11,9 +11,9 @@ export const Route = createFileRoute("/_authenticated/list/$id")({
   head: () => ({
     meta: [
       { title: "Collection — REX 🦖💡" },
-      { name: "description", content: "A REX collection of recommendations worth saving." },
+      { name: "description", content: "A REX collection of Rex worth saving." },
       { property: "og:title", content: "A REX collection" },
-      { property: "og:description", content: "A REX collection of recommendations worth saving." },
+      { property: "og:description", content: "A REX collection of Rex worth saving." },
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary" },
     ],

@@ -259,7 +259,7 @@ function FeedPage() {
               <Sparkles className="h-5 w-5" />
             </div>
             <div className="min-w-0 flex-1">
-              <p className="font-medium">Ask friends for a rec</p>
+              <p className="font-medium">Ask friends for a Rex</p>
               <p className="truncate text-xs text-muted-foreground">Put out a blast — friends can chime in.</p>
             </div>
             <Plus className="h-4 w-4 text-muted-foreground" />
@@ -461,7 +461,7 @@ function SearchResults({ query, feed, scope }: { query: string; feed: FeedRow[];
             Nobody you follow has Rexed this yet — add it yourself.
           </p>
           <Button asChild variant="outline" className="mt-4 h-10 rounded-full">
-            <Link to="/add"><Plus className="mr-1.5 h-4 w-4" /> Add a rec</Link>
+            <Link to="/add"><Plus className="mr-1.5 h-4 w-4" /> Add a Rex</Link>
           </Button>
         </div>
       )}
@@ -566,7 +566,7 @@ function EmptyState() {
           <Link to="/creators"><Mic className="mr-1.5 h-4 w-4" /> Follow creators</Link>
         </Button>
         <Button asChild variant="ghost" className="h-11 rounded-full">
-          <Link to="/add"><Plus className="mr-1.5 h-4 w-4" /> Add your first rec</Link>
+          <Link to="/add"><Plus className="mr-1.5 h-4 w-4" /> Add your first Rex</Link>
         </Button>
       </div>
     </div>

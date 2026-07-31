@@ -66,7 +66,7 @@ export const PREF_LABELS: Record<
   rec_like: { label: "Likes on my Rex", description: "When someone likes a Rex you posted" },
   friend_request: { label: "New friend requests", description: "When someone wants to connect" },
   friend_accepted: { label: "Friend requests accepted", description: "When someone accepts your request" },
-  blast_new: { label: "New blasts from friends", description: "When a friend posts a want-a-rec" },
+  blast_new: { label: "New blasts from friends", description: "When a friend asks for a Rex" },
   blast_comment: { label: "Replies to my blasts", description: "Comments or suggestions on blasts you posted" },
   mention: { label: "Tagged in a comment", description: "When a friend tags you with @ in a comment" },
   friend_new_rec: { label: "New Rex from friends", description: "Every time a friend posts a Rex (can be noisy)" },

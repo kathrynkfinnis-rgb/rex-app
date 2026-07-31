@@ -139,7 +139,7 @@ function AdminPage() {
           <Kpi label="Signups · 24h" value={u?.new_24h} accent />
           <Kpi label="Signups · 7d" value={u?.new_7d} />
           <Kpi label="Signups · 30d" value={u?.new_30d} />
-          <Kpi label="DAU" value={u?.dau} sub="posted a rec · 24h" />
+          <Kpi label="DAU" value={u?.dau} sub="posted a Rex · 24h" />
           <Kpi label="WAU" value={u?.wau} sub="posted · 7d" />
           <Kpi label="MAU" value={u?.mau} sub="posted · 30d" />
           <Kpi label="WAU / MAU" value={ratio(u?.wau, u?.mau)} sub="stickiness" />
@@ -150,7 +150,7 @@ function AdminPage() {
         <div className="grid grid-cols-2 gap-2">
           <Pair icon={<Sparkles className="h-4 w-4" />} label="Rex" total={c?.recs_total} recent={c?.recs_7d} />
           <Pair icon={<Megaphone className="h-4 w-4" />} label="Blasts" total={c?.blasts_total} recent={c?.blasts_7d} />
-          <Pair icon={<MessageCircle className="h-4 w-4" />} label="Rec comments" total={c?.rec_comments_total} recent={c?.rec_comments_7d} />
+          <Pair icon={<MessageCircle className="h-4 w-4" />} label="Rex comments" total={c?.rec_comments_total} recent={c?.rec_comments_7d} />
           <Pair icon={<MessageCircle className="h-4 w-4" />} label="Blast comments" total={c?.blast_comments_total} recent={c?.blast_comments_7d} />
           <Pair icon={<Heart className="h-4 w-4" />} label="Likes" total={c?.likes_total} recent={c?.likes_7d} />
           <Pair icon={<Bookmark className="h-4 w-4" />} label="Saves" total={c?.saves_total} recent={c?.saves_7d} />
@@ -159,7 +159,7 @@ function AdminPage() {
 
       <Section title="Activation & funnel" icon={<Zap className="h-4 w-4" />}>
         <div className="grid grid-cols-2 gap-2">
-          <Kpi label="Activation rate" value={ratio(e?.activated_users, e?.total_users)} sub={`${e?.activated_users ?? 0} posted ≥1 rec`} accent />
+          <Kpi label="Activation rate" value={ratio(e?.activated_users, e?.total_users)} sub={`${e?.activated_users ?? 0} posted ≥1 Rex`} accent />
           <Kpi label="Connected rate" value={ratio(e?.users_with_friend, e?.total_users)} sub={`${e?.users_with_friend ?? 0} have ≥1 friend`} />
           <Kpi label="Rex / active user" value={e?.recs_per_active_user} sub="depth of use" />
           <Kpi label="Avg crowns" value={e?.avg_rating} sub="rating quality" />
