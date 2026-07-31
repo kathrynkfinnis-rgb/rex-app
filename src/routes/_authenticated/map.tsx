@@ -1,7 +1,7 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
-import { MapPin, Loader2, X, Star } from "lucide-react";
+import { MapPin, Loader2, X, Star, Luggage } from "lucide-react";
 import { useTopFriends } from "@/lib/topFriends";
 
 import { ClientOnly } from "@tanstack/react-router";
