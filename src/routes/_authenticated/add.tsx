@@ -77,6 +77,7 @@ function AddPage() {
     setPicked(null);
     setManualMode(false);
     setPlaceSubs([]);
+    setTags([]);
     setJustAdded(null);
     setPhotos([]);
   }
