@@ -512,6 +512,32 @@ function ImportPage() {
           </div>
         )}
 
+        {placeRows.length >= 2 && (
+          <div className="space-y-3 rounded-2xl bg-primary/5 p-4 ring-1 ring-primary/30">
+            <div className="flex items-center gap-2 text-sm font-semibold">
+              <Luggage className="h-4 w-4 text-primary" />
+              {placeRows.length} place Rex in the queue
+            </div>
+            <p className="text-xs text-muted-foreground">
+              Were these all from one trip? Group them into a single Trip Rex — each place still becomes its own Rex, linked together under the trip.
+            </p>
+            <Input
+              value={tripName}
+              onChange={(e) => setTripName(e.target.value)}
+              placeholder="Trip name, e.g. Lisbon, May 2026"
+              className="h-11 bg-background"
+            />
+            <Button
+              onClick={onMakeTrip}
+              disabled={tripLoading || !tripName.trim()}
+              className="h-11 w-full rounded-full"
+            >
+              {tripLoading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Luggage className="mr-2 h-4 w-4" />}
+              Make a trip from these {placeRows.length}
+            </Button>
+          </div>
+        )}
+
         <section>
           <h2 className="mb-2 text-xs font-semibold uppercase tracking-widest text-muted-foreground">
             Review queue {staging && staging.length > 0 ? `(${staging.length})` : ""}
