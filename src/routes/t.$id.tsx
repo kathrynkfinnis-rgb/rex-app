@@ -54,8 +54,8 @@ function mapsHref(stop: SharedStop) {
 export const Route = createFileRoute("/t/$id")({
   loader: async ({ params }) => {
     const [tripRes, stopsRes] = await Promise.all([
-      supabase.rpc("get_shared_trip", { trip_id: params.id }),
-      supabase.rpc("get_shared_trip_stops", { trip_id: params.id }),
+      supabase.rpc("get_shared_trip", { _trip: params.id }),
+      supabase.rpc("get_shared_trip_stops", { _trip: params.id }),
     ]);
     const trip = (tripRes.data as SharedTrip[] | null)?.[0];
     if (tripRes.error || !trip) throw notFound();
