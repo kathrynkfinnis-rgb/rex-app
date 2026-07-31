@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Link } from "@tanstack/react-router";
 import { supabase } from "@/integrations/supabase/client";
@@ -13,7 +13,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { Lock, MoreHorizontal, Plus, Trash2, Users, Globe2, Check } from "lucide-react";
+import { Lock, MoreHorizontal, Plus, Trash2, Users, Globe2, Check, GripVertical } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { CATEGORIES, categoryMeta, type ItemType } from "@/lib/categories";
 import { toast } from "sonner";
@@ -239,6 +239,72 @@ export function HitList({ userId }: { userId: string }) {
     invalidateEntries();
   }
 
+  // --- Drag & drop: pick a card up by its grip and drop it on any collection ---
+  const [drag, setDrag] = useState<{ entry: Entry; x: number; y: number } | null>(null);
+  const [overId, setOverId] = useState<string | null>(null);
+  const dragRef = useRef<{ entry: Entry } | null>(null);
+  const overRef = useRef<string | null>(null);
+
+  function startDrag(entry: Entry, e: React.PointerEvent) {
+    e.preventDefault();
+    e.stopPropagation();
+    dragRef.current = { entry };
+    overRef.current = null;
+    setOverId(null);
+    setDrag({ entry, x: e.clientX, y: e.clientY });
+  }
+
+  useEffect(() => {
+    if (!drag) return;
+
+    function pointAt(x: number, y: number) {
+      const el = document.elementFromPoint(x, y);
+      const zone = el?.closest("[data-drop-id]") as HTMLElement | null;
+      return zone?.dataset.dropId ?? null;
+    }
+
+    function onMove(ev: PointerEvent) {
+      ev.preventDefault();
+      setDrag((d) => (d ? { ...d, x: ev.clientX, y: ev.clientY } : d));
+      const id = pointAt(ev.clientX, ev.clientY);
+      overRef.current = id;
+      setOverId(id);
+      // auto-scroll near the viewport edges so you can reach far-away collections
+      const edge = 90;
+      if (ev.clientY < edge) window.scrollBy({ top: -14 });
+      else if (ev.clientY > window.innerHeight - edge) window.scrollBy({ top: 14 });
+    }
+
+    function onUp() {
+      const current = dragRef.current;
+      const target = overRef.current;
+      dragRef.current = null;
+      overRef.current = null;
+      setDrag(null);
+      setOverId(null);
+      if (!current || !target) return;
+      const nextListId = target.startsWith("default:") ? null : target;
+      if ((current.entry.listId ?? null) === nextListId) return;
+      moveEntry(current.entry, nextListId);
+      toast.success(
+        nextListId
+          ? `Moved to ${allLists.find((l) => l.id === nextListId)?.name ?? "collection"}`
+          : "Moved back to default",
+      );
+    }
+
+    window.addEventListener("pointermove", onMove, { passive: false });
+    window.addEventListener("pointerup", onUp);
+    window.addEventListener("pointercancel", onUp);
+    return () => {
+      window.removeEventListener("pointermove", onMove);
+      window.removeEventListener("pointerup", onUp);
+      window.removeEventListener("pointercancel", onUp);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [drag?.entry.id, allLists]);
+
+
   async function removeEntry(entry: Entry) {
     const table = entry.kind === "want" ? "wants" : "saved_posts";
     const { error } = await supabase.from(table).delete().eq("id", entry.id);
@@ -340,7 +406,15 @@ export function HitList({ userId }: { userId: string }) {
             const VIcon = VMeta.icon;
             const isOwner = list.user_id === userId;
             return (
-              <div key={list.id} className="rounded-2xl border border-border bg-card/40 p-3">
+              <div
+                key={list.id}
+                data-drop-id={list.id}
+                className={cn(
+                  "rounded-2xl border border-border bg-card/40 p-3 transition",
+                  drag && "border-dashed",
+                  drag && overId === list.id && "border-primary bg-primary/10 ring-2 ring-primary/40",
+                )}
+              >
                 <div className="mb-2 flex items-center justify-between gap-2">
                   <p className="min-w-0 truncate font-medium">
                     <span className="mr-1.5">{list.emoji ?? "✨"}</span>
@@ -413,10 +487,12 @@ export function HitList({ userId }: { userId: string }) {
                     people={people}
                     onMove={moveEntry}
                     onRemove={removeEntry}
+                    onDragStart={startDrag}
+                    draggingId={drag ? `${drag.entry.kind}-${drag.entry.id}` : null}
                   />
                 ) : (
                   <p className="text-xs text-muted-foreground">
-                    Empty — anything you save can be moved in here, whatever the category.
+                    {drag ? "Drop here to add it to this collection." : "Empty — drag any card in here, whatever the category."}
                   </p>
                 )}
               </div>
@@ -429,7 +505,14 @@ export function HitList({ userId }: { userId: string }) {
         const defaults = (byCategory.get(cat.type) ?? []).filter((e) => !e.listId && e.userId === userId);
         if (defaults.length === 0) return null;
         return (
-          <div key={cat.type} className="space-y-3">
+          <div
+            key={cat.type}
+            data-drop-id={`default:${cat.type}`}
+            className={cn(
+              "space-y-3 rounded-2xl p-1 transition",
+              drag && overId === `default:${cat.type}` && "bg-primary/10 ring-2 ring-primary/40",
+            )}
+          >
             <div className="flex items-center justify-between">
               <h3 className="font-display text-lg">
                 <span className="mr-2">{cat.hitDefaultEmoji}</span>
@@ -446,6 +529,8 @@ export function HitList({ userId }: { userId: string }) {
               people={people}
               onMove={moveEntry}
               onRemove={removeEntry}
+              onDragStart={startDrag}
+              draggingId={drag ? `${drag.entry.kind}-${drag.entry.id}` : null}
             />
           </div>
         );
@@ -521,6 +606,16 @@ export function HitList({ userId }: { userId: string }) {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {drag ? (
+        <div
+          className="pointer-events-none fixed z-50 flex max-w-[70vw] items-center gap-2 rounded-2xl bg-card px-3 py-2 text-sm font-medium shadow-lg ring-2 ring-primary"
+          style={{ left: drag.x + 12, top: drag.y - 20 }}
+        >
+          <GripVertical className="h-4 w-4 shrink-0 text-muted-foreground" />
+          <span className="truncate">{drag.entry.title}</span>
+        </div>
+      ) : null}
     </div>
   );
 }
@@ -533,6 +628,8 @@ function EntryList({
   people,
   onMove,
   onRemove,
+  onDragStart,
+  draggingId,
 }: {
   entries: Entry[];
   lists: ListRow[];
@@ -541,6 +638,8 @@ function EntryList({
   people?: Map<string, Profile>;
   onMove: (entry: Entry, listId: string | null) => void;
   onRemove: (entry: Entry) => void;
+  onDragStart?: (entry: Entry, e: React.PointerEvent) => void;
+  draggingId?: string | null;
 }) {
   if (entries.length === 0) return null;
   return (
@@ -550,11 +649,26 @@ function EntryList({
         const Icon = c.icon;
         const mine = e.userId === currentUserId;
         const who = mine ? null : people?.get(e.userId) ?? null;
+        const key = `${e.kind}-${e.id}`;
         return (
           <div
-            key={`${e.kind}-${e.id}`}
-            className="flex items-center gap-3 rounded-2xl bg-card p-3 ring-1 ring-border"
+            key={key}
+            className={cn(
+              "flex items-center gap-2 rounded-2xl bg-card p-3 ring-1 ring-border transition",
+              draggingId === key && "opacity-40",
+            )}
           >
+            {mine && onDragStart ? (
+              <button
+                type="button"
+                aria-label="Drag to another collection"
+                onPointerDown={(ev) => onDragStart(e, ev)}
+                onClick={(ev) => ev.preventDefault()}
+                className="-ml-1 shrink-0 cursor-grab touch-none rounded-lg p-1 text-muted-foreground/60 hover:bg-muted hover:text-foreground active:cursor-grabbing"
+              >
+                <GripVertical className="h-4 w-4" />
+              </button>
+            ) : null}
             <Link
               to={e.href as any}
               params={e.params}
