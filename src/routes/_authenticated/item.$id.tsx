@@ -197,12 +197,9 @@ function ItemPage() {
               </div>
               {r.note && <p className="mt-2 text-sm leading-snug">&ldquo;{r.note}&rdquo;</p>}
               {photos.length > 0 && (
-                <div className={photos.length === 1 ? "mt-3" : "mt-3 grid grid-cols-2 gap-1"}>
-                  {photos.slice(0, 4).map((url) => (
-                    <img key={url} src={url} alt="" className="w-full rounded-lg object-cover ring-1 ring-border" style={{ maxHeight: photos.length === 1 ? 360 : undefined, aspectRatio: photos.length === 1 ? undefined : "1 / 1" }} />
-                  ))}
-                </div>
+                <PhotoCarousel photos={photos} className="mt-3 overflow-hidden rounded-lg ring-1 ring-border" />
               )}
+
               <p className="mt-1 text-[11px] text-muted-foreground">{formatDistanceToNow(new Date(r.created_at), { addSuffix: true })}</p>
               <div className="mt-2 border-t border-border pt-2">
                 <LikesComments recommendationId={r.id} />
