@@ -189,6 +189,7 @@ function ItemPage() {
         <div className="mt-3 space-y-3">
           {recs.map((r: any) => {
             const photos = (r.photo_urls && r.photo_urls.length ? r.photo_urls : r.photo_url ? [r.photo_url] : []) as string[];
+            const mine = uid && r.user_id === uid;
             return (
             <div key={r.id} className="rounded-2xl bg-card p-4 ring-1 ring-border">
               <div className="flex items-center justify-between">
@@ -196,12 +197,25 @@ function ItemPage() {
                   <UserAvatar url={r.profiles?.avatar_url} name={r.profiles?.display_name || r.profiles?.username} size="sm" />
                   <span className="font-medium">{r.profiles?.display_name || r.profiles?.username}</span>
                 </div>
-                <div className="flex items-center gap-0.5 text-sm font-semibold tabular-nums">
-                  <Crown className="h-3.5 w-3.5 text-primary" />
-                  {r.rating}<span className="text-muted-foreground font-normal">/10</span>
+                <div className="flex items-center gap-2">
+                  {mine && (
+                    <button
+                      type="button"
+                      onClick={() => setEditingRec(r)}
+                      className="flex h-7 w-7 items-center justify-center rounded-full text-muted-foreground ring-1 ring-border hover:text-foreground"
+                      aria-label="Edit or delete your Rex"
+                    >
+                      <Pencil className="h-3.5 w-3.5" />
+                    </button>
+                  )}
+                  <div className="flex items-center gap-0.5 text-sm font-semibold tabular-nums">
+                    <Crown className="h-3.5 w-3.5 text-primary" />
+                    {r.rating}<span className="text-muted-foreground font-normal">/10</span>
+                  </div>
                 </div>
 
               </div>
+
               {r.note && <p className="mt-2 text-sm leading-snug">&ldquo;{r.note}&rdquo;</p>}
               {photos.length > 0 && (
                 <PhotoCarousel photos={photos} className="mt-3 overflow-hidden rounded-lg ring-1 ring-border" />
