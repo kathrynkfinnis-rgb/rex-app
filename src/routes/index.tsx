@@ -2,7 +2,7 @@ import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { MapPin, Book, Film, Tv } from "lucide-react";
-import rexLogo from "@/assets/rex-logo.png.asset.json";
+import rexLogo from "@/assets/rex-wordmark.png.asset.json";
 
 export const Route = createFileRoute("/")({
   ssr: false,
