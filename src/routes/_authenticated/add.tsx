@@ -628,6 +628,15 @@ function AddPage() {
 
         {type === "trip" && <TripStopsBuilder value={tripStops} onChange={setTripStops} />}
 
+        {tripId && (
+          <SectionPicker
+            value={tripSection}
+            onChange={setTripSection}
+            label="Which part of the trip? (optional)"
+          />
+        )}
+
+
         <div className="space-y-1.5">
           <Label>Tags</Label>
           <TagsInput
