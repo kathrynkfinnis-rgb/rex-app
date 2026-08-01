@@ -7,7 +7,7 @@ import { categoryMeta, type ItemType } from "@/lib/categories";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { toast } from "sonner";
-import { ArrowLeft, MapPin, Check } from "lucide-react";
+import { ArrowLeft, MapPin, Check, Crown } from "lucide-react";
 import { CrownRatingDisplay, CrownRatingInput } from "@/components/CrownRating";
 import { ItemEnrichment } from "@/components/ItemEnrichment";
 import { LikesComments } from "@/components/LikesComments";
@@ -139,7 +139,10 @@ function ItemPage() {
         {recs.length > 0 && (
           <div className="mt-4 flex items-center gap-2">
             <CrownRatingDisplay value={avg} size="md" />
-            <span className="text-sm font-semibold tabular-nums">{avg.toFixed(1)}<span className="text-muted-foreground font-normal">/10</span></span>
+            <span className="flex items-center gap-0.5 text-sm font-semibold tabular-nums">
+              <Crown className="h-3.5 w-3.5 text-primary" />
+              {avg.toFixed(1)}<span className="text-muted-foreground font-normal">/10</span>
+            </span>
             <span className="text-sm text-muted-foreground">· {recs.length} Rex</span>
           </div>
         )}
@@ -193,7 +196,10 @@ function ItemPage() {
                   <UserAvatar url={r.profiles?.avatar_url} name={r.profiles?.display_name || r.profiles?.username} size="sm" />
                   <span className="font-medium">{r.profiles?.display_name || r.profiles?.username}</span>
                 </div>
-                <CrownRatingDisplay value={r.rating} size="xs" />
+                <div className="flex items-center gap-0.5 text-sm font-semibold tabular-nums">
+                  <Crown className="h-3.5 w-3.5 text-primary" />
+                  {r.rating}<span className="text-muted-foreground font-normal">/10</span>
+                </div>
 
               </div>
               {r.note && <p className="mt-2 text-sm leading-snug">&ldquo;{r.note}&rdquo;</p>}
