@@ -12,7 +12,8 @@ import { categoryMeta, splitGenres, type ItemType } from "@/lib/categories";
 import { ShareButton } from "@/components/ShareButton";
 
 const SELECT =
-  "id, rating, note, created_at, photo_url, photo_urls, tags, user_id, item_id, trip_id, items!inner(id, type, title, subtitle, image_url, genre), profiles!recommendations_user_id_fkey(username, display_name, avatar_url), creators(slug, name, color, emoji)";
+  "id, rating, note, created_at, photo_url, photo_urls, tags, user_id, item_id, trip_id, trip_section, items!inner(id, type, title, subtitle, image_url, genre), profiles!recommendations_user_id_fkey(username, display_name, avatar_url), creators(slug, name, color, emoji)";
+
 
 export const Route = createFileRoute("/_authenticated/trip/$id")({
   head: () => ({
