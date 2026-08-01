@@ -219,14 +219,20 @@ function MapPage() {
               Showing the {filtered.length} stop{filtered.length === 1 ? "" : "s"} on{" "}
               <span className="font-semibold">{activeTrip.items?.title}</span>
             </span>
-            <Link
-              to="/trip/$id"
-              params={{ id: activeTrip.id }}
-              className="shrink-0 font-semibold text-primary underline"
-            >
-              Open trip
-            </Link>
+            <div className="flex shrink-0 items-center gap-2">
+              <Link
+                to="/trip/$id"
+                params={{ id: activeTrip.id }}
+                className="font-semibold text-primary underline"
+              >
+                Open trip
+              </Link>
+              <button onClick={clearTrip} aria-label="Clear trip filter" className="text-muted-foreground">
+                <X className="h-3.5 w-3.5" />
+              </button>
+            </div>
           </div>
+
         )}
 
         {subs.length > 0 && (
