@@ -6,7 +6,7 @@ const items: { to: "/feed" | "/map" | "/add" | "/me" | "/friends"; icon: typeof 
   { to: "/feed", icon: Home, label: "Feed" },
   { to: "/map", icon: Map, label: "Map" },
   { to: "/add", icon: Plus, label: "Add", primary: true },
-  { to: "/me", icon: Bookmark, label: "My Collections" },
+  { to: "/me", icon: Bookmark, label: "Collections" },
   { to: "/friends", icon: Users, label: "Friends" },
 ];
 

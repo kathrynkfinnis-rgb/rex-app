@@ -318,7 +318,7 @@ export function HitList({ userId }: { userId: string }) {
     const table = entry.kind === "want" ? "wants" : "saved_posts";
     const { error } = await supabase.from(table).delete().eq("id", entry.id);
     if (error) return toast.error(error.message);
-    toast.success("Removed from My Collections");
+    toast.success("Removed from Collections");
     invalidateEntries();
   }
 

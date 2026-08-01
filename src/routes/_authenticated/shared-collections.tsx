@@ -44,7 +44,7 @@ function SharedCollectionsPage() {
     <div className="pb-24">
       <header className="border-b border-border bg-background px-5 pb-6 pt-[calc(env(safe-area-inset-top)+1rem)]">
         <Link to="/me" className="mb-2 inline-flex items-center gap-1 text-sm text-muted-foreground">
-          <ArrowLeft className="h-4 w-4" /> My Collections
+          <ArrowLeft className="h-4 w-4" /> Collections
         </Link>
         <h1 className="font-display text-3xl">Shared Collections</h1>
         <p className="mt-1 text-sm text-muted-foreground">Public collections from across REX — most read first.</p>

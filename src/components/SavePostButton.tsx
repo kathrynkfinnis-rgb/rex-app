@@ -64,7 +64,7 @@ export function SavePostButton({
     <>
       <button
         type="button"
-        aria-label={saved ? "Change collection" : "Save to My Collections"}
+        aria-label={saved ? "Change collection" : "Save to Collections"}
         aria-pressed={!!saved}
         onClick={(e) => {
           e.preventDefault();
