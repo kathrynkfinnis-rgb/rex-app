@@ -151,6 +151,12 @@
     -webkit-font-smoothing: antialiased;
   }
 
+  :root input:not([type="checkbox"]):not([type="radio"]),
+  :root textarea,
+  :root select {
+    background-color: var(--color-card);
+  }
+
   h1, h2, h3, .font-display {
     font-family: var(--font-display);
     letter-spacing: -0.01em;
