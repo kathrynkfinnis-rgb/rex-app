@@ -152,38 +152,17 @@ export function RecommendationCard({ rec }: { rec: FeedRow }) {
             )}
           </div>
         </div>
-        {(() => {
-          const photos = (rec.photo_urls && rec.photo_urls.length
-            ? rec.photo_urls
-            : rec.photo_url
-            ? [rec.photo_url]
-            : []) as string[];
-          if (!photos.length) return null;
-          if (photos.length === 1) {
-            return (
-              <img
-                src={photos[0]}
-                alt=""
-                className="max-h-56 w-full object-cover"
-              />
-            );
-          }
-          return (
-            <div className="grid grid-cols-2 gap-0.5">
-              {photos.slice(0, 4).map((url, i) => (
-                <div key={url} className="relative aspect-[4/3] overflow-hidden bg-muted">
-                  <img src={url} alt="" className="h-full w-full object-cover" />
-                  {i === 3 && photos.length > 4 && (
-                    <div className="absolute inset-0 flex items-center justify-center bg-black/50 text-lg font-semibold text-white">
-                      +{photos.length - 4}
-                    </div>
-                  )}
-                </div>
-              ))}
-            </div>
-          );
-        })()}
       </Link>
+      {(() => {
+        const photos = (rec.photo_urls && rec.photo_urls.length
+          ? rec.photo_urls
+          : rec.photo_url
+          ? [rec.photo_url]
+          : []) as string[];
+        if (!photos.length) return null;
+        return <PhotoCarousel photos={photos} />;
+      })()}
+
       <div className="flex items-center gap-2 border-t border-border px-3 py-1.5 text-xs text-muted-foreground">
         {creator ? (
           <span
