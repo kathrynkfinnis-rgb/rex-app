@@ -132,9 +132,7 @@ function FeedPage() {
       <header className="sticky top-0 z-30 border-b border-border bg-background/90 px-5 pb-3 pt-[calc(env(safe-area-inset-top)+1rem)] backdrop-blur">
         <div className="flex items-center justify-between">
           <div>
-            <div className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-widest text-primary">
-              <TRexLogo className="h-4 w-4" /> REX
-            </div>
+            <img src={rexLogo.url} alt="REX" className="h-5 w-auto object-contain" />
             <h1 className="mt-0.5 font-display text-3xl">{searching ? "Search" : "Your feed"}</h1>
           </div>
         </div>
