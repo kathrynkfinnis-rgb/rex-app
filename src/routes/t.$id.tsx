@@ -41,7 +41,7 @@ type SharedStop = {
   item_lng: number | null;
 };
 
-const SITE = "https://pocket-app-pioneers.lovable.app";
+import { SITE } from "@/lib/site";
 
 function mapsHref(stop: SharedStop) {
   if (stop.item_lat != null && stop.item_lng != null) {

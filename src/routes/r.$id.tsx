@@ -24,7 +24,7 @@ type SharedRec = {
   author_avatar_url: string | null;
 };
 
-const SITE = "https://pocket-app-pioneers.lovable.app";
+import { SITE } from "@/lib/site";
 
 export const Route = createFileRoute("/r/$id")({
   loader: async ({ params }) => {
