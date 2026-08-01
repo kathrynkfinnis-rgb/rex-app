@@ -63,11 +63,11 @@
 :root {
   --radius: 0.875rem;
   /* Pistachio: creamy off-white bg, deep pistachio green primary, warm nut accent */
-  --background: oklch(0.98 0.02 115);
+  --background: oklch(0.968 0.0065 55);
   --foreground: oklch(0.24 0.04 145);
-  --card: oklch(0.995 0.012 115);
+  --card: oklch(1 0 0);
   --card-foreground: oklch(0.24 0.04 145);
-  --popover: oklch(0.995 0.012 115);
+  --popover: oklch(1 0 0);
   --popover-foreground: oklch(0.24 0.04 145);
   --primary: oklch(0.62 0.13 140);
   --primary-foreground: oklch(0.985 0.012 115);
@@ -149,6 +149,12 @@
     background-color: var(--color-background);
     color: var(--color-foreground);
     -webkit-font-smoothing: antialiased;
+  }
+
+  :root input:not([type="checkbox"]):not([type="radio"]),
+  :root textarea,
+  :root select {
+    background-color: var(--color-card);
   }
 
   h1, h2, h3, .font-display {
