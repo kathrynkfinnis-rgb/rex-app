@@ -209,8 +209,7 @@ export function EditRecommendationDialog({
           <DialogFooter className="flex-row justify-between sm:justify-between">
             <Button
               type="button"
-              variant="ghost"
-              className="text-destructive hover:text-destructive"
+              variant="destructive"
               onClick={() => setConfirmDelete(true)}
             >
               <Trash2 className="mr-1.5 h-4 w-4" /> Delete
