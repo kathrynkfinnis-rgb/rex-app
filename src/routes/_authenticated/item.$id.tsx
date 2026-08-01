@@ -7,7 +7,7 @@ import { categoryMeta, type ItemType } from "@/lib/categories";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { toast } from "sonner";
-import { ArrowLeft, MapPin, Check, Crown } from "lucide-react";
+import { ArrowLeft, MapPin, Check, Crown, Pencil } from "lucide-react";
 import { CrownRatingDisplay, CrownRatingInput } from "@/components/CrownRating";
 import { ItemEnrichment } from "@/components/ItemEnrichment";
 import { LikesComments } from "@/components/LikesComments";
@@ -16,6 +16,7 @@ import { WantButton } from "@/components/WantButton";
 import { cn } from "@/lib/utils";
 import { formatDistanceToNow } from "date-fns";
 import { parseRecipe } from "@/lib/recipe";
+import { EditRecommendationDialog } from "@/components/EditRecommendationDialog";
 
 export const Route = createFileRoute("/_authenticated/item/$id")({
   head: () => ({
@@ -65,6 +66,7 @@ function ItemPage() {
   const [note, setNote] = useState("");
   const [posting, setPosting] = useState(false);
   const [checking, setChecking] = useState(false);
+  const [editingRec, setEditingRec] = useState<any>(null);
 
   if (isLoading || !data) {
     return <div className="p-6"><div className="h-40 animate-pulse rounded-2xl bg-muted" /></div>;
@@ -247,6 +249,22 @@ function ItemPage() {
       </section>
 
       <ItemEnrichment itemId={id} />
+
+      {editingRec && (
+        <EditRecommendationDialog
+          open={!!editingRec}
+          onOpenChange={(v) => !v && setEditingRec(null)}
+          recommendation={{
+            id: editingRec.id,
+            rating: editingRec.rating,
+            note: editingRec.note,
+            photo_url: editingRec.photo_url,
+            photo_urls: editingRec.photo_urls ?? null,
+            tags: editingRec.tags ?? null,
+          }}
+          item={{ id: item.id, type: item.type as ItemType, genre: item.genre, recipe_text: (item as any).recipe_text ?? null }}
+        />
+      )}
     </div>
   );
 }
