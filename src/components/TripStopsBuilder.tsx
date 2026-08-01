@@ -23,14 +23,82 @@ export type DraftStop = {
   external_source: string | null;
   rating: number;
   note: string;
+  /** Optional heading this stop sits under, e.g. "Brunch" or "Museums". */
+  section: string | null;
 };
 
 const STOP_TYPES: ItemType[] = CATEGORIES.map((c) => c.type).filter((t) => t !== "trip");
+
+export const SECTION_SUGGESTIONS = [
+  "Breakfast",
+  "Brunch",
+  "Lunch",
+  "Dinner",
+  "Coffee",
+  "Drinks",
+  "Museums",
+  "Sights",
+  "Shopping",
+  "Stay",
+  "Nightlife",
+];
 
 type Props = {
   value: DraftStop[];
   onChange: (stops: DraftStop[]) => void;
 };
+
+/** Group stops under their heading, keeping the original order of both. */
+export function groupStops<T extends { section?: string | null }>(items: T[]): Array<[string, T[]]> {
+  const groups: Array<[string, T[]]> = [];
+  for (const item of items) {
+    const heading = (item.section ?? "").trim();
+    const found = groups.find(([h]) => h.toLowerCase() === heading.toLowerCase());
+    if (found) found[1].push(item);
+    else groups.push([heading, [item]]);
+  }
+  return groups;
+}
+
+export function SectionPicker({
+  value,
+  onChange,
+  label = "Heading (optional)",
+}: {
+  value: string;
+  onChange: (v: string) => void;
+  label?: string;
+}) {
+  return (
+    <div className="space-y-1.5">
+      <Label htmlFor="stop-section">{label}</Label>
+      <div className="flex flex-wrap gap-1.5">
+        {SECTION_SUGGESTIONS.map((s) => (
+          <button
+            key={s}
+            type="button"
+            onClick={() => onChange(value.toLowerCase() === s.toLowerCase() ? "" : s)}
+            className={cn(
+              "rounded-full px-2.5 py-1 text-xs ring-1 transition-colors",
+              value.toLowerCase() === s.toLowerCase()
+                ? "bg-primary text-primary-foreground ring-primary"
+                : "bg-background text-muted-foreground ring-border hover:bg-muted",
+            )}
+          >
+            {s}
+          </button>
+        ))}
+      </div>
+      <Input
+        id="stop-section"
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        placeholder="e.g. Brunch, Dinner, Museums"
+        className="h-11 rounded-xl"
+      />
+    </div>
+  );
+}
 
 export function TripStopsBuilder({ value, onChange }: Props) {
   const [open, setOpen] = useState(false);
@@ -41,6 +109,7 @@ export function TripStopsBuilder({ value, onChange }: Props) {
   const [subtitle, setSubtitle] = useState("");
   const [rating, setRating] = useState(10);
   const [note, setNote] = useState("");
+  const [section, setSection] = useState("");
 
   const needsSearch = type !== "recipe" && type !== "other";
   const showForm = !needsSearch || picked || manual;
@@ -53,6 +122,7 @@ export function TripStopsBuilder({ value, onChange }: Props) {
     setRating(10);
     setNote("");
     setType("place");
+    // Heading stays so several stops can be added under the same one.
   }
 
   function pick(hit: AnyHit) {
@@ -80,11 +150,13 @@ export function TripStopsBuilder({ value, onChange }: Props) {
         external_source: hit?.external_source ?? null,
         rating,
         note: note.trim(),
+        section: section.trim() || null,
       },
     ]);
     reset();
     setOpen(false);
   }
+
 
   return (
     <div className="space-y-3">
@@ -96,39 +168,47 @@ export function TripStopsBuilder({ value, onChange }: Props) {
       </div>
 
       {value.length > 0 && (
-        <ol className="space-y-2">
-          {value.map((s, i) => {
-            const meta = categoryMeta(s.type);
-            const Icon = meta.icon;
-            return (
-              <li key={s.key} className="flex items-start gap-2 rounded-2xl bg-card p-3 ring-1 ring-border">
-                <span className="mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-primary/15 text-[11px] font-bold text-primary">
-                  {i + 1}
-                </span>
-                <div className="min-w-0 flex-1">
-                  <div className="flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-widest text-muted-foreground">
-                    <Icon className="h-3.5 w-3.5" /> {meta.label}
+        <div className="space-y-3">
+          {groupStops(value).map(([heading, stops]) => (
+            <div key={heading || "__none"} className="space-y-2">
+              {heading && (
+                <p className="px-1 font-display text-base text-foreground">{heading}</p>
+              )}
+              {stops.map((s) => {
+                const meta = categoryMeta(s.type);
+                const Icon = meta.icon;
+                return (
+                  <div key={s.key} className="flex items-start gap-2 rounded-2xl bg-card p-3 ring-1 ring-border">
+                    <span className="mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-primary/15 text-[11px] font-bold text-primary">
+                      {value.indexOf(s) + 1}
+                    </span>
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-widest text-muted-foreground">
+                        <Icon className="h-3.5 w-3.5" /> {meta.label}
+                      </div>
+                      <div className="truncate font-medium">{s.title}</div>
+                      {s.subtitle && <div className="truncate text-sm text-muted-foreground">{s.subtitle}</div>}
+                      <div className="mt-1">
+                        <CrownRatingDisplay value={s.rating} size="xs" showNumber />
+                      </div>
+                      {s.note && <p className="mt-1 text-sm text-muted-foreground">{s.note}</p>}
+                    </div>
+                    <button
+                      type="button"
+                      aria-label={`Remove ${s.title}`}
+                      onClick={() => onChange(value.filter((v) => v.key !== s.key))}
+                      className="rounded-full p-1 text-muted-foreground hover:text-foreground"
+                    >
+                      <X className="h-4 w-4" />
+                    </button>
                   </div>
-                  <div className="truncate font-medium">{s.title}</div>
-                  {s.subtitle && <div className="truncate text-sm text-muted-foreground">{s.subtitle}</div>}
-                  <div className="mt-1">
-                    <CrownRatingDisplay value={s.rating} size="xs" showNumber />
-                  </div>
-                  {s.note && <p className="mt-1 text-sm text-muted-foreground">{s.note}</p>}
-                </div>
-                <button
-                  type="button"
-                  aria-label={`Remove ${s.title}`}
-                  onClick={() => onChange(value.filter((v) => v.key !== s.key))}
-                  className="rounded-full p-1 text-muted-foreground hover:text-foreground"
-                >
-                  <X className="h-4 w-4" />
-                </button>
-              </li>
-            );
-          })}
-        </ol>
+                );
+              })}
+            </div>
+          ))}
+        </div>
       )}
+
 
       {!open && (
         <Button
@@ -236,10 +316,13 @@ export function TripStopsBuilder({ value, onChange }: Props) {
                 </>
               )}
 
+              <SectionPicker value={section} onChange={setSection} />
+
               <div className="space-y-2">
                 <Label>Your rating</Label>
                 <CrownRatingInput value={rating} onChange={setRating} />
               </div>
+
 
               <div className="space-y-1.5">
                 <Label htmlFor="stop-note">Why are you Rexing it?</Label>

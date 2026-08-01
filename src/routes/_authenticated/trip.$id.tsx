@@ -10,9 +10,12 @@ import { ArrowLeft, Plus, Luggage } from "lucide-react";
 import { formatDistanceToNow } from "date-fns";
 import { categoryMeta, splitGenres, type ItemType } from "@/lib/categories";
 import { ShareButton } from "@/components/ShareButton";
+import { groupStops } from "@/components/TripStopsBuilder";
+
 
 const SELECT =
-  "id, rating, note, created_at, photo_url, photo_urls, tags, user_id, item_id, trip_id, items!inner(id, type, title, subtitle, image_url, genre), profiles!recommendations_user_id_fkey(username, display_name, avatar_url), creators(slug, name, color, emoji)";
+  "id, rating, note, created_at, photo_url, photo_urls, tags, user_id, item_id, trip_id, trip_section, items!inner(id, type, title, subtitle, image_url, genre), profiles!recommendations_user_id_fkey(username, display_name, avatar_url), creators(slug, name, color, emoji)";
+
 
 export const Route = createFileRoute("/_authenticated/trip/$id")({
   head: () => ({
@@ -159,35 +162,45 @@ function TripPage() {
             </p>
           )}
 
-          {(stops.data?.length ?? 0) > 0 && (
-            <ol className="relative space-y-3 pl-9">
-              <span
-                aria-hidden
-                className="absolute bottom-6 left-[13px] top-6 w-px bg-gradient-to-b from-primary/40 via-border to-transparent"
-              />
-              {stops.data!.map((rec, i) => {
-                const meta = categoryMeta((rec.items?.type ?? "other") as ItemType);
-                const Icon = meta.icon;
-                return (
-                  <li key={rec.id} className="relative">
-                    <span className="absolute -left-9 top-3 flex h-7 w-7 items-center justify-center rounded-full bg-background text-[11px] font-bold text-primary ring-2 ring-primary/30">
-                      {i + 1}
-                    </span>
-                    <div className="mb-1 flex items-center gap-1.5 pl-0.5 text-[11px] font-semibold uppercase tracking-widest text-muted-foreground">
-                      <Icon className="h-3.5 w-3.5" />
-                      {meta.label}
-                      {rec.items?.genre && (
-                        <span className="normal-case tracking-normal text-muted-foreground/80">
-                          · {splitGenres(rec.items.genre).join(", ")}
+          {(stops.data?.length ?? 0) > 0 &&
+            groupStops(
+              stops.data!.map((rec) => ({ ...rec, section: (rec as any).trip_section as string | null })),
+            ).map(([heading, group]) => (
+              <div key={heading || "__none"} className="space-y-2">
+                {heading && (
+                  <h3 className="px-1 pt-2 font-display text-lg text-foreground">{heading}</h3>
+                )}
+                <ol className="relative space-y-3 pl-9">
+                  <span
+                    aria-hidden
+                    className="absolute bottom-6 left-[13px] top-6 w-px bg-gradient-to-b from-primary/40 via-border to-transparent"
+                  />
+                  {group.map((rec) => {
+                    const meta = categoryMeta((rec.items?.type ?? "other") as ItemType);
+                    const Icon = meta.icon;
+                    const n = stops.data!.findIndex((s) => s.id === rec.id) + 1;
+                    return (
+                      <li key={rec.id} className="relative">
+                        <span className="absolute -left-9 top-3 flex h-7 w-7 items-center justify-center rounded-full bg-background text-[11px] font-bold text-primary ring-2 ring-primary/30">
+                          {n}
                         </span>
-                      )}
-                    </div>
-                    <RecommendationCard rec={rec} />
-                  </li>
-                );
-              })}
-            </ol>
-          )}
+                        <div className="mb-1 flex items-center gap-1.5 pl-0.5 text-[11px] font-semibold uppercase tracking-widest text-muted-foreground">
+                          <Icon className="h-3.5 w-3.5" />
+                          {meta.label}
+                          {rec.items?.genre && (
+                            <span className="normal-case tracking-normal text-muted-foreground/80">
+                              · {splitGenres(rec.items.genre).join(", ")}
+                            </span>
+                          )}
+                        </div>
+                        <RecommendationCard rec={rec} />
+                      </li>
+                    );
+                  })}
+                </ol>
+              </div>
+            ))}
+
 
         </div>
       )}

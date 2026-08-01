@@ -19,7 +19,7 @@ import { useServerFn } from "@tanstack/react-start";
 import { RecipeEditor } from "@/components/RecipeEditor";
 import { PhotoUploader } from "@/components/PhotoUploader";
 import { TagsInput } from "@/components/TagsInput";
-import { TripStopsBuilder, type DraftStop } from "@/components/TripStopsBuilder";
+import { TripStopsBuilder, SectionPicker, type DraftStop } from "@/components/TripStopsBuilder";
 
 export const Route = createFileRoute("/_authenticated/add")({
   validateSearch: (search: Record<string, unknown>) => ({
@@ -55,6 +55,8 @@ function AddPage() {
   const [tags, setTags] = useState<string[]>([]);
   const [showTripInfo, setShowTripInfo] = useState(false);
   const [tripStops, setTripStops] = useState<DraftStop[]>([]);
+  const [tripSection, setTripSection] = useState("");
+
   const { data: uid } = useQuery({
     queryKey: ["current-user-id"],
     queryFn: async () => (await supabase.auth.getUser()).data.user?.id ?? null,
@@ -185,7 +187,9 @@ function AddPage() {
           photo_urls: photos,
           tags,
           trip_id: tripId ?? null,
+          trip_section: tripId ? tripSection.trim() || null : null,
         } as never)
+
         .select("id")
         .single();
       if (recErr) throw recErr;
@@ -231,7 +235,9 @@ function AddPage() {
             photo_urls: [],
             tags: [],
             trip_id: rec.id,
+            trip_section: stop.section,
           } as never);
+
           if (stopRecErr) throw stopRecErr;
           savedStops += 1;
         }
@@ -621,6 +627,15 @@ function AddPage() {
         )}
 
         {type === "trip" && <TripStopsBuilder value={tripStops} onChange={setTripStops} />}
+
+        {tripId && (
+          <SectionPicker
+            value={tripSection}
+            onChange={setTripSection}
+            label="Which part of the trip? (optional)"
+          />
+        )}
+
 
         <div className="space-y-1.5">
           <Label>Tags</Label>
