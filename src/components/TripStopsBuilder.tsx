@@ -47,6 +47,19 @@ type Props = {
   value: DraftStop[];
   onChange: (stops: DraftStop[]) => void;
 };
+
+/** Group stops under their heading, keeping the original order of both. */
+export function groupStops<T extends { section?: string | null }>(items: T[]): Array<[string, T[]]> {
+  const groups: Array<[string, T[]]> = [];
+  for (const item of items) {
+    const heading = (item.section ?? "").trim();
+    const found = groups.find(([h]) => h.toLowerCase() === heading.toLowerCase());
+    if (found) found[1].push(item);
+    else groups.push([heading, [item]]);
+  }
+  return groups;
+}
+
 export function SectionPicker({
   value,
   onChange,
