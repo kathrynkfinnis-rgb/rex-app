@@ -14,6 +14,9 @@ const GoogleMap = lazy(() => import("@/components/GoogleMap").then((m) => ({ def
 
 
 export const Route = createFileRoute("/_authenticated/map")({
+  validateSearch: (search: Record<string, unknown>) => ({
+    trip: typeof search.trip === "string" && search.trip ? search.trip : undefined,
+  }),
   head: () => ({
     meta: [
       { title: "Map — REX" },
@@ -30,10 +33,13 @@ function MapPage() {
   const [geocoding, setGeocoding] = useState(false);
   const ranAuto = useRef(false);
 
+  const { trip: tripParam } = Route.useSearch();
   const [cat, setCat] = useState<ItemType | "all">("all");
   const [sub, setSub] = useState<string | null>(null);
   const [topOnly, setTopOnly] = useState(false);
-  const [tripId, setTripId] = useState<string | null>(null);
+  const tripId = tripParam ?? null;
+  const clearTrip = () => navigate({ to: "/map", search: {} });
+
 
 
   const { data } = useQuery({
@@ -53,18 +59,19 @@ function MapPage() {
   });
 
   const { data: trips } = useQuery({
-    queryKey: ["map-trips"],
+    enabled: !!tripId,
+    queryKey: ["map-trip", tripId],
     queryFn: async () => {
       const { data, error } = await supabase
         .from("recommendations")
         .select("id, created_at, items!inner(title, type), profiles!recommendations_user_id_fkey(display_name, username)")
-        .eq("items.type", "trip")
-        .order("created_at", { ascending: false })
-        .limit(50);
+        .eq("id", tripId!)
+        .limit(1);
       if (error) throw error;
       return (data ?? []) as any[];
     },
   });
+
 
   const all = data ?? [];
 
@@ -196,27 +203,15 @@ function MapPage() {
           </div>
         )}
 
-        {(trips?.length ?? 0) > 0 && (
-          <div className="-mx-5 mt-2 flex gap-2 overflow-x-auto px-5 pb-0.5 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-            <span className="flex shrink-0 items-center gap-1 pr-0.5 text-xs font-semibold uppercase tracking-widest text-muted-foreground">
-              <Luggage className="h-3.5 w-3.5" /> Trips
-            </span>
-            {trips!.map((t: any) => (
-              <button
-                key={t.id}
-                className={chip(tripId === t.id)}
-                onClick={() => { setTripId(tripId === t.id ? null : t.id); setCat("all"); setSub(null); }}
-              >
-                {t.items?.title}
-              </button>
-            ))}
-            {tripId && (
-              <button className={chip(false)} onClick={() => setTripId(null)}>
-                <X className="h-3 w-3" />
-              </button>
-            )}
-          </div>
-        )}
+        <div className="mt-3">
+          <Link
+            to="/trips"
+            className="inline-flex items-center gap-1.5 rounded-full bg-primary/10 px-3.5 py-2 text-xs font-semibold text-primary"
+          >
+            <Luggage className="h-3.5 w-3.5" /> Looking for a trip?
+          </Link>
+        </div>
+
 
         {activeTrip && (
           <div className="mt-2 flex items-center justify-between gap-3 rounded-xl bg-primary/5 px-3 py-2 text-xs ring-1 ring-primary/20">
@@ -224,14 +219,20 @@ function MapPage() {
               Showing the {filtered.length} stop{filtered.length === 1 ? "" : "s"} on{" "}
               <span className="font-semibold">{activeTrip.items?.title}</span>
             </span>
-            <Link
-              to="/trip/$id"
-              params={{ id: activeTrip.id }}
-              className="shrink-0 font-semibold text-primary underline"
-            >
-              Open trip
-            </Link>
+            <div className="flex shrink-0 items-center gap-2">
+              <Link
+                to="/trip/$id"
+                params={{ id: activeTrip.id }}
+                className="font-semibold text-primary underline"
+              >
+                Open trip
+              </Link>
+              <button onClick={clearTrip} aria-label="Clear trip filter" className="text-muted-foreground">
+                <X className="h-3.5 w-3.5" />
+              </button>
+            </div>
           </div>
+
         )}
 
         {subs.length > 0 && (
