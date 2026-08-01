@@ -316,10 +316,13 @@ export function TripStopsBuilder({ value, onChange }: Props) {
                 </>
               )}
 
+              <SectionPicker value={section} onChange={setSection} />
+
               <div className="space-y-2">
                 <Label>Your rating</Label>
                 <CrownRatingInput value={rating} onChange={setRating} />
               </div>
+
 
               <div className="space-y-1.5">
                 <Label htmlFor="stop-note">Why are you Rexing it?</Label>
