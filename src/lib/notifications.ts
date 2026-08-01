@@ -51,10 +51,30 @@ export function notifCopy(n: NotificationRow): string {
 }
 
 export function notifHref(n: NotificationRow): string {
-  if (n.entity_type === "recommendation" && n.entity_id) return `/item/${n.entity_id}`;
-  if (n.entity_type === "request" && n.entity_id) return `/ask/${n.entity_id}`;
-  if (n.entity_type === "friendship") return `/friends`;
-  return `/notifications`;
+  const t = notifTarget(n);
+  if (t.params && "id" in t.params) return t.to.replace("$id", String(t.params.id));
+  return t.to;
+}
+
+/** Typed router target so dynamic routes actually resolve (never interpolate into `to`). */
+export function notifTarget(n: NotificationRow):
+  | { to: "/item/$id"; params: { id: string } }
+  | { to: "/trip/$id"; params: { id: string } }
+  | { to: "/ask/$id"; params: { id: string } }
+  | { to: "/friends"; params?: undefined }
+  | { to: "/notifications"; params?: undefined } {
+  if (n.entity_id) {
+    if (n.entity_type === "recommendation") {
+      if (n.data?.category === "trip") return { to: "/trip/$id", params: { id: n.entity_id } };
+      return { to: "/item/$id", params: { id: n.entity_id } };
+    }
+    if (n.entity_type === "trip") return { to: "/trip/$id", params: { id: n.entity_id } };
+    if (n.entity_type === "request" || n.entity_type === "blast")
+      return { to: "/ask/$id", params: { id: n.entity_id } };
+  }
+  if (n.entity_type === "friendship" || n.type === "friend_request" || n.type === "friend_accepted")
+    return { to: "/friends" };
+  return { to: "/notifications" };
 }
 
 export const PREF_LABELS: Record<
