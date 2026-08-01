@@ -10,6 +10,8 @@ import { ArrowLeft, Plus, Luggage } from "lucide-react";
 import { formatDistanceToNow } from "date-fns";
 import { categoryMeta, splitGenres, type ItemType } from "@/lib/categories";
 import { ShareButton } from "@/components/ShareButton";
+import { groupStops } from "@/components/TripStopsBuilder";
+
 
 const SELECT =
   "id, rating, note, created_at, photo_url, photo_urls, tags, user_id, item_id, trip_id, trip_section, items!inner(id, type, title, subtitle, image_url, genre), profiles!recommendations_user_id_fkey(username, display_name, avatar_url), creators(slug, name, color, emoji)";
