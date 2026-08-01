@@ -14,6 +14,9 @@ const GoogleMap = lazy(() => import("@/components/GoogleMap").then((m) => ({ def
 
 
 export const Route = createFileRoute("/_authenticated/map")({
+  validateSearch: (search: Record<string, unknown>) => ({
+    trip: typeof search.trip === "string" && search.trip ? search.trip : undefined,
+  }),
   head: () => ({
     meta: [
       { title: "Map — REX" },
@@ -30,10 +33,13 @@ function MapPage() {
   const [geocoding, setGeocoding] = useState(false);
   const ranAuto = useRef(false);
 
+  const { trip: tripParam } = Route.useSearch();
   const [cat, setCat] = useState<ItemType | "all">("all");
   const [sub, setSub] = useState<string | null>(null);
   const [topOnly, setTopOnly] = useState(false);
-  const [tripId, setTripId] = useState<string | null>(null);
+  const tripId = tripParam ?? null;
+  const clearTrip = () => navigate({ to: "/map", search: {} });
+
 
 
   const { data } = useQuery({
