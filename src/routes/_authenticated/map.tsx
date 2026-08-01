@@ -202,27 +202,15 @@ function MapPage() {
           </div>
         )}
 
-        {(trips?.length ?? 0) > 0 && (
-          <div className="-mx-5 mt-2 flex gap-2 overflow-x-auto px-5 pb-0.5 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-            <span className="flex shrink-0 items-center gap-1 pr-0.5 text-xs font-semibold uppercase tracking-widest text-muted-foreground">
-              <Luggage className="h-3.5 w-3.5" /> Trips
-            </span>
-            {trips!.map((t: any) => (
-              <button
-                key={t.id}
-                className={chip(tripId === t.id)}
-                onClick={() => { setTripId(tripId === t.id ? null : t.id); setCat("all"); setSub(null); }}
-              >
-                {t.items?.title}
-              </button>
-            ))}
-            {tripId && (
-              <button className={chip(false)} onClick={() => setTripId(null)}>
-                <X className="h-3 w-3" />
-              </button>
-            )}
-          </div>
-        )}
+        <div className="mt-3">
+          <Link
+            to="/trips"
+            className="inline-flex items-center gap-1.5 rounded-full bg-primary/10 px-3.5 py-2 text-xs font-semibold text-primary"
+          >
+            <Luggage className="h-3.5 w-3.5" /> Looking for a trip?
+          </Link>
+        </div>
+
 
         {activeTrip && (
           <div className="mt-2 flex items-center justify-between gap-3 rounded-xl bg-primary/5 px-3 py-2 text-xs ring-1 ring-primary/20">
