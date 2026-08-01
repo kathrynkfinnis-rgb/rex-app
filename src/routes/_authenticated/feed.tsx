@@ -8,6 +8,7 @@ import { RecommendationCard, type FeedRow } from "@/components/RecommendationCar
 
 import { RequestCard, type RequestRow } from "@/components/RequestCard";
 import { TRexLogo } from "@/components/TRexLogo";
+import rexLogo from "@/assets/rex-logo.png.asset.json";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { UserPlus, Mic, Plus, Search, X, User, Sparkles, ListChecks as ListIcon, Lock, Users as UsersIcon, Globe2 } from "lucide-react";
