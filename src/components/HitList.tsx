@@ -441,7 +441,9 @@ export function HitList({ userId }: { userId: string }) {
                         Shared with you
                       </span>
                     ) : null}
-                  </p>
+                    </span>
+                  </button>
+
                   <div className="flex items-center gap-1">
                     <CollaboratorStack
                       collaborators={collabsByList.get(list.id) ?? []}
