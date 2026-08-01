@@ -649,6 +649,7 @@ export type Database = {
           rating: number
           tags: string[]
           trip_id: string | null
+          trip_section: string | null
           updated_at: string
           user_id: string
         }
@@ -663,6 +664,7 @@ export type Database = {
           rating: number
           tags?: string[]
           trip_id?: string | null
+          trip_section?: string | null
           updated_at?: string
           user_id: string
         }
@@ -677,6 +679,7 @@ export type Database = {
           rating?: number
           tags?: string[]
           trip_id?: string | null
+          trip_section?: string | null
           updated_at?: string
           user_id?: string
         }
