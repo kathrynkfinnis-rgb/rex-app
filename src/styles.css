@@ -149,6 +149,7 @@
     background-color: var(--color-background);
     color: var(--color-foreground);
     -webkit-font-smoothing: antialiased;
+    overflow-y: auto;
   }
 
   :root input:not([type="checkbox"]):not([type="radio"]),
