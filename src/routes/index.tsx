@@ -2,7 +2,7 @@ import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { MapPin, Book, Film, Tv } from "lucide-react";
-import { TRexLogo } from "@/components/TRexLogo";
+import rexLogo from "@/assets/rex-logo.png.asset.json";
 
 export const Route = createFileRoute("/")({
   ssr: false,
@@ -37,9 +37,11 @@ function Landing() {
       <div className="pointer-events-none absolute -left-24 top-1/2 h-72 w-72 rounded-full bg-accent/20 blur-3xl" />
 
       <div className="relative mx-auto flex min-h-screen max-w-md flex-col px-6 pb-10 pt-16">
-        <div className="flex items-center gap-2 text-sm font-semibold uppercase tracking-widest text-primary">
-          <TRexLogo className="h-5 w-5" /> REX
-        </div>
+        <img
+          src={rexLogo.url}
+          alt="REX logo"
+          className="h-14 w-auto self-start object-contain"
+        />
 
         <h1 className="mt-10 font-display text-5xl leading-[1.05] text-foreground">
           The little shared book of things your friends&nbsp;
