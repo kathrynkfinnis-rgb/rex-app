@@ -185,7 +185,9 @@ function AddPage() {
           photo_urls: photos,
           tags,
           trip_id: tripId ?? null,
+          trip_section: tripId ? tripSection.trim() || null : null,
         } as never)
+
         .select("id")
         .single();
       if (recErr) throw recErr;
