@@ -225,6 +225,15 @@ export function HitList({ userId }: { userId: string }) {
   const activeCategories =
     filter === "all" ? allActiveCategories : allActiveCategories.filter((c) => c.type === filter);
 
+  // Collections start collapsed so the page stays scannable as it fills up.
+  const [expanded, setExpanded] = useState<Set<string>>(new Set());
+  const isOpen = (id: string) => expanded.has(id) || (!!drag && overId === id);
+  const toggleOpen = (id: string) =>
+    setExpanded((prev) => {
+      const next = new Set(prev);
+      next.has(id) ? next.delete(id) : next.add(id);
+      return next;
+    });
 
 
   function invalidateEntries() {
