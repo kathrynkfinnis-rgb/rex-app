@@ -111,10 +111,12 @@ function NotificationsPage() {
       ) : (
         <>
           <ul className="space-y-2">
-            {items.map((n) => (
+            {items.map((n) => {
+              const target = notifTarget(n);
+              return (
               <li key={n.id}>
                 <Link
-                  to={notifHref(n)}
+                  {...(target as any)}
                   className={`flex items-start gap-3 rounded-2xl p-3 transition-colors ${
                     n.read_at ? "bg-card/60" : "bg-card ring-1 ring-primary/30"
                   }`}
@@ -133,7 +135,8 @@ function NotificationsPage() {
                   {!n.read_at && <span className="mt-1 h-2 w-2 shrink-0 rounded-full bg-primary" />}
                 </Link>
               </li>
-            ))}
+              );
+            })}
           </ul>
           <div className="mt-6 flex justify-center">
             <Button variant="ghost" size="sm" onClick={() => clearAll.mutate()} disabled={clearAll.isPending}>
