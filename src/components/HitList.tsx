@@ -424,10 +424,18 @@ export function HitList({ userId }: { userId: string }) {
                   drag && overId === list.id && "border-primary bg-primary/10 ring-2 ring-primary/40",
                 )}
               >
-                <div className="mb-2 flex items-center justify-between gap-2">
-                  <p className="min-w-0 truncate font-medium">
+                <div className="flex items-center justify-between gap-2">
+                  <button
+                    type="button"
+                    onClick={() => toggleOpen(list.id)}
+                    className="flex min-w-0 flex-1 items-center gap-1.5 text-left font-medium"
+                    aria-expanded={isOpen(list.id)}
+                  >
+                    <ChevronRight className={cn("h-4 w-4 shrink-0 text-muted-foreground transition-transform", isOpen(list.id) && "rotate-90")} />
+                    <span className="min-w-0 truncate">
                     <span className="mr-1.5">{list.emoji ?? "✨"}</span>
                     {list.name} <span className="text-xs text-muted-foreground">({inList.length})</span>
+
                     {!isOwner ? (
                       <span className="ml-1.5 rounded-full bg-primary/10 px-1.5 py-0.5 text-[10px] font-medium text-primary">
                         Shared with you
