@@ -14,6 +14,7 @@ import { ShareButton } from "@/components/ShareButton";
 import { ShareToGroupButton } from "@/components/ShareToGroupButton";
 import { AlsoRecommendedBy } from "@/components/AlsoRecommendedBy";
 import { TopRexxerCrown } from "@/components/TopRexxers";
+import { PhotoCarousel } from "@/components/PhotoCarousel";
 
 
 
