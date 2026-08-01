@@ -1,6 +1,7 @@
 import { Link } from "@tanstack/react-router";
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
+import { cn } from "@/lib/utils";
 import { LikesComments } from "@/components/LikesComments";
 import { EditRecommendationDialog } from "@/components/EditRecommendationDialog";
 import { categoryMeta, splitGenres, type ItemType } from "@/lib/categories";
