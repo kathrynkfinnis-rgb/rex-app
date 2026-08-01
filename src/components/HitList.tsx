@@ -408,7 +408,7 @@ export function HitList({ userId }: { userId: string }) {
 
       {allLists.length > 0 && (
         <div className="space-y-3">
-          <h3 className="font-display text-lg">Your collections</h3>
+          <h3 className="font-display text-lg">Collections</h3>
           {allLists.map((list) => {
             const inList = entries.filter((e) => e.listId === list.id && matchesFilter(e));
             const VMeta = VISIBILITY_META[list.visibility];
