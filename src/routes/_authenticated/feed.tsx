@@ -7,8 +7,7 @@ import { CATEGORIES, categoryMeta, splitGenres, hasGenre, type ItemType } from "
 import { RecommendationCard, type FeedRow } from "@/components/RecommendationCard";
 
 import { RequestCard, type RequestRow } from "@/components/RequestCard";
-import { TRexLogo } from "@/components/TRexLogo";
-import rexLogo from "@/assets/rex-logo.png.asset.json";
+import rexLogo from "@/assets/rex-wordmark.png.asset.json";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { UserPlus, Mic, Plus, Search, X, User, Sparkles, ListChecks as ListIcon, Lock, Users as UsersIcon, Globe2 } from "lucide-react";
@@ -133,7 +132,7 @@ function FeedPage() {
       <header className="sticky top-0 z-30 border-b border-border bg-background/90 px-5 pb-3 pt-[calc(env(safe-area-inset-top)+1rem)] backdrop-blur">
         <div className="flex items-center justify-between">
           <div>
-            <img src={rexLogo.url} alt="REX" className="h-5 w-auto object-contain" />
+            <img src={rexLogo.url} alt="REX" className="h-6 w-auto object-contain" />
             <h1 className="mt-0.5 font-display text-3xl">{searching ? "Search" : "Your feed"}</h1>
           </div>
         </div>
@@ -551,7 +550,7 @@ function EmptyState() {
   return (
     <div className="mt-8 rounded-3xl border border-dashed border-border bg-card p-6 text-center">
       <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-primary/10">
-        <TRexLogo className="h-7 w-7" />
+        <img src={rexLogo.url} alt="REX" className="h-7 w-auto object-contain" />
       </div>
       <h2 className="mt-3 font-display text-2xl">Your feed is empty</h2>
       <p className="mx-auto mt-2 max-w-xs text-sm text-muted-foreground">
