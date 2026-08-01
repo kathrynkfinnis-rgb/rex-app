@@ -7,7 +7,7 @@ import { categoryMeta, type ItemType } from "@/lib/categories";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { toast } from "sonner";
-import { ArrowLeft, MapPin, Check } from "lucide-react";
+import { ArrowLeft, MapPin, Check, Crown } from "lucide-react";
 import { CrownRatingDisplay, CrownRatingInput } from "@/components/CrownRating";
 import { ItemEnrichment } from "@/components/ItemEnrichment";
 import { LikesComments } from "@/components/LikesComments";

@@ -7,7 +7,7 @@ import { EditRecommendationDialog } from "@/components/EditRecommendationDialog"
 import { categoryMeta, splitGenres, type ItemType } from "@/lib/categories";
 import { supabase } from "@/integrations/supabase/client";
 import { formatDistanceToNow } from "date-fns";
-import { Pencil } from "lucide-react";
+import { Pencil, Crown } from "lucide-react";
 import { UserAvatar } from "@/components/UserAvatar";
 import { SavePostButton } from "@/components/SavePostButton";
 import { ShareButton } from "@/components/ShareButton";
