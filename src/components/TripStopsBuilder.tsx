@@ -155,39 +155,47 @@ export function TripStopsBuilder({ value, onChange }: Props) {
       </div>
 
       {value.length > 0 && (
-        <ol className="space-y-2">
-          {value.map((s, i) => {
-            const meta = categoryMeta(s.type);
-            const Icon = meta.icon;
-            return (
-              <li key={s.key} className="flex items-start gap-2 rounded-2xl bg-card p-3 ring-1 ring-border">
-                <span className="mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-primary/15 text-[11px] font-bold text-primary">
-                  {i + 1}
-                </span>
-                <div className="min-w-0 flex-1">
-                  <div className="flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-widest text-muted-foreground">
-                    <Icon className="h-3.5 w-3.5" /> {meta.label}
+        <div className="space-y-3">
+          {groupStops(value).map(([heading, stops]) => (
+            <div key={heading || "__none"} className="space-y-2">
+              {heading && (
+                <p className="px-1 font-display text-base text-foreground">{heading}</p>
+              )}
+              {stops.map((s) => {
+                const meta = categoryMeta(s.type);
+                const Icon = meta.icon;
+                return (
+                  <div key={s.key} className="flex items-start gap-2 rounded-2xl bg-card p-3 ring-1 ring-border">
+                    <span className="mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-primary/15 text-[11px] font-bold text-primary">
+                      {value.indexOf(s) + 1}
+                    </span>
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-widest text-muted-foreground">
+                        <Icon className="h-3.5 w-3.5" /> {meta.label}
+                      </div>
+                      <div className="truncate font-medium">{s.title}</div>
+                      {s.subtitle && <div className="truncate text-sm text-muted-foreground">{s.subtitle}</div>}
+                      <div className="mt-1">
+                        <CrownRatingDisplay value={s.rating} size="xs" showNumber />
+                      </div>
+                      {s.note && <p className="mt-1 text-sm text-muted-foreground">{s.note}</p>}
+                    </div>
+                    <button
+                      type="button"
+                      aria-label={`Remove ${s.title}`}
+                      onClick={() => onChange(value.filter((v) => v.key !== s.key))}
+                      className="rounded-full p-1 text-muted-foreground hover:text-foreground"
+                    >
+                      <X className="h-4 w-4" />
+                    </button>
                   </div>
-                  <div className="truncate font-medium">{s.title}</div>
-                  {s.subtitle && <div className="truncate text-sm text-muted-foreground">{s.subtitle}</div>}
-                  <div className="mt-1">
-                    <CrownRatingDisplay value={s.rating} size="xs" showNumber />
-                  </div>
-                  {s.note && <p className="mt-1 text-sm text-muted-foreground">{s.note}</p>}
-                </div>
-                <button
-                  type="button"
-                  aria-label={`Remove ${s.title}`}
-                  onClick={() => onChange(value.filter((v) => v.key !== s.key))}
-                  className="rounded-full p-1 text-muted-foreground hover:text-foreground"
-                >
-                  <X className="h-4 w-4" />
-                </button>
-              </li>
-            );
-          })}
-        </ol>
+                );
+              })}
+            </div>
+          ))}
+        </div>
       )}
+
 
       {!open && (
         <Button
