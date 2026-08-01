@@ -197,10 +197,10 @@ export function RecommendationCard({ rec }: { rec: FeedRow }) {
           <Link
             to="/profile/$username"
             params={{ username: author.username }}
-            className="flex min-w-0 items-center gap-1.5 rounded-full -ml-1 px-1 py-0.5 hover:bg-muted"
+            className="flex min-w-0 shrink items-center gap-1.5 rounded-full -ml-1 px-1 py-0.5 hover:bg-muted"
           >
             <UserAvatar url={author.avatar_url} name={author.display_name || author.username} size="xs" />
-            <span className="truncate font-medium text-foreground">
+            <span className="truncate text-[13px] font-semibold text-foreground">
               {author.display_name || author.username}
             </span>
             <TopRexxerCrown userId={rec.user_id} />
@@ -209,7 +209,8 @@ export function RecommendationCard({ rec }: { rec: FeedRow }) {
         ) : (
           <span className="font-medium text-foreground">Someone</span>
         )}
-        <span className="shrink-0">· {formatDistanceToNow(new Date(rec.created_at), { addSuffix: true }).replace("about ", "")}</span>
+        <span className="shrink-0 text-[10px] text-muted-foreground/70">{formatDistanceToNow(new Date(rec.created_at)).replace("about ", "").replace(" minutes", "m").replace(" minute", "m").replace(" hours", "h").replace(" hour", "h").replace(" days", "d").replace(" day", "d").replace(" months", "mo").replace(" month", "mo").replace(" years", "y").replace(" year", "y").replace("less than am", "now")}</span>
+
         <div className="ml-auto flex items-center">
           <LikesComments recommendationId={rec.id} compact />
           <SavePostButton recommendationId={rec.id} itemType={(rec.items?.type ?? "other") as any} itemTitle={rec.items?.title} />
