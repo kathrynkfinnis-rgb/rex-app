@@ -23,14 +23,31 @@ export type DraftStop = {
   external_source: string | null;
   rating: number;
   note: string;
+  /** Optional heading this stop sits under, e.g. "Brunch" or "Museums". */
+  section: string | null;
 };
 
 const STOP_TYPES: ItemType[] = CATEGORIES.map((c) => c.type).filter((t) => t !== "trip");
+
+export const SECTION_SUGGESTIONS = [
+  "Breakfast",
+  "Brunch",
+  "Lunch",
+  "Dinner",
+  "Coffee",
+  "Drinks",
+  "Museums",
+  "Sights",
+  "Shopping",
+  "Stay",
+  "Nightlife",
+];
 
 type Props = {
   value: DraftStop[];
   onChange: (stops: DraftStop[]) => void;
 };
+
 
 export function TripStopsBuilder({ value, onChange }: Props) {
   const [open, setOpen] = useState(false);
