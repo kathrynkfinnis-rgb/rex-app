@@ -1,13 +1,24 @@
 import { Link } from "@tanstack/react-router";
-import { useState } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useRef, useState } from "react";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { toast } from "sonner";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { cn } from "@/lib/utils";
 import { LikesComments } from "@/components/LikesComments";
 import { EditRecommendationDialog } from "@/components/EditRecommendationDialog";
 import { categoryMeta, splitGenres, type ItemType } from "@/lib/categories";
 import { supabase } from "@/integrations/supabase/client";
 import { formatDistanceToNow } from "date-fns";
-import { Pencil, Crown } from "lucide-react";
+import { Pencil, Crown, Trash2 } from "lucide-react";
 import { UserAvatar } from "@/components/UserAvatar";
 import { SavePostButton } from "@/components/SavePostButton";
 import { ShareButton } from "@/components/ShareButton";
@@ -76,17 +87,77 @@ export function RecommendationCard({ rec }: { rec: FeedRow }) {
       return count ?? 0;
     },
   });
+  const qc = useQueryClient();
+  const [confirmDelete, setConfirmDelete] = useState(false);
+  const [offset, setOffset] = useState(0);
+  const start = useRef<{ x: number; y: number; base: number } | null>(null);
+  const axis = useRef<"none" | "x" | "y">("none");
+  const del = useMutation({
+    mutationFn: async () => {
+      const { error } = await supabase.from("recommendations").delete().eq("id", rec.id);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      toast.success("Rex deleted");
+      qc.invalidateQueries();
+      setConfirmDelete(false);
+      setOffset(0);
+    },
+    onError: (e: any) => toast.error(e.message ?? "Couldn't delete"),
+  });
   if (!item) return null;
   const cat = categoryMeta(item.type);
   const Icon = cat.icon;
   const isOwner = currentUserId && currentUserId === rec.user_id;
   const isTrip = item.type === "trip";
+  const swipeHandlers = isOwner
+    ? {
+        onTouchStart: (e: React.TouchEvent) => {
+          const t = e.touches[0];
+          start.current = { x: t.clientX, y: t.clientY, base: offset };
+          axis.current = "none";
+        },
+        onTouchMove: (e: React.TouchEvent) => {
+          if (!start.current) return;
+          const t = e.touches[0];
+          const dx = t.clientX - start.current.x;
+          const dy = t.clientY - start.current.y;
+          if (axis.current === "none") {
+            if (Math.abs(dx) > 10 && Math.abs(dx) > Math.abs(dy)) axis.current = "x";
+            else if (Math.abs(dy) > 10) axis.current = "y";
+          }
+          if (axis.current !== "x") return;
+          const next = Math.min(96, Math.max(0, start.current.base - dx));
+          setOffset(next);
+        },
+        onTouchEnd: () => {
+          if (axis.current === "x") setOffset(offset > 48 ? 88 : 0);
+          start.current = null;
+          axis.current = "none";
+        },
+      }
+    : {};
   return (
     <>
+    <div className="relative overflow-hidden rounded-2xl">
+      {isOwner && (
+        <button
+          type="button"
+          onClick={() => setConfirmDelete(true)}
+          className="absolute inset-y-0 right-0 flex w-[88px] items-center justify-center bg-destructive text-destructive-foreground"
+          aria-label="Delete Rex"
+        >
+          <Trash2 className="h-5 w-5" />
+        </button>
+      )}
     <article
+      {...swipeHandlers}
       className="relative overflow-hidden rounded-2xl bg-card shadow-sm ring-1 ring-border touch-pan-y"
-
-      style={creator ? { borderLeft: `4px solid ${creator.color}` } : undefined}
+      style={{
+        transform: `translateX(-${offset}px)`,
+        transition: start.current ? "none" : "transform 200ms ease",
+        ...(creator ? { borderLeft: `4px solid ${creator.color}` } : {}),
+      }}
     >
       {isOwner && (
         <button
@@ -210,6 +281,7 @@ export function RecommendationCard({ rec }: { rec: FeedRow }) {
       </div>
       <AlsoRecommendedBy itemId={item.id} excludeUserId={rec.user_id} />
     </article>
+    </div>
 
     {isOwner && (
       <EditRecommendationDialog
@@ -219,6 +291,24 @@ export function RecommendationCard({ rec }: { rec: FeedRow }) {
         item={{ id: item.id, type: item.type, genre: item.genre, recipe_text: (item as any).recipe_text ?? null }}
       />
     )}
+
+    <AlertDialog open={confirmDelete} onOpenChange={(v) => { setConfirmDelete(v); if (!v) setOffset(0); }}>
+      <AlertDialogContent>
+        <AlertDialogHeader>
+          <AlertDialogTitle>Delete this Rex?</AlertDialogTitle>
+          <AlertDialogDescription>This will permanently remove your Rex. This can't be undone.</AlertDialogDescription>
+        </AlertDialogHeader>
+        <AlertDialogFooter>
+          <AlertDialogCancel>Cancel</AlertDialogCancel>
+          <AlertDialogAction
+            onClick={(e) => { e.preventDefault(); del.mutate(); }}
+            className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+          >
+            {del.isPending ? "Deleting…" : "Delete"}
+          </AlertDialogAction>
+        </AlertDialogFooter>
+      </AlertDialogContent>
+    </AlertDialog>
     </>
   );
 }
