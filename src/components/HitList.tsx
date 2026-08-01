@@ -535,14 +535,21 @@ export function HitList({ userId }: { userId: string }) {
               drag && overId === `default:${cat.type}` && "bg-primary/10 ring-2 ring-primary/40",
             )}
           >
-            <div className="flex items-center justify-between">
+            <button
+              type="button"
+              onClick={() => toggleOpen(`default:${cat.type}`)}
+              aria-expanded={isOpen(`default:${cat.type}`)}
+              className="flex w-full items-center gap-1.5 text-left"
+            >
+              <ChevronRight className={cn("h-4 w-4 shrink-0 text-muted-foreground transition-transform", isOpen(`default:${cat.type}`) && "rotate-90")} />
               <h3 className="font-display text-lg">
                 <span className="mr-2">{cat.hitDefaultEmoji}</span>
                 {cat.hitDefaultLabel}{" "}
                 <span className="text-sm text-muted-foreground">({defaults.length})</span>
               </h3>
-            </div>
+            </button>
 
+            {isOpen(`default:${cat.type}`) ? (
             <EntryList
               entries={defaults}
               lists={allLists}
@@ -554,6 +561,8 @@ export function HitList({ userId }: { userId: string }) {
               onDragStart={startDrag}
               draggingId={drag ? `${drag.entry.kind}-${drag.entry.id}` : null}
             />
+            ) : null}
+
           </div>
         );
       })}
