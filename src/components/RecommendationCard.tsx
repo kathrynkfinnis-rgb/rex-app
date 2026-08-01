@@ -281,6 +281,7 @@ export function RecommendationCard({ rec }: { rec: FeedRow }) {
       </div>
       <AlsoRecommendedBy itemId={item.id} excludeUserId={rec.user_id} />
     </article>
+    </div>
 
     {isOwner && (
       <EditRecommendationDialog
@@ -290,6 +291,24 @@ export function RecommendationCard({ rec }: { rec: FeedRow }) {
         item={{ id: item.id, type: item.type, genre: item.genre, recipe_text: (item as any).recipe_text ?? null }}
       />
     )}
+
+    <AlertDialog open={confirmDelete} onOpenChange={(v) => { setConfirmDelete(v); if (!v) setOffset(0); }}>
+      <AlertDialogContent>
+        <AlertDialogHeader>
+          <AlertDialogTitle>Delete this Rex?</AlertDialogTitle>
+          <AlertDialogDescription>This will permanently remove your Rex. This can't be undone.</AlertDialogDescription>
+        </AlertDialogHeader>
+        <AlertDialogFooter>
+          <AlertDialogCancel>Cancel</AlertDialogCancel>
+          <AlertDialogAction
+            onClick={(e) => { e.preventDefault(); del.mutate(); }}
+            className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+          >
+            {del.isPending ? "Deleting…" : "Delete"}
+          </AlertDialogAction>
+        </AlertDialogFooter>
+      </AlertDialogContent>
+    </AlertDialog>
     </>
   );
 }
