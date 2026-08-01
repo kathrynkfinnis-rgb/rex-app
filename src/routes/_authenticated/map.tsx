@@ -41,12 +41,14 @@ function MapPage() {
     queryFn: async () => {
       const { data, error } = await supabase
         .from("items")
-        .select("id, title, subtitle, type, genre, address, lat, lng, image_url, recommendations(id, rating, note, user_id, trip_id, profiles(display_name, username, avatar_url))")
+        .select("id, title, subtitle, type, genre, address, lat, lng, image_url, recommendations!inner(id, rating, note, user_id, trip_id, profiles(display_name, username, avatar_url))")
         .in("type", ["place", "event"])
         .order("created_at", { ascending: false })
         .limit(200);
       if (error) throw error;
-      return data ?? [];
+      // Items whose Rex have all been deleted shouldn't linger as orphan pins.
+      return (data ?? []).filter((p: any) => (p.recommendations?.length ?? 0) > 0);
+
     },
   });
 

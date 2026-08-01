@@ -302,14 +302,21 @@ export function GoogleMap({
       });
     }
 
-    // The user's own 10-mile view wins when we have their location.
-    if (userCentered && !fitPlaces) return;
+    // The user's own 10-mile view wins only when some pins actually fall in it.
+    if (userCentered && !fitPlaces) {
+      const circle = userLayerRef.current[0];
+      const userBounds = circle?.getBounds?.();
+      const anyNearby =
+        userBounds && places.some((p) => userBounds.contains(new g.LatLng(p.lat, p.lng)));
+      if (anyNearby) return;
+    }
     if (places.length === 1) {
       mapRef.current.setCenter(bounds.getCenter());
       mapRef.current.setZoom(14);
     } else {
       mapRef.current.fitBounds(bounds, 48);
     }
+
   }, [places, onSelect, ready, userCentered, fitPlaces, connect]);
 
 
