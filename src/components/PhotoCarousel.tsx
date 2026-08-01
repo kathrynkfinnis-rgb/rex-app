@@ -28,7 +28,7 @@ export function PhotoCarousel({ photos, className }: { photos: string[]; classNa
       <div
         ref={ref}
         onScroll={onScroll}
-        className="flex snap-x snap-mandatory overflow-x-auto scroll-smooth [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+        className="flex snap-x snap-mandatory overflow-x-auto scroll-smooth overscroll-x-contain [scrollbar-width:none] [&::-webkit-scrollbar]:hidden touch-pan-x touch-pan-y"
       >
         {photos.map((url) => (
           <div key={url} className="h-56 w-full shrink-0 snap-center bg-muted">

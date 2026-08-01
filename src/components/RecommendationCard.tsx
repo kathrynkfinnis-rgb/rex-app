@@ -84,7 +84,7 @@ export function RecommendationCard({ rec }: { rec: FeedRow }) {
   return (
     <>
     <article
-      className="relative overflow-hidden rounded-2xl bg-card shadow-sm ring-1 ring-border"
+      className="relative overflow-hidden rounded-2xl bg-card shadow-sm ring-1 ring-border touch-pan-y"
 
       style={creator ? { borderLeft: `4px solid ${creator.color}` } : undefined}
     >
