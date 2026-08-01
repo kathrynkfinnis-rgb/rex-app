@@ -13,7 +13,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { Lock, MoreHorizontal, Plus, Trash2, Users, Globe2, Check, GripVertical } from "lucide-react";
+import { Lock, MoreHorizontal, Plus, Trash2, Users, Globe2, Check, GripVertical, ChevronRight } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { CATEGORIES, categoryMeta, type ItemType } from "@/lib/categories";
 import { toast } from "sonner";
@@ -225,6 +225,15 @@ export function HitList({ userId }: { userId: string }) {
   const activeCategories =
     filter === "all" ? allActiveCategories : allActiveCategories.filter((c) => c.type === filter);
 
+  // Collections start collapsed so the page stays scannable as it fills up.
+  const [expanded, setExpanded] = useState<Set<string>>(new Set());
+  const isOpen = (id: string) => expanded.has(id) || (!!drag && overId === id);
+  const toggleOpen = (id: string) =>
+    setExpanded((prev) => {
+      const next = new Set(prev);
+      next.has(id) ? next.delete(id) : next.add(id);
+      return next;
+    });
 
 
   function invalidateEntries() {
@@ -309,7 +318,7 @@ export function HitList({ userId }: { userId: string }) {
     const table = entry.kind === "want" ? "wants" : "saved_posts";
     const { error } = await supabase.from(table).delete().eq("id", entry.id);
     if (error) return toast.error(error.message);
-    toast.success("Removed from My Collections");
+    toast.success("Removed from Collections");
     invalidateEntries();
   }
 
@@ -399,7 +408,7 @@ export function HitList({ userId }: { userId: string }) {
 
       {allLists.length > 0 && (
         <div className="space-y-3">
-          <h3 className="font-display text-lg">Your collections</h3>
+          <h3 className="font-display text-lg">Collections</h3>
           {allLists.map((list) => {
             const inList = entries.filter((e) => e.listId === list.id && matchesFilter(e));
             const VMeta = VISIBILITY_META[list.visibility];
@@ -415,16 +424,26 @@ export function HitList({ userId }: { userId: string }) {
                   drag && overId === list.id && "border-primary bg-primary/10 ring-2 ring-primary/40",
                 )}
               >
-                <div className="mb-2 flex items-center justify-between gap-2">
-                  <p className="min-w-0 truncate font-medium">
+                <div className="flex items-center justify-between gap-2">
+                  <button
+                    type="button"
+                    onClick={() => toggleOpen(list.id)}
+                    className="flex min-w-0 flex-1 items-center gap-1.5 text-left font-medium"
+                    aria-expanded={isOpen(list.id)}
+                  >
+                    <ChevronRight className={cn("h-4 w-4 shrink-0 text-muted-foreground transition-transform", isOpen(list.id) && "rotate-90")} />
+                    <span className="min-w-0 truncate">
                     <span className="mr-1.5">{list.emoji ?? "✨"}</span>
                     {list.name} <span className="text-xs text-muted-foreground">({inList.length})</span>
+
                     {!isOwner ? (
                       <span className="ml-1.5 rounded-full bg-primary/10 px-1.5 py-0.5 text-[10px] font-medium text-primary">
                         Shared with you
                       </span>
                     ) : null}
-                  </p>
+                    </span>
+                  </button>
+
                   <div className="flex items-center gap-1">
                     <CollaboratorStack
                       collaborators={collabsByList.get(list.id) ?? []}
@@ -479,7 +498,8 @@ export function HitList({ userId }: { userId: string }) {
                     ) : null}
                   </div>
                 </div>
-                {inList.length > 0 ? (
+                {!isOpen(list.id) ? null : inList.length > 0 ? (
+                  <div className="mt-2">
                   <EntryList
                     entries={inList}
                     lists={allLists}
@@ -490,8 +510,10 @@ export function HitList({ userId }: { userId: string }) {
                     onDragStart={startDrag}
                     draggingId={drag ? `${drag.entry.kind}-${drag.entry.id}` : null}
                   />
+                  </div>
                 ) : (
-                  <p className="text-xs text-muted-foreground">
+                  <p className="mt-2 text-xs text-muted-foreground">
+
                     {drag ? "Drop here to add it to this collection." : "Empty — drag any card in here, whatever the category."}
                   </p>
                 )}
@@ -513,14 +535,21 @@ export function HitList({ userId }: { userId: string }) {
               drag && overId === `default:${cat.type}` && "bg-primary/10 ring-2 ring-primary/40",
             )}
           >
-            <div className="flex items-center justify-between">
+            <button
+              type="button"
+              onClick={() => toggleOpen(`default:${cat.type}`)}
+              aria-expanded={isOpen(`default:${cat.type}`)}
+              className="flex w-full items-center gap-1.5 text-left"
+            >
+              <ChevronRight className={cn("h-4 w-4 shrink-0 text-muted-foreground transition-transform", isOpen(`default:${cat.type}`) && "rotate-90")} />
               <h3 className="font-display text-lg">
                 <span className="mr-2">{cat.hitDefaultEmoji}</span>
                 {cat.hitDefaultLabel}{" "}
                 <span className="text-sm text-muted-foreground">({defaults.length})</span>
               </h3>
-            </div>
+            </button>
 
+            {isOpen(`default:${cat.type}`) ? (
             <EntryList
               entries={defaults}
               lists={allLists}
@@ -532,6 +561,8 @@ export function HitList({ userId }: { userId: string }) {
               onDragStart={startDrag}
               draggingId={drag ? `${drag.entry.kind}-${drag.entry.id}` : null}
             />
+            ) : null}
+
           </div>
         );
       })}

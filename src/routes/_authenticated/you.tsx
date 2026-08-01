@@ -203,7 +203,7 @@ function YouPage() {
           <h2 className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">
             Your Rex{total ? ` (${total})` : ""}
           </h2>
-          <Link to="/me" className="text-xs font-medium text-primary">My Collections →</Link>
+          <Link to="/me" className="text-xs font-medium text-primary">Collections →</Link>
         </div>
         {loadingRecs ? (
           <div className="h-40 animate-pulse rounded-2xl bg-muted" />
