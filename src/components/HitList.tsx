@@ -498,7 +498,8 @@ export function HitList({ userId }: { userId: string }) {
                     ) : null}
                   </div>
                 </div>
-                {inList.length > 0 ? (
+                {!isOpen(list.id) ? null : inList.length > 0 ? (
+                  <div className="mt-2">
                   <EntryList
                     entries={inList}
                     lists={allLists}
@@ -509,8 +510,10 @@ export function HitList({ userId }: { userId: string }) {
                     onDragStart={startDrag}
                     draggingId={drag ? `${drag.entry.kind}-${drag.entry.id}` : null}
                   />
+                  </div>
                 ) : (
-                  <p className="text-xs text-muted-foreground">
+                  <p className="mt-2 text-xs text-muted-foreground">
+
                     {drag ? "Drop here to add it to this collection." : "Empty — drag any card in here, whatever the category."}
                   </p>
                 )}
