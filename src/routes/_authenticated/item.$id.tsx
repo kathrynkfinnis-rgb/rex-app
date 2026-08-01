@@ -7,7 +7,7 @@ import { categoryMeta, type ItemType } from "@/lib/categories";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { toast } from "sonner";
-import { ArrowLeft, MapPin, Check, Crown } from "lucide-react";
+import { ArrowLeft, MapPin, Check, Crown, Pencil } from "lucide-react";
 import { CrownRatingDisplay, CrownRatingInput } from "@/components/CrownRating";
 import { ItemEnrichment } from "@/components/ItemEnrichment";
 import { LikesComments } from "@/components/LikesComments";
@@ -16,6 +16,7 @@ import { WantButton } from "@/components/WantButton";
 import { cn } from "@/lib/utils";
 import { formatDistanceToNow } from "date-fns";
 import { parseRecipe } from "@/lib/recipe";
+import { EditRecommendationDialog } from "@/components/EditRecommendationDialog";
 
 export const Route = createFileRoute("/_authenticated/item/$id")({
   head: () => ({
@@ -65,6 +66,7 @@ function ItemPage() {
   const [note, setNote] = useState("");
   const [posting, setPosting] = useState(false);
   const [checking, setChecking] = useState(false);
+  const [editingRec, setEditingRec] = useState<any>(null);
 
   if (isLoading || !data) {
     return <div className="p-6"><div className="h-40 animate-pulse rounded-2xl bg-muted" /></div>;
@@ -189,6 +191,7 @@ function ItemPage() {
         <div className="mt-3 space-y-3">
           {recs.map((r: any) => {
             const photos = (r.photo_urls && r.photo_urls.length ? r.photo_urls : r.photo_url ? [r.photo_url] : []) as string[];
+            const mine = uid && r.user_id === uid;
             return (
             <div key={r.id} className="rounded-2xl bg-card p-4 ring-1 ring-border">
               <div className="flex items-center justify-between">
@@ -196,12 +199,25 @@ function ItemPage() {
                   <UserAvatar url={r.profiles?.avatar_url} name={r.profiles?.display_name || r.profiles?.username} size="sm" />
                   <span className="font-medium">{r.profiles?.display_name || r.profiles?.username}</span>
                 </div>
-                <div className="flex items-center gap-0.5 text-sm font-semibold tabular-nums">
-                  <Crown className="h-3.5 w-3.5 text-primary" />
-                  {r.rating}<span className="text-muted-foreground font-normal">/10</span>
+                <div className="flex items-center gap-2">
+                  {mine && (
+                    <button
+                      type="button"
+                      onClick={() => setEditingRec(r)}
+                      className="flex h-7 w-7 items-center justify-center rounded-full text-muted-foreground ring-1 ring-border hover:text-foreground"
+                      aria-label="Edit or delete your Rex"
+                    >
+                      <Pencil className="h-3.5 w-3.5" />
+                    </button>
+                  )}
+                  <div className="flex items-center gap-0.5 text-sm font-semibold tabular-nums">
+                    <Crown className="h-3.5 w-3.5 text-primary" />
+                    {r.rating}<span className="text-muted-foreground font-normal">/10</span>
+                  </div>
                 </div>
 
               </div>
+
               {r.note && <p className="mt-2 text-sm leading-snug">&ldquo;{r.note}&rdquo;</p>}
               {photos.length > 0 && (
                 <PhotoCarousel photos={photos} className="mt-3 overflow-hidden rounded-lg ring-1 ring-border" />
@@ -233,6 +249,22 @@ function ItemPage() {
       </section>
 
       <ItemEnrichment itemId={id} />
+
+      {editingRec && (
+        <EditRecommendationDialog
+          open={!!editingRec}
+          onOpenChange={(v) => !v && setEditingRec(null)}
+          recommendation={{
+            id: editingRec.id,
+            rating: editingRec.rating,
+            note: editingRec.note,
+            photo_url: editingRec.photo_url,
+            photo_urls: editingRec.photo_urls ?? null,
+            tags: editingRec.tags ?? null,
+          }}
+          item={{ id: item.id, type: item.type as ItemType, genre: item.genre, recipe_text: (item as any).recipe_text ?? null }}
+        />
+      )}
     </div>
   );
 }
