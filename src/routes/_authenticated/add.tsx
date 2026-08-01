@@ -231,7 +231,9 @@ function AddPage() {
             photo_urls: [],
             tags: [],
             trip_id: rec.id,
+            trip_section: stop.section,
           } as never);
+
           if (stopRecErr) throw stopRecErr;
           savedStops += 1;
         }
