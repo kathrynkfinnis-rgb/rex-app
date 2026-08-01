@@ -59,18 +59,19 @@ function MapPage() {
   });
 
   const { data: trips } = useQuery({
-    queryKey: ["map-trips"],
+    enabled: !!tripId,
+    queryKey: ["map-trip", tripId],
     queryFn: async () => {
       const { data, error } = await supabase
         .from("recommendations")
         .select("id, created_at, items!inner(title, type), profiles!recommendations_user_id_fkey(display_name, username)")
-        .eq("items.type", "trip")
-        .order("created_at", { ascending: false })
-        .limit(50);
+        .eq("id", tripId!)
+        .limit(1);
       if (error) throw error;
       return (data ?? []) as any[];
     },
   });
+
 
   const all = data ?? [];
 
