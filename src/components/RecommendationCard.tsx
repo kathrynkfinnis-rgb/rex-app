@@ -124,7 +124,7 @@ export function RecommendationCard({ rec }: { rec: FeedRow }) {
                   {g}
                 </span>
               ))}
-              <div className="ml-auto shrink-0"><CrownRatingDisplay value={rec.rating} size="xs" showNumber /></div>
+              <div className="ml-auto shrink-0 text-sm font-semibold tabular-nums">{rec.rating.toFixed(rec.rating % 1 === 0 ? 0 : 1)}<span className="text-muted-foreground font-normal">/10</span></div>
             </div>
             <h3 className="mt-0.5 truncate font-display text-base leading-tight">{item.title}</h3>
             {isTrip && (
