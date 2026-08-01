@@ -47,7 +47,45 @@ type Props = {
   value: DraftStop[];
   onChange: (stops: DraftStop[]) => void;
 };
-
+export function SectionPicker({
+  value,
+  onChange,
+  label = "Heading (optional)",
+}: {
+  value: string;
+  onChange: (v: string) => void;
+  label?: string;
+}) {
+  return (
+    <div className="space-y-1.5">
+      <Label htmlFor="stop-section">{label}</Label>
+      <div className="flex flex-wrap gap-1.5">
+        {SECTION_SUGGESTIONS.map((s) => (
+          <button
+            key={s}
+            type="button"
+            onClick={() => onChange(value.toLowerCase() === s.toLowerCase() ? "" : s)}
+            className={cn(
+              "rounded-full px-2.5 py-1 text-xs ring-1 transition-colors",
+              value.toLowerCase() === s.toLowerCase()
+                ? "bg-primary text-primary-foreground ring-primary"
+                : "bg-background text-muted-foreground ring-border hover:bg-muted",
+            )}
+          >
+            {s}
+          </button>
+        ))}
+      </div>
+      <Input
+        id="stop-section"
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        placeholder="e.g. Brunch, Dinner, Museums"
+        className="h-11 rounded-xl"
+      />
+    </div>
+  );
+}
 
 export function TripStopsBuilder({ value, onChange }: Props) {
   const [open, setOpen] = useState(false);
@@ -58,6 +96,7 @@ export function TripStopsBuilder({ value, onChange }: Props) {
   const [subtitle, setSubtitle] = useState("");
   const [rating, setRating] = useState(10);
   const [note, setNote] = useState("");
+  const [section, setSection] = useState("");
 
   const needsSearch = type !== "recipe" && type !== "other";
   const showForm = !needsSearch || picked || manual;
@@ -70,6 +109,7 @@ export function TripStopsBuilder({ value, onChange }: Props) {
     setRating(10);
     setNote("");
     setType("place");
+    // Heading stays so several stops can be added under the same one.
   }
 
   function pick(hit: AnyHit) {
@@ -97,11 +137,13 @@ export function TripStopsBuilder({ value, onChange }: Props) {
         external_source: hit?.external_source ?? null,
         rating,
         note: note.trim(),
+        section: section.trim() || null,
       },
     ]);
     reset();
     setOpen(false);
   }
+
 
   return (
     <div className="space-y-3">
