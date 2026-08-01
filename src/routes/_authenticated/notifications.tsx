@@ -6,7 +6,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { UserAvatar } from "@/components/UserAvatar";
 import { Button } from "@/components/ui/button";
 import { Settings, CheckCheck, Bell } from "lucide-react";
-import { notifCopy, notifHref, type NotificationRow } from "@/lib/notifications";
+import { notifCopy, notifTarget, type NotificationRow } from "@/lib/notifications";
 
 export const Route = createFileRoute("/_authenticated/notifications")({
   head: () => ({
