@@ -105,7 +105,7 @@ export function RecommendationCard({ rec }: { rec: FeedRow }) {
         params={{ id: isTrip ? rec.id : item.id } as any}
         className="block transition-shadow hover:shadow-md"
       >
-        <div className="flex gap-3 p-3">
+        <div className={cn("flex gap-3 p-3", isOwner && "pr-9")}>
 
           <div className="flex h-14 w-14 shrink-0 items-center justify-center overflow-hidden rounded-lg bg-muted">
             {item.image_url ? (
