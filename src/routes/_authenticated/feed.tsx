@@ -131,9 +131,9 @@ function FeedPage() {
     <div className="min-h-screen">
       <header className="sticky top-0 z-30 border-b border-border bg-background/90 px-5 pb-3 pt-[calc(env(safe-area-inset-top)+1rem)] backdrop-blur">
         <div className="flex items-center justify-between">
-          <div>
+          <div className="flex items-baseline gap-3">
             <img src={rexLogo.url} alt="REX" className="h-12 w-auto object-contain" />
-            <h1 className="mt-0.5 font-display text-3xl">{searching ? "Search" : "Your feed"}</h1>
+            <h1 className="font-display text-3xl">{searching ? "Search" : "Your feed"}</h1>
           </div>
         </div>
         <div className="relative mt-3">
