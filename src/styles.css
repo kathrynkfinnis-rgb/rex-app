@@ -62,8 +62,8 @@
 
 :root {
   --radius: 0.875rem;
-  /* Pistachio: creamy off-white bg, deep pistachio green primary, warm nut accent */
-  --background: oklch(0.968 0.0065 55);
+  /* Neutral warm grey-green background, deep pistachio green primary, warm nut accent */
+  --background: #BFBFB5;
   --foreground: oklch(0.24 0.04 145);
   --card: oklch(1 0 0);
   --card-foreground: oklch(0.24 0.04 145);
