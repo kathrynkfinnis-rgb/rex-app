@@ -133,7 +133,6 @@ function FeedPage() {
         <div className="flex items-center justify-between">
           <div>
             <img src={rexLogo.url} alt="REX" className="h-12 w-auto object-contain" />
-            <h1 className="mt-0.5 font-display text-3xl">{searching ? "Search" : "Your feed"}</h1>
           </div>
         </div>
         <div className="relative mt-3">
