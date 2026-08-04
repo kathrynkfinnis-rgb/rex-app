@@ -7,7 +7,7 @@ import { CATEGORIES, categoryMeta, splitGenres, hasGenre, type ItemType } from "
 import { RecommendationCard, type FeedRow } from "@/components/RecommendationCard";
 
 import { RequestCard, type RequestRow } from "@/components/RequestCard";
-import rexLogo from "@/assets/rex-wordmark.png.asset.json";
+import rexLogo from "@/assets/rex-wordmark-forest.png";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { UserPlus, Mic, Plus, Search, X, User, Sparkles, ListChecks as ListIcon, Lock, Users as UsersIcon, Globe2 } from "lucide-react";
@@ -132,7 +132,7 @@ function FeedPage() {
       <header className="sticky top-0 z-30 border-b border-border bg-background/90 px-5 pb-3 pt-[calc(env(safe-area-inset-top)+1rem)] backdrop-blur">
         <div className="flex items-center justify-start">
           <div className="text-left">
-            <img src={rexLogo.url} alt="REX" className="h-24 w-auto object-contain" />
+            <img src={rexLogo} alt="REX" className="h-24 w-auto object-contain" />
           </div>
         </div>
         <div className="relative mt-3">

@@ -8,7 +8,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { toast } from "sonner";
 import { ArrowLeft } from "lucide-react";
-import rexLogo from "@/assets/rex-wordmark.png.asset.json";
+import rexLogo from "@/assets/rex-wordmark-forest.png";
 
 const searchSchema = z.object({
   mode: z.enum(["signin", "signup"]).default("signin").catch("signin"),
@@ -97,7 +97,7 @@ function AuthPage() {
           <ArrowLeft className="h-4 w-4" /> Back
         </Link>
         <div className="mt-6 flex items-center">
-          <img src={rexLogo.url} alt="REX" className="h-8 w-auto object-contain" />
+          <img src={rexLogo} alt="REX" className="h-8 w-auto object-contain" />
         </div>
         <h1 className="mt-4 font-display text-4xl leading-tight">
           {mode === "signup" ? "Start Rexing" : "Welcome back"}
