@@ -549,7 +549,7 @@ function EmptyState() {
   return (
     <div className="mt-8 rounded-3xl border border-dashed border-border bg-card p-6 text-center">
       <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-primary/10">
-        <img src={rexLogo.url} alt="REX" className="h-7 w-auto object-contain" />
+        <img src={rexLogo} alt="REX" className="h-7 w-auto object-contain" />
       </div>
       <h2 className="mt-3 font-display text-2xl">Your feed is empty</h2>
       <p className="mx-auto mt-2 max-w-xs text-sm text-muted-foreground">
