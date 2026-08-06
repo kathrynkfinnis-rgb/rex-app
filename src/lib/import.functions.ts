@@ -41,53 +41,51 @@ export const fetchSheetCsv = createServerFn({ method: "POST" })
   });
 
 // -------- LLM extraction --------
-async function callLovableAI(prompt: string, userText: string): Promise<ExtractedRec[]> {
-  const key = process.env.LOVABLE_API_KEY;
-  if (!key) throw new Error("LOVABLE_API_KEY not configured");
-  const res = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${key}`,
-    },
-    body: JSON.stringify({
-      model: "google/gemini-2.5-flash",
-      messages: [
-        { role: "system", content: prompt },
-        { role: "user", content: userText.slice(0, 60000) },
-      ],
-      response_format: {
-        type: "json_schema",
-        json_schema: {
-          name: "recommendations",
-          strict: true,
-          schema: {
-            type: "object",
-            additionalProperties: false,
-            required: ["items"],
-            properties: {
-              items: {
-                type: "array",
-                items: {
-                  type: "object",
-                  additionalProperties: false,
-                  required: ["title", "creator", "note", "rating", "type"],
-                  properties: {
-                    title: { type: "string" },
-                    creator: { type: ["string", "null"] },
-                    note: { type: ["string", "null"] },
-                    rating: { type: ["number", "null"] },
-                    type: {
-                      type: ["string", "null"],
-                      enum: ["book", "movie", "tv", "place", null],
-                    },
-                  },
-                },
-              },
+const EXTRACTION_TOOL = {
+  name: "extract_recommendations",
+  description: "Return the recommendations extracted from the user's text.",
+  input_schema: {
+    type: "object",
+    required: ["items"],
+    properties: {
+      items: {
+        type: "array",
+        items: {
+          type: "object",
+          required: ["title", "creator", "note", "rating", "type"],
+          properties: {
+            title: { type: "string" },
+            creator: { type: ["string", "null"] },
+            note: { type: ["string", "null"] },
+            rating: { type: ["number", "null"] },
+            type: {
+              type: ["string", "null"],
+              enum: ["book", "movie", "tv", "place", null],
             },
           },
         },
       },
+    },
+  },
+} as const;
+
+async function callAnthropic(prompt: string, userText: string): Promise<ExtractedRec[]> {
+  const key = process.env.ANTHROPIC_API_KEY;
+  if (!key) throw new Error("ANTHROPIC_API_KEY not configured");
+  const res = await fetch("https://api.anthropic.com/v1/messages", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      "x-api-key": key,
+      "anthropic-version": "2023-06-01",
+    },
+    body: JSON.stringify({
+      model: "claude-haiku-4-5-20251001",
+      max_tokens: 4096,
+      system: prompt,
+      messages: [{ role: "user", content: userText.slice(0, 60000) }],
+      tools: [EXTRACTION_TOOL],
+      tool_choice: { type: "tool", name: "extract_recommendations" },
     }),
   });
   if (!res.ok) {
@@ -95,14 +93,11 @@ async function callLovableAI(prompt: string, userText: string): Promise<Extracte
     throw new Error(`AI extraction failed [${res.status}]: ${body.slice(0, 300)}`);
   }
   const json: any = await res.json();
-  const content = json.choices?.[0]?.message?.content ?? "{}";
-  try {
-    const parsed = JSON.parse(content);
-    const items: ExtractedRec[] = Array.isArray(parsed.items) ? parsed.items : [];
-    return items.filter((i) => i.title && i.title.trim().length > 0);
-  } catch {
-    return [];
-  }
+  const toolUse = json.content?.find(
+    (b: any) => b.type === "tool_use" && b.name === "extract_recommendations",
+  );
+  const items: ExtractedRec[] = Array.isArray(toolUse?.input?.items) ? toolUse.input.items : [];
+  return items.filter((i) => i.title && i.title.trim().length > 0);
 }
 
 const PROMPT = `You extract book/film/TV/restaurant recommendations from user notes, CSV rows, or podcast/blog text.
@@ -122,7 +117,7 @@ export const extractFromText = createServerFn({ method: "POST" })
     z.object({ text: z.string().min(1).max(200000), source: z.string().min(1).max(80) }).parse(d),
   )
   .handler(async ({ data, context }) => {
-    const extracted = await callLovableAI(PROMPT, data.text);
+    const extracted = await callAnthropic(PROMPT, data.text);
     if (!extracted.length) return { inserted: 0 };
     const rows = extracted.slice(0, 200).map((e) => ({
       user_id: context.userId,

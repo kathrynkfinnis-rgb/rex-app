@@ -2,7 +2,7 @@ import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 
-const GATEWAY = "https://connector-gateway.lovable.dev/google_maps";
+const GATEWAY = "https://places.googleapis.com/v1";
 
 export const geocodeMissingPlaces = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
@@ -10,9 +10,8 @@ export const geocodeMissingPlaces = createServerFn({ method: "POST" })
     z.object({ limit: z.number().int().min(1).max(50).optional() }).parse(d ?? {}),
   )
   .handler(async ({ data, context }) => {
-    const lovable = process.env.LOVABLE_API_KEY;
     const gmk = process.env.GOOGLE_MAPS_API_KEY;
-    if (!lovable || !gmk) return { updated: 0, checked: 0, remaining: 0, reason: "no_key" as const };
+    if (!gmk) return { updated: 0, checked: 0, remaining: 0, reason: "no_key" as const };
 
     const { supabase } = context;
     const limit = data.limit ?? 25;
@@ -28,8 +27,7 @@ export const geocodeMissingPlaces = createServerFn({ method: "POST" })
     if (error || !rows) return { updated: 0, checked: 0, remaining: 0 };
 
     const headers = {
-      Authorization: `Bearer ${lovable}`,
-      "X-Connection-Api-Key": gmk,
+      "X-Goog-Api-Key": gmk,
       "Content-Type": "application/json",
       "X-Goog-FieldMask":
         "places.formattedAddress,places.location,places.id,places.primaryTypeDisplayName",
@@ -40,7 +38,7 @@ export const geocodeMissingPlaces = createServerFn({ method: "POST" })
       const q = [row.title, row.address, row.subtitle].filter(Boolean).join(", ");
       if (!q) continue;
       try {
-        const res = await fetch(`${GATEWAY}/places/v1/places:searchText`, {
+        const res = await fetch(`${GATEWAY}/places:searchText`, {
           method: "POST",
           headers,
           body: JSON.stringify({ textQuery: q, pageSize: 1 }),

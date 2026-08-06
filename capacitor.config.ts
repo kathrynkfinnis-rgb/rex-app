@@ -5,7 +5,7 @@ const config: CapacitorConfig = {
   appName: 'Rex',
   webDir: '.output/public',
   server: {
-    url: 'https://rex-app.lovable.app',
+    url: 'https://kathrynkfinnis-rgb-rex-app.kathryn-k-finnis.workers.dev',
     cleartext: false
   }
 };

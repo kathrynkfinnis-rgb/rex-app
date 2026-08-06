@@ -16,6 +16,21 @@
 		504EC3121FED79650016851F /* LaunchScreen.storyboard in Resources */ = {isa = PBXBuildFile; fileRef = 504EC3101FED79650016851F /* LaunchScreen.storyboard */; };
 		50B271D11FEDC1A000F3C39B /* public in Resources */ = {isa = PBXBuildFile; fileRef = 50B271D01FEDC1A000F3C39B /* public */; };
 		9582B6832FE993A70072D4E8 /* SceneDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9582B6822FE993A50072D4E8 /* SceneDelegate.swift */; };
+		FEED001B0000000000000000 /* Theme.swift in Sources */ = {isa = PBXBuildFile; fileRef = FEED001A0000000000000000 /* Theme.swift */; };
+		FEED002B0000000000000000 /* Models.swift in Sources */ = {isa = PBXBuildFile; fileRef = FEED002A0000000000000000 /* Models.swift */; };
+		FEED003B0000000000000000 /* RexAPI.swift in Sources */ = {isa = PBXBuildFile; fileRef = FEED003A0000000000000000 /* RexAPI.swift */; };
+		FEED004B0000000000000000 /* LoginView.swift in Sources */ = {isa = PBXBuildFile; fileRef = FEED004A0000000000000000 /* LoginView.swift */; };
+		FEED005B0000000000000000 /* RecommendationCardView.swift in Sources */ = {isa = PBXBuildFile; fileRef = FEED005A0000000000000000 /* RecommendationCardView.swift */; };
+		FEED006B0000000000000000 /* FeedView.swift in Sources */ = {isa = PBXBuildFile; fileRef = FEED006A0000000000000000 /* FeedView.swift */; };
+		FEED007B0000000000000000 /* RootView.swift in Sources */ = {isa = PBXBuildFile; fileRef = FEED007A0000000000000000 /* RootView.swift */; };
+		FEED008B0000000000000000 /* ItemDetailView.swift in Sources */ = {isa = PBXBuildFile; fileRef = FEED008A0000000000000000 /* ItemDetailView.swift */; };
+		FEED009B0000000000000000 /* AddRexView.swift in Sources */ = {isa = PBXBuildFile; fileRef = FEED009A0000000000000000 /* AddRexView.swift */; };
+		FEED010B0000000000000000 /* ProfileView.swift in Sources */ = {isa = PBXBuildFile; fileRef = FEED010A0000000000000000 /* ProfileView.swift */; };
+		FEED011B0000000000000000 /* FriendsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = FEED011A0000000000000000 /* FriendsView.swift */; };
+		FEED012B0000000000000000 /* NotificationsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = FEED012A0000000000000000 /* NotificationsView.swift */; };
+		FEED013B0000000000000000 /* CollectionsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = FEED013A0000000000000000 /* CollectionsView.swift */; };
+		FEED014B0000000000000000 /* MainTabView.swift in Sources */ = {isa = PBXBuildFile; fileRef = FEED014A0000000000000000 /* MainTabView.swift */; };
+		FEED015B0000000000000000 /* MapView.swift in Sources */ = {isa = PBXBuildFile; fileRef = FEED015A0000000000000000 /* MapView.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -30,6 +45,21 @@
 		50B271D01FEDC1A000F3C39B /* public */ = {isa = PBXFileReference; lastKnownFileType = folder; path = public; sourceTree = "<group>"; };
 		9582B6822FE993A50072D4E8 /* SceneDelegate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SceneDelegate.swift; sourceTree = "<group>"; };
 		958DCC722DB07C7200EA8C5F /* debug.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; name = debug.xcconfig; path = ../debug.xcconfig; sourceTree = SOURCE_ROOT; };
+		FEED001A0000000000000000 /* Theme.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Theme.swift; sourceTree = "<group>"; };
+		FEED002A0000000000000000 /* Models.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Models.swift; sourceTree = "<group>"; };
+		FEED003A0000000000000000 /* RexAPI.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RexAPI.swift; sourceTree = "<group>"; };
+		FEED004A0000000000000000 /* LoginView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LoginView.swift; sourceTree = "<group>"; };
+		FEED005A0000000000000000 /* RecommendationCardView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RecommendationCardView.swift; sourceTree = "<group>"; };
+		FEED006A0000000000000000 /* FeedView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FeedView.swift; sourceTree = "<group>"; };
+		FEED007A0000000000000000 /* RootView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RootView.swift; sourceTree = "<group>"; };
+		FEED008A0000000000000000 /* ItemDetailView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ItemDetailView.swift; sourceTree = "<group>"; };
+		FEED009A0000000000000000 /* AddRexView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AddRexView.swift; sourceTree = "<group>"; };
+		FEED010A0000000000000000 /* ProfileView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProfileView.swift; sourceTree = "<group>"; };
+		FEED011A0000000000000000 /* FriendsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FriendsView.swift; sourceTree = "<group>"; };
+		FEED012A0000000000000000 /* NotificationsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NotificationsView.swift; sourceTree = "<group>"; };
+		FEED013A0000000000000000 /* CollectionsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CollectionsView.swift; sourceTree = "<group>"; };
+		FEED014A0000000000000000 /* MainTabView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MainTabView.swift; sourceTree = "<group>"; };
+		FEED015A0000000000000000 /* MapView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MapView.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -67,6 +97,7 @@
 				9582B6822FE993A50072D4E8 /* SceneDelegate.swift */,
 				50379B222058CBB4000EE86E /* capacitor.config.json */,
 				504EC3071FED79650016851F /* AppDelegate.swift */,
+				FEED099C0000000000000000 /* Native */,
 				504EC30B1FED79650016851F /* Main.storyboard */,
 				504EC30E1FED79650016851F /* Assets.xcassets */,
 				504EC3101FED79650016851F /* LaunchScreen.storyboard */,
@@ -75,6 +106,28 @@
 				50B271D01FEDC1A000F3C39B /* public */,
 			);
 			path = App;
+			sourceTree = "<group>";
+		};
+		FEED099C0000000000000000 /* Native */ = {
+			isa = PBXGroup;
+			children = (
+				FEED001A0000000000000000 /* Theme.swift */,
+				FEED002A0000000000000000 /* Models.swift */,
+				FEED003A0000000000000000 /* RexAPI.swift */,
+				FEED004A0000000000000000 /* LoginView.swift */,
+				FEED005A0000000000000000 /* RecommendationCardView.swift */,
+				FEED006A0000000000000000 /* FeedView.swift */,
+				FEED007A0000000000000000 /* RootView.swift */,
+				FEED008A0000000000000000 /* ItemDetailView.swift */,
+				FEED009A0000000000000000 /* AddRexView.swift */,
+				FEED010A0000000000000000 /* ProfileView.swift */,
+				FEED011A0000000000000000 /* FriendsView.swift */,
+				FEED012A0000000000000000 /* NotificationsView.swift */,
+				FEED013A0000000000000000 /* CollectionsView.swift */,
+				FEED014A0000000000000000 /* MainTabView.swift */,
+				FEED015A0000000000000000 /* MapView.swift */,
+			);
+			path = Native;
 			sourceTree = "<group>";
 		};
 /* End PBXGroup section */
@@ -160,6 +213,21 @@
 			files = (
 				504EC3081FED79650016851F /* AppDelegate.swift in Sources */,
 				9582B6832FE993A70072D4E8 /* SceneDelegate.swift in Sources */,
+				FEED001B0000000000000000 /* Theme.swift in Sources */,
+				FEED002B0000000000000000 /* Models.swift in Sources */,
+				FEED003B0000000000000000 /* RexAPI.swift in Sources */,
+				FEED004B0000000000000000 /* LoginView.swift in Sources */,
+				FEED005B0000000000000000 /* RecommendationCardView.swift in Sources */,
+				FEED006B0000000000000000 /* FeedView.swift in Sources */,
+				FEED007B0000000000000000 /* RootView.swift in Sources */,
+				FEED008B0000000000000000 /* ItemDetailView.swift in Sources */,
+				FEED009B0000000000000000 /* AddRexView.swift in Sources */,
+				FEED010B0000000000000000 /* ProfileView.swift in Sources */,
+				FEED011B0000000000000000 /* FriendsView.swift in Sources */,
+				FEED012B0000000000000000 /* NotificationsView.swift in Sources */,
+				FEED013B0000000000000000 /* CollectionsView.swift in Sources */,
+				FEED014B0000000000000000 /* MainTabView.swift in Sources */,
+				FEED015B0000000000000000 /* MapView.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -234,7 +302,7 @@
 				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
 				GCC_WARN_UNUSED_FUNCTION = YES;
 				GCC_WARN_UNUSED_VARIABLE = YES;
-				IPHONEOS_DEPLOYMENT_TARGET = 15.0;
+				IPHONEOS_DEPLOYMENT_TARGET = 18.0;
 				MTL_ENABLE_DEBUG_INFO = YES;
 				ONLY_ACTIVE_ARCH = YES;
 				SDKROOT = iphoneos;
@@ -285,7 +353,7 @@
 				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
 				GCC_WARN_UNUSED_FUNCTION = YES;
 				GCC_WARN_UNUSED_VARIABLE = YES;
-				IPHONEOS_DEPLOYMENT_TARGET = 15.0;
+				IPHONEOS_DEPLOYMENT_TARGET = 18.0;
 				MTL_ENABLE_DEBUG_INFO = NO;
 				SDKROOT = iphoneos;
 				SWIFT_COMPILATION_MODE = wholemodule;
@@ -302,7 +370,7 @@
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
 				INFOPLIST_FILE = App/Info.plist;
-				IPHONEOS_DEPLOYMENT_TARGET = 15.0;
+				IPHONEOS_DEPLOYMENT_TARGET = 18.0;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/Frameworks",
@@ -324,7 +392,7 @@
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
 				INFOPLIST_FILE = App/Info.plist;
-				IPHONEOS_DEPLOYMENT_TARGET = 15.0;
+				IPHONEOS_DEPLOYMENT_TARGET = 18.0;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/Frameworks",

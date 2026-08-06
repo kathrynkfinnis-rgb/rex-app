@@ -1,4 +1,5 @@
 import UIKit
+import SwiftUI
 import Capacitor
 
 class SceneDelegate: UIResponder, UIWindowSceneDelegate {
@@ -8,7 +9,9 @@ class SceneDelegate: UIResponder, UIWindowSceneDelegate {
         guard let windowScene = scene as? UIWindowScene else { return }
 
         window = UIWindow(windowScene: windowScene)
-        window?.rootViewController = CAPBridgeViewController()
+        // Native SwiftUI rewrite in progress — screens not yet ported still live only
+        // in the Capacitor/WebView build. See CAPBridgeViewController() for that path.
+        window?.rootViewController = UIHostingController(rootView: RootView())
         window?.makeKeyAndVisible()
 
         SceneDelegateProxy.shared.scene(scene, willConnectTo: session, options: connectionOptions)

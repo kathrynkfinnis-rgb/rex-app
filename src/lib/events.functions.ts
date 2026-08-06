@@ -74,9 +74,8 @@ async function searchTicketmaster(q: string, near?: { lat: number; lng: number }
 }
 
 async function searchGooglePlacesEvents(q: string, near?: { lat: number; lng: number } | null): Promise<EventHit[]> {
-  const lovable = process.env.LOVABLE_API_KEY;
   const gmk = process.env.GOOGLE_MAPS_API_KEY;
-  if (!lovable || !gmk) return [];
+  if (!gmk) return [];
   const body: Record<string, unknown> = { textQuery: q, pageSize: 8 };
   if (near) {
     body.locationBias = {
@@ -84,11 +83,10 @@ async function searchGooglePlacesEvents(q: string, near?: { lat: number; lng: nu
     };
   }
   try {
-    const res = await fetch("https://connector-gateway.lovable.dev/google_maps/places/v1/places:searchText", {
+    const res = await fetch("https://places.googleapis.com/v1/places:searchText", {
       method: "POST",
       headers: {
-        Authorization: `Bearer ${lovable}`,
-        "X-Connection-Api-Key": gmk,
+        "X-Goog-Api-Key": gmk,
         "Content-Type": "application/json",
         "X-Goog-FieldMask":
           "places.id,places.displayName,places.formattedAddress,places.shortFormattedAddress,places.location,places.primaryTypeDisplayName,places.websiteUri",

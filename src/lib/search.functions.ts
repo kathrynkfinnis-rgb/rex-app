@@ -96,7 +96,12 @@ export const searchPodcasts = createServerFn({ method: "GET" })
   .inputValidator((d: { q: string }) => querySchema.parse(d))
   .handler(async ({ data }): Promise<SearchHit[]> => {
     const url = `https://itunes.apple.com/search?media=podcast&entity=podcast&limit=15&term=${encodeURIComponent(data.q)}`;
-    const res = await fetch(url);
+    const res = await fetch(url, {
+      headers: {
+        "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/128.0.0.0 Safari/537.36",
+        Accept: "application/json",
+      },
+    });
     if (!res.ok) return [];
     const json: any = await res.json();
     return (json.results ?? []).map((r: any) => ({

@@ -190,19 +190,17 @@ async function enrichTmdb(item: any, kind: "movie" | "tv"): Promise<Enrichment |
 }
 
 async function enrichPlace(item: any): Promise<Enrichment | null> {
-  const lovableKey = process.env.LOVABLE_API_KEY;
   const mapsKey = process.env.GOOGLE_MAPS_API_KEY;
-  if (!lovableKey || !mapsKey) return null;
-  const GATEWAY = "https://connector-gateway.lovable.dev/google_maps";
+  if (!mapsKey) return null;
+  const GATEWAY = "https://places.googleapis.com/v1";
 
   let placeId: string | null = item.external_source === "google_places" ? item.external_id : null;
   if (!placeId) {
     // Text search fallback
-    const searchRes = await fetch(`${GATEWAY}/places/v1/places:searchText`, {
+    const searchRes = await fetch(`${GATEWAY}/places:searchText`, {
       method: "POST",
       headers: {
-        Authorization: `Bearer ${lovableKey}`,
-        "X-Connection-Api-Key": mapsKey,
+        "X-Goog-Api-Key": mapsKey,
         "Content-Type": "application/json",
         "X-Goog-FieldMask": "places.id",
       },
@@ -237,10 +235,9 @@ async function enrichPlace(item: any): Promise<Enrichment | null> {
     "reviews",
     "photos",
   ].join(",");
-  const detailsRes = await fetch(`${GATEWAY}/places/v1/places/${encodeURIComponent(placeId)}`, {
+  const detailsRes = await fetch(`${GATEWAY}/places/${encodeURIComponent(placeId)}`, {
     headers: {
-      Authorization: `Bearer ${lovableKey}`,
-      "X-Connection-Api-Key": mapsKey,
+      "X-Goog-Api-Key": mapsKey,
       "X-Goog-FieldMask": fields,
     },
   });
@@ -275,7 +272,7 @@ async function enrichPlace(item: any): Promise<Enrichment | null> {
   let image: string | null = null;
   const photoName = p.photos?.[0]?.name;
   if (photoName) {
-    image = `${GATEWAY}/places/v1/${photoName}/media?maxWidthPx=800&skipHttpRedirect=false`;
+    image = `${GATEWAY}/${photoName}/media?maxWidthPx=800&skipHttpRedirect=false`;
     // But this URL requires auth headers; not directly embeddable. Skip and let existing item.image_url show.
     image = null;
   }

@@ -14,15 +14,13 @@ export type PlaceHit = {
   genre: string | null;
 };
 
-const GATEWAY = "https://connector-gateway.lovable.dev/google_maps";
+const GATEWAY = "https://places.googleapis.com/v1";
 
 function gwHeaders(): Record<string, string> | null {
-  const lovable = process.env.LOVABLE_API_KEY;
   const gmk = process.env.GOOGLE_MAPS_API_KEY;
-  if (!lovable || !gmk) return null;
+  if (!gmk) return null;
   return {
-    Authorization: `Bearer ${lovable}`,
-    "X-Connection-Api-Key": gmk,
+    "X-Goog-Api-Key": gmk,
     "Content-Type": "application/json",
   };
 }
@@ -48,7 +46,7 @@ export const searchPlaces = createServerFn({ method: "POST" })
         },
       };
     }
-    const res = await fetch(`${GATEWAY}/places/v1/places:searchText`, {
+    const res = await fetch(`${GATEWAY}/places:searchText`, {
       method: "POST",
       headers: {
         ...headers,
@@ -83,7 +81,7 @@ export const getPlacePhotoUrl = createServerFn({ method: "POST" })
     if (!headers) return null;
     const w = data.maxWidth ?? 800;
     const res = await fetch(
-      `${GATEWAY}/places/v1/${data.photoName}/media?maxWidthPx=${w}&skipHttpRedirect=true`,
+      `${GATEWAY}/${data.photoName}/media?maxWidthPx=${w}&skipHttpRedirect=true`,
       { headers },
     );
     if (!res.ok) return null;

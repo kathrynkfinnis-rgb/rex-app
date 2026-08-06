@@ -71,15 +71,12 @@ export function RecipeEditor({ value, onChange }: Props) {
     if (parsed.ingredients.length || parsed.method.length) {
       if (parsed.ingredients.length) setIngredients(parsed.ingredients);
       if (parsed.method.length) setMethod(parsed.method);
-      setLegacy("");
     } else {
-      // No headings — treat every non-empty line as an ingredient if short, else steps.
-      const lines = pasteBuf.split(/\n+/).map((l) => l.trim()).filter(Boolean);
-      const looksLikeSteps = lines.some((l) => l.length > 80 || /^\d+[.)]/.test(l));
-      if (looksLikeSteps) setMethod(lines.map((l) => l.replace(/^\s*(?:\d+[.)]|[-*•])\s+/, "")));
-      else setIngredients(lines.map((l) => l.replace(/^\s*(?:[-*•])\s+/, "")));
-      setLegacy("");
+      // Nothing recognisable as ingredients or steps (e.g. a single plain
+      // sentence) — drop it in as one method step rather than losing it.
+      setMethod([pasteBuf.trim()]);
     }
+    setLegacy("");
     setPasteBuf("");
     setShowPaste(false);
   }
