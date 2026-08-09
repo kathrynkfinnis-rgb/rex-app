@@ -295,7 +295,7 @@ function AddPage() {
             <>
               <Button
                 onClick={() => navigate({ to: "/trip/$id", params: { id: justAdded.recId } })}
-                className="h-14 w-full rounded-full text-base font-semibold shadow-lg shadow-primary/30"
+                className="h-14 w-full rounded-[14px] text-base font-semibold shadow-[0_2px_12px_rgba(0,0,0,0.04)]"
               >
                 {justAdded.stopCount ? "View trip" : "Add Rex to this trip"}
               </Button>
@@ -307,7 +307,7 @@ function AddPage() {
             <>
               <Button
                 onClick={resetForm}
-                className="h-14 w-full rounded-full text-base font-semibold shadow-lg shadow-primary/30"
+                className="h-14 w-full rounded-[14px] text-base font-semibold shadow-[0_2px_12px_rgba(0,0,0,0.04)]"
               >
                 Add another Rex to this trip
               </Button>
@@ -326,7 +326,7 @@ function AddPage() {
             <>
               <Button
                 onClick={resetForm}
-                className="h-14 w-full rounded-full text-base font-semibold shadow-lg shadow-primary/30"
+                className="h-14 w-full rounded-[14px] text-base font-semibold shadow-[0_2px_12px_rgba(0,0,0,0.04)]"
               >
                 Add another
               </Button>
@@ -664,7 +664,7 @@ function AddPage() {
           type="button"
           onClick={handleSave}
           disabled={saving || !title.trim()}
-          className="h-14 w-full rounded-full text-base font-semibold shadow-lg shadow-primary/30"
+          className="h-14 w-full rounded-[14px] text-base font-semibold shadow-[0_2px_12px_rgba(0,0,0,0.04)]"
         >
           {saving
             ? "Saving…"

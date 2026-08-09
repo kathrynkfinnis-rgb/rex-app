@@ -7,7 +7,7 @@ import { CATEGORIES, categoryMeta, splitGenres, hasGenre, type ItemType } from "
 import { RecommendationCard, type FeedRow } from "@/components/RecommendationCard";
 
 import { RequestCard, type RequestRow } from "@/components/RequestCard";
-import rexLogo from "@/assets/rex-wordmark.png.asset.json";
+import rexLogo from "@/assets/rex-wordmark-forest.png";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { UserPlus, Mic, Plus, Search, X, User, Sparkles, ListChecks as ListIcon, Lock, Users as UsersIcon, Globe2 } from "lucide-react";
@@ -130,10 +130,9 @@ function FeedPage() {
   return (
     <div className="min-h-screen">
       <header className="sticky top-0 z-30 border-b border-border bg-background/90 px-5 pb-3 pt-[calc(env(safe-area-inset-top)+1rem)] backdrop-blur">
-        <div className="flex items-center justify-between">
-          <div>
-            <img src={rexLogo.url} alt="REX" className="h-12 w-auto object-contain" />
-            <h1 className="mt-0.5 font-display text-3xl">{searching ? "Search" : "Your feed"}</h1>
+        <div className="flex items-center justify-start">
+          <div className="text-left">
+            <img src={rexLogo} alt="REX" className="h-24 w-auto object-contain" />
           </div>
         </div>
         <div className="relative mt-3">
@@ -251,7 +250,7 @@ function FeedPage() {
         <div className="space-y-2 px-3 py-3">
           <Link
             to="/ask"
-            className="flex items-center gap-3 rounded-2xl bg-gradient-to-br from-accent/15 to-card p-3 ring-1 ring-accent/40 transition-transform active:scale-[0.99]"
+            className="flex items-center gap-3 rounded-[18px] border border-border bg-card p-4 transition-transform active:scale-[0.99]"
           >
             <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-accent/20 text-accent-foreground">
               <Sparkles className="h-5 w-5" />
@@ -550,7 +549,7 @@ function EmptyState() {
   return (
     <div className="mt-8 rounded-3xl border border-dashed border-border bg-card p-6 text-center">
       <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-primary/10">
-        <img src={rexLogo.url} alt="REX" className="h-7 w-auto object-contain" />
+        <img src={rexLogo} alt="REX" className="h-7 w-auto object-contain" />
       </div>
       <h2 className="mt-3 font-display text-2xl">Your feed is empty</h2>
       <p className="mx-auto mt-2 max-w-xs text-sm text-muted-foreground">

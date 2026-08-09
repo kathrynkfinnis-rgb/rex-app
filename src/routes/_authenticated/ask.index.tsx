@@ -118,7 +118,7 @@ function AskPage() {
           type="button"
           onClick={handlePost}
           disabled={saving || !title.trim()}
-          className="h-14 w-full rounded-full text-base font-semibold shadow-lg shadow-primary/30"
+          className="h-14 w-full rounded-[14px] text-base font-semibold shadow-[0_2px_12px_rgba(0,0,0,0.04)]"
         >
           {saving ? "Posting…" : "Post ask"}
         </Button>

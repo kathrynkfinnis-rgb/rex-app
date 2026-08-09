@@ -2,7 +2,7 @@ import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { MapPin, Book, Film, Tv } from "lucide-react";
-import rexLogo from "@/assets/rex-wordmark.png.asset.json";
+import rexLogo from "@/assets/rex-wordmark-forest.png";
 
 export const Route = createFileRoute("/")({
   ssr: false,
@@ -38,7 +38,7 @@ function Landing() {
 
       <div className="relative mx-auto flex min-h-screen max-w-md flex-col px-6 pb-10 pt-16">
         <img
-          src={rexLogo.url}
+          src={rexLogo}
           alt="REX logo"
           className="h-14 w-auto self-start object-contain"
         />
@@ -70,7 +70,7 @@ function Landing() {
           <Link
             to="/auth"
             search={{ mode: "signup" as const }}
-            className="flex h-14 items-center justify-center rounded-full bg-primary text-base font-semibold text-primary-foreground shadow-lg shadow-primary/30 transition-transform active:scale-[0.98]"
+            className="flex h-14 items-center justify-center rounded-[14px] bg-primary text-base font-semibold text-primary-foreground shadow-[0_2px_12px_rgba(0,0,0,0.04)] transition-transform active:scale-[0.98]"
           >
             Get started
           </Link>

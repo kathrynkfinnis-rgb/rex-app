@@ -120,7 +120,7 @@ export function MentionInput({
   return (
     <div className="relative min-w-0 flex-1">
       {mention && matches.length > 0 && (
-        <div className="absolute bottom-full left-0 z-50 mb-2 w-full max-w-xs overflow-hidden rounded-xl border border-border bg-popover shadow-lg">
+        <div className="absolute bottom-full left-0 z-50 mb-2 w-full max-w-xs overflow-hidden rounded-xl border border-border bg-popover shadow-[0_8px_24px_rgba(0,0,0,0.08)]">
           {matches.map((p) => (
             <button
               key={p.id}
