@@ -175,7 +175,7 @@ function AskDetailPage() {
 
   return (
     <div>
-      <header className="border-b border-border bg-gradient-to-br from-accent/15 via-background to-background px-5 pb-5 pt-[calc(env(safe-area-inset-top)+1rem)]">
+      <header className="border-b border-border bg-background px-5 pb-5 pt-[calc(env(safe-area-inset-top)+1rem)]">
         <button onClick={() => navigate({ to: "/feed" })} className="flex items-center gap-2 text-sm text-muted-foreground">
           <ArrowLeft className="h-4 w-4" /> Back
         </button>

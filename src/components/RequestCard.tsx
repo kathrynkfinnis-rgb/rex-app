@@ -75,7 +75,7 @@ export function RequestCard({ req }: { req: RequestRow }) {
     <Link
       to="/ask/$id"
       params={{ id: req.id }}
-      className="relative block overflow-hidden rounded-2xl bg-gradient-to-br from-accent/15 via-card to-card p-4 shadow-sm ring-1 ring-accent/40 transition-transform active:scale-[0.99]"
+      className="relative block overflow-hidden rounded-[18px] border border-border bg-card p-4 shadow-[0_2px_12px_rgba(0,0,0,0.04)] transition-transform active:scale-[0.99]"
     >
       {isOwner && (
         <button

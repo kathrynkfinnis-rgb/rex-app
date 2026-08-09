@@ -173,7 +173,7 @@ function TripPage() {
                 <ol className="relative space-y-3 pl-9">
                   <span
                     aria-hidden
-                    className="absolute bottom-6 left-[13px] top-6 w-px bg-gradient-to-b from-primary/40 via-border to-transparent"
+                    className="absolute bottom-6 left-[13px] top-6 w-px bg-border"
                   />
                   {group.map((rec) => {
                     const meta = categoryMeta((rec.items?.type ?? "other") as ItemType);
