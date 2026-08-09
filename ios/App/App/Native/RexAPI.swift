@@ -175,6 +175,32 @@ final class RexAPI {
         return try JSONDecoder().decode(RexItem.self, from: data)
     }
 
+    /// Stops on a trip. A stop is a recommendation whose `trip_id` points at the
+    /// trip's *recommendation* id (not its item id), mirroring the web trip page.
+    /// Ordered oldest-first so the itinerary reads in the order it was built.
+    func fetchTripStops(tripRecommendationId: String) async throws -> [FeedRecommendation] {
+        let token = try await validToken()
+        let select = "id,rating,note,created_at,photo_url,photo_urls,tags,user_id,item_id,trip_id,trip_section," +
+            "items!inner(id,type,title,subtitle,image_url,genre)," +
+            "profiles!recommendations_user_id_fkey(username,display_name,avatar_url)"
+        var components = URLComponents(url: baseURL.appendingPathComponent("/rest/v1/recommendations"), resolvingAgainstBaseURL: false)!
+        components.queryItems = [
+            URLQueryItem(name: "select", value: select),
+            URLQueryItem(name: "trip_id", value: "eq.\(tripRecommendationId)"),
+            URLQueryItem(name: "order", value: "created_at.asc"),
+        ]
+        var request = URLRequest(url: components.url!)
+        request.setValue(anonKey, forHTTPHeaderField: "apikey")
+        request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+
+        let (data, response) = try await URLSession.shared.data(for: request)
+        guard let http = response as? HTTPURLResponse, http.statusCode < 400 else {
+            let body = String(data: data, encoding: .utf8) ?? ""
+            throw RexAPIError.server("Couldn't load this trip. \(body)")
+        }
+        return try JSONDecoder().decode([FeedRecommendation].self, from: data)
+    }
+
     func fetchRecommendations(forItem itemId: String) async throws -> [FeedRecommendation] {
         let token = try await validToken()
         let select = "id,rating,note,created_at,photo_url,photo_urls,tags,user_id,item_id," +

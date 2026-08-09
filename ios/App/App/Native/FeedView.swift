@@ -29,10 +29,22 @@ struct FeedView: View {
                             emptyState
                         } else {
                             ForEach(recommendations) { rec in
-                                NavigationLink(value: rec.item_id) {
-                                    RecommendationCardView(rec: rec)
+                                // Trips open their itinerary; everything else
+                                // opens the item screen.
+                                if RexCategory(rawType: rec.items?.type) == .trip {
+                                    NavigationLink(value: TripRoute(
+                                        recommendationId: rec.id,
+                                        title: rec.items?.title ?? "Trip",
+                                    )) {
+                                        RecommendationCardView(rec: rec)
+                                    }
+                                    .buttonStyle(.plain)
+                                } else {
+                                    NavigationLink(value: rec.item_id) {
+                                        RecommendationCardView(rec: rec)
+                                    }
+                                    .buttonStyle(.plain)
                                 }
-                                .buttonStyle(.plain)
                             }
                         }
                     }
@@ -43,6 +55,9 @@ struct FeedView: View {
             .navigationBarTitleDisplayMode(.inline)
             .navigationDestination(for: String.self) { itemId in
                 ItemDetailView(itemId: itemId)
+            }
+            .navigationDestination(for: TripRoute.self) { route in
+                TripDetailView(route: route)
             }
             .navigationDestination(for: NotificationsRoute.self) { _ in
                 NotificationsView()
