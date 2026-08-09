@@ -22,7 +22,7 @@ export function BottomNav() {
               <Link
                 key={to}
                 to={to}
-                className="-mt-6 flex h-14 w-14 shrink-0 items-center justify-center rounded-full bg-primary text-primary-foreground shadow-lg shadow-primary/30 transition-transform active:scale-95"
+                className="-mt-6 flex h-14 w-14 shrink-0 items-center justify-center rounded-full bg-primary text-primary-foreground shadow-[0_2px_12px_rgba(0,0,0,0.04)] transition-transform active:scale-95"
                 aria-label={label}
               >
                 <Icon className="h-6 w-6" strokeWidth={2.5} />

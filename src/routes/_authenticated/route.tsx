@@ -37,7 +37,7 @@ function ProfileButton() {
     <Link
       to="/you"
       className={cn(
-        "pointer-events-auto flex h-10 w-10 items-center justify-center rounded-full bg-primary text-sm font-semibold text-primary-foreground shadow-md ring-2 ring-background transition-transform active:scale-95",
+        "pointer-events-auto flex h-10 w-10 items-center justify-center rounded-full bg-primary text-sm font-semibold text-primary-foreground shadow-[0_2px_12px_rgba(0,0,0,0.04)] ring-1 ring-border transition-transform active:scale-95",
         profile?.avatar_url && "bg-cover bg-center text-transparent"
       )}
       style={profile?.avatar_url ? { backgroundImage: `url(${profile.avatar_url})` } : undefined}
@@ -57,7 +57,7 @@ function AuthedLayout() {
           <Link
             to="/feedback"
             aria-label="Send feedback"
-            className="pointer-events-auto flex h-10 w-10 items-center justify-center rounded-full bg-card text-foreground shadow-md ring-2 ring-background transition-transform active:scale-95"
+            className="pointer-events-auto flex h-10 w-10 items-center justify-center rounded-full bg-card text-foreground shadow-[0_2px_12px_rgba(0,0,0,0.04)] ring-1 ring-border transition-transform active:scale-95"
           >
             <MessageSquareText className="h-5 w-5" />
           </Link>

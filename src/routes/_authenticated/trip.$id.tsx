@@ -137,7 +137,7 @@ function TripPage() {
           {isOwner && (
             <Button
               onClick={() => navigate({ to: "/add", search: { trip: t.id } })}
-              className="h-12 w-full gap-2 rounded-full font-semibold shadow-lg shadow-primary/30"
+              className="h-12 w-full gap-2 rounded-[14px] font-semibold shadow-[0_2px_12px_rgba(0,0,0,0.04)]"
             >
               <Plus className="h-4 w-4" /> Add Rex to this trip
             </Button>

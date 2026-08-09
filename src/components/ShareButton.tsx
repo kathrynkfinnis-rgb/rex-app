@@ -82,7 +82,7 @@ export function ShareButton({
               setOpen(false);
             }}
           />
-          <div className="absolute right-0 top-full z-50 mt-2 w-56 overflow-hidden rounded-2xl bg-popover shadow-lg ring-1 ring-border">
+          <div className="absolute right-0 top-full z-50 mt-2 w-56 overflow-hidden rounded-2xl bg-popover shadow-[0_8px_24px_rgba(0,0,0,0.08)] ring-1 ring-border">
             <a
               href={waHref}
               target="_blank"

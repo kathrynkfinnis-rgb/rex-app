@@ -176,7 +176,7 @@ export function RecommendationCard({ rec }: { rec: FeedRow }) {
       <Link
         to={(isTrip ? "/trip/$id" : "/item/$id") as any}
         params={{ id: isTrip ? rec.id : item.id } as any}
-        className="block transition-shadow hover:shadow-md"
+        className="block transition-shadow hover:shadow-[0_2px_12px_rgba(0,0,0,0.04)]"
       >
         <div className={cn("flex gap-3 p-3", isOwner && "pr-9")}>
 
