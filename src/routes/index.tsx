@@ -70,7 +70,7 @@ function Landing() {
           <Link
             to="/auth"
             search={{ mode: "signup" as const }}
-            className="flex h-14 items-center justify-center rounded-full bg-primary text-base font-semibold text-primary-foreground shadow-lg shadow-primary/30 transition-transform active:scale-[0.98]"
+            className="flex h-14 items-center justify-center rounded-[14px] bg-primary text-base font-semibold text-primary-foreground shadow-[0_2px_12px_rgba(0,0,0,0.04)] transition-transform active:scale-[0.98]"
           >
             Get started
           </Link>

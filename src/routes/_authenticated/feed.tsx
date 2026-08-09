@@ -250,7 +250,7 @@ function FeedPage() {
         <div className="space-y-2 px-3 py-3">
           <Link
             to="/ask"
-            className="flex items-center gap-3 rounded-2xl bg-gradient-to-br from-accent/15 to-card p-3 ring-1 ring-accent/40 transition-transform active:scale-[0.99]"
+            className="flex items-center gap-3 rounded-[18px] border border-border bg-card p-4 transition-transform active:scale-[0.99]"
           >
             <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-accent/20 text-accent-foreground">
               <Sparkles className="h-5 w-5" />

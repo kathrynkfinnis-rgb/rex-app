@@ -31,7 +31,7 @@ export function TopRexxerCrown({ userId, className = "" }: { userId: string; cla
   if (rank < 0) return null;
   return (
     <Crown
-      className={`h-3.5 w-3.5 shrink-0 fill-amber-400 text-amber-500 ${className}`}
+      className={`h-3.5 w-3.5 shrink-0 fill-gold/25 text-gold ${className}`}
       aria-label={`Top Rexxer this week (#${rank + 1})`}
     />
   );
@@ -45,7 +45,7 @@ export function TopRexxersCard() {
   return (
     <div className="rounded-2xl bg-card p-3 ring-1 ring-border">
       <div className="mb-2 flex items-center gap-1.5">
-        <Crown className="h-4 w-4 fill-amber-400 text-amber-500" />
+        <Crown className="h-4 w-4 fill-gold/25 text-gold" />
         <h2 className="text-sm font-semibold">Top Rexxers this week</h2>
       </div>
       <ul className="space-y-1.5">
@@ -61,7 +61,7 @@ export function TopRexxersCard() {
               <span className="min-w-0 flex-1 truncate text-sm font-medium">
                 {r.display_name || r.username}
               </span>
-              {i === 0 && <Crown className="h-3.5 w-3.5 fill-amber-400 text-amber-500" />}
+              {i === 0 && <Crown className="h-3.5 w-3.5 fill-gold/25 text-gold" />}
               <span className="shrink-0 text-xs text-muted-foreground">
                 {r.rex_count} Rex{Number(r.rex_count) === 1 ? "" : "es"}
               </span>

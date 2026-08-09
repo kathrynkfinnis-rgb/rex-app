@@ -43,7 +43,7 @@ export function NotificationBell({ userId }: { userId: string }) {
       to="/notifications"
       aria-label={unread > 0 ? `Notifications, ${unread} unread` : "Notifications"}
       className={cn(
-        "pointer-events-auto relative flex h-10 w-10 items-center justify-center rounded-full bg-card text-foreground shadow-md ring-2 ring-background transition-transform active:scale-95"
+        "pointer-events-auto relative flex h-10 w-10 items-center justify-center rounded-full bg-card text-foreground shadow-[0_2px_12px_rgba(0,0,0,0.04)] ring-1 ring-border transition-transform active:scale-95"
       )}
     >
       <Bell className="h-5 w-5" />
