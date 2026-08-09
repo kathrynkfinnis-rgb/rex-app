@@ -1,5 +1,28 @@
 import type { SearchHit } from "@/lib/search.functions";
 
+// Client-side podcast search. Apple blocks Cloudflare Workers' egress IPs, so
+// the same iTunes request that works locally returns nothing from the deployed
+// server. iTunes does send CORS headers, so calling it from the browser gets us
+// the full catalogue (with publisher + genre) without an API key or a proxy.
+export async function searchPodcastsClient(q: string): Promise<SearchHit[]> {
+  const term = q.trim();
+  if (!term) return [];
+  const url = `https://itunes.apple.com/search?media=podcast&entity=podcast&limit=15&term=${encodeURIComponent(term)}`;
+  const res = await fetch(url);
+  if (!res.ok) return [];
+  const json: any = await res.json();
+  return (json.results ?? []).map((r: any): SearchHit => ({
+    external_id: String(r.collectionId ?? r.trackId),
+    external_source: "itunes_podcast" as const,
+    title: r.collectionName ?? r.trackName ?? "Untitled",
+    subtitle: r.artistName ?? null,
+    image_url: r.artworkUrl600 ?? r.artworkUrl100 ?? null,
+    genre: Array.isArray(r.genres)
+      ? r.genres.find((g: string) => g && g !== "Podcasts") ?? r.primaryGenreName ?? null
+      : r.primaryGenreName ?? null,
+  }));
+}
+
 // Client-side book search. Uses OpenLibrary (no key, generous quota, CORS-friendly)
 // so we don't hit the shared server-IP quota on Google Books.
 export async function searchBooksClient(q: string): Promise<SearchHit[]> {

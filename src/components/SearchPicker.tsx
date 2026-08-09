@@ -2,8 +2,8 @@ import { useEffect, useState } from "react";
 import { useServerFn } from "@tanstack/react-start";
 import { Input } from "@/components/ui/input";
 import { Search, Loader2, Pencil, MapPin, Ticket } from "lucide-react";
-import { searchMovies, searchTv, searchPodcasts, type SearchHit } from "@/lib/search.functions";
-import { searchBooksClient } from "@/lib/search-client";
+import { searchMovies, searchTv, type SearchHit } from "@/lib/search.functions";
+import { searchBooksClient, searchPodcastsClient } from "@/lib/search-client";
 import { searchPlaces, type PlaceHit } from "@/lib/places.functions";
 import { searchEvents, type EventHit } from "@/lib/events.functions";
 import type { ItemType } from "@/lib/categories";
@@ -24,7 +24,6 @@ export function SearchPicker({ type, onPick, onManual, near }: Props) {
   const movieFn = useServerFn(searchMovies);
   const tvFn = useServerFn(searchTv);
   const placesFn = useServerFn(searchPlaces);
-  const podcastFn = useServerFn(searchPodcasts);
   const eventFn = useServerFn(searchEvents);
 
   useEffect(() => {
@@ -44,7 +43,7 @@ export function SearchPicker({ type, onPick, onManual, near }: Props) {
               : type === "tv"
                 ? await tvFn({ data: { q: term } })
                 : type === "podcast"
-                  ? await podcastFn({ data: { q: term } })
+                  ? await searchPodcastsClient(term)
                   : type === "event"
                     ? await eventFn({ data: { q: term, near: near ?? null } })
                     : await placesFn({ data: { q: term, near: near ?? null } });
@@ -56,7 +55,7 @@ export function SearchPicker({ type, onPick, onManual, near }: Props) {
       }
     }, 300);
     return () => clearTimeout(t);
-  }, [q, type, movieFn, tvFn, placesFn, podcastFn, eventFn, near?.lat, near?.lng]);
+  }, [q, type, movieFn, tvFn, placesFn, eventFn, near?.lat, near?.lng]);
 
   const placeholder =
     type === "book"

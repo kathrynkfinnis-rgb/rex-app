@@ -27,7 +27,9 @@ export type DraftStop = {
   section: string | null;
 };
 
-const STOP_TYPES: ItemType[] = CATEGORIES.map((c) => c.type).filter((t) => t !== "trip");
+// Only the categories that actually turn up on a trip. Books/films/TV/podcasts
+// aren't things you visit, so they'd just be noise in the stop picker.
+const STOP_TYPES: ItemType[] = ["place", "event", "recipe", "other"];
 
 export const SECTION_SUGGESTIONS = [
   "Breakfast",
@@ -107,7 +109,9 @@ export function TripStopsBuilder({ value, onChange }: Props) {
   const [manual, setManual] = useState(false);
   const [title, setTitle] = useState("");
   const [subtitle, setSubtitle] = useState("");
-  const [rating, setRating] = useState(10);
+  // 0 = not rated. Ratings are optional on trip stops — plenty of stops are
+  // worth listing without scoring them.
+  const [rating, setRating] = useState(0);
   const [note, setNote] = useState("");
   const [section, setSection] = useState("");
 
@@ -119,7 +123,7 @@ export function TripStopsBuilder({ value, onChange }: Props) {
     setManual(false);
     setTitle("");
     setSubtitle("");
-    setRating(10);
+    setRating(0);
     setNote("");
     setType("place");
     // Heading stays so several stops can be added under the same one.
@@ -188,9 +192,11 @@ export function TripStopsBuilder({ value, onChange }: Props) {
                       </div>
                       <div className="truncate font-medium">{s.title}</div>
                       {s.subtitle && <div className="truncate text-sm text-muted-foreground">{s.subtitle}</div>}
-                      <div className="mt-1">
-                        <CrownRatingDisplay value={s.rating} size="xs" showNumber />
-                      </div>
+                      {s.rating > 0 && (
+                        <div className="mt-1">
+                          <CrownRatingDisplay value={s.rating} size="xs" showNumber />
+                        </div>
+                      )}
                       {s.note && <p className="mt-1 text-sm text-muted-foreground">{s.note}</p>}
                     </div>
                     <button
@@ -319,8 +325,8 @@ export function TripStopsBuilder({ value, onChange }: Props) {
               <SectionPicker value={section} onChange={setSection} />
 
               <div className="space-y-2">
-                <Label>Your rating</Label>
-                <CrownRatingInput value={rating} onChange={setRating} />
+                <Label>Your rating (optional)</Label>
+                <CrownRatingInput value={rating} onChange={setRating} clearable />
               </div>
 
 
