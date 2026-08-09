@@ -56,6 +56,10 @@ function AddPage() {
   const [showTripInfo, setShowTripInfo] = useState(false);
   const [tripStops, setTripStops] = useState<DraftStop[]>([]);
   const [tripSection, setTripSection] = useState("");
+  // Bumped on reset to remount the sub-forms that keep their own internal
+  // state (a half-typed tag, the parsed recipe). Without this they carry
+  // over into the next Rex even though the parent state has been cleared.
+  const [formKey, setFormKey] = useState(0);
 
   const { data: uid } = useQuery({
     queryKey: ["current-user-id"],
@@ -85,6 +89,8 @@ function AddPage() {
     setJustAdded(null);
     setPhotos([]);
     setTripStops([]);
+    setTripSection("");
+    setFormKey((k) => k + 1);
   }
 
 
@@ -593,7 +599,7 @@ function AddPage() {
 
         {type === "recipe" && (
           <div className="rounded-2xl bg-card p-4 ring-1 ring-border">
-            <RecipeEditor value={recipeText} onChange={setRecipeText} />
+            <RecipeEditor key={formKey} value={recipeText} onChange={setRecipeText} />
             <p className="mt-4 text-xs text-muted-foreground">
               Saved on the recipe so friends can cook it in-app.
             </p>
@@ -640,6 +646,7 @@ function AddPage() {
         <div className="space-y-1.5">
           <Label>Tags</Label>
           <TagsInput
+            key={formKey}
             value={tags}
             onChange={setTags}
             placeholder={type === "place" ? "e.g. private dining, date night, dog friendly" : "Add tags (press enter)"}
