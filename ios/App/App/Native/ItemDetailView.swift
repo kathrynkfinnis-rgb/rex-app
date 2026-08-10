@@ -182,13 +182,11 @@ struct ItemDetailView: View {
                 VStack(alignment: .leading, spacing: 6) {
                     HStack {
                         HStack(spacing: 6) {
-                            ZStack {
-                                Circle().fill(RexColor.secondary)
-                                Text(String((rec.profiles?.display_name ?? rec.profiles?.username ?? "?").prefix(1)).uppercased())
-                                    .font(.system(size: 11, weight: .semibold))
-                                    .foregroundStyle(RexColor.secondaryForeground)
-                            }
-                            .frame(width: 24, height: 24)
+                            UserAvatarView(
+                                url: rec.profiles?.avatar_url,
+                                name: rec.profiles?.display_name ?? rec.profiles?.username ?? "?",
+                                size: 24
+                            )
 
                             Text(rec.profiles?.display_name ?? rec.profiles?.username ?? "Someone")
                                 .font(.system(size: 14, weight: .semibold))
@@ -206,6 +204,9 @@ struct ItemDetailView: View {
                     if let note = rec.note, !note.isEmpty {
                         Text("\u{201C}\(note)\u{201D}").font(.system(size: 13)).foregroundStyle(RexColor.foreground.opacity(0.9))
                     }
+
+                    Rectangle().fill(RexColor.divider).frame(height: 1).padding(.vertical, 4)
+                    LikesCommentsView(recommendationId: rec.id)
                 }
                 .padding(12)
                 .background(RexColor.card)

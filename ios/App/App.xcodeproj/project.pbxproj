@@ -31,6 +31,7 @@
 		FEED013B0000000000000000 /* CollectionsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = FEED013A0000000000000000 /* CollectionsView.swift */; };
 		FEED014B0000000000000000 /* MainTabView.swift in Sources */ = {isa = PBXBuildFile; fileRef = FEED014A0000000000000000 /* MainTabView.swift */; };
 		FEED015B0000000000000000 /* MapView.swift in Sources */ = {isa = PBXBuildFile; fileRef = FEED015A0000000000000000 /* MapView.swift */; };
+		FEED020B0000000000000000 /* LikesCommentsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = FEED020A0000000000000000 /* LikesCommentsView.swift */; };
 		FEED019B0000000000000000 /* RexSearch.swift in Sources */ = {isa = PBXBuildFile; fileRef = FEED019A0000000000000000 /* RexSearch.swift */; };
 		FEED018B0000000000000000 /* GoogleMapView.swift in Sources */ = {isa = PBXBuildFile; fileRef = FEED018A0000000000000000 /* GoogleMapView.swift */; };
 		FEED017B0000000000000000 /* UserAvatarView.swift in Sources */ = {isa = PBXBuildFile; fileRef = FEED017A0000000000000000 /* UserAvatarView.swift */; };
@@ -64,6 +65,7 @@
 		FEED013A0000000000000000 /* CollectionsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CollectionsView.swift; sourceTree = "<group>"; };
 		FEED014A0000000000000000 /* MainTabView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MainTabView.swift; sourceTree = "<group>"; };
 		FEED015A0000000000000000 /* MapView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MapView.swift; sourceTree = "<group>"; };
+		FEED020A0000000000000000 /* LikesCommentsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LikesCommentsView.swift; sourceTree = "<group>"; };
 		FEED019A0000000000000000 /* RexSearch.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RexSearch.swift; sourceTree = "<group>"; };
 		FEED018A0000000000000000 /* GoogleMapView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GoogleMapView.swift; sourceTree = "<group>"; };
 		FEED017A0000000000000000 /* UserAvatarView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UserAvatarView.swift; sourceTree = "<group>"; };
@@ -134,6 +136,7 @@
 				FEED013A0000000000000000 /* CollectionsView.swift */,
 				FEED014A0000000000000000 /* MainTabView.swift */,
 				FEED015A0000000000000000 /* MapView.swift */,
+				FEED020A0000000000000000 /* LikesCommentsView.swift */,
 				FEED019A0000000000000000 /* RexSearch.swift */,
 				FEED018A0000000000000000 /* GoogleMapView.swift */,
 				FEED017A0000000000000000 /* UserAvatarView.swift */,
@@ -242,6 +245,7 @@
 				FEED013B0000000000000000 /* CollectionsView.swift in Sources */,
 				FEED014B0000000000000000 /* MainTabView.swift in Sources */,
 				FEED015B0000000000000000 /* MapView.swift in Sources */,
+				FEED020B0000000000000000 /* LikesCommentsView.swift in Sources */,
 				FEED019B0000000000000000 /* RexSearch.swift in Sources */,
 				FEED018B0000000000000000 /* GoogleMapView.swift in Sources */,
 				FEED017B0000000000000000 /* UserAvatarView.swift in Sources */,

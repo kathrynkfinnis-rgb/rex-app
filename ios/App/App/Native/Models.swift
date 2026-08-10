@@ -216,3 +216,11 @@ struct SavedPost: Codable, Identifiable {
     let recommendation_id: String
     let recommendations: FeedRecommendation?
 }
+
+struct RexComment: Codable, Identifiable {
+    let id: String
+    let body: String
+    let created_at: String
+    let user_id: String
+    let profiles: RexProfile?
+}

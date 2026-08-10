@@ -516,6 +516,107 @@ final class RexAPI {
 
     // MARK: - Wants (Collections)
 
+    // MARK: - Likes & comments
+
+    /// Like counts plus whether the current user has liked each one, for a page
+    /// of recommendations. Fetched in one round trip rather than per card.
+    func fetchLikeState(recommendationIds: [String]) async throws -> [String: (count: Int, likedByMe: Bool)] {
+        guard !recommendationIds.isEmpty else { return [:] }
+        let token = try await validToken()
+        let list = recommendationIds.joined(separator: ",")
+        var components = URLComponents(url: baseURL.appendingPathComponent("/rest/v1/recommendation_likes"), resolvingAgainstBaseURL: false)!
+        components.queryItems = [
+            URLQueryItem(name: "select", value: "recommendation_id,user_id"),
+            URLQueryItem(name: "recommendation_id", value: "in.(\(list))"),
+        ]
+        var request = URLRequest(url: components.url!)
+        request.setValue(anonKey, forHTTPHeaderField: "apikey")
+        request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+
+        let (data, response) = try await URLSession.shared.data(for: request)
+        guard let http = response as? HTTPURLResponse, http.statusCode < 400 else { return [:] }
+
+        struct LikeRow: Codable { let recommendation_id: String; let user_id: String }
+        let rows = try JSONDecoder().decode([LikeRow].self, from: data)
+        let me = currentUserId
+        var result: [String: (count: Int, likedByMe: Bool)] = [:]
+        for row in rows {
+            var entry = result[row.recommendation_id] ?? (0, false)
+            entry.count += 1
+            if row.user_id == me { entry.likedByMe = true }
+            result[row.recommendation_id] = entry
+        }
+        return result
+    }
+
+    func setLike(recommendationId: String, liked: Bool) async throws {
+        let token = try await validToken()
+        guard let userId = currentUserId else { throw RexAPIError.notSignedIn }
+
+        if liked {
+            var request = URLRequest(url: baseURL.appendingPathComponent("/rest/v1/recommendation_likes"))
+            request.httpMethod = "POST"
+            request.setValue(anonKey, forHTTPHeaderField: "apikey")
+            request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+            request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+            // Liking twice shouldn't error — treat it as idempotent.
+            request.setValue("resolution=ignore-duplicates", forHTTPHeaderField: "Prefer")
+            request.httpBody = try JSONSerialization.data(withJSONObject: [
+                "recommendation_id": recommendationId, "user_id": userId,
+            ])
+            _ = try await URLSession.shared.data(for: request)
+        } else {
+            var components = URLComponents(url: baseURL.appendingPathComponent("/rest/v1/recommendation_likes"), resolvingAgainstBaseURL: false)!
+            components.queryItems = [
+                URLQueryItem(name: "recommendation_id", value: "eq.\(recommendationId)"),
+                URLQueryItem(name: "user_id", value: "eq.\(userId)"),
+            ]
+            var request = URLRequest(url: components.url!)
+            request.httpMethod = "DELETE"
+            request.setValue(anonKey, forHTTPHeaderField: "apikey")
+            request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+            _ = try await URLSession.shared.data(for: request)
+        }
+    }
+
+    func fetchComments(recommendationId: String) async throws -> [RexComment] {
+        let token = try await validToken()
+        var components = URLComponents(url: baseURL.appendingPathComponent("/rest/v1/recommendation_comments"), resolvingAgainstBaseURL: false)!
+        components.queryItems = [
+            URLQueryItem(name: "select", value: "id,body,created_at,user_id,profiles!recommendation_comments_user_id_fkey(username,display_name,avatar_url)"),
+            URLQueryItem(name: "recommendation_id", value: "eq.\(recommendationId)"),
+            URLQueryItem(name: "order", value: "created_at.asc"),
+        ]
+        var request = URLRequest(url: components.url!)
+        request.setValue(anonKey, forHTTPHeaderField: "apikey")
+        request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+
+        let (data, response) = try await URLSession.shared.data(for: request)
+        guard let http = response as? HTTPURLResponse, http.statusCode < 400 else {
+            let body = String(data: data, encoding: .utf8) ?? ""
+            throw RexAPIError.server("Couldn't load comments. \(body)")
+        }
+        return try JSONDecoder().decode([RexComment].self, from: data)
+    }
+
+    func addComment(recommendationId: String, body text: String) async throws {
+        let token = try await validToken()
+        guard let userId = currentUserId else { throw RexAPIError.notSignedIn }
+        var request = URLRequest(url: baseURL.appendingPathComponent("/rest/v1/recommendation_comments"))
+        request.httpMethod = "POST"
+        request.setValue(anonKey, forHTTPHeaderField: "apikey")
+        request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        request.httpBody = try JSONSerialization.data(withJSONObject: [
+            "recommendation_id": recommendationId, "user_id": userId, "body": text,
+        ])
+        let (data, response) = try await URLSession.shared.data(for: request)
+        guard let http = response as? HTTPURLResponse, http.statusCode < 400 else {
+            let body = String(data: data, encoding: .utf8) ?? ""
+            throw RexAPIError.server("Couldn't post your comment. \(body)")
+        }
+    }
+
     /// The user's own curated lists (hitlist_lists) — e.g. "Baby Recs".
     func fetchLists() async throws -> [RexList] {
         let token = try await validToken()
