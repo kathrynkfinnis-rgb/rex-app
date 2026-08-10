@@ -81,6 +81,16 @@ function ImportPage() {
 
   const placeRows = (staging ?? []).filter((r) => r.suggested_type === "place");
 
+  // Headings the extractor found in the source document, in the order they
+  // first appear — shown so you can see the trip will keep its structure.
+  const detectedSections = Array.from(
+    placeRows.reduce((set, r) => {
+      const s = (r as any).raw_section?.trim();
+      if (s) set.add(s);
+      return set;
+    }, new Set<string>()),
+  );
+
   async function onMakeTrip() {
     if (!tripName.trim() || placeRows.length === 0) return;
     setTripLoading(true);
@@ -547,6 +557,24 @@ function ImportPage() {
             <p className="text-xs text-muted-foreground">
               Were these all from one trip? Group them into a single Trip Rex — each place still becomes its own Rex, linked together under the trip.
             </p>
+            {detectedSections.length > 0 && (
+              <div className="space-y-1.5">
+                <p className="text-xs text-muted-foreground">
+                  We picked up {detectedSections.length} heading{detectedSections.length === 1 ? "" : "s"} from your
+                  document — stops will keep this structure:
+                </p>
+                <div className="flex flex-wrap gap-1.5">
+                  {detectedSections.map((s) => (
+                    <span
+                      key={s}
+                      className="rounded-full bg-background px-2.5 py-1 text-xs font-medium text-primary ring-1 ring-primary/20"
+                    >
+                      {s}
+                    </span>
+                  ))}
+                </div>
+              </div>
+            )}
             <Input
               value={tripName}
               onChange={(e) => setTripName(e.target.value)}

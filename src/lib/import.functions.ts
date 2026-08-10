@@ -11,6 +11,10 @@ type ExtractedRec = {
   note?: string | null;
   rating?: number | null;
   type?: ItemType | null;
+  /** Heading the item sat under in the source doc, e.g. "Brunch". */
+  section?: string | null;
+  /** A URL linked next to the item in the source doc. */
+  url?: string | null;
 };
 
 // -------- Google Sheets: fetch as CSV via the public gviz endpoint --------
@@ -62,6 +66,15 @@ const EXTRACTION_TOOL = {
               type: ["string", "null"],
               enum: ["book", "movie", "tv", "place", null],
             },
+            section: {
+              type: ["string", "null"],
+              description:
+                "The heading this item sat under in the source document, e.g. 'Brunch', 'Museums', 'Day 1'. Null if the document has no headings.",
+            },
+            url: {
+              type: ["string", "null"],
+              description: "A URL linked to or written next to this item, if any.",
+            },
           },
         },
       },
@@ -108,6 +121,11 @@ For each distinct recommendation, output:
 - note: the person's comment about it, cleaned up (null if none)
 - rating: if a numeric rating is present, normalize to a 1-10 scale (e.g. 4/5 -> 8, 9/10 -> 9). null if none.
 - type: one of "book", "movie", "tv", "place" — your best guess
+- section: the heading this item appeared under, copied verbatim (e.g. "Brunch", "Museums", "Day 2"). Use the nearest heading above the item. null if the document has no headings.
+- url: a link written next to or attached to the item. null if none.
+
+Preserve the document's own structure: if it is organised under headings, every
+item must carry the heading it belongs to, so an itinerary keeps its shape.
 
 Skip lines that aren't specific works or places. Skip duplicates. Never invent items.`;
 
@@ -127,9 +145,11 @@ export const extractFromText = createServerFn({ method: "POST" })
       raw_note: e.note?.slice(0, 2000) ?? null,
       raw_rating: typeof e.rating === "number" ? Math.max(1, Math.min(10, e.rating)) : null,
       suggested_type: e.type ?? null,
+      raw_section: e.section?.trim().slice(0, 120) || null,
+      raw_url: e.url?.trim().slice(0, 2000) || null,
       status: "pending",
     }));
-    const { error } = await context.supabase.from("import_staging").insert(rows);
+    const { error } = await context.supabase.from("import_staging").insert(rows as never);
     if (error) throw new Error(error.message);
     return { inserted: rows.length };
   });
@@ -368,6 +388,7 @@ async function approveRow(
         external_id: row.resolved_external_id ?? null,
         external_source: row.resolved_external_source ?? null,
         genre: row.resolved_genre ?? null,
+        link_url: row.raw_url ?? null,
       })
       .select("id")
       .single();
@@ -388,6 +409,9 @@ async function approveRow(
     rating,
     note: (opts.note ?? row.raw_note ?? null)?.slice(0, 2000) || null,
     trip_id: opts.tripId ?? null,
+    // Keeps the imported document's own structure — stops land under the
+    // heading they appeared beneath ("Brunch", "Museums", "Day 2").
+    trip_section: opts.tripId ? row.raw_section ?? null : null,
   });
   if (rErr) throw new Error(rErr.message);
 
