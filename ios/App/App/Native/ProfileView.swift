@@ -5,6 +5,10 @@ import SwiftUI
 /// scrollable row of chips rather than a dropdown — same pattern requested for the feed's
 /// filters (task #17), so this establishes the look we'll reuse there later.
 struct ProfileView: View {
+    /// Optional so the tab-bar Profile can own sign-out while other entry
+    /// points (e.g. the feed toolbar) just view the profile.
+    var onSignedOut: (() -> Void)? = nil
+
     @State private var profile: RexProfileDetail?
     @State private var recommendations: [FeedRecommendation] = []
     @State private var isLoading = true
@@ -39,6 +43,9 @@ struct ProfileView: View {
                         filterRow
                     }
                     recList
+                    if let onSignedOut {
+                        logOutButton(onSignedOut)
+                    }
                 }
             }
         }
@@ -140,6 +147,21 @@ struct ProfileView: View {
             }
             .padding(16)
         }
+    }
+
+    /// Log out lives at the bottom of Profile rather than eating space in the
+    /// feed's top bar.
+    private func logOutButton(_ signOut: @escaping () -> Void) -> some View {
+        Button {
+            RexAPI.shared.signOut()
+            signOut()
+        } label: {
+            Text("Log out")
+        }
+        .buttonStyle(RexSecondaryButtonStyle())
+        .padding(.horizontal, RexSpacing.page)
+        .padding(.top, RexSpacing.sm)
+        .padding(.bottom, RexSpacing.xxl)
     }
 
     private func errorState(_ message: String) -> some View {
