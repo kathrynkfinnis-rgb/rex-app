@@ -248,7 +248,16 @@ final class RexAPI {
     }
 
     /// Creates a new item (manual entry — no external search match) and returns its id.
-    func createItem(type: String, title: String, subtitle: String?, address: String?) async throws -> String {
+    /// `hit` carries the external catalogue metadata (cover art, coordinates,
+    /// genre, source id) when the user picked a search suggestion, so items
+    /// created natively look the same as ones created on the web.
+    func createItem(
+        type: String,
+        title: String,
+        subtitle: String?,
+        address: String?,
+        hit: RexSearchHit? = nil
+    ) async throws -> String {
         let token = try await validToken()
         var request = URLRequest(url: baseURL.appendingPathComponent("/rest/v1/items"))
         request.httpMethod = "POST"
@@ -260,6 +269,14 @@ final class RexAPI {
         var body: [String: Any] = ["type": type, "title": title]
         body["subtitle"] = subtitle?.isEmpty == false ? subtitle : NSNull()
         body["address"] = address?.isEmpty == false ? address : NSNull()
+        if let hit {
+            body["external_id"] = hit.externalId
+            body["external_source"] = hit.externalSource
+            body["image_url"] = hit.imageURL ?? NSNull()
+            body["genre"] = hit.genre ?? NSNull()
+            body["lat"] = hit.lat ?? NSNull()
+            body["lng"] = hit.lng ?? NSNull()
+        }
         request.httpBody = try JSONSerialization.data(withJSONObject: body)
 
         let (data, response) = try await URLSession.shared.data(for: request)

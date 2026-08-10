@@ -24,6 +24,12 @@ struct AddRexView: View {
     @State private var didPost = false
     @State private var didWant = false
 
+    // Search-as-you-type against the external catalogues.
+    @State private var hits: [RexSearchHit] = []
+    @State private var isSearching = false
+    @State private var picked: RexSearchHit?
+    @State private var searchTask: Task<Void, Never>?
+
     var body: some View {
         NavigationStack {
             ZStack {
@@ -80,6 +86,9 @@ struct AddRexView: View {
     private func form(for category: RexCategory) -> some View {
         VStack(alignment: .leading, spacing: 14) {
             field("Title", text: $title, placeholder: "e.g. \(placeholderTitle(for: category))")
+                .onChange(of: title) { _, _ in scheduleSearch(for: category) }
+
+            suggestions(for: category)
 
             field(subtitleLabel(for: category), text: $subtitle, placeholder: "Optional")
 
@@ -122,6 +131,147 @@ struct AddRexView: View {
             .padding(.top, 6)
         }
         .padding(16)
+    }
+
+    /// Live results from the external catalogues. Hidden once the user picks
+    /// something, so the form stops nagging.
+    @ViewBuilder
+    private func suggestions(for category: RexCategory) -> some View {
+        let searchable: Set<RexCategory> = [.place, .event, .book, .movie, .tv, .podcast]
+
+        if searchable.contains(category) {
+            if let picked {
+                HStack(spacing: RexSpacing.md) {
+                    Image(systemName: "checkmark.circle.fill")
+                        .foregroundStyle(RexColor.primary)
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text(picked.title)
+                            .font(RexFont.text(14, weight: .semibold))
+                            .foregroundStyle(RexColor.foreground)
+                            .lineLimit(1)
+                        if let sub = picked.address ?? picked.subtitle, !sub.isEmpty {
+                            Text(sub)
+                                .font(RexFont.text(12))
+                                .foregroundStyle(RexColor.mutedForeground)
+                                .lineLimit(1)
+                        }
+                    }
+                    Spacer()
+                    Button("Change") {
+                        self.picked = nil
+                        hits = []
+                    }
+                    .font(RexFont.text(12, weight: .semibold))
+                    .foregroundStyle(RexColor.primary)
+                }
+                .padding(RexSpacing.md)
+                .background(RexColor.badgeBackground)
+                .clipShape(RoundedRectangle(cornerRadius: RexRadius.input, style: .continuous))
+            } else if isSearching || !hits.isEmpty {
+                VStack(spacing: 0) {
+                    if isSearching && hits.isEmpty {
+                        HStack(spacing: RexSpacing.sm) {
+                            ProgressView().controlSize(.small)
+                            Text("Searching…")
+                                .font(RexFont.text(13))
+                                .foregroundStyle(RexColor.mutedForeground)
+                            Spacer()
+                        }
+                        .padding(RexSpacing.md)
+                    }
+                    ForEach(hits.prefix(6)) { hit in
+                        Button {
+                            apply(hit)
+                        } label: {
+                            HStack(spacing: RexSpacing.md) {
+                                thumb(hit)
+                                VStack(alignment: .leading, spacing: 2) {
+                                    Text(hit.title)
+                                        .font(RexFont.text(14, weight: .medium))
+                                        .foregroundStyle(RexColor.foreground)
+                                        .lineLimit(1)
+                                    if let sub = hit.address ?? hit.subtitle, !sub.isEmpty {
+                                        Text(sub)
+                                            .font(RexFont.text(12))
+                                            .foregroundStyle(RexColor.mutedForeground)
+                                            .lineLimit(1)
+                                    }
+                                }
+                                Spacer()
+                            }
+                            .padding(.horizontal, RexSpacing.md)
+                            .padding(.vertical, RexSpacing.sm)
+                            .contentShape(Rectangle())
+                        }
+                        .buttonStyle(.plain)
+
+                        if hit.id != hits.prefix(6).last?.id {
+                            Rectangle().fill(RexColor.divider).frame(height: 1)
+                        }
+                    }
+                }
+                .background(RexColor.card)
+                .clipShape(RoundedRectangle(cornerRadius: RexRadius.input, style: .continuous))
+                .overlay(
+                    RoundedRectangle(cornerRadius: RexRadius.input, style: .continuous)
+                        .stroke(RexColor.border, lineWidth: 1)
+                )
+            }
+        }
+    }
+
+    @ViewBuilder
+    private func thumb(_ hit: RexSearchHit) -> some View {
+        Group {
+            if let s = hit.imageURL, let url = URL(string: s) {
+                AsyncImage(url: url) { phase in
+                    if let image = phase.image {
+                        image.resizable().aspectRatio(contentMode: .fill)
+                    } else { RexColor.muted }
+                }
+            } else {
+                RexColor.muted
+            }
+        }
+        .frame(width: 34, height: 34)
+        .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
+    }
+
+    private func apply(_ hit: RexSearchHit) {
+        picked = hit
+        title = hit.title
+        // Google returns the place name in displayName, so its "subtitle" is
+        // the address rather than an author/year.
+        if hit.externalSource == "google_places" {
+            subtitle = ""
+            address = hit.address ?? ""
+        } else {
+            subtitle = hit.subtitle ?? ""
+        }
+        hits = []
+    }
+
+    /// Debounced so we're not firing a request per keystroke.
+    private func scheduleSearch(for category: RexCategory) {
+        searchTask?.cancel()
+        guard picked == nil else { return }
+        let term = title
+        guard term.trimmingCharacters(in: .whitespaces).count >= 2 else {
+            hits = []
+            isSearching = false
+            return
+        }
+        isSearching = true
+        searchTask = Task {
+            try? await Task.sleep(nanoseconds: 300_000_000)
+            if Task.isCancelled { return }
+            let results = await RexSearch.search(category: category, query: term)
+            if Task.isCancelled { return }
+            await MainActor.run {
+                hits = results
+                isSearching = false
+            }
+        }
     }
 
     @ViewBuilder
@@ -204,7 +354,8 @@ struct AddRexView: View {
                 type: category.rawValue,
                 title: title.trimmingCharacters(in: .whitespaces),
                 subtitle: subtitle.isEmpty ? nil : subtitle,
-                address: (category == .place || category == .event) && !address.isEmpty ? address : nil
+                address: (category == .place || category == .event) && !address.isEmpty ? address : nil,
+                hit: picked
             )
             switch mode {
             case .rated:
