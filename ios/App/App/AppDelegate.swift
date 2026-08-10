@@ -1,5 +1,6 @@
 import UIKit
 import Capacitor
+import GoogleMaps
 
 @UIApplicationMain
 class AppDelegate: UIResponder, UIApplicationDelegate {
@@ -7,7 +8,13 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
     var window: UIWindow?
 
     func application(_ application: UIApplication, didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]?) -> Bool {
-        // Override point for customization after application launch.
+        // Google Maps must be keyed before any GMSMapView is created. The key
+        // is iOS-restricted to this bundle id, so it's safe to ship in the app
+        // (as Google intends for client keys) but is read from Info.plist to
+        // keep it out of source.
+        if let key = Bundle.main.object(forInfoDictionaryKey: "GMSApiKey") as? String, !key.isEmpty {
+            GMSServices.provideAPIKey(key)
+        }
         return true
     }
 

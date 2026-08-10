@@ -1,70 +1,126 @@
 import SwiftUI
-import MapKit
 import CoreLocation
 
-/// v1 scope: pins for places/events with coordinates, colored by category (decided:
-/// category not person), one consolidated pin per place (guaranteed by the `!inner` join —
-/// see fetchMapPlaces). Tapping a pin shows a summary sheet with the decided wording:
-/// the single recommender's name, or "Rex'd by several friends" if more than one.
-/// Skips: European-bias search tuning, Google star import, world-view/deleted-pin bugs
-/// (those are web-app-specific per task #22) — this is the native map from scratch.
+/// Places and events on a Google map, matching the web app's basemap.
+/// Opens centred on the user with a 10-mile radius; falls back to fitting the
+/// pins when location isn't available.
 struct RexMapView: View {
     @State private var places: [MapPlace] = []
     @State private var isLoading = true
     @State private var errorMessage: String?
     @State private var selectedPlace: MapPlace?
-    @State private var cameraPosition: MapCameraPosition = .automatic
-    @State private var didCenterOnUser = false
+    @State private var userCoordinate: CLLocationCoordinate2D?
+    @State private var areaName: String?
+    @State private var filter: RexCategory?
+
+    private static let milesToMeters = 1609.34
+    private var radiusMeters: Double { 10 * Self.milesToMeters }
+
+    private var visiblePlaces: [MapPlace] {
+        guard let filter else { return places }
+        return places.filter { RexCategory(rawType: $0.type) == filter }
+    }
+
+    /// Centre on the user if we have them, otherwise the middle of the pins.
+    private var center: CLLocationCoordinate2D? {
+        if let userCoordinate { return userCoordinate }
+        let coords = visiblePlaces.compactMap { p -> CLLocationCoordinate2D? in
+            guard let lat = p.lat, let lng = p.lng else { return nil }
+            return CLLocationCoordinate2D(latitude: lat, longitude: lng)
+        }
+        guard !coords.isEmpty else { return nil }
+        let lats = coords.map(\.latitude), lngs = coords.map(\.longitude)
+        return CLLocationCoordinate2D(
+            latitude: (lats.min()! + lats.max()!) / 2,
+            longitude: (lngs.min()! + lngs.max()!) / 2
+        )
+    }
 
     var body: some View {
-        ZStack {
+        ZStack(alignment: .top) {
+            RexColor.background.ignoresSafeArea()
+
             if isLoading {
-                RexColor.background.ignoresSafeArea()
                 ProgressView()
             } else if let errorMessage {
-                RexColor.background.ignoresSafeArea()
                 errorState(errorMessage)
             } else {
-                Map(position: $cameraPosition, selection: .constant(nil)) {
-                    ForEach(places) { place in
-                        if let lat = place.lat, let lng = place.lng {
-                            Annotation(place.title, coordinate: CLLocationCoordinate2D(latitude: lat, longitude: lng)) {
-                                pin(for: place)
-                                    .onTapGesture { selectedPlace = place }
-                            }
-                        }
-                    }
-                }
-                .mapControls {
-                    MapCompass()
-                    MapScaleView()
-                }
+                GoogleMapView(
+                    places: visiblePlaces,
+                    center: center,
+                    radiusMeters: radiusMeters,
+                    onSelect: { selectedPlace = $0 }
+                )
+                .ignoresSafeArea(edges: .bottom)
             }
+
+            topBar
         }
         .navigationBarTitleDisplayMode(.inline)
-        .navigationTitle("Map")
+        .navigationTitle("")
+        .toolbar(.hidden, for: .navigationBar)
         .task {
             async let placesTask: () = load()
-            async let locationTask: () = centerOnUserLocation()
+            async let locationTask: () = resolveLocation()
             _ = await (placesTask, locationTask)
         }
         .sheet(item: $selectedPlace) { place in
-            placeSummarySheet(place)
-                .presentationDetents([.height(220)])
+            placeSheet(place)
+                .presentationDetents([.height(240)])
         }
     }
 
-    private func pin(for place: MapPlace) -> some View {
-        let category = RexCategory(rawType: place.type)
-        return ZStack {
-            Circle()
-                .fill(category == .event ? RexColor.accent : RexColor.primary)
-                .frame(width: 30, height: 30)
-            Image(systemName: category.symbol)
-                .font(.system(size: 13, weight: .semibold))
-                .foregroundStyle(.white)
+    /// Location indicator + category filters, floating over the map.
+    private var topBar: some View {
+        VStack(alignment: .leading, spacing: RexSpacing.sm) {
+            HStack(spacing: RexSpacing.sm) {
+                Image(systemName: "location.fill")
+                    .font(.system(size: 12))
+                    .foregroundStyle(RexColor.primary)
+                Text(areaName ?? "Places near you")
+                    .font(RexFont.display(18, weight: .semibold))
+                    .foregroundStyle(RexColor.foreground)
+                Spacer()
+                Text("\(visiblePlaces.count)")
+                    .font(RexFont.text(12, weight: .semibold))
+                    .foregroundStyle(RexColor.badgeForeground)
+                    .padding(.horizontal, RexSpacing.sm)
+                    .padding(.vertical, 3)
+                    .background(RexColor.badgeBackground)
+                    .clipShape(Capsule())
+            }
+
+            ScrollView(.horizontal, showsIndicators: false) {
+                HStack(spacing: RexSpacing.sm) {
+                    chip("All", active: filter == nil) { filter = nil }
+                    chip("Places", active: filter == .place) { filter = filter == .place ? nil : .place }
+                    chip("Events", active: filter == .event) { filter = filter == .event ? nil : .event }
+                }
+            }
         }
-        .shadow(color: .black.opacity(0.2), radius: 3, y: 1)
+        .padding(.horizontal, RexSpacing.lg)
+        .padding(.vertical, RexSpacing.md)
+        .background(
+            RexColor.card.opacity(0.96)
+                .overlay(alignment: .bottom) {
+                    Rectangle().fill(RexColor.border).frame(height: 1)
+                }
+                .ignoresSafeArea(edges: .top)
+        )
+    }
+
+    private func chip(_ title: String, active: Bool, action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            Text(title)
+                .font(RexFont.text(13, weight: active ? .semibold : .regular))
+                .foregroundStyle(active ? RexColor.primaryForeground : RexColor.mutedForeground)
+                .padding(.horizontal, RexSpacing.md)
+                .padding(.vertical, 6)
+                .background(active ? RexColor.primary : RexColor.card)
+                .clipShape(Capsule())
+                .overlay(Capsule().stroke(active ? RexColor.primary : RexColor.border, lineWidth: 1))
+        }
+        .buttonStyle(.plain)
     }
 
     private func load() async {
@@ -72,23 +128,19 @@ struct RexMapView: View {
         errorMessage = nil
         do {
             places = try await RexAPI.shared.fetchMapPlaces()
-            // Only use "fit all pins" as a fallback — a successful user-location fix (below,
-            // running concurrently) takes priority per the 10-mile-radius-from-me request.
-            if !didCenterOnUser { fitCamera(to: places) }
         } catch {
             errorMessage = error.localizedDescription
         }
         isLoading = false
     }
 
-    /// Centers on the user's current location with a ~10 mile radius. Falls back to
-    /// "fit all pins" (set in load(), above) if permission is denied or location can't
-    /// be resolved within a few seconds — never blocks the map from showing.
-    private func centerOnUserLocation() async {
+    /// Gets a location fix (races an 8s timeout so the map never hangs) and
+    /// reverse-geocodes it into a place name for the header.
+    private func resolveLocation() async {
         let manager = CLLocationManager()
         manager.requestWhenInUseAuthorization()
 
-        guard let location = await withTaskGroup(of: CLLocation?.self, returning: CLLocation?.self, body: { group in
+        let location: CLLocation? = await withTaskGroup(of: CLLocation?.self) { group in
             group.addTask {
                 do {
                     for try await update in CLLocationUpdate.liveUpdates() {
@@ -105,93 +157,71 @@ struct RexMapView: View {
             let first = await group.next() ?? nil
             group.cancelAll()
             return first
-        }) else { return }
-
-        let milesToMeters = 1609.34
-        let region = MKCoordinateRegion(
-            center: location.coordinate,
-            latitudinalMeters: 10 * milesToMeters * 2,
-            longitudinalMeters: 10 * milesToMeters * 2
-        )
-        didCenterOnUser = true
-        cameraPosition = .region(region)
-    }
-
-    private func fitCamera(to places: [MapPlace]) {
-        let coords = places.compactMap { place -> CLLocationCoordinate2D? in
-            guard let lat = place.lat, let lng = place.lng else { return nil }
-            return CLLocationCoordinate2D(latitude: lat, longitude: lng)
         }
-        guard !coords.isEmpty else { return }
-        if coords.count == 1 {
-            cameraPosition = .region(MKCoordinateRegion(center: coords[0], latitudinalMeters: 4000, longitudinalMeters: 4000))
-            return
+
+        guard let location else { return }
+        userCoordinate = location.coordinate
+        if let placemark = try? await CLGeocoder().reverseGeocodeLocation(location).first {
+            areaName = placemark.locality ?? placemark.subAdministrativeArea ?? placemark.administrativeArea
         }
-        let lats = coords.map { $0.latitude }
-        let lngs = coords.map { $0.longitude }
-        let center = CLLocationCoordinate2D(
-            latitude: (lats.min()! + lats.max()!) / 2,
-            longitude: (lngs.min()! + lngs.max()!) / 2
-        )
-        let span = MKCoordinateSpan(
-            latitudeDelta: max((lats.max()! - lats.min()!) * 1.4, 0.05),
-            longitudeDelta: max((lngs.max()! - lngs.min()!) * 1.4, 0.05)
-        )
-        cameraPosition = .region(MKCoordinateRegion(center: center, span: span))
     }
 
     @ViewBuilder
-    private func placeSummarySheet(_ place: MapPlace) -> some View {
+    private func placeSheet(_ place: MapPlace) -> some View {
         NavigationStack {
-            VStack(alignment: .leading, spacing: 10) {
-                HStack(spacing: 3) {
+            VStack(alignment: .leading, spacing: RexSpacing.md) {
+                HStack(spacing: 4) {
                     Image(systemName: RexCategory(rawType: place.type).symbol).font(.system(size: 9))
-                    Text(RexCategory(rawType: place.type).label.uppercased()).font(.system(size: 9, weight: .semibold))
+                    Text(RexCategory(rawType: place.type).label.uppercased())
+                        .font(.system(size: 10, weight: .semibold)).tracking(0.6)
                 }
-                .foregroundStyle(RexColor.primary)
-                .padding(.horizontal, 6).padding(.vertical, 2)
-                .background(RexColor.primary.opacity(0.1))
+                .foregroundStyle(RexColor.badgeForeground)
+                .padding(.horizontal, RexSpacing.sm).padding(.vertical, 3)
+                .background(RexColor.badgeBackground)
                 .clipShape(Capsule())
 
-                Text(place.title).font(.system(size: 20, weight: .semibold, design: .rounded)).foregroundStyle(RexColor.foreground)
+                Text(place.title)
+                    .font(RexFont.display(22, weight: .semibold))
+                    .foregroundStyle(RexColor.foreground)
+
                 if let address = place.address, !address.isEmpty {
-                    Text(address).font(.system(size: 13)).foregroundStyle(RexColor.mutedForeground)
+                    Text(address)
+                        .font(RexFont.text(13))
+                        .foregroundStyle(RexColor.mutedForeground)
+                        .lineLimit(2)
                 }
 
                 HStack(spacing: 6) {
                     Image(systemName: "crown.fill").font(.system(size: 12)).foregroundStyle(RexColor.primary)
-                    Text(String(format: "%.1f", place.averageRating)).font(.system(size: 14, weight: .semibold))
-                    Text("/10").font(.system(size: 12)).foregroundStyle(RexColor.mutedForeground)
-                    Text("· \(place.recommenderSummary)").font(.system(size: 13)).foregroundStyle(RexColor.mutedForeground)
+                    Text(String(format: "%.1f", place.averageRating))
+                        .font(RexFont.text(14, weight: .semibold))
+                    Text("/10").font(RexFont.text(12)).foregroundStyle(RexColor.mutedForeground)
+                    Text("· \(place.recommenderSummary)")
+                        .font(RexFont.text(13)).foregroundStyle(RexColor.mutedForeground)
                 }
-                .padding(.top, 2)
 
                 NavigationLink(value: place.id) {
-                    Text("View details").fontWeight(.semibold).frame(maxWidth: .infinity)
+                    Text("View details")
                 }
-                .frame(height: 44)
-                .background(RexColor.primary)
-                .foregroundStyle(RexColor.primaryForeground)
-                .clipShape(Capsule())
-                .padding(.top, 4)
+                .buttonStyle(RexPrimaryButtonStyle())
 
                 Spacer()
             }
-            .padding(20)
+            .padding(RexSpacing.page)
             .background(RexColor.background.ignoresSafeArea())
-            .navigationDestination(for: String.self) { itemId in
-                ItemDetailView(itemId: itemId)
-            }
+            .navigationDestination(for: String.self) { ItemDetailView(itemId: $0) }
         }
     }
 
     private func errorState(_ message: String) -> some View {
-        VStack(spacing: 8) {
+        VStack(spacing: RexSpacing.sm) {
             Image(systemName: "exclamationmark.triangle").font(.title).foregroundStyle(RexColor.destructive)
-            Text(message).font(.footnote).foregroundStyle(RexColor.mutedForeground).multilineTextAlignment(.center)
-            Button("Retry") { Task { await load() } }.font(.footnote.weight(.semibold)).foregroundStyle(RexColor.primary)
+            Text(message).font(RexFont.text(13)).foregroundStyle(RexColor.mutedForeground).multilineTextAlignment(.center)
+            Button("Retry") { Task { await load() } }
+                .font(RexFont.text(13, weight: .semibold))
+                .foregroundStyle(RexColor.primary)
         }
-        .padding(32)
+        .padding(RexSpacing.xxl)
         .frame(maxWidth: .infinity)
     }
 }

@@ -31,6 +31,7 @@
 		FEED013B0000000000000000 /* CollectionsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = FEED013A0000000000000000 /* CollectionsView.swift */; };
 		FEED014B0000000000000000 /* MainTabView.swift in Sources */ = {isa = PBXBuildFile; fileRef = FEED014A0000000000000000 /* MainTabView.swift */; };
 		FEED015B0000000000000000 /* MapView.swift in Sources */ = {isa = PBXBuildFile; fileRef = FEED015A0000000000000000 /* MapView.swift */; };
+		FEED018B0000000000000000 /* GoogleMapView.swift in Sources */ = {isa = PBXBuildFile; fileRef = FEED018A0000000000000000 /* GoogleMapView.swift */; };
 		FEED017B0000000000000000 /* UserAvatarView.swift in Sources */ = {isa = PBXBuildFile; fileRef = FEED017A0000000000000000 /* UserAvatarView.swift */; };
 		FEED016B0000000000000000 /* TripDetailView.swift in Sources */ = {isa = PBXBuildFile; fileRef = FEED016A0000000000000000 /* TripDetailView.swift */; };
 /* End PBXBuildFile section */
@@ -62,6 +63,7 @@
 		FEED013A0000000000000000 /* CollectionsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CollectionsView.swift; sourceTree = "<group>"; };
 		FEED014A0000000000000000 /* MainTabView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MainTabView.swift; sourceTree = "<group>"; };
 		FEED015A0000000000000000 /* MapView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MapView.swift; sourceTree = "<group>"; };
+		FEED018A0000000000000000 /* GoogleMapView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GoogleMapView.swift; sourceTree = "<group>"; };
 		FEED017A0000000000000000 /* UserAvatarView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UserAvatarView.swift; sourceTree = "<group>"; };
 		FEED016A0000000000000000 /* TripDetailView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TripDetailView.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
@@ -130,6 +132,7 @@
 				FEED013A0000000000000000 /* CollectionsView.swift */,
 				FEED014A0000000000000000 /* MainTabView.swift */,
 				FEED015A0000000000000000 /* MapView.swift */,
+				FEED018A0000000000000000 /* GoogleMapView.swift */,
 				FEED017A0000000000000000 /* UserAvatarView.swift */,
 				FEED016A0000000000000000 /* TripDetailView.swift */,
 			);
@@ -154,6 +157,7 @@
 			name = App;
 			packageProductDependencies = (
 				4D22ABE82AF431CB00220026 /* CapApp-SPM */,
+				GMAP00020000000000000000 /* GoogleMaps */,
 			);
 			productName = App;
 			productReference = 504EC3041FED79650016851F /* App.app */;
@@ -186,6 +190,7 @@
 			mainGroup = 504EC2FB1FED79650016851F;
 			packageReferences = (
 				D4C12C0A2AAA248700AAC8A2 /* XCLocalSwiftPackageReference "CapApp-SPM" */,
+				GMAP00010000000000000000 /* XCRemoteSwiftPackageReference "ios-maps-sdk" */,
 			);
 			productRefGroup = 504EC3051FED79650016851F /* Products */;
 			projectDirPath = "";
@@ -234,6 +239,7 @@
 				FEED013B0000000000000000 /* CollectionsView.swift in Sources */,
 				FEED014B0000000000000000 /* MainTabView.swift in Sources */,
 				FEED015B0000000000000000 /* MapView.swift in Sources */,
+				FEED018B0000000000000000 /* GoogleMapView.swift in Sources */,
 				FEED017B0000000000000000 /* UserAvatarView.swift in Sources */,
 				FEED016B0000000000000000 /* TripDetailView.swift in Sources */,
 			);
@@ -446,11 +452,27 @@
 		};
 /* End XCLocalSwiftPackageReference section */
 
+/* Begin XCRemoteSwiftPackageReference section */
+		GMAP00010000000000000000 /* XCRemoteSwiftPackageReference "ios-maps-sdk" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/googlemaps/ios-maps-sdk";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 9.0.0;
+			};
+		};
+/* End XCRemoteSwiftPackageReference section */
+
 /* Begin XCSwiftPackageProductDependency section */
 		4D22ABE82AF431CB00220026 /* CapApp-SPM */ = {
 			isa = XCSwiftPackageProductDependency;
 			package = D4C12C0A2AAA248700AAC8A2 /* XCLocalSwiftPackageReference "CapApp-SPM" */;
 			productName = "CapApp-SPM";
+		};
+		GMAP00020000000000000000 /* GoogleMaps */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = GMAP00010000000000000000 /* XCRemoteSwiftPackageReference "ios-maps-sdk" */;
+			productName = GoogleMaps;
 		};
 /* End XCSwiftPackageProductDependency section */
 	};

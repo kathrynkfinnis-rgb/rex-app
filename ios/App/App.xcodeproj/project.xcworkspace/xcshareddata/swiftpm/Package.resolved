@@ -1,5 +1,5 @@
 {
-  "originHash" : "56f00f7add63910d78ebf4d48824ff5622a71941a41a5069aed5199592993a49",
+  "originHash" : "f3b94f0271c8b52355aa949c76082732b3adfd0e73ea31b344a8c7874e844a99",
   "pins" : [
     {
       "identity" : "capacitor-swift-pm",
@@ -8,6 +8,15 @@
       "state" : {
         "revision" : "4f71d0b979f2f957326f04353eca7604ee937e1e",
         "version" : "8.5.0"
+      }
+    },
+    {
+      "identity" : "ios-maps-sdk",
+      "kind" : "remoteSourceControl",
+      "location" : "https://github.com/googlemaps/ios-maps-sdk",
+      "state" : {
+        "revision" : "02f8f144ef266da44d50a68d1562ca051bac27cc",
+        "version" : "9.4.0"
       }
     }
   ],

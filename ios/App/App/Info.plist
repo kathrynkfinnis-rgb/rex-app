@@ -28,6 +28,8 @@
 	<string>Rex uses your location to center the map on places near you.</string>
 	<key>ITSAppUsesNonExemptEncryption</key>
 	<false/>
+	<key>GMSApiKey</key>
+	<string>AIzaSyDkOplr05vWtevy7-AabRgA_GK0ZP577qc</string>
 	<key>UIApplicationSceneManifest</key>
 	<dict>
 		<key>UIApplicationSupportsMultipleScenes</key>
