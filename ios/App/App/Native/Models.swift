@@ -197,3 +197,22 @@ struct FeedRecommendation: Codable, Identifiable {
             ?? ISO8601DateFormatter().date(from: created_at)
     }
 }
+
+/// One of the user's own curated lists (hitlist_lists) — e.g. "Baby Recs".
+struct RexList: Codable, Identifiable {
+    let id: String
+    let name: String
+    let emoji: String?
+    let item_type: String?
+    let visibility: String?
+    let created_at: String?
+}
+
+/// A recommendation the user saved from someone else's post.
+struct SavedPost: Codable, Identifiable {
+    let id: String
+    let created_at: String?
+    let list_id: String?
+    let recommendation_id: String
+    let recommendations: FeedRecommendation?
+}

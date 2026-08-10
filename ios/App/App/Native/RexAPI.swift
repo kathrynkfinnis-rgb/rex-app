@@ -516,6 +516,53 @@ final class RexAPI {
 
     // MARK: - Wants (Collections)
 
+    /// The user's own curated lists (hitlist_lists) — e.g. "Baby Recs".
+    func fetchLists() async throws -> [RexList] {
+        let token = try await validToken()
+        guard let userId = currentUserId else { throw RexAPIError.notSignedIn }
+        var components = URLComponents(url: baseURL.appendingPathComponent("/rest/v1/hitlist_lists"), resolvingAgainstBaseURL: false)!
+        components.queryItems = [
+            URLQueryItem(name: "select", value: "id,name,emoji,item_type,visibility,created_at"),
+            URLQueryItem(name: "user_id", value: "eq.\(userId)"),
+            URLQueryItem(name: "order", value: "created_at.desc"),
+        ]
+        var request = URLRequest(url: components.url!)
+        request.setValue(anonKey, forHTTPHeaderField: "apikey")
+        request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+
+        let (data, response) = try await URLSession.shared.data(for: request)
+        guard let http = response as? HTTPURLResponse, http.statusCode < 400 else {
+            throw RexAPIError.server("Couldn't load your lists.")
+        }
+        return try JSONDecoder().decode([RexList].self, from: data)
+    }
+
+    /// Posts saved from other people — the Pinterest-style half of Collections.
+    func fetchSavedPosts() async throws -> [SavedPost] {
+        let token = try await validToken()
+        guard let userId = currentUserId else { throw RexAPIError.notSignedIn }
+        let select = "id,created_at,list_id,recommendation_id," +
+            "recommendations(id,rating,note,created_at,photo_url,photo_urls,tags,user_id,item_id," +
+            "items(id,type,title,subtitle,image_url,genre)," +
+            "profiles!recommendations_user_id_fkey(username,display_name,avatar_url))"
+        var components = URLComponents(url: baseURL.appendingPathComponent("/rest/v1/saved_posts"), resolvingAgainstBaseURL: false)!
+        components.queryItems = [
+            URLQueryItem(name: "select", value: select),
+            URLQueryItem(name: "user_id", value: "eq.\(userId)"),
+            URLQueryItem(name: "order", value: "created_at.desc"),
+        ]
+        var request = URLRequest(url: components.url!)
+        request.setValue(anonKey, forHTTPHeaderField: "apikey")
+        request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+
+        let (data, response) = try await URLSession.shared.data(for: request)
+        guard let http = response as? HTTPURLResponse, http.statusCode < 400 else {
+            let body = String(data: data, encoding: .utf8) ?? ""
+            throw RexAPIError.server("Couldn't load your saved posts. \(body)")
+        }
+        return try JSONDecoder().decode([SavedPost].self, from: data)
+    }
+
     func fetchWants() async throws -> [WantRow] {
         let token = try await validToken()
         guard let userId = currentUserId else { throw RexAPIError.notSignedIn }
