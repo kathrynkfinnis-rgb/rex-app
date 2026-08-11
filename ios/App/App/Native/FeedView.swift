@@ -121,12 +121,13 @@ struct FeedView: View {
             }
             .toolbar {
                 ToolbarItem(placement: .topBarLeading) {
-                    Text("REX")
-                        .font(RexFont.display(20, weight: .semibold))
-                        .foregroundStyle(RexColor.primary)
-                        .tracking(1)
-                        // Without this the toolbar squeezes it to "R…".
-                        .fixedSize()
+                    // The supplied wordmark artwork, used without distortion
+                    // per the brand guidelines.
+                    Image("RexWordmark")
+                        .resizable()
+                        .scaledToFit()
+                        .frame(height: 20)
+                        .accessibilityLabel("REX")
                 }
                 ToolbarItem(placement: .topBarTrailing) {
                     HStack(spacing: RexSpacing.lg) {
