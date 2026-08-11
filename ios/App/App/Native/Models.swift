@@ -219,6 +219,8 @@ struct RexList: Codable, Identifiable {
     let item_type: String?
     let visibility: String?
     let created_at: String?
+    /// Owner — used to credit followed and shared collections.
+    let user_id: String?
 }
 
 /// A recommendation the user saved from someone else's post.

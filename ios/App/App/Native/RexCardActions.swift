@@ -8,7 +8,6 @@ struct RexCardActions: View {
 
     @State private var liked = false
     @State private var likeCount = 0
-    @State private var saved = false
     @State private var wanted = false
     @State private var busy = false
 
@@ -34,23 +33,16 @@ struct RexCardActions: View {
             action(icon: "bubble.left", tint: RexColor.mutedForeground, count: 0, label: "Comments") {}
                 .allowsHitTesting(false)
 
+            // A single save action. There used to be two (bookmark and +)
+            // writing to different tables, which testers found confusing —
+            // "what does that tick mean?". Everything saved now lands in
+            // My list.
             action(
-                icon: saved ? "bookmark.fill" : "bookmark",
-                tint: saved ? RexColor.primary : RexColor.mutedForeground,
-                count: 0,
-                label: saved ? "Remove from collection" : "Save to collection",
-                activeLabel: "Saved",
-                isActive: saved
-            ) {
-                Task { await toggleSave() }
-            }
-
-            action(
-                icon: wanted ? "checkmark.circle.fill" : "plus.circle",
+                icon: wanted ? "bookmark.fill" : "bookmark",
                 tint: wanted ? RexColor.primary : RexColor.mutedForeground,
                 count: 0,
-                label: wanted ? "Remove from want-to list" : "Add to want-to list",
-                activeLabel: "Want to",
+                label: wanted ? "Remove from my list" : "Save to my list",
+                activeLabel: "Saved",
                 isActive: wanted
             ) {
                 Task { await toggleWant() }
@@ -103,7 +95,6 @@ struct RexCardActions: View {
             likeCount = entry.count
             liked = entry.likedByMe
         }
-        saved = (try? await RexAPI.shared.isSaved(recommendationId: rec.id)) ?? false
         wanted = (try? await RexAPI.shared.isWanted(itemId: rec.item_id)) ?? false
     }
 
@@ -118,18 +109,6 @@ struct RexCardActions: View {
             liked = !next
             likeCount = max(0, likeCount + (next ? -1 : 1))
         }
-    }
-
-    private func toggleSave() async {
-        busy = true
-        let next = !saved
-        saved = next
-        do {
-            try await RexAPI.shared.setSaved(recommendationId: rec.id, saved: next)
-        } catch {
-            saved = !next
-        }
-        busy = false
     }
 
     /// Tapping again removes it — every one of these buttons should undo.
