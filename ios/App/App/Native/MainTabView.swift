@@ -21,12 +21,14 @@ struct MainTabView: View {
                 NavigationStack {
                     RexMapView()
                         .navigationDestination(for: String.self) { ItemDetailView(itemId: $0) }
+                        .navigationDestination(for: UserProfileRoute.self) { UserProfileView(route: $0) }
                 }
                 .tag(1)
 
                 NavigationStack {
                     CollectionsView()
                         .navigationDestination(for: String.self) { ItemDetailView(itemId: $0) }
+                        .navigationDestination(for: UserProfileRoute.self) { UserProfileView(route: $0) }
                 }
                 .tag(2)
 
@@ -35,6 +37,7 @@ struct MainTabView: View {
                 NavigationStack {
                     ProfileView(onSignedOut: onSignedOut)
                         .navigationDestination(for: String.self) { ItemDetailView(itemId: $0) }
+                        .navigationDestination(for: UserProfileRoute.self) { UserProfileView(route: $0) }
                 }
                 .tag(4)
             }

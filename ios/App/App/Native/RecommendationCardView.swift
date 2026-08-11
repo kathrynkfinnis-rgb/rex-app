@@ -173,17 +173,24 @@ struct RecommendationCardView: View {
             .background(Color(hex: creator.color.replacingOccurrences(of: "#", with: "")))
             .clipShape(Capsule())
         } else if let author = rec.profiles {
-            HStack(spacing: RexSpacing.sm) {
-                UserAvatarView(
-                    url: author.avatar_url,
-                    name: author.display_name ?? author.username,
-                    size: 24
-                )
-                Text(author.display_name ?? author.username)
-                    .font(RexFont.text(13, weight: .medium))
-                    .foregroundStyle(RexColor.foreground)
-                    .lineLimit(1)
+            // Tapping the author opens their profile.
+            NavigationLink(value: UserProfileRoute(
+                userId: rec.user_id,
+                name: author.display_name ?? author.username
+            )) {
+                HStack(spacing: RexSpacing.sm) {
+                    UserAvatarView(
+                        url: author.avatar_url,
+                        name: author.display_name ?? author.username,
+                        size: 24
+                    )
+                    Text(author.display_name ?? author.username)
+                        .font(RexFont.text(13, weight: .medium))
+                        .foregroundStyle(RexColor.foreground)
+                        .lineLimit(1)
+                }
             }
+            .buttonStyle(.plain)
         } else {
             Text("Someone")
                 .font(RexFont.text(13, weight: .medium))

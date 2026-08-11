@@ -110,6 +110,9 @@ struct FeedView: View {
             .navigationDestination(for: TripRoute.self) { route in
                 TripDetailView(route: route)
             }
+            .navigationDestination(for: UserProfileRoute.self) { r in
+                UserProfileView(route: r)
+            }
             .navigationDestination(for: NotificationsRoute.self) { _ in
                 NotificationsView()
             }

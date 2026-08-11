@@ -21,6 +21,10 @@ struct TopRexxersView: View {
                 ScrollView(.horizontal, showsIndicators: false) {
                     HStack(spacing: RexSpacing.lg) {
                         ForEach(Array(rexxers.enumerated()), id: \.element.id) { index, person in
+                            NavigationLink(value: UserProfileRoute(
+                                userId: person.user_id,
+                                name: person.display_name ?? person.username
+                            )) {
                             VStack(spacing: RexSpacing.xs) {
                                 ZStack(alignment: .topTrailing) {
                                     UserAvatarView(
@@ -51,6 +55,8 @@ struct TopRexxersView: View {
                                     .font(RexFont.text(10))
                                     .foregroundStyle(RexColor.mutedForeground)
                             }
+                            }
+                            .buttonStyle(.plain)
                         }
                     }
                     .padding(.horizontal, 1)
