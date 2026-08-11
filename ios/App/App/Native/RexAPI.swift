@@ -516,6 +516,24 @@ final class RexAPI {
 
     // MARK: - Wants (Collections)
 
+    /// Weekly leaderboard, via the same RPC the web uses.
+    func fetchTopRexxers(limit: Int = 5) async throws -> [TopRexxer] {
+        let token = try await validToken()
+        var request = URLRequest(url: baseURL.appendingPathComponent("/rest/v1/rpc/top_rexxers_weekly"))
+        request.httpMethod = "POST"
+        request.setValue(anonKey, forHTTPHeaderField: "apikey")
+        request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        request.httpBody = try JSONSerialization.data(withJSONObject: ["_limit": limit])
+
+        let (data, response) = try await URLSession.shared.data(for: request)
+        guard let http = response as? HTTPURLResponse, http.statusCode < 400 else {
+            let body = String(data: data, encoding: .utf8) ?? ""
+            throw RexAPIError.server("Couldn't load the leaderboard. \(body)")
+        }
+        return try JSONDecoder().decode([TopRexxer].self, from: data)
+    }
+
     // MARK: - Likes & comments
 
     /// Like counts plus whether the current user has liked each one, for a page

@@ -121,6 +121,14 @@ struct RexNotification: Codable, Identifiable {
         guard data?["category"]?.stringValue != "trip" else { return nil }
         return id
     }
+
+    /// Trips are addressed by their recommendation id, so they open the
+    /// itinerary rather than a generic item screen.
+    var isTrip: Bool {
+        entity_type == "recommendation" && data?["category"]?.stringValue == "trip"
+    }
+
+    var linkedTitle: String? { data?["title"]?.stringValue }
     var linksToFriends: Bool {
         entity_type == "friendship" || type == "friend_request" || type == "friend_accepted"
     }
@@ -223,4 +231,15 @@ struct RexComment: Codable, Identifiable {
     let created_at: String
     let user_id: String
     let profiles: RexProfile?
+}
+
+/// A weekly leaderboard entry from the top_rexxers_weekly RPC.
+struct TopRexxer: Codable, Identifiable {
+    let user_id: String
+    let username: String
+    let display_name: String?
+    let avatar_url: String?
+    let rex_count: Int
+
+    var id: String { user_id }
 }

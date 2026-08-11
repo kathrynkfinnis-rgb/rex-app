@@ -73,6 +73,11 @@ struct FeedView: View {
                         } else if visible.isEmpty {
                             noMatchesState
                         } else {
+                            // Leaderboard sits above the feed, and hides itself
+                            // when there's nothing to show.
+                            if filter == nil && subFilter == nil && query.isEmpty {
+                                TopRexxersView()
+                            }
                             ForEach(visible) { rec in
                                 // Trips open their itinerary; everything else
                                 // opens the item screen.
@@ -110,6 +115,9 @@ struct FeedView: View {
             }
             .navigationDestination(for: ProfileRoute.self) { _ in
                 ProfileView(onSignedOut: onSignedOut)
+            }
+            .navigationDestination(for: FriendsRoute.self) { _ in
+                FriendsView()
             }
             .toolbar {
                 ToolbarItem(placement: .topBarLeading) {
