@@ -32,6 +32,7 @@ struct ItemDetailView: View {
                     header(item: item)
                     yourTakeSection
                     friendsSection
+                    googleSection
                 }
             }
         }
@@ -163,6 +164,36 @@ struct ItemDetailView: View {
             .disabled(isSaving)
         }
         .padding(16)
+    }
+
+    /// Public Google rating, deliberately after "What friends say" — friends
+    /// lead, the crowd is secondary.
+    @ViewBuilder
+    private var googleSection: some View {
+        if let rating = item?.google_rating, rating > 0 {
+            VStack(alignment: .leading, spacing: RexSpacing.sm) {
+                Text("On Google")
+                    .font(RexFont.text(13, weight: .semibold))
+                    .foregroundStyle(RexColor.mutedForeground)
+                HStack(spacing: RexSpacing.sm) {
+                    Image(systemName: "star.fill")
+                        .font(.system(size: 12))
+                        .foregroundStyle(RexColor.accent)
+                    Text(String(format: "%.1f", rating))
+                        .font(RexFont.text(15, weight: .semibold))
+                        .foregroundStyle(RexColor.foreground)
+                    if let count = item?.google_rating_count, count > 0 {
+                        Text("· \(count) reviews")
+                            .font(RexFont.text(13))
+                            .foregroundStyle(RexColor.mutedForeground)
+                    }
+                }
+                .padding(RexSpacing.md)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .rexCard()
+            }
+            .padding(.top, RexSpacing.lg)
+        }
     }
 
     private var friendsSection: some View {

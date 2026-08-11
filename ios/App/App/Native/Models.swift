@@ -8,8 +8,10 @@ struct RexItem: Codable {
     let image_url: String?
     let genre: String?
     let address: String?
+    let google_rating: Double?
+    let google_rating_count: Int?
 
-    init(id: String, type: String, title: String, subtitle: String?, image_url: String?, genre: String?, address: String? = nil) {
+    init(id: String, type: String, title: String, subtitle: String?, image_url: String?, genre: String?, address: String? = nil, google_rating: Double? = nil, google_rating_count: Int? = nil) {
         self.id = id
         self.type = type
         self.title = title
@@ -17,6 +19,8 @@ struct RexItem: Codable {
         self.image_url = image_url
         self.genre = genre
         self.address = address
+        self.google_rating = google_rating
+        self.google_rating_count = google_rating_count
     }
 }
 
@@ -92,7 +96,8 @@ struct RexNotification: Codable, Identifiable {
     let data: [String: JSONValue]?
     let read_at: String?
     let created_at: String
-    let actor: RexProfile?
+    /// Filled in after fetch — there's no FK to embed it via the query.
+    var actor: RexProfile?
 
     var copy: String {
         let who = actor?.display_name ?? actor?.username ?? "Someone"

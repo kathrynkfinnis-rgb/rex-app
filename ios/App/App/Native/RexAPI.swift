@@ -160,7 +160,7 @@ final class RexAPI {
         let token = try await validToken()
         var components = URLComponents(url: baseURL.appendingPathComponent("/rest/v1/items"), resolvingAgainstBaseURL: false)!
         components.queryItems = [
-            URLQueryItem(name: "select", value: "id,type,title,subtitle,image_url,genre,address"),
+            URLQueryItem(name: "select", value: "id,type,title,subtitle,image_url,genre,address,google_rating,google_rating_count"),
             URLQueryItem(name: "id", value: "eq.\(id)"),
         ]
         var request = URLRequest(url: components.url!)
@@ -292,6 +292,9 @@ final class RexAPI {
         if let imageURL { body["image_url"] = imageURL }
         if let lat { body["lat"] = lat }
         if let lng { body["lng"] = lng }
+        // Google's public rating, kept separate from friends' ratings.
+        if let r = hit?.googleRating { body["google_rating"] = r }
+        if let c = hit?.googleRatingCount { body["google_rating_count"] = c }
         request.httpBody = try JSONSerialization.data(withJSONObject: body)
 
         let (data, response) = try await URLSession.shared.data(for: request)
@@ -518,9 +521,12 @@ final class RexAPI {
     func fetchNotifications() async throws -> [RexNotification] {
         let token = try await validToken()
         guard let userId = currentUserId else { throw RexAPIError.notSignedIn }
+        // There's no FK from notifications.actor_id to profiles, so the
+        // embedded join PostgREST would need doesn't exist — fetch the actors
+        // separately and stitch them on. (The web app does the same.)
         var components = URLComponents(url: baseURL.appendingPathComponent("/rest/v1/notifications"), resolvingAgainstBaseURL: false)!
         components.queryItems = [
-            URLQueryItem(name: "select", value: "id,actor_id,type,entity_type,entity_id,data,read_at,created_at,actor:profiles!notifications_actor_id_fkey(username,display_name,avatar_url)"),
+            URLQueryItem(name: "select", value: "id,actor_id,type,entity_type,entity_id,data,read_at,created_at"),
             URLQueryItem(name: "user_id", value: "eq.\(userId)"),
             URLQueryItem(name: "order", value: "created_at.desc"),
             URLQueryItem(name: "limit", value: "100"),
@@ -531,9 +537,27 @@ final class RexAPI {
 
         let (data, response) = try await URLSession.shared.data(for: request)
         guard let http = response as? HTTPURLResponse, http.statusCode < 400 else {
-            throw RexAPIError.server("Couldn't load notifications.")
+            let body = String(data: data, encoding: .utf8) ?? ""
+            throw RexAPIError.server("Couldn't load notifications. \(body)")
         }
-        return try JSONDecoder().decode([RexNotification].self, from: data)
+        var notifications = try JSONDecoder().decode([RexNotification].self, from: data)
+
+        let actorIds = Array(Set(notifications.compactMap { $0.actor_id }))
+        if !actorIds.isEmpty {
+            let profiles = (try? await fetchProfiles(ids: actorIds)) ?? []
+            let byId = Dictionary(uniqueKeysWithValues: profiles.map { ($0.id, $0) })
+            notifications = notifications.map { n in
+                guard let aid = n.actor_id, let p = byId[aid] else { return n }
+                var copy = n
+                copy.actor = RexProfile(
+                    username: p.username,
+                    display_name: p.display_name,
+                    avatar_url: p.avatar_url
+                )
+                return copy
+            }
+        }
+        return notifications
     }
 
     func markNotificationsRead(ids: [String]) async throws {
@@ -687,6 +711,21 @@ final class RexAPI {
             request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
             _ = try await URLSession.shared.data(for: request)
         }
+    }
+
+    func removeWant(itemId: String) async throws {
+        let token = try await validToken()
+        guard let userId = currentUserId else { throw RexAPIError.notSignedIn }
+        var components = URLComponents(url: baseURL.appendingPathComponent("/rest/v1/wants"), resolvingAgainstBaseURL: false)!
+        components.queryItems = [
+            URLQueryItem(name: "user_id", value: "eq.\(userId)"),
+            URLQueryItem(name: "item_id", value: "eq.\(itemId)"),
+        ]
+        var request = URLRequest(url: components.url!)
+        request.httpMethod = "DELETE"
+        request.setValue(anonKey, forHTTPHeaderField: "apikey")
+        request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+        _ = try await URLSession.shared.data(for: request)
     }
 
     func isWanted(itemId: String) async throws -> Bool {

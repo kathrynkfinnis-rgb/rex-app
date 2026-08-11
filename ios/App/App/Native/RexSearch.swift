@@ -12,13 +12,17 @@ struct RexSearchHit: Identifiable, Hashable {
     let address: String?
     let lat: Double?
     let lng: Double?
+    /// Google's public star rating, shown beneath friends' ratings.
+    let googleRating: Double?
+    let googleRatingCount: Int?
 
     var id: String { "\(externalSource):\(externalId)" }
 
     init(
         externalId: String, externalSource: String, title: String,
         subtitle: String? = nil, imageURL: String? = nil, genre: String? = nil,
-        address: String? = nil, lat: Double? = nil, lng: Double? = nil
+        address: String? = nil, lat: Double? = nil, lng: Double? = nil,
+        googleRating: Double? = nil, googleRatingCount: Int? = nil
     ) {
         self.externalId = externalId
         self.externalSource = externalSource
@@ -29,6 +33,8 @@ struct RexSearchHit: Identifiable, Hashable {
         self.address = address
         self.lat = lat
         self.lng = lng
+        self.googleRating = googleRating
+        self.googleRatingCount = googleRatingCount
     }
 }
 
@@ -142,7 +148,8 @@ enum RexSearch {
         request.setValue(googleKey, forHTTPHeaderField: "X-Goog-Api-Key")
         request.setValue(bundleId, forHTTPHeaderField: "X-Ios-Bundle-Identifier")
         request.setValue(
-            "places.id,places.displayName,places.formattedAddress,places.location,places.primaryTypeDisplayName",
+            "places.id,places.displayName,places.formattedAddress,places.location," +
+            "places.primaryTypeDisplayName,places.photos,places.rating,places.userRatingCount",
             forHTTPHeaderField: "X-Goog-FieldMask"
         )
         request.httpBody = try JSONSerialization.data(withJSONObject: ["textQuery": q, "pageSize": 10])
@@ -155,16 +162,24 @@ enum RexSearch {
             guard let id = p["id"] as? String else { return nil }
             let name = (p["displayName"] as? [String: Any])?["text"] as? String ?? "Untitled"
             let loc = p["location"] as? [String: Any]
+            // Places photos come back as resource names; the media endpoint
+            // serves the actual image and accepts the same iOS-restricted key.
+            let photoName = (p["photos"] as? [[String: Any]])?.first?["name"] as? String
+            let photoURL = photoName.map {
+                "https://places.googleapis.com/v1/\($0)/media?maxWidthPx=800&key=\(googleKey)"
+            }
             return RexSearchHit(
                 externalId: id,
                 externalSource: "google_places",
                 title: name,
                 subtitle: nil,
-                imageURL: nil,
+                imageURL: photoURL,
                 genre: (p["primaryTypeDisplayName"] as? [String: Any])?["text"] as? String,
                 address: p["formattedAddress"] as? String,
                 lat: loc?["latitude"] as? Double,
-                lng: loc?["longitude"] as? Double
+                lng: loc?["longitude"] as? Double,
+                googleRating: p["rating"] as? Double,
+                googleRatingCount: p["userRatingCount"] as? Int
             )
         }
     }

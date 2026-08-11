@@ -46,7 +46,7 @@ struct RexCardActions: View {
                 tint: wanted ? RexColor.primary : RexColor.mutedForeground,
                 count: 0
             ) {
-                Task { await addWant() }
+                Task { await toggleWant() }
             }
 
             ShareLink(item: shareText) {
@@ -115,14 +115,19 @@ struct RexCardActions: View {
         busy = false
     }
 
-    private func addWant() async {
-        guard !wanted else { return }
+    /// Tapping again removes it — every one of these buttons should undo.
+    private func toggleWant() async {
         busy = true
-        wanted = true
+        let next = !wanted
+        wanted = next
         do {
-            try await RexAPI.shared.createWant(itemId: rec.item_id)
+            if next {
+                try await RexAPI.shared.createWant(itemId: rec.item_id)
+            } else {
+                try await RexAPI.shared.removeWant(itemId: rec.item_id)
+            }
         } catch {
-            wanted = false
+            wanted = !next
         }
         busy = false
     }
