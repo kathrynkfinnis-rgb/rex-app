@@ -99,11 +99,18 @@ struct FeedView: View {
                                     }
                                 }
                                 .modifier(EditableIfMine(rec: rec, editing: $editing))
+                                // One menu only — a second `.contextMenu` replaces
+                                // the first rather than adding to it.
                                 .contextMenu {
                                     Button {
                                         addingToCollection = rec
                                     } label: {
                                         Label("Add to collection", systemImage: "folder.badge.plus")
+                                    }
+                                    if rec.user_id == RexAPI.shared.currentUserId {
+                                        Button { editing = rec } label: {
+                                            Label("Edit", systemImage: "pencil")
+                                        }
                                     }
                                 }
                             }
@@ -396,9 +403,6 @@ struct EditableIfMine: ViewModifier {
     func body(content: Content) -> some View {
         if isMine {
             content
-                .contextMenu {
-                    Button { editing = rec } label: { Label("Edit", systemImage: "pencil") }
-                }
                 .overlay(alignment: .topTrailing) {
                     Button { editing = rec } label: {
                         Image(systemName: "pencil")
