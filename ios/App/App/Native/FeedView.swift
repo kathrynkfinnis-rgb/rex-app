@@ -5,6 +5,10 @@ struct ProfileRoute: Hashable {}
 
 struct FeedView: View {
     var onSignedOut: () -> Void
+    /// Incremented by the tab bar when Feed is tapped while already active.
+    var popToRootSignal: Int = 0
+
+    @State private var path = NavigationPath()
 
     @State private var recommendations: [FeedRecommendation] = []
     @State private var isLoading = true
@@ -48,7 +52,7 @@ struct FeedView: View {
     }
 
     var body: some View {
-        NavigationStack {
+        NavigationStack(path: $path) {
             ZStack {
                 RexColor.background.ignoresSafeArea()
 
@@ -135,6 +139,9 @@ struct FeedView: View {
             }
         }
         .tint(RexColor.primary)
+        .onChange(of: popToRootSignal) { _, _ in
+            path = NavigationPath()
+        }
         .task { await loadFeed() }
         .sheet(isPresented: $showingAddRex, onDismiss: { Task { await loadFeed() } }) {
             AddRexView(onDone: { showingAddRex = false })
@@ -143,11 +150,8 @@ struct FeedView: View {
 
     private var header: some View {
         VStack(alignment: .leading, spacing: RexSpacing.md) {
-            Text("Your feed")
-                .font(RexFont.display(32, weight: .semibold))
-                .foregroundStyle(RexColor.foreground)
-                .frame(maxWidth: .infinity, alignment: .leading)
-
+            // No "Your feed" heading — the feed is the home screen, so naming
+            // it just eats vertical space above the content.
             searchField
 
             if !availableCategories.isEmpty {

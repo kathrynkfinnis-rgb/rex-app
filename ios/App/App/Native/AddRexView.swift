@@ -8,7 +8,9 @@ import SwiftUI
 struct AddRexView: View {
     var onDone: () -> Void
 
-    private let creatableCategories: [RexCategory] = [.place, .book, .movie, .tv, .podcast, .recipe, .event, .other]
+    // Trip sits second, as on the web. A trip is created as a normal Rex here
+    // and stops get added to it afterwards from the trip screen.
+    private let creatableCategories: [RexCategory] = [.place, .trip, .book, .movie, .tv, .podcast, .recipe, .event, .other]
 
     private enum Mode { case rated, want }
 

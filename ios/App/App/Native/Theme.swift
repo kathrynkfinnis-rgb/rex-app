@@ -17,38 +17,43 @@ extension Color {
 /// mostly neutral. Roughly 85% white and warm neutrals, 10% forest green,
 /// 5% accent. Colour is used sparingly and deliberately.
 enum RexColor {
-    // Brand
-    static let primary = Color(hex: "173626")          // Forest green
-    static let primaryPressed = Color(hex: "10271C")
-    static let primaryForeground = Color(hex: "FFFFFF")
-    static let moss = Color(hex: "4D6B56")             // Secondary green
+    // Brand — four tones, clear roles (REX Brand Guidelines).
+    // Oxford Stone carries the surface, Chocolate carries text, Khaki Green
+    // carries brand recognition and primary action, Oxblood is selective
+    // emphasis only. Aim for large fields of stone with small, purposeful
+    // areas of the rest.
+    static let primary = Color(hex: "4B5320")          // Khaki Green
+    static let primaryPressed = Color(hex: "3C421A")
+    static let primaryForeground = Color(hex: "F5EFE6")
+    static let moss = Color(hex: "6B7340")
 
     // Surfaces
-    static let background = Color(hex: "F8F8F5")       // Warm white canvas
+    static let background = Color(hex: "F5EFE6")       // Oxford Stone
     static let card = Color(hex: "FFFFFF")
-    static let border = Color(hex: "E2E5DE")
-    static let divider = Color(hex: "ECEEE8")
+    static let border = Color(hex: "E3DACE")
+    static let divider = Color(hex: "EDE5D9")
 
     // Text
-    static let foreground = Color(hex: "1D1D1D")       // Charcoal
-    static let mutedForeground = Color(hex: "666A66")  // Soft grey
-    static let placeholder = Color(hex: "9A9C98")
-    static let disabled = Color(hex: "BCBEB8")
+    static let foreground = Color(hex: "3A2E22")       // Chocolate
+    static let mutedForeground = Color(hex: "7A6A58")
+    static let placeholder = Color(hex: "A89785")
+    static let disabled = Color(hex: "C4B7A6")
 
     // Status
-    static let success = Color(hex: "2E7D32")
-    static let gold = Color(hex: "C79A3B")             // Premium/featured ONLY
-    static let destructive = Color(hex: "B44A3A")
+    static let success = Color(hex: "4B5320")
+    /// Oxblood — accent and emphasis only, never the default action colour.
+    static let accent = Color(hex: "6B2A2A")
+    static let destructive = Color(hex: "6B2A2A")
+    static let gold = Color(hex: "6B2A2A")
 
     // Badges
-    static let badgeBackground = Color(hex: "EEF1EC")
-    static let badgeForeground = Color(hex: "4D6B56")
+    static let badgeBackground = Color(hex: "EAE4D8")
+    static let badgeForeground = Color(hex: "4B5320")
 
-    // Kept for existing call sites; maps onto the neutral badge surface.
-    static let muted = Color(hex: "ECEEE8")
-    static let secondary = Color(hex: "EEF1EC")
-    static let secondaryForeground = Color(hex: "4D6B56")
-    static let accent = Color(hex: "C79A3B")
+    // Kept for existing call sites.
+    static let muted = Color(hex: "EDE5D9")
+    static let secondary = Color(hex: "EAE4D8")
+    static let secondaryForeground = Color(hex: "4B5320")
 }
 
 /// Corner radii from the spec.
@@ -125,12 +130,21 @@ struct RexSecondaryButtonStyle: ButtonStyle {
 /// Editorial serif for headlines, system sans for everything else. Falls back
 /// gracefully when the licensed display face isn't bundled.
 enum RexFont {
+    /// Expressive serif — brand-led moments and short headlines only.
     static func display(_ size: CGFloat, weight: Font.Weight = .regular) -> Font {
         .system(size: size, weight: weight, design: .serif)
     }
+    /// Neutral sans — navigation, buttons, forms, metadata, longer reading.
     static func text(_ size: CGFloat, weight: Font.Weight = .regular) -> Font {
         .system(size: size, weight: weight)
     }
+
+    // The guidelines' product scale, so screens stop picking sizes ad hoc.
+    static let displayLarge = display(34, weight: .semibold)   // 32-40
+    static let screenTitle  = text(26, weight: .bold)          // 24-28
+    static let section      = text(19, weight: .bold)          // 18-20
+    static let body         = text(16)                         // 15-17
+    static let metadata     = text(12)                         // 12-13
 }
 
 enum RexCategory: String {

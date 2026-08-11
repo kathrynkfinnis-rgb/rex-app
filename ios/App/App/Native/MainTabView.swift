@@ -8,11 +8,15 @@ struct MainTabView: View {
 
     @State private var selection = 0
     @State private var showingAddRex = false
+    /// Bumped when Feed is tapped while already selected — FeedView watches it
+    /// and pops back to the top, so "home" always means the feed rather than
+    /// whatever Rex you were last looking at.
+    @State private var feedPopSignal = 0
 
     var body: some View {
         ZStack(alignment: .bottom) {
             TabView(selection: $selection) {
-                FeedView(onSignedOut: onSignedOut).tag(0)
+                FeedView(onSignedOut: onSignedOut, popToRootSignal: feedPopSignal).tag(0)
 
                 NavigationStack {
                     RexMapView()
@@ -87,6 +91,8 @@ struct MainTabView: View {
 
     private func tabButton(index: Int, title: String, icon: String) -> some View {
         Button {
+            // Tapping the tab you're already on returns you to its root.
+            if selection == index && index == 0 { feedPopSignal += 1 }
             selection = index
         } label: {
             VStack(spacing: 4) {
