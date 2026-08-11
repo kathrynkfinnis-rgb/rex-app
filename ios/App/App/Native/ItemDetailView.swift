@@ -231,14 +231,24 @@ struct ItemDetailView: View {
 
 struct CrownRatingInput: View {
     @Binding var value: Double
+    /// Allow 0 ("not rated") by tapping the crown that's already selected.
+    var clearable: Bool = false
 
     var body: some View {
-        HStack(spacing: 4) {
+        HStack(spacing: RexSpacing.xs) {
             ForEach(1...10, id: \.self) { i in
                 Image(systemName: Double(i) <= value ? "crown.fill" : "crown")
                     .font(.system(size: 18))
                     .foregroundStyle(Double(i) <= value ? RexColor.primary : RexColor.border)
-                    .onTapGesture { value = Double(i) }
+                    .onTapGesture {
+                        value = (clearable && value == Double(i)) ? 0 : Double(i)
+                    }
+            }
+            if clearable && value == 0 {
+                Text("Not rated")
+                    .font(RexFont.text(12))
+                    .foregroundStyle(RexColor.mutedForeground)
+                    .padding(.leading, RexSpacing.xs)
             }
         }
     }

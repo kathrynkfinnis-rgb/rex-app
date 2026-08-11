@@ -291,7 +291,13 @@ final class RexAPI {
     }
 
     /// Creates a brand-new recommendation (used right after createItem — no existing row to merge with).
-    func createRecommendation(itemId: String, rating: Double, note: String?) async throws {
+    func createRecommendation(
+        itemId: String,
+        rating: Double,
+        note: String?,
+        photoURLs: [String] = [],
+        tags: [String] = []
+    ) async throws {
         let token = try await validToken()
         guard let userId = currentUserId else { throw RexAPIError.notSignedIn }
         var request = URLRequest(url: baseURL.appendingPathComponent("/rest/v1/recommendations"))
@@ -302,6 +308,9 @@ final class RexAPI {
 
         var body: [String: Any] = ["user_id": userId, "item_id": itemId, "rating": rating]
         body["note"] = note?.isEmpty == false ? note : NSNull()
+        body["photo_url"] = photoURLs.first ?? NSNull()
+        body["photo_urls"] = photoURLs
+        body["tags"] = tags
         request.httpBody = try JSONSerialization.data(withJSONObject: body)
 
         let (data, response) = try await URLSession.shared.data(for: request)
@@ -515,6 +524,160 @@ final class RexAPI {
     }
 
     // MARK: - Wants (Collections)
+
+    // MARK: - Photos
+
+    /// Uploads image data to the rec-photos bucket and returns a long-lived
+    /// signed URL. Files go under the user's own folder, which is what the
+    /// storage RLS policy checks.
+    func uploadPhoto(data imageData: Data, fileExtension: String = "jpg") async throws -> String {
+        let token = try await validToken()
+        guard let userId = currentUserId else { throw RexAPIError.notSignedIn }
+        let path = "\(userId)/\(UUID().uuidString).\(fileExtension)"
+
+        var upload = URLRequest(url: baseURL.appendingPathComponent("/storage/v1/object/rec-photos/\(path)"))
+        upload.httpMethod = "POST"
+        upload.setValue(anonKey, forHTTPHeaderField: "apikey")
+        upload.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+        upload.setValue(fileExtension == "png" ? "image/png" : "image/jpeg", forHTTPHeaderField: "Content-Type")
+        upload.httpBody = imageData
+
+        let (upData, upResponse) = try await URLSession.shared.data(for: upload)
+        guard let upHttp = upResponse as? HTTPURLResponse, upHttp.statusCode < 400 else {
+            let body = String(data: upData, encoding: .utf8) ?? ""
+            throw RexAPIError.server("Couldn't upload that photo. \(body)")
+        }
+
+        // 5 years, matching the web uploader.
+        var sign = URLRequest(url: baseURL.appendingPathComponent("/storage/v1/object/sign/rec-photos/\(path)"))
+        sign.httpMethod = "POST"
+        sign.setValue(anonKey, forHTTPHeaderField: "apikey")
+        sign.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+        sign.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        sign.httpBody = try JSONSerialization.data(withJSONObject: ["expiresIn": 157_680_000])
+
+        let (signData, signResponse) = try await URLSession.shared.data(for: sign)
+        guard let signHttp = signResponse as? HTTPURLResponse, signHttp.statusCode < 400,
+              let json = try JSONSerialization.jsonObject(with: signData) as? [String: Any],
+              let signed = json["signedURL"] as? String ?? json["signedUrl"] as? String
+        else {
+            throw RexAPIError.server("Couldn't sign that photo URL.")
+        }
+        return baseURL.absoluteString + "/storage/v1" + signed
+    }
+
+    // MARK: - Editing
+
+    func updateRecommendation(
+        id: String,
+        rating: Double,
+        note: String?,
+        photoURLs: [String],
+        tags: [String]
+    ) async throws {
+        let token = try await validToken()
+        var components = URLComponents(url: baseURL.appendingPathComponent("/rest/v1/recommendations"), resolvingAgainstBaseURL: false)!
+        components.queryItems = [URLQueryItem(name: "id", value: "eq.\(id)")]
+        var request = URLRequest(url: components.url!)
+        request.httpMethod = "PATCH"
+        request.setValue(anonKey, forHTTPHeaderField: "apikey")
+        request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+
+        var body: [String: Any] = ["rating": rating, "tags": tags, "photo_urls": photoURLs]
+        body["note"] = note?.isEmpty == false ? note : NSNull()
+        body["photo_url"] = photoURLs.first ?? NSNull()
+        request.httpBody = try JSONSerialization.data(withJSONObject: body)
+
+        let (data, response) = try await URLSession.shared.data(for: request)
+        guard let http = response as? HTTPURLResponse, http.statusCode < 400 else {
+            let body = String(data: data, encoding: .utf8) ?? ""
+            throw RexAPIError.server("Couldn't save your changes. \(body)")
+        }
+    }
+
+    func deleteRecommendation(id: String) async throws {
+        let token = try await validToken()
+        var components = URLComponents(url: baseURL.appendingPathComponent("/rest/v1/recommendations"), resolvingAgainstBaseURL: false)!
+        components.queryItems = [URLQueryItem(name: "id", value: "eq.\(id)")]
+        var request = URLRequest(url: components.url!)
+        request.httpMethod = "DELETE"
+        request.setValue(anonKey, forHTTPHeaderField: "apikey")
+        request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+        let (data, response) = try await URLSession.shared.data(for: request)
+        guard let http = response as? HTTPURLResponse, http.statusCode < 400 else {
+            let body = String(data: data, encoding: .utf8) ?? ""
+            throw RexAPIError.server("Couldn't delete that Rex. \(body)")
+        }
+    }
+
+    // MARK: - Saves & wants (card actions)
+
+    func isSaved(recommendationId: String) async throws -> Bool {
+        let token = try await validToken()
+        guard let userId = currentUserId else { return false }
+        var components = URLComponents(url: baseURL.appendingPathComponent("/rest/v1/saved_posts"), resolvingAgainstBaseURL: false)!
+        components.queryItems = [
+            URLQueryItem(name: "select", value: "id"),
+            URLQueryItem(name: "user_id", value: "eq.\(userId)"),
+            URLQueryItem(name: "recommendation_id", value: "eq.\(recommendationId)"),
+            URLQueryItem(name: "limit", value: "1"),
+        ]
+        var request = URLRequest(url: components.url!)
+        request.setValue(anonKey, forHTTPHeaderField: "apikey")
+        request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+        let (data, response) = try await URLSession.shared.data(for: request)
+        guard let http = response as? HTTPURLResponse, http.statusCode < 400 else { return false }
+        struct Row: Codable { let id: String }
+        return !((try? JSONDecoder().decode([Row].self, from: data)) ?? []).isEmpty
+    }
+
+    func setSaved(recommendationId: String, saved: Bool) async throws {
+        let token = try await validToken()
+        guard let userId = currentUserId else { throw RexAPIError.notSignedIn }
+        if saved {
+            var request = URLRequest(url: baseURL.appendingPathComponent("/rest/v1/saved_posts"))
+            request.httpMethod = "POST"
+            request.setValue(anonKey, forHTTPHeaderField: "apikey")
+            request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+            request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+            request.setValue("resolution=ignore-duplicates", forHTTPHeaderField: "Prefer")
+            request.httpBody = try JSONSerialization.data(withJSONObject: [
+                "user_id": userId, "recommendation_id": recommendationId,
+            ])
+            _ = try await URLSession.shared.data(for: request)
+        } else {
+            var components = URLComponents(url: baseURL.appendingPathComponent("/rest/v1/saved_posts"), resolvingAgainstBaseURL: false)!
+            components.queryItems = [
+                URLQueryItem(name: "user_id", value: "eq.\(userId)"),
+                URLQueryItem(name: "recommendation_id", value: "eq.\(recommendationId)"),
+            ]
+            var request = URLRequest(url: components.url!)
+            request.httpMethod = "DELETE"
+            request.setValue(anonKey, forHTTPHeaderField: "apikey")
+            request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+            _ = try await URLSession.shared.data(for: request)
+        }
+    }
+
+    func isWanted(itemId: String) async throws -> Bool {
+        let token = try await validToken()
+        guard let userId = currentUserId else { return false }
+        var components = URLComponents(url: baseURL.appendingPathComponent("/rest/v1/wants"), resolvingAgainstBaseURL: false)!
+        components.queryItems = [
+            URLQueryItem(name: "select", value: "id"),
+            URLQueryItem(name: "user_id", value: "eq.\(userId)"),
+            URLQueryItem(name: "item_id", value: "eq.\(itemId)"),
+            URLQueryItem(name: "limit", value: "1"),
+        ]
+        var request = URLRequest(url: components.url!)
+        request.setValue(anonKey, forHTTPHeaderField: "apikey")
+        request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+        let (data, response) = try await URLSession.shared.data(for: request)
+        guard let http = response as? HTTPURLResponse, http.statusCode < 400 else { return false }
+        struct Row: Codable { let id: String }
+        return !((try? JSONDecoder().decode([Row].self, from: data)) ?? []).isEmpty
+    }
 
     /// Weekly leaderboard, via the same RPC the web uses.
     func fetchTopRexxers(limit: Int = 5) async throws -> [TopRexxer] {

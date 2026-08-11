@@ -14,6 +14,7 @@ struct ProfileView: View {
     @State private var isLoading = true
     @State private var errorMessage: String?
     @State private var selectedFilter: RexCategory?
+    @State private var editing: FeedRecommendation?
 
     private var availableCategories: [RexCategory] {
         let present = Set(recommendations.compactMap { RexCategory(rawValue: $0.items?.type ?? "") })
@@ -53,6 +54,13 @@ struct ProfileView: View {
         .navigationTitle(profile?.display_name ?? profile?.username ?? "Profile")
         .navigationBarTitleDisplayMode(.inline)
         .task { await load() }
+        .sheet(item: $editing) { rec in
+            EditRexView(
+                rec: rec,
+                onSaved: { Task { await load() } },
+                onDeleted: { Task { await load() } }
+            )
+        }
     }
 
     private func load() async {
@@ -137,15 +145,38 @@ struct ProfileView: View {
                 .frame(maxWidth: .infinity)
                 .padding(.top, 40)
         } else {
-            VStack(spacing: 10) {
+            VStack(spacing: RexSpacing.betweenCards) {
                 ForEach(filteredRecommendations) { rec in
                     NavigationLink(value: rec.item_id) {
                         RecommendationCardView(rec: rec)
                     }
                     .buttonStyle(.plain)
+                    // These are all your own Rex, so every one is editable.
+                    .contextMenu {
+                        Button {
+                            editing = rec
+                        } label: {
+                            Label("Edit", systemImage: "pencil")
+                        }
+                    }
+                    .overlay(alignment: .topTrailing) {
+                        Button {
+                            editing = rec
+                        } label: {
+                            Image(systemName: "pencil")
+                                .font(.system(size: 12, weight: .semibold))
+                                .foregroundStyle(RexColor.mutedForeground)
+                                .padding(7)
+                                .background(RexColor.card)
+                                .clipShape(Circle())
+                                .overlay(Circle().stroke(RexColor.border, lineWidth: 1))
+                        }
+                        .buttonStyle(.plain)
+                        .padding(10)
+                    }
                 }
             }
-            .padding(16)
+            .padding(.horizontal, RexSpacing.page)
         }
     }
 

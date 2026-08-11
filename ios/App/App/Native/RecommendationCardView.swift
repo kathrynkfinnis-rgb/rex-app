@@ -32,6 +32,18 @@ struct RecommendationCardView: View {
                     VStack(alignment: .leading, spacing: RexSpacing.xs) {
                         HStack(spacing: RexSpacing.sm) {
                             categoryBadge
+                            // Second tag: what kind of place/book/etc it is,
+                            // e.g. PLACE · Restaurant.
+                            if let genre = splitGenres(item.genre).first {
+                                Text(genre)
+                                    .font(.system(size: 10, weight: .medium))
+                                    .foregroundStyle(RexColor.mutedForeground)
+                                    .padding(.horizontal, RexSpacing.sm)
+                                    .padding(.vertical, 3)
+                                    .background(RexColor.muted)
+                                    .clipShape(Capsule())
+                                    .lineLimit(1)
+                            }
                             Spacer(minLength: RexSpacing.sm)
                             // Rating is an "important icon" — one of the few
                             // places the spec allows forest green.
@@ -96,10 +108,8 @@ struct RecommendationCardView: View {
 
                 HStack(spacing: RexSpacing.sm) {
                     authorRow
-                    Spacer()
-                    Text(relativeTime)
-                        .font(RexFont.text(11))
-                        .foregroundStyle(RexColor.mutedForeground)
+                    Spacer(minLength: RexSpacing.sm)
+                    RexCardActions(rec: rec)
                 }
                 .padding(.horizontal, RexSpacing.cardPadding)
                 .padding(.vertical, RexSpacing.md)

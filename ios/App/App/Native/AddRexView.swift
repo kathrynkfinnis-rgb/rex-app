@@ -31,6 +31,7 @@ struct AddRexView: View {
     @State private var isSearching = false
     @State private var picked: RexSearchHit?
     @State private var searchTask: Task<Void, Never>?
+    @State private var photoURLs: [String] = []
 
     var body: some View {
         NavigationStack {
@@ -111,6 +112,9 @@ struct AddRexView: View {
                     .background(RexColor.card)
                     .clipShape(RoundedRectangle(cornerRadius: 14))
                     .overlay(RoundedRectangle(cornerRadius: 14).stroke(RexColor.border, lineWidth: 1))
+
+                Text("Photos").font(.system(size: 14, weight: .semibold)).foregroundStyle(RexColor.foreground)
+                PhotoPickerView(photoURLs: $photoURLs)
             }
 
             if let errorMessage {
@@ -361,7 +365,12 @@ struct AddRexView: View {
             )
             switch mode {
             case .rated:
-                try await RexAPI.shared.createRecommendation(itemId: itemId, rating: rating, note: note.isEmpty ? nil : note)
+                try await RexAPI.shared.createRecommendation(
+                    itemId: itemId,
+                    rating: rating,
+                    note: note.isEmpty ? nil : note,
+                    photoURLs: photoURLs
+                )
                 didWant = false
             case .want:
                 try await RexAPI.shared.createWant(itemId: itemId)
