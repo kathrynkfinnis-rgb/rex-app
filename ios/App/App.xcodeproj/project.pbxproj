@@ -31,6 +31,7 @@
 		FEED013B0000000000000000 /* CollectionsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = FEED013A0000000000000000 /* CollectionsView.swift */; };
 		FEED014B0000000000000000 /* MainTabView.swift in Sources */ = {isa = PBXBuildFile; fileRef = FEED014A0000000000000000 /* MainTabView.swift */; };
 		FEED015B0000000000000000 /* MapView.swift in Sources */ = {isa = PBXBuildFile; fileRef = FEED015A0000000000000000 /* MapView.swift */; };
+		FEED025B0000000000000000 /* PhotoCarouselView.swift in Sources */ = {isa = PBXBuildFile; fileRef = FEED025A0000000000000000 /* PhotoCarouselView.swift */; };
 		FEED024B0000000000000000 /* RexCardActions.swift in Sources */ = {isa = PBXBuildFile; fileRef = FEED024A0000000000000000 /* RexCardActions.swift */; };
 		FEED023B0000000000000000 /* EditRexView.swift in Sources */ = {isa = PBXBuildFile; fileRef = FEED023A0000000000000000 /* EditRexView.swift */; };
 		FEED022B0000000000000000 /* PhotoPickerView.swift in Sources */ = {isa = PBXBuildFile; fileRef = FEED022A0000000000000000 /* PhotoPickerView.swift */; };
@@ -69,6 +70,7 @@
 		FEED013A0000000000000000 /* CollectionsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CollectionsView.swift; sourceTree = "<group>"; };
 		FEED014A0000000000000000 /* MainTabView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MainTabView.swift; sourceTree = "<group>"; };
 		FEED015A0000000000000000 /* MapView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MapView.swift; sourceTree = "<group>"; };
+		FEED025A0000000000000000 /* PhotoCarouselView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PhotoCarouselView.swift; sourceTree = "<group>"; };
 		FEED024A0000000000000000 /* RexCardActions.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RexCardActions.swift; sourceTree = "<group>"; };
 		FEED023A0000000000000000 /* EditRexView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EditRexView.swift; sourceTree = "<group>"; };
 		FEED022A0000000000000000 /* PhotoPickerView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PhotoPickerView.swift; sourceTree = "<group>"; };
@@ -144,6 +146,7 @@
 				FEED013A0000000000000000 /* CollectionsView.swift */,
 				FEED014A0000000000000000 /* MainTabView.swift */,
 				FEED015A0000000000000000 /* MapView.swift */,
+				FEED025A0000000000000000 /* PhotoCarouselView.swift */,
 				FEED024A0000000000000000 /* RexCardActions.swift */,
 				FEED023A0000000000000000 /* EditRexView.swift */,
 				FEED022A0000000000000000 /* PhotoPickerView.swift */,
@@ -257,6 +260,7 @@
 				FEED013B0000000000000000 /* CollectionsView.swift in Sources */,
 				FEED014B0000000000000000 /* MainTabView.swift in Sources */,
 				FEED015B0000000000000000 /* MapView.swift in Sources */,
+				FEED025B0000000000000000 /* PhotoCarouselView.swift in Sources */,
 				FEED024B0000000000000000 /* RexCardActions.swift in Sources */,
 				FEED023B0000000000000000 /* EditRexView.swift in Sources */,
 				FEED022B0000000000000000 /* PhotoPickerView.swift in Sources */,

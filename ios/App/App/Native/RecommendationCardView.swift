@@ -102,6 +102,11 @@ struct RecommendationCardView: View {
                 }
                 .padding(RexSpacing.cardPadding)
 
+                if let photos = rec.photo_urls, !photos.isEmpty {
+                    PhotoCarouselView(urls: photos, height: 200, cornerRadius: 0)
+                        .padding(.bottom, RexSpacing.sm)
+                }
+
                 Rectangle()
                     .fill(RexColor.divider)
                     .frame(height: 1)

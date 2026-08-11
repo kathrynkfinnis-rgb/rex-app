@@ -15,6 +15,10 @@ struct ProfileView: View {
     @State private var errorMessage: String?
     @State private var selectedFilter: RexCategory?
     @State private var editing: FeedRecommendation?
+    @State private var selecting = false
+    @State private var selectedIds: Set<String> = []
+    @State private var confirmBulkDelete = false
+    @State private var isDeleting = false
 
     private var availableCategories: [RexCategory] {
         let present = Set(recommendations.compactMap { RexCategory(rawValue: $0.items?.type ?? "") })
@@ -53,6 +57,46 @@ struct ProfileView: View {
         .background(RexColor.background.ignoresSafeArea())
         .navigationTitle(profile?.display_name ?? profile?.username ?? "Profile")
         .navigationBarTitleDisplayMode(.inline)
+        .toolbar {
+            ToolbarItem(placement: .topBarTrailing) {
+                if !recommendations.isEmpty {
+                    Button(selecting ? "Done" : "Select") {
+                        selecting.toggle()
+                        selectedIds.removeAll()
+                    }
+                    .font(RexFont.text(14, weight: .semibold))
+                    .foregroundStyle(RexColor.primary)
+                }
+            }
+        }
+        .safeAreaInset(edge: .bottom) {
+            if selecting && !selectedIds.isEmpty {
+                Button {
+                    confirmBulkDelete = true
+                } label: {
+                    if isDeleting {
+                        ProgressView().tint(.white)
+                    } else {
+                        Text("Delete \(selectedIds.count) Rex")
+                    }
+                }
+                .font(RexFont.text(16, weight: .semibold))
+                .foregroundStyle(.white)
+                .frame(maxWidth: .infinity)
+                .frame(height: 50)
+                .background(RexColor.destructive)
+                .clipShape(RoundedRectangle(cornerRadius: RexRadius.button, style: .continuous))
+                .padding(.horizontal, RexSpacing.page)
+                .padding(.bottom, RexSpacing.sm)
+                .disabled(isDeleting)
+            }
+        }
+        .alert("Delete \(selectedIds.count) Rex?", isPresented: $confirmBulkDelete) {
+            Button("Cancel", role: .cancel) {}
+            Button("Delete", role: .destructive) { Task { await bulkDelete() } }
+        } message: {
+            Text("This can't be undone.")
+        }
         .task { await load() }
         .sheet(item: $editing) { rec in
             EditRexView(
@@ -61,6 +105,19 @@ struct ProfileView: View {
                 onDeleted: { Task { await load() } }
             )
         }
+    }
+
+    private func bulkDelete() async {
+        isDeleting = true
+        // Sequential rather than parallel — a handful of deletes, and this
+        // keeps the error case simple if one fails partway.
+        for id in selectedIds {
+            try? await RexAPI.shared.deleteRecommendation(id: id)
+        }
+        selectedIds.removeAll()
+        selecting = false
+        isDeleting = false
+        await load()
     }
 
     private func load() async {
@@ -147,10 +204,30 @@ struct ProfileView: View {
         } else {
             VStack(spacing: RexSpacing.betweenCards) {
                 ForEach(filteredRecommendations) { rec in
-                    NavigationLink(value: rec.item_id) {
-                        RecommendationCardView(rec: rec)
+                    Group {
+                        if selecting {
+                            Button {
+                                if selectedIds.contains(rec.id) { selectedIds.remove(rec.id) }
+                                else { selectedIds.insert(rec.id) }
+                            } label: {
+                                RecommendationCardView(rec: rec)
+                                    .overlay(alignment: .topLeading) {
+                                        Image(systemName: selectedIds.contains(rec.id) ? "checkmark.circle.fill" : "circle")
+                                            .font(.system(size: 22))
+                                            .foregroundStyle(selectedIds.contains(rec.id) ? RexColor.primary : RexColor.border)
+                                            .background(Circle().fill(RexColor.card).padding(2))
+                                            .padding(10)
+                                    }
+                                    .opacity(selectedIds.contains(rec.id) ? 1 : 0.75)
+                            }
+                            .buttonStyle(.plain)
+                        } else {
+                            NavigationLink(value: rec.item_id) {
+                                RecommendationCardView(rec: rec)
+                            }
+                            .buttonStyle(.plain)
+                        }
                     }
-                    .buttonStyle(.plain)
                     // These are all your own Rex, so every one is editable.
                     .contextMenu {
                         Button {
