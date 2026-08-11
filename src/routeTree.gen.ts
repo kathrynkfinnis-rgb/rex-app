@@ -9,103 +9,72 @@
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
 import { Route as rootRouteImport } from './routes/__root'
-import { Route as IndexRouteImport } from './routes/index'
-import { Route as AuthenticatedRouteRouteImport } from './routes/_authenticated/route'
 import { Route as AuthRouteImport } from './routes/auth'
-import { Route as AuthenticatedAddRouteImport } from './routes/_authenticated/add'
-import { Route as AuthenticatedAdminRouteImport } from './routes/_authenticated/admin'
-import { Route as AuthenticatedCreatorsRouteImport } from './routes/_authenticated/creators'
-import { Route as AuthenticatedFeedRouteImport } from './routes/_authenticated/feed'
-import { Route as AuthenticatedFeedbackRouteImport } from './routes/_authenticated/feedback'
-import { Route as AuthenticatedFriendsRouteImport } from './routes/_authenticated/friends'
-import { Route as AuthenticatedImportRouteImport } from './routes/_authenticated/import'
-import { Route as AuthenticatedImportGoodreadsRouteImport } from './routes/_authenticated/import-goodreads'
-import { Route as AuthenticatedMapRouteImport } from './routes/_authenticated/map'
-import { Route as AuthenticatedMeRouteImport } from './routes/_authenticated/me'
-import { Route as AuthenticatedNotificationSettingsRouteImport } from './routes/_authenticated/notification-settings'
-import { Route as AuthenticatedNotificationsRouteImport } from './routes/_authenticated/notifications'
-import { Route as AuthenticatedSharedCollectionsRouteImport } from './routes/_authenticated/shared-collections'
-import { Route as AuthenticatedTripsRouteImport } from './routes/_authenticated/trips'
-import { Route as AuthenticatedYouRouteImport } from './routes/_authenticated/you'
-import { Route as RIdRouteImport } from './routes/r.$id'
+import { Route as AuthenticatedRouteRouteImport } from './routes/_authenticated/route'
+import { Route as IndexRouteImport } from './routes/index'
 import { Route as TIdRouteImport } from './routes/t.$id'
+import { Route as RIdRouteImport } from './routes/r.$id'
+import { Route as AuthenticatedYouRouteImport } from './routes/_authenticated/you'
+import { Route as AuthenticatedTripsRouteImport } from './routes/_authenticated/trips'
+import { Route as AuthenticatedSharedCollectionsRouteImport } from './routes/_authenticated/shared-collections'
+import { Route as AuthenticatedNotificationsRouteImport } from './routes/_authenticated/notifications'
+import { Route as AuthenticatedNotificationSettingsRouteImport } from './routes/_authenticated/notification-settings'
+import { Route as AuthenticatedMeRouteImport } from './routes/_authenticated/me'
+import { Route as AuthenticatedMapRouteImport } from './routes/_authenticated/map'
+import { Route as AuthenticatedImportGoodreadsRouteImport } from './routes/_authenticated/import-goodreads'
+import { Route as AuthenticatedImportRouteImport } from './routes/_authenticated/import'
+import { Route as AuthenticatedFriendsRouteImport } from './routes/_authenticated/friends'
+import { Route as AuthenticatedFeedbackRouteImport } from './routes/_authenticated/feedback'
+import { Route as AuthenticatedFeedRouteImport } from './routes/_authenticated/feed'
+import { Route as AuthenticatedCreatorsRouteImport } from './routes/_authenticated/creators'
+import { Route as AuthenticatedAdminRouteImport } from './routes/_authenticated/admin'
+import { Route as AuthenticatedAddRouteImport } from './routes/_authenticated/add'
 import { Route as AuthenticatedAskIndexRouteImport } from './routes/_authenticated/ask.index'
-import { Route as AuthenticatedAskIdRouteImport } from './routes/_authenticated/ask.$id'
-import { Route as AuthenticatedGroupIdRouteImport } from './routes/_authenticated/group.$id'
-import { Route as AuthenticatedItemIdRouteImport } from './routes/_authenticated/item.$id'
-import { Route as AuthenticatedListIdRouteImport } from './routes/_authenticated/list.$id'
-import { Route as AuthenticatedProfileUsernameRouteImport } from './routes/_authenticated/profile.$username'
 import { Route as AuthenticatedTripIdRouteImport } from './routes/_authenticated/trip.$id'
+import { Route as AuthenticatedProfileUsernameRouteImport } from './routes/_authenticated/profile.$username'
+import { Route as AuthenticatedListIdRouteImport } from './routes/_authenticated/list.$id'
+import { Route as AuthenticatedItemIdRouteImport } from './routes/_authenticated/item.$id'
+import { Route as AuthenticatedGroupIdRouteImport } from './routes/_authenticated/group.$id'
+import { Route as AuthenticatedAskIdRouteImport } from './routes/_authenticated/ask.$id'
 
-const IndexRoute = IndexRouteImport.update({
-  id: '/',
-  path: '/',
+const AuthRoute = AuthRouteImport.update({
+  id: '/auth',
+  path: '/auth',
   getParentRoute: () => rootRouteImport,
 } as any)
 const AuthenticatedRouteRoute = AuthenticatedRouteRouteImport.update({
   id: '/_authenticated',
   getParentRoute: () => rootRouteImport,
 } as any)
-const AuthRoute = AuthRouteImport.update({
-  id: '/auth',
-  path: '/auth',
+const IndexRoute = IndexRouteImport.update({
+  id: '/',
+  path: '/',
   getParentRoute: () => rootRouteImport,
 } as any)
-const AuthenticatedAddRoute = AuthenticatedAddRouteImport.update({
-  id: '/add',
-  path: '/add',
+const TIdRoute = TIdRouteImport.update({
+  id: '/t/$id',
+  path: '/t/$id',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const RIdRoute = RIdRouteImport.update({
+  id: '/r/$id',
+  path: '/r/$id',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const AuthenticatedYouRoute = AuthenticatedYouRouteImport.update({
+  id: '/you',
+  path: '/you',
   getParentRoute: () => AuthenticatedRouteRoute,
 } as any)
-const AuthenticatedAdminRoute = AuthenticatedAdminRouteImport.update({
-  id: '/admin',
-  path: '/admin',
+const AuthenticatedTripsRoute = AuthenticatedTripsRouteImport.update({
+  id: '/trips',
+  path: '/trips',
   getParentRoute: () => AuthenticatedRouteRoute,
 } as any)
-const AuthenticatedCreatorsRoute = AuthenticatedCreatorsRouteImport.update({
-  id: '/creators',
-  path: '/creators',
-  getParentRoute: () => AuthenticatedRouteRoute,
-} as any)
-const AuthenticatedFeedRoute = AuthenticatedFeedRouteImport.update({
-  id: '/feed',
-  path: '/feed',
-  getParentRoute: () => AuthenticatedRouteRoute,
-} as any)
-const AuthenticatedFeedbackRoute = AuthenticatedFeedbackRouteImport.update({
-  id: '/feedback',
-  path: '/feedback',
-  getParentRoute: () => AuthenticatedRouteRoute,
-} as any)
-const AuthenticatedFriendsRoute = AuthenticatedFriendsRouteImport.update({
-  id: '/friends',
-  path: '/friends',
-  getParentRoute: () => AuthenticatedRouteRoute,
-} as any)
-const AuthenticatedImportRoute = AuthenticatedImportRouteImport.update({
-  id: '/import',
-  path: '/import',
-  getParentRoute: () => AuthenticatedRouteRoute,
-} as any)
-const AuthenticatedImportGoodreadsRoute =
-  AuthenticatedImportGoodreadsRouteImport.update({
-    id: '/import-goodreads',
-    path: '/import-goodreads',
-    getParentRoute: () => AuthenticatedRouteRoute,
-  } as any)
-const AuthenticatedMapRoute = AuthenticatedMapRouteImport.update({
-  id: '/map',
-  path: '/map',
-  getParentRoute: () => AuthenticatedRouteRoute,
-} as any)
-const AuthenticatedMeRoute = AuthenticatedMeRouteImport.update({
-  id: '/me',
-  path: '/me',
-  getParentRoute: () => AuthenticatedRouteRoute,
-} as any)
-const AuthenticatedNotificationSettingsRoute =
-  AuthenticatedNotificationSettingsRouteImport.update({
-    id: '/notification-settings',
-    path: '/notification-settings',
+const AuthenticatedSharedCollectionsRoute =
+  AuthenticatedSharedCollectionsRouteImport.update({
+    id: '/shared-collections',
+    path: '/shared-collections',
     getParentRoute: () => AuthenticatedRouteRoute,
   } as any)
 const AuthenticatedNotificationsRoute =
@@ -114,55 +83,71 @@ const AuthenticatedNotificationsRoute =
     path: '/notifications',
     getParentRoute: () => AuthenticatedRouteRoute,
   } as any)
-const AuthenticatedSharedCollectionsRoute =
-  AuthenticatedSharedCollectionsRouteImport.update({
-    id: '/shared-collections',
-    path: '/shared-collections',
+const AuthenticatedNotificationSettingsRoute =
+  AuthenticatedNotificationSettingsRouteImport.update({
+    id: '/notification-settings',
+    path: '/notification-settings',
     getParentRoute: () => AuthenticatedRouteRoute,
   } as any)
-const AuthenticatedTripsRoute = AuthenticatedTripsRouteImport.update({
-  id: '/trips',
-  path: '/trips',
+const AuthenticatedMeRoute = AuthenticatedMeRouteImport.update({
+  id: '/me',
+  path: '/me',
   getParentRoute: () => AuthenticatedRouteRoute,
 } as any)
-const AuthenticatedYouRoute = AuthenticatedYouRouteImport.update({
-  id: '/you',
-  path: '/you',
+const AuthenticatedMapRoute = AuthenticatedMapRouteImport.update({
+  id: '/map',
+  path: '/map',
   getParentRoute: () => AuthenticatedRouteRoute,
 } as any)
-const RIdRoute = RIdRouteImport.update({
-  id: '/r/$id',
-  path: '/r/$id',
-  getParentRoute: () => rootRouteImport,
+const AuthenticatedImportGoodreadsRoute =
+  AuthenticatedImportGoodreadsRouteImport.update({
+    id: '/import-goodreads',
+    path: '/import-goodreads',
+    getParentRoute: () => AuthenticatedRouteRoute,
+  } as any)
+const AuthenticatedImportRoute = AuthenticatedImportRouteImport.update({
+  id: '/import',
+  path: '/import',
+  getParentRoute: () => AuthenticatedRouteRoute,
 } as any)
-const TIdRoute = TIdRouteImport.update({
-  id: '/t/$id',
-  path: '/t/$id',
-  getParentRoute: () => rootRouteImport,
+const AuthenticatedFriendsRoute = AuthenticatedFriendsRouteImport.update({
+  id: '/friends',
+  path: '/friends',
+  getParentRoute: () => AuthenticatedRouteRoute,
+} as any)
+const AuthenticatedFeedbackRoute = AuthenticatedFeedbackRouteImport.update({
+  id: '/feedback',
+  path: '/feedback',
+  getParentRoute: () => AuthenticatedRouteRoute,
+} as any)
+const AuthenticatedFeedRoute = AuthenticatedFeedRouteImport.update({
+  id: '/feed',
+  path: '/feed',
+  getParentRoute: () => AuthenticatedRouteRoute,
+} as any)
+const AuthenticatedCreatorsRoute = AuthenticatedCreatorsRouteImport.update({
+  id: '/creators',
+  path: '/creators',
+  getParentRoute: () => AuthenticatedRouteRoute,
+} as any)
+const AuthenticatedAdminRoute = AuthenticatedAdminRouteImport.update({
+  id: '/admin',
+  path: '/admin',
+  getParentRoute: () => AuthenticatedRouteRoute,
+} as any)
+const AuthenticatedAddRoute = AuthenticatedAddRouteImport.update({
+  id: '/add',
+  path: '/add',
+  getParentRoute: () => AuthenticatedRouteRoute,
 } as any)
 const AuthenticatedAskIndexRoute = AuthenticatedAskIndexRouteImport.update({
   id: '/ask/',
   path: '/ask/',
   getParentRoute: () => AuthenticatedRouteRoute,
 } as any)
-const AuthenticatedAskIdRoute = AuthenticatedAskIdRouteImport.update({
-  id: '/ask/$id',
-  path: '/ask/$id',
-  getParentRoute: () => AuthenticatedRouteRoute,
-} as any)
-const AuthenticatedGroupIdRoute = AuthenticatedGroupIdRouteImport.update({
-  id: '/group/$id',
-  path: '/group/$id',
-  getParentRoute: () => AuthenticatedRouteRoute,
-} as any)
-const AuthenticatedItemIdRoute = AuthenticatedItemIdRouteImport.update({
-  id: '/item/$id',
-  path: '/item/$id',
-  getParentRoute: () => AuthenticatedRouteRoute,
-} as any)
-const AuthenticatedListIdRoute = AuthenticatedListIdRouteImport.update({
-  id: '/list/$id',
-  path: '/list/$id',
+const AuthenticatedTripIdRoute = AuthenticatedTripIdRouteImport.update({
+  id: '/trip/$id',
+  path: '/trip/$id',
   getParentRoute: () => AuthenticatedRouteRoute,
 } as any)
 const AuthenticatedProfileUsernameRoute =
@@ -171,9 +156,24 @@ const AuthenticatedProfileUsernameRoute =
     path: '/profile/$username',
     getParentRoute: () => AuthenticatedRouteRoute,
   } as any)
-const AuthenticatedTripIdRoute = AuthenticatedTripIdRouteImport.update({
-  id: '/trip/$id',
-  path: '/trip/$id',
+const AuthenticatedListIdRoute = AuthenticatedListIdRouteImport.update({
+  id: '/list/$id',
+  path: '/list/$id',
+  getParentRoute: () => AuthenticatedRouteRoute,
+} as any)
+const AuthenticatedItemIdRoute = AuthenticatedItemIdRouteImport.update({
+  id: '/item/$id',
+  path: '/item/$id',
+  getParentRoute: () => AuthenticatedRouteRoute,
+} as any)
+const AuthenticatedGroupIdRoute = AuthenticatedGroupIdRouteImport.update({
+  id: '/group/$id',
+  path: '/group/$id',
+  getParentRoute: () => AuthenticatedRouteRoute,
+} as any)
+const AuthenticatedAskIdRoute = AuthenticatedAskIdRouteImport.update({
+  id: '/ask/$id',
+  path: '/ask/$id',
   getParentRoute: () => AuthenticatedRouteRoute,
 } as any)
 
@@ -361,11 +361,11 @@ export interface RootRouteChildren {
 
 declare module '@tanstack/react-router' {
   interface FileRoutesByPath {
-    '/': {
-      id: '/'
-      path: '/'
-      fullPath: '/'
-      preLoaderRoute: typeof IndexRouteImport
+    '/auth': {
+      id: '/auth'
+      path: '/auth'
+      fullPath: '/auth'
+      preLoaderRoute: typeof AuthRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/_authenticated': {
@@ -375,123 +375,11 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedRouteRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/auth': {
-      id: '/auth'
-      path: '/auth'
-      fullPath: '/auth'
-      preLoaderRoute: typeof AuthRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/_authenticated/add': {
-      id: '/_authenticated/add'
-      path: '/add'
-      fullPath: '/add'
-      preLoaderRoute: typeof AuthenticatedAddRouteImport
-      parentRoute: typeof AuthenticatedRouteRoute
-    }
-    '/_authenticated/admin': {
-      id: '/_authenticated/admin'
-      path: '/admin'
-      fullPath: '/admin'
-      preLoaderRoute: typeof AuthenticatedAdminRouteImport
-      parentRoute: typeof AuthenticatedRouteRoute
-    }
-    '/_authenticated/creators': {
-      id: '/_authenticated/creators'
-      path: '/creators'
-      fullPath: '/creators'
-      preLoaderRoute: typeof AuthenticatedCreatorsRouteImport
-      parentRoute: typeof AuthenticatedRouteRoute
-    }
-    '/_authenticated/feed': {
-      id: '/_authenticated/feed'
-      path: '/feed'
-      fullPath: '/feed'
-      preLoaderRoute: typeof AuthenticatedFeedRouteImport
-      parentRoute: typeof AuthenticatedRouteRoute
-    }
-    '/_authenticated/feedback': {
-      id: '/_authenticated/feedback'
-      path: '/feedback'
-      fullPath: '/feedback'
-      preLoaderRoute: typeof AuthenticatedFeedbackRouteImport
-      parentRoute: typeof AuthenticatedRouteRoute
-    }
-    '/_authenticated/friends': {
-      id: '/_authenticated/friends'
-      path: '/friends'
-      fullPath: '/friends'
-      preLoaderRoute: typeof AuthenticatedFriendsRouteImport
-      parentRoute: typeof AuthenticatedRouteRoute
-    }
-    '/_authenticated/import': {
-      id: '/_authenticated/import'
-      path: '/import'
-      fullPath: '/import'
-      preLoaderRoute: typeof AuthenticatedImportRouteImport
-      parentRoute: typeof AuthenticatedRouteRoute
-    }
-    '/_authenticated/import-goodreads': {
-      id: '/_authenticated/import-goodreads'
-      path: '/import-goodreads'
-      fullPath: '/import-goodreads'
-      preLoaderRoute: typeof AuthenticatedImportGoodreadsRouteImport
-      parentRoute: typeof AuthenticatedRouteRoute
-    }
-    '/_authenticated/map': {
-      id: '/_authenticated/map'
-      path: '/map'
-      fullPath: '/map'
-      preLoaderRoute: typeof AuthenticatedMapRouteImport
-      parentRoute: typeof AuthenticatedRouteRoute
-    }
-    '/_authenticated/me': {
-      id: '/_authenticated/me'
-      path: '/me'
-      fullPath: '/me'
-      preLoaderRoute: typeof AuthenticatedMeRouteImport
-      parentRoute: typeof AuthenticatedRouteRoute
-    }
-    '/_authenticated/notification-settings': {
-      id: '/_authenticated/notification-settings'
-      path: '/notification-settings'
-      fullPath: '/notification-settings'
-      preLoaderRoute: typeof AuthenticatedNotificationSettingsRouteImport
-      parentRoute: typeof AuthenticatedRouteRoute
-    }
-    '/_authenticated/notifications': {
-      id: '/_authenticated/notifications'
-      path: '/notifications'
-      fullPath: '/notifications'
-      preLoaderRoute: typeof AuthenticatedNotificationsRouteImport
-      parentRoute: typeof AuthenticatedRouteRoute
-    }
-    '/_authenticated/shared-collections': {
-      id: '/_authenticated/shared-collections'
-      path: '/shared-collections'
-      fullPath: '/shared-collections'
-      preLoaderRoute: typeof AuthenticatedSharedCollectionsRouteImport
-      parentRoute: typeof AuthenticatedRouteRoute
-    }
-    '/_authenticated/trips': {
-      id: '/_authenticated/trips'
-      path: '/trips'
-      fullPath: '/trips'
-      preLoaderRoute: typeof AuthenticatedTripsRouteImport
-      parentRoute: typeof AuthenticatedRouteRoute
-    }
-    '/_authenticated/you': {
-      id: '/_authenticated/you'
-      path: '/you'
-      fullPath: '/you'
-      preLoaderRoute: typeof AuthenticatedYouRouteImport
-      parentRoute: typeof AuthenticatedRouteRoute
-    }
-    '/r/$id': {
-      id: '/r/$id'
-      path: '/r/$id'
-      fullPath: '/r/$id'
-      preLoaderRoute: typeof RIdRouteImport
+    '/': {
+      id: '/'
+      path: '/'
+      fullPath: '/'
+      preLoaderRoute: typeof IndexRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/t/$id': {
@@ -501,6 +389,118 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof TIdRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/r/$id': {
+      id: '/r/$id'
+      path: '/r/$id'
+      fullPath: '/r/$id'
+      preLoaderRoute: typeof RIdRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/_authenticated/you': {
+      id: '/_authenticated/you'
+      path: '/you'
+      fullPath: '/you'
+      preLoaderRoute: typeof AuthenticatedYouRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
+    '/_authenticated/trips': {
+      id: '/_authenticated/trips'
+      path: '/trips'
+      fullPath: '/trips'
+      preLoaderRoute: typeof AuthenticatedTripsRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
+    '/_authenticated/shared-collections': {
+      id: '/_authenticated/shared-collections'
+      path: '/shared-collections'
+      fullPath: '/shared-collections'
+      preLoaderRoute: typeof AuthenticatedSharedCollectionsRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
+    '/_authenticated/notifications': {
+      id: '/_authenticated/notifications'
+      path: '/notifications'
+      fullPath: '/notifications'
+      preLoaderRoute: typeof AuthenticatedNotificationsRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
+    '/_authenticated/notification-settings': {
+      id: '/_authenticated/notification-settings'
+      path: '/notification-settings'
+      fullPath: '/notification-settings'
+      preLoaderRoute: typeof AuthenticatedNotificationSettingsRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
+    '/_authenticated/me': {
+      id: '/_authenticated/me'
+      path: '/me'
+      fullPath: '/me'
+      preLoaderRoute: typeof AuthenticatedMeRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
+    '/_authenticated/map': {
+      id: '/_authenticated/map'
+      path: '/map'
+      fullPath: '/map'
+      preLoaderRoute: typeof AuthenticatedMapRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
+    '/_authenticated/import-goodreads': {
+      id: '/_authenticated/import-goodreads'
+      path: '/import-goodreads'
+      fullPath: '/import-goodreads'
+      preLoaderRoute: typeof AuthenticatedImportGoodreadsRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
+    '/_authenticated/import': {
+      id: '/_authenticated/import'
+      path: '/import'
+      fullPath: '/import'
+      preLoaderRoute: typeof AuthenticatedImportRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
+    '/_authenticated/friends': {
+      id: '/_authenticated/friends'
+      path: '/friends'
+      fullPath: '/friends'
+      preLoaderRoute: typeof AuthenticatedFriendsRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
+    '/_authenticated/feedback': {
+      id: '/_authenticated/feedback'
+      path: '/feedback'
+      fullPath: '/feedback'
+      preLoaderRoute: typeof AuthenticatedFeedbackRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
+    '/_authenticated/feed': {
+      id: '/_authenticated/feed'
+      path: '/feed'
+      fullPath: '/feed'
+      preLoaderRoute: typeof AuthenticatedFeedRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
+    '/_authenticated/creators': {
+      id: '/_authenticated/creators'
+      path: '/creators'
+      fullPath: '/creators'
+      preLoaderRoute: typeof AuthenticatedCreatorsRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
+    '/_authenticated/admin': {
+      id: '/_authenticated/admin'
+      path: '/admin'
+      fullPath: '/admin'
+      preLoaderRoute: typeof AuthenticatedAdminRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
+    '/_authenticated/add': {
+      id: '/_authenticated/add'
+      path: '/add'
+      fullPath: '/add'
+      preLoaderRoute: typeof AuthenticatedAddRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
     '/_authenticated/ask/': {
       id: '/_authenticated/ask/'
       path: '/ask'
@@ -508,32 +508,11 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedAskIndexRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
-    '/_authenticated/ask/$id': {
-      id: '/_authenticated/ask/$id'
-      path: '/ask/$id'
-      fullPath: '/ask/$id'
-      preLoaderRoute: typeof AuthenticatedAskIdRouteImport
-      parentRoute: typeof AuthenticatedRouteRoute
-    }
-    '/_authenticated/group/$id': {
-      id: '/_authenticated/group/$id'
-      path: '/group/$id'
-      fullPath: '/group/$id'
-      preLoaderRoute: typeof AuthenticatedGroupIdRouteImport
-      parentRoute: typeof AuthenticatedRouteRoute
-    }
-    '/_authenticated/item/$id': {
-      id: '/_authenticated/item/$id'
-      path: '/item/$id'
-      fullPath: '/item/$id'
-      preLoaderRoute: typeof AuthenticatedItemIdRouteImport
-      parentRoute: typeof AuthenticatedRouteRoute
-    }
-    '/_authenticated/list/$id': {
-      id: '/_authenticated/list/$id'
-      path: '/list/$id'
-      fullPath: '/list/$id'
-      preLoaderRoute: typeof AuthenticatedListIdRouteImport
+    '/_authenticated/trip/$id': {
+      id: '/_authenticated/trip/$id'
+      path: '/trip/$id'
+      fullPath: '/trip/$id'
+      preLoaderRoute: typeof AuthenticatedTripIdRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
     '/_authenticated/profile/$username': {
@@ -543,11 +522,32 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedProfileUsernameRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
-    '/_authenticated/trip/$id': {
-      id: '/_authenticated/trip/$id'
-      path: '/trip/$id'
-      fullPath: '/trip/$id'
-      preLoaderRoute: typeof AuthenticatedTripIdRouteImport
+    '/_authenticated/list/$id': {
+      id: '/_authenticated/list/$id'
+      path: '/list/$id'
+      fullPath: '/list/$id'
+      preLoaderRoute: typeof AuthenticatedListIdRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
+    '/_authenticated/item/$id': {
+      id: '/_authenticated/item/$id'
+      path: '/item/$id'
+      fullPath: '/item/$id'
+      preLoaderRoute: typeof AuthenticatedItemIdRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
+    '/_authenticated/group/$id': {
+      id: '/_authenticated/group/$id'
+      path: '/group/$id'
+      fullPath: '/group/$id'
+      preLoaderRoute: typeof AuthenticatedGroupIdRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
+    '/_authenticated/ask/$id': {
+      id: '/_authenticated/ask/$id'
+      path: '/ask/$id'
+      fullPath: '/ask/$id'
+      preLoaderRoute: typeof AuthenticatedAskIdRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
   }
