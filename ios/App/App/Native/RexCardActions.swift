@@ -23,20 +23,24 @@ struct RexCardActions: View {
             action(
                 icon: liked ? "heart.fill" : "heart",
                 tint: liked ? RexColor.accent : RexColor.mutedForeground,
-                count: likeCount
+                count: likeCount,
+                label: liked ? "Unlike" : "Like"
             ) {
                 Task { await toggleLike() }
             }
 
             // Comments live on the detail screen; this is a visual affordance
             // that the card is tappable through to them.
-            action(icon: "bubble.left", tint: RexColor.mutedForeground, count: 0) {}
+            action(icon: "bubble.left", tint: RexColor.mutedForeground, count: 0, label: "Comments") {}
                 .allowsHitTesting(false)
 
             action(
                 icon: saved ? "bookmark.fill" : "bookmark",
                 tint: saved ? RexColor.primary : RexColor.mutedForeground,
-                count: 0
+                count: 0,
+                label: saved ? "Remove from collection" : "Save to collection",
+                activeLabel: "Saved",
+                isActive: saved
             ) {
                 Task { await toggleSave() }
             }
@@ -44,7 +48,10 @@ struct RexCardActions: View {
             action(
                 icon: wanted ? "checkmark.circle.fill" : "plus.circle",
                 tint: wanted ? RexColor.primary : RexColor.mutedForeground,
-                count: 0
+                count: 0,
+                label: wanted ? "Remove from want-to list" : "Add to want-to list",
+                activeLabel: "Want to",
+                isActive: wanted
             ) {
                 Task { await toggleWant() }
             }
@@ -59,10 +66,15 @@ struct RexCardActions: View {
         .task { await loadState() }
     }
 
+    /// `label` doubles as the accessibility label and, when the action is on,
+    /// a short caption — "what does that tick mean?" was real feedback.
     private func action(
         icon: String,
         tint: Color,
         count: Int,
+        label: String,
+        activeLabel: String? = nil,
+        isActive: Bool = false,
         perform: @escaping () -> Void
     ) -> some View {
         Button(action: perform) {
@@ -70,7 +82,11 @@ struct RexCardActions: View {
                 Image(systemName: icon)
                     .font(.system(size: 15))
                     .foregroundStyle(tint)
-                if count > 0 {
+                if isActive, let activeLabel {
+                    Text(activeLabel)
+                        .font(RexFont.text(11, weight: .medium))
+                        .foregroundStyle(tint)
+                } else if count > 0 {
                     Text("\(count)")
                         .font(RexFont.text(11))
                         .foregroundStyle(RexColor.mutedForeground)
@@ -79,6 +95,7 @@ struct RexCardActions: View {
         }
         .buttonStyle(.plain)
         .disabled(busy)
+        .accessibilityLabel(label)
     }
 
     private func loadState() async {

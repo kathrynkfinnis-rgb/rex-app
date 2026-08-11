@@ -441,8 +441,12 @@ struct AddRexView: View {
 
     private var successState: some View {
         VStack(spacing: 16) {
-            Text(didWant ? "📌" : "🦖").font(.system(size: 56))
-            Text(didWant ? "Saved!" : "Nice one!").font(.system(size: 26, weight: .semibold, design: .rounded)).foregroundStyle(RexColor.foreground)
+            Image(systemName: didWant ? "bookmark.fill" : "checkmark.circle.fill")
+                .font(.system(size: 44))
+                .foregroundStyle(RexColor.primary)
+            Text(didWant ? "Saved" : "Posted")
+                .font(RexFont.display(26, weight: .semibold))
+                .foregroundStyle(RexColor.foreground)
             Text(didWant ? "\"\(title)\" is on your want-to list." : "\"\(title)\" is in your feed.")
                 .font(.system(size: 15))
                 .foregroundStyle(RexColor.mutedForeground)
