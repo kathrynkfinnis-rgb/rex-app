@@ -578,6 +578,67 @@ final class RexAPI {
 
     // MARK: - Wants (Collections)
 
+    // MARK: - Profile
+
+    /// Uploads an avatar to the `avatars` bucket (own folder, matching the RLS
+    /// policy) and returns a long-lived signed URL.
+    func uploadAvatar(data imageData: Data) async throws -> String {
+        let token = try await validToken()
+        guard let userId = currentUserId else { throw RexAPIError.notSignedIn }
+        let path = "\(userId)/\(UUID().uuidString).jpg"
+
+        var upload = URLRequest(url: baseURL.appendingPathComponent("/storage/v1/object/avatars/\(path)"))
+        upload.httpMethod = "POST"
+        upload.setValue(anonKey, forHTTPHeaderField: "apikey")
+        upload.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+        upload.setValue("image/jpeg", forHTTPHeaderField: "Content-Type")
+        upload.httpBody = imageData
+
+        let (upData, upResponse) = try await URLSession.shared.data(for: upload)
+        guard let upHttp = upResponse as? HTTPURLResponse, upHttp.statusCode < 400 else {
+            let body = String(data: upData, encoding: .utf8) ?? ""
+            throw RexAPIError.server("Couldn't upload that photo. \(body)")
+        }
+
+        var sign = URLRequest(url: baseURL.appendingPathComponent("/storage/v1/object/sign/avatars/\(path)"))
+        sign.httpMethod = "POST"
+        sign.setValue(anonKey, forHTTPHeaderField: "apikey")
+        sign.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+        sign.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        sign.httpBody = try JSONSerialization.data(withJSONObject: ["expiresIn": 157_680_000])
+
+        let (signData, signResponse) = try await URLSession.shared.data(for: sign)
+        guard let signHttp = signResponse as? HTTPURLResponse, signHttp.statusCode < 400,
+              let json = try JSONSerialization.jsonObject(with: signData) as? [String: Any],
+              let signed = json["signedURL"] as? String ?? json["signedUrl"] as? String
+        else { throw RexAPIError.server("Couldn't sign that photo URL.") }
+        return baseURL.absoluteString + "/storage/v1" + signed
+    }
+
+    func updateProfile(displayName: String?, avatarURL: String?) async throws {
+        let token = try await validToken()
+        guard let userId = currentUserId else { throw RexAPIError.notSignedIn }
+        var components = URLComponents(url: baseURL.appendingPathComponent("/rest/v1/profiles"), resolvingAgainstBaseURL: false)!
+        components.queryItems = [URLQueryItem(name: "id", value: "eq.\(userId)")]
+        var request = URLRequest(url: components.url!)
+        request.httpMethod = "PATCH"
+        request.setValue(anonKey, forHTTPHeaderField: "apikey")
+        request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+
+        var body: [String: Any] = [:]
+        if let displayName { body["display_name"] = displayName.isEmpty ? NSNull() : displayName }
+        if let avatarURL { body["avatar_url"] = avatarURL }
+        guard !body.isEmpty else { return }
+        request.httpBody = try JSONSerialization.data(withJSONObject: body)
+
+        let (data, response) = try await URLSession.shared.data(for: request)
+        guard let http = response as? HTTPURLResponse, http.statusCode < 400 else {
+            let body = String(data: data, encoding: .utf8) ?? ""
+            throw RexAPIError.server("Couldn't save your profile. \(body)")
+        }
+    }
+
     // MARK: - Photos
 
     /// Uploads image data to the rec-photos bucket and returns a long-lived

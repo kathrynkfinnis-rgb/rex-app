@@ -19,6 +19,7 @@ struct ProfileView: View {
     @State private var selectedIds: Set<String> = []
     @State private var confirmBulkDelete = false
     @State private var isDeleting = false
+    @State private var editingProfile = false
 
     private var availableCategories: [RexCategory] {
         let present = Set(recommendations.compactMap { RexCategory(rawValue: $0.items?.type ?? "") })
@@ -98,6 +99,9 @@ struct ProfileView: View {
             Text("This can't be undone.")
         }
         .task { await load() }
+        .sheet(isPresented: $editingProfile) {
+            EditProfileView(profile: profile, onSaved: { Task { await load() } })
+        }
         .sheet(item: $editing) { rec in
             EditRexView(
                 rec: rec,
@@ -136,13 +140,11 @@ struct ProfileView: View {
 
     private var header: some View {
         HStack(spacing: 14) {
-            ZStack {
-                Circle().fill(RexColor.primary)
-                Text(String((profile?.display_name ?? profile?.username ?? "?").prefix(1)).uppercased())
-                    .font(.system(size: 24, weight: .semibold))
-                    .foregroundStyle(RexColor.primaryForeground)
-            }
-            .frame(width: 64, height: 64)
+            UserAvatarView(
+                url: profile?.avatar_url,
+                name: profile?.display_name ?? profile?.username ?? "?",
+                size: 64
+            )
 
             VStack(alignment: .leading, spacing: 3) {
                 Text(profile?.display_name ?? profile?.username ?? "")
@@ -163,6 +165,17 @@ struct ProfileView: View {
                 .padding(.top, 2)
             }
             Spacer()
+            Button {
+                editingProfile = true
+            } label: {
+                Text("Edit")
+                    .font(RexFont.text(13, weight: .semibold))
+                    .foregroundStyle(RexColor.primary)
+                    .padding(.horizontal, RexSpacing.md)
+                    .padding(.vertical, 6)
+                    .overlay(Capsule().stroke(RexColor.primary, lineWidth: 1))
+            }
+            .buttonStyle(.plain)
         }
         .padding(16)
     }
