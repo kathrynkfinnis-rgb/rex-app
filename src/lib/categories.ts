@@ -22,7 +22,7 @@ export const CATEGORIES: {
   { type: "podcast", label: "Podcast", plural: "Podcasts", icon: Mic, tokenClass: "bg-cat-podcast/15 text-cat-podcast", subtitleLabel: "Host or network", actionVerb: "Listened", wantVerb: "Want to listen", hitDefaultEmoji: "🎧", hitDefaultLabel: "To listen" },
   { type: "recipe", label: "Recipe", plural: "Recipes", icon: ChefHat, tokenClass: "bg-cat-recipe/15 text-cat-recipe", subtitleLabel: "Cookbook, chef, or source", actionVerb: "Cooked it", wantVerb: "Want to try", hitDefaultEmoji: "🍜", hitDefaultLabel: "To eat" },
   { type: "event", label: "Event", plural: "Events", icon: Ticket, tokenClass: "bg-cat-event/15 text-cat-event", subtitleLabel: "Venue, date, or type", actionVerb: "Went", wantVerb: "Want to go", hitDefaultEmoji: "🎟️", hitDefaultLabel: "To attend" },
-  { type: "other", label: "Stuff", plural: "Stuff", icon: Sparkles, tokenClass: "bg-cat-other/15 text-cat-other", subtitleLabel: "What is it?", actionVerb: "Tried it", wantVerb: "Want to try", hitDefaultEmoji: "✨", hitDefaultLabel: "To try" },
+  { type: "other", label: "Other", plural: "Other", icon: Sparkles, tokenClass: "bg-cat-other/15 text-cat-other", subtitleLabel: "What is it?", actionVerb: "Tried it", wantVerb: "Want to try", hitDefaultEmoji: "✨", hitDefaultLabel: "To try" },
 ];
 
 export function categoryMeta(type: ItemType) {
@@ -75,8 +75,12 @@ export const SUBCATEGORIES: Record<ItemType, readonly string[]> = {
     "Festival", "Film", "Other",
   ],
   other: [
-    "Product", "Gadget", "App", "Service", "Newsletter", "Video",
-    "Article", "Game", "Hidden gem", "Other",
+    // Things
+    "Product", "Gadget", "App", "Newsletter", "Video", "Article", "Game",
+    // Services — tradespeople and the like, requested as its own grouping
+    "Tradesperson", "Beauty", "Gardener", "Cleaner", "Childcare",
+    "Health & fitness", "Other service",
+    "Hidden gem", "Other",
   ],
 };
 

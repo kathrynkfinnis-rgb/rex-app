@@ -256,7 +256,9 @@ final class RexAPI {
         title: String,
         subtitle: String?,
         address: String?,
-        hit: RexSearchHit? = nil
+        hit: RexSearchHit? = nil,
+        genre: String? = nil,
+        linkURL: String? = nil
     ) async throws -> String {
         let token = try await validToken()
         var request = URLRequest(url: baseURL.appendingPathComponent("/rest/v1/items"))
@@ -277,6 +279,9 @@ final class RexAPI {
             body["lat"] = hit.lat ?? NSNull()
             body["lng"] = hit.lng ?? NSNull()
         }
+        // An explicit subcategory choice wins over whatever the catalogue guessed.
+        if let genre, !genre.isEmpty { body["genre"] = genre }
+        if let linkURL, !linkURL.isEmpty { body["link_url"] = linkURL }
         request.httpBody = try JSONSerialization.data(withJSONObject: body)
 
         let (data, response) = try await URLSession.shared.data(for: request)

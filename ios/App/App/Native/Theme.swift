@@ -160,7 +160,7 @@ enum RexCategory: String {
         case .podcast: return "Podcast"
         case .recipe: return "Recipe"
         case .event: return "Event"
-        case .other: return "Stuff"
+        case .other: return "Other"
         }
     }
 
@@ -183,7 +183,65 @@ enum RexCategory: String {
     }
 }
 
+/// Subcategories per category, mirroring src/lib/categories.ts. Stored
+/// comma-separated in items.genre.
+let rexSubcategories: [RexCategory: [String]] = [
+    .place: ["Restaurant", "Private dining", "Bar", "Café", "Beauty",
+             "Accommodation", "Shop", "Activity", "Other"],
+    .trip: ["City break", "Beach", "Road trip", "Countryside", "Ski", "Adventure",
+            "Family", "Weekend away", "Honeymoon", "Work trip", "Other"],
+    .recipe: ["Salad", "Soup", "Pasta", "Rice & grains", "Meat", "Fish & seafood",
+              "Vegetarian", "Vegan", "Breakfast", "Dessert", "Baking", "Snack",
+              "Drink", "Sauce & dressing", "Other"],
+    .book: ["Fiction", "Non-fiction", "Thriller", "Mystery", "Sci-fi", "Fantasy",
+            "Romance", "Biography", "History", "Business", "Self-help", "Poetry",
+            "Kids", "Other"],
+    .movie: ["Action", "Comedy", "Drama", "Thriller", "Horror", "Sci-fi",
+             "Documentary", "Romance", "Animation", "Kids", "Other"],
+    .tv: ["Drama", "Comedy", "Documentary", "Reality", "Crime", "Sci-fi",
+          "Kids", "Sport", "Other"],
+    .podcast: ["Comedy", "News", "History", "Business", "Interview", "True crime",
+               "Society", "Sport", "Tech", "Other"],
+    .event: ["Concert", "Exhibition", "Theatre", "Comedy", "Sport", "Talk",
+             "Festival", "Film", "Other"],
+    .other: ["Product", "Gadget", "App", "Newsletter", "Video", "Article", "Game",
+             "Tradesperson", "Beauty", "Gardener", "Cleaner", "Childcare",
+             "Health & fitness", "Other service", "Hidden gem", "Other"],
+]
+
 /// All categories in the order the web app shows them.
 let rexAllCategories: [RexCategory] = [
     .place, .trip, .book, .movie, .tv, .podcast, .recipe, .event, .other,
 ]
+
+/// Wrapping row of multi-select chips, used for subcategories.
+struct FlowChips: View {
+    let options: [String]
+    @Binding var selected: Set<String>
+
+    var body: some View {
+        // A horizontal scroller keeps this predictable on narrow screens
+        // without needing a custom wrapping layout.
+        ScrollView(.horizontal, showsIndicators: false) {
+            HStack(spacing: RexSpacing.sm) {
+                ForEach(options, id: \.self) { option in
+                    let isOn = selected.contains(option)
+                    Button {
+                        if isOn { selected.remove(option) } else { selected.insert(option) }
+                    } label: {
+                        Text(option)
+                            .font(RexFont.text(13, weight: isOn ? .semibold : .regular))
+                            .foregroundStyle(isOn ? RexColor.primaryForeground : RexColor.mutedForeground)
+                            .padding(.horizontal, RexSpacing.md)
+                            .padding(.vertical, 7)
+                            .background(isOn ? RexColor.primary : RexColor.card)
+                            .clipShape(Capsule())
+                            .overlay(Capsule().stroke(isOn ? RexColor.primary : RexColor.border, lineWidth: 1))
+                    }
+                    .buttonStyle(.plain)
+                }
+            }
+            .padding(.horizontal, 1)
+        }
+    }
+}

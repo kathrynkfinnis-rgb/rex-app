@@ -32,6 +32,8 @@ struct AddRexView: View {
     @State private var picked: RexSearchHit?
     @State private var searchTask: Task<Void, Never>?
     @State private var photoURLs: [String] = []
+    @State private var subcategories: Set<String> = []
+    @State private var productLink = ""
 
     var body: some View {
         NavigationStack {
@@ -98,6 +100,18 @@ struct AddRexView: View {
             if category == .place || category == .event {
                 field("Address", text: $address, placeholder: "Optional")
             }
+
+            if let options = rexSubcategories[category], !options.isEmpty {
+                Text(category == .place ? "Type of place" : "Type")
+                    .font(.system(size: 14, weight: .semibold))
+                    .foregroundStyle(RexColor.foreground)
+                FlowChips(options: options, selected: $subcategories)
+            }
+
+            // Somewhere to put a link to the thing itself — most useful on
+            // Other (products, services) but harmless everywhere.
+            field("Link (optional)", text: $productLink, placeholder: "https://…")
+                .textInputAutocapitalization(.never)
 
             modePicker(for: category)
 
@@ -361,7 +375,9 @@ struct AddRexView: View {
                 title: title.trimmingCharacters(in: .whitespaces),
                 subtitle: subtitle.isEmpty ? nil : subtitle,
                 address: (category == .place || category == .event) && !address.isEmpty ? address : nil,
-                hit: picked
+                hit: picked,
+                genre: subcategories.isEmpty ? nil : subcategories.sorted().joined(separator: ", "),
+                linkURL: productLink.trimmingCharacters(in: .whitespaces).isEmpty ? nil : productLink.trimmingCharacters(in: .whitespaces)
             )
             switch mode {
             case .rated:
