@@ -35,6 +35,10 @@ struct AddRexView: View {
     @State private var subcategories: Set<String> = []
     @State private var productLink = ""
     @State private var tripStops: [DraftStop] = []
+    @State private var recipeText = ""
+    /// Searchable categories open on a search field; the full form only
+    /// appears once something's picked or you choose to type it in manually.
+    @State private var manualEntry = false
 
     var body: some View {
         NavigationStack {
@@ -55,7 +59,14 @@ struct AddRexView: View {
             .toolbar {
                 if category != nil && !didPost {
                     ToolbarItem(placement: .topBarLeading) {
-                        Button("Back") { withAnimation { category = nil } }
+                        Button("Back") {
+                            withAnimation {
+                                category = nil
+                                manualEntry = false
+                                picked = nil
+                                hits = []
+                            }
+                        }
                     }
                 }
                 ToolbarItem(placement: .topBarTrailing) {
@@ -91,11 +102,37 @@ struct AddRexView: View {
     @ViewBuilder
     private func form(for category: RexCategory) -> some View {
         VStack(alignment: .leading, spacing: 14) {
-            field("Title", text: $title, placeholder: "e.g. \(placeholderTitle(for: category))")
+            let searchable: Set<RexCategory> = [.place, .event, .book, .movie, .tv, .podcast]
+            let searchFirst = searchable.contains(category) && picked == nil && !manualEntry
+
+            field(searchFirst ? "Search" : "Title", text: $title,
+                  placeholder: searchFirst
+                      ? "Search \(category.label.lowercased())s…"
+                      : "e.g. \(placeholderTitle(for: category))")
                 .onChange(of: title) { _, _ in scheduleSearch(for: category) }
 
             suggestions(for: category)
 
+            if searchFirst {
+                // Escape hatch for anything the catalogues don't have.
+                Button {
+                    manualEntry = true
+                } label: {
+                    HStack(spacing: RexSpacing.sm) {
+                        Image(systemName: "square.and.pencil").font(.system(size: 12))
+                        Text("Can't find it? Enter the details manually")
+                            .font(RexFont.text(13, weight: .medium))
+                    }
+                    .foregroundStyle(RexColor.primary)
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, RexSpacing.md)
+                    .background(RexColor.badgeBackground)
+                    .clipShape(RoundedRectangle(cornerRadius: RexRadius.input, style: .continuous))
+                }
+                .buttonStyle(.plain)
+            }
+
+            if !searchFirst {
             field(subtitleLabel(for: category), text: $subtitle, placeholder: "Optional")
 
             if category == .place || category == .event {
@@ -104,6 +141,10 @@ struct AddRexView: View {
 
             if category == .trip {
                 TripStopsBuilderView(stops: $tripStops)
+            }
+
+            if category == .recipe {
+                RecipeEditorView(recipeText: $recipeText)
             }
 
             if let options = rexSubcategories[category], !options.isEmpty {
@@ -154,6 +195,7 @@ struct AddRexView: View {
             .clipShape(Capsule())
             .disabled(isSaving || title.trimmingCharacters(in: .whitespaces).isEmpty)
             .padding(.top, 6)
+            }
         }
         .padding(16)
     }
@@ -382,7 +424,8 @@ struct AddRexView: View {
                 address: (category == .place || category == .event) && !address.isEmpty ? address : nil,
                 hit: picked,
                 genre: subcategories.isEmpty ? nil : subcategories.sorted().joined(separator: ", "),
-                linkURL: productLink.trimmingCharacters(in: .whitespaces).isEmpty ? nil : productLink.trimmingCharacters(in: .whitespaces)
+                linkURL: productLink.trimmingCharacters(in: .whitespaces).isEmpty ? nil : productLink.trimmingCharacters(in: .whitespaces),
+                recipeText: category == .recipe && !recipeText.isEmpty ? recipeText : nil
             )
             // Trip stops become their own Rex, linked to the trip.
             if category == .trip, !tripStops.isEmpty {

@@ -263,7 +263,8 @@ final class RexAPI {
         externalSource: String? = nil,
         imageURL: String? = nil,
         lat: Double? = nil,
-        lng: Double? = nil
+        lng: Double? = nil,
+        recipeText: String? = nil
     ) async throws -> String {
         let token = try await validToken()
         var request = URLRequest(url: baseURL.appendingPathComponent("/rest/v1/items"))
@@ -295,6 +296,7 @@ final class RexAPI {
         // Google's public rating, kept separate from friends' ratings.
         if let r = hit?.googleRating { body["google_rating"] = r }
         if let c = hit?.googleRatingCount { body["google_rating_count"] = c }
+        if let recipeText, !recipeText.isEmpty { body["recipe_text"] = recipeText }
         request.httpBody = try JSONSerialization.data(withJSONObject: body)
 
         let (data, response) = try await URLSession.shared.data(for: request)
