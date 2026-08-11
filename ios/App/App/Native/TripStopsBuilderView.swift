@@ -142,6 +142,26 @@ struct TripStopsBuilderView: View {
             Text("Each stop becomes its own Rex as well as part of the trip.")
                 .font(RexFont.text(11))
                 .foregroundStyle(RexColor.mutedForeground)
+
+            // Importing a curated itinerary means picking a Word/Excel file and
+            // parsing it — something you'd realistically do at a desk. Rather
+            // than rebuild that on the phone, hand off to the web importer,
+            // which already handles headings and links.
+            Link(destination: URL(string: "https://kathrynkfinnis-rgb-rex-app.kathryn-k-finnis.workers.dev/import")!) {
+                HStack(spacing: RexSpacing.sm) {
+                    Image(systemName: "square.and.arrow.down")
+                        .font(.system(size: 13))
+                    Text("Import a trip from a document")
+                        .font(RexFont.text(13, weight: .medium))
+                    Spacer()
+                    Image(systemName: "arrow.up.right")
+                        .font(.system(size: 11))
+                }
+                .foregroundStyle(RexColor.primary)
+                .padding(RexSpacing.md)
+                .background(RexColor.badgeBackground)
+                .clipShape(RoundedRectangle(cornerRadius: RexRadius.input, style: .continuous))
+            }
         }
     }
 
