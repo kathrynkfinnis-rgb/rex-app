@@ -19,6 +19,7 @@ struct FeedView: View {
     @State private var query = ""
     @State private var myProfile: RexProfileDetail?
     @State private var editing: FeedRecommendation?
+    @State private var addingToCollection: FeedRecommendation?
 
     /// Categories that actually appear in the feed, so we don't show filters
     /// that would return nothing.
@@ -98,6 +99,13 @@ struct FeedView: View {
                                     }
                                 }
                                 .modifier(EditableIfMine(rec: rec, editing: $editing))
+                                .contextMenu {
+                                    Button {
+                                        addingToCollection = rec
+                                    } label: {
+                                        Label("Add to collection", systemImage: "folder.badge.plus")
+                                    }
+                                }
                             }
                         }
                     }
@@ -187,6 +195,9 @@ struct FeedView: View {
                 onSaved: { Task { await loadFeed() } },
                 onDeleted: { Task { await loadFeed() } }
             )
+        }
+        .sheet(item: $addingToCollection) { rec in
+            AddToCollectionView(rec: rec, onDone: {})
         }
     }
 
