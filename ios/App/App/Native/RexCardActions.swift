@@ -9,6 +9,7 @@ struct RexCardActions: View {
     @State private var liked = false
     @State private var likeCount = 0
     @State private var wanted = false
+    @State private var commentCount = 0
     @State private var busy = false
 
     private var shareText: String {
@@ -30,7 +31,8 @@ struct RexCardActions: View {
 
             // Comments live on the detail screen; this is a visual affordance
             // that the card is tappable through to them.
-            action(icon: "bubble.left", tint: RexColor.mutedForeground, count: 0, label: "Comments") {}
+            action(icon: "bubble.left", tint: RexColor.mutedForeground,
+                   count: commentCount, label: "Comments") {}
                 .allowsHitTesting(false)
 
             // A single save action. There used to be two (bookmark and +)
@@ -49,11 +51,12 @@ struct RexCardActions: View {
             }
 
             ShareLink(item: shareText) {
-                Image(systemName: "square.and.arrow.up")
+                Image(systemName: "paperplane")
                     .font(.system(size: 15))
                     .foregroundStyle(RexColor.mutedForeground)
             }
             .buttonStyle(.plain)
+            .accessibilityLabel("Share with friends")
         }
         .task { await loadState() }
     }
@@ -96,6 +99,7 @@ struct RexCardActions: View {
             liked = entry.likedByMe
         }
         wanted = (try? await RexAPI.shared.isWanted(itemId: rec.item_id)) ?? false
+        commentCount = (try? await RexAPI.shared.fetchCommentCounts(recommendationIds: [rec.id])[rec.id]) ?? 0
     }
 
     /// Optimistic, rolling back if the write fails.

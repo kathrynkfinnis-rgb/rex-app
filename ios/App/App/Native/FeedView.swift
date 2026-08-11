@@ -17,6 +17,8 @@ struct FeedView: View {
     @State private var filter: RexCategory?
     @State private var subFilter: String?
     @State private var query = ""
+    @State private var myProfile: RexProfileDetail?
+    @State private var editing: FeedRecommendation?
 
     /// Categories that actually appear in the feed, so we don't show filters
     /// that would return nothing.
@@ -73,28 +75,29 @@ struct FeedView: View {
                         } else if visible.isEmpty {
                             noMatchesState
                         } else {
-                            // Leaderboard sits above the feed, and hides itself
-                            // when there's nothing to show.
                             if filter == nil && subFilter == nil && query.isEmpty {
-                                TopRexxersView()
+                                askForRexCard
                             }
                             ForEach(visible) { rec in
-                                // Trips open their itinerary; everything else
-                                // opens the item screen.
-                                if RexCategory(rawType: rec.items?.type) == .trip {
-                                    NavigationLink(value: TripRoute(
-                                        recommendationId: rec.id,
-                                        title: rec.items?.title ?? "Trip",
-                                    )) {
-                                        RecommendationCardView(rec: rec)
+                                Group {
+                                    // Trips open their itinerary; everything
+                                    // else opens the item screen.
+                                    if RexCategory(rawType: rec.items?.type) == .trip {
+                                        NavigationLink(value: TripRoute(
+                                            recommendationId: rec.id,
+                                            title: rec.items?.title ?? "Trip",
+                                        )) {
+                                            RecommendationCardView(rec: rec)
+                                        }
+                                        .buttonStyle(.plain)
+                                    } else {
+                                        NavigationLink(value: rec.item_id) {
+                                            RecommendationCardView(rec: rec)
+                                        }
+                                        .buttonStyle(.plain)
                                     }
-                                    .buttonStyle(.plain)
-                                } else {
-                                    NavigationLink(value: rec.item_id) {
-                                        RecommendationCardView(rec: rec)
-                                    }
-                                    .buttonStyle(.plain)
                                 }
+                                .modifier(EditableIfMine(rec: rec, editing: $editing))
                             }
                         }
                     }
@@ -122,6 +125,12 @@ struct FeedView: View {
             .navigationDestination(for: FriendsRoute.self) { _ in
                 FriendsView()
             }
+            .navigationDestination(for: FeedbackRoute.self) { _ in
+                FeedbackView()
+            }
+            .navigationDestination(for: AskRoute.self) { _ in
+                AskForRexView()
+            }
             .toolbar {
                 ToolbarItem(placement: .topBarLeading) {
                     // The supplied wordmark artwork, used without distortion
@@ -134,18 +143,29 @@ struct FeedView: View {
                 }
                 ToolbarItem(placement: .topBarTrailing) {
                     HStack(spacing: RexSpacing.lg) {
+                        NavigationLink(value: FeedbackRoute()) {
+                            Image(systemName: "exclamationmark.bubble")
+                                .font(.system(size: 18))
+                                .foregroundStyle(RexColor.mutedForeground)
+                        }
+                        .accessibilityLabel("Send feedback")
+
                         NavigationLink(value: NotificationsRoute()) {
                             Image(systemName: "bell")
                                 .font(.system(size: 18))
                                 .foregroundStyle(RexColor.mutedForeground)
                         }
-                        // Profile avatar replaces the old "Sign out" button;
-                        // logging out now lives at the bottom of Profile.
+                        .accessibilityLabel("Notifications")
+
+                        // Your own picture, not a generic glyph.
                         NavigationLink(value: ProfileRoute()) {
-                            Image(systemName: "person.circle")
-                                .font(.system(size: 20))
-                                .foregroundStyle(RexColor.mutedForeground)
+                            UserAvatarView(
+                                url: myProfile?.avatar_url,
+                                name: myProfile?.display_name ?? myProfile?.username ?? "?",
+                                size: 28
+                            )
                         }
+                        .accessibilityLabel("Your profile")
                     }
                 }
             }
@@ -154,9 +174,19 @@ struct FeedView: View {
         .onChange(of: popToRootSignal) { _, _ in
             path = NavigationPath()
         }
-        .task { await loadFeed() }
+        .task {
+            await loadFeed()
+            myProfile = try? await RexAPI.shared.fetchMyProfile()
+        }
         .sheet(isPresented: $showingAddRex, onDismiss: { Task { await loadFeed() } }) {
             AddRexView(onDone: { showingAddRex = false })
+        }
+        .sheet(item: $editing) { rec in
+            EditRexView(
+                rec: rec,
+                onSaved: { Task { await loadFeed() } },
+                onDeleted: { Task { await loadFeed() } }
+            )
         }
     }
 
@@ -197,6 +227,36 @@ struct FeedView: View {
             }
         }
         .padding(.top, RexSpacing.sm)
+    }
+
+    private var askForRexCard: some View {
+        NavigationLink(value: AskRoute()) {
+            HStack(spacing: RexSpacing.md) {
+                ZStack {
+                    Circle().fill(RexColor.badgeBackground)
+                    Image(systemName: "sparkles")
+                        .font(.system(size: 15))
+                        .foregroundStyle(RexColor.primary)
+                }
+                .frame(width: 40, height: 40)
+
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("Ask friends for a Rex")
+                        .font(RexFont.text(15, weight: .semibold))
+                        .foregroundStyle(RexColor.foreground)
+                    Text("Put out a blast — friends can chime in.")
+                        .font(RexFont.text(13))
+                        .foregroundStyle(RexColor.mutedForeground)
+                }
+                Spacer()
+                Image(systemName: "plus")
+                    .font(.system(size: 14, weight: .semibold))
+                    .foregroundStyle(RexColor.primary)
+            }
+            .padding(RexSpacing.cardPadding)
+            .rexCard()
+        }
+        .buttonStyle(.plain)
     }
 
     private var searchField: some View {
@@ -313,4 +373,36 @@ func splitGenres(_ raw: String?) -> [String] {
         .split(separator: ",")
         .map { $0.trimmingCharacters(in: .whitespaces) }
         .filter { !$0.isEmpty }
+}
+
+/// Adds an edit affordance to a card, but only on your own Rex.
+struct EditableIfMine: ViewModifier {
+    let rec: FeedRecommendation
+    @Binding var editing: FeedRecommendation?
+
+    private var isMine: Bool { rec.user_id == RexAPI.shared.currentUserId }
+
+    func body(content: Content) -> some View {
+        if isMine {
+            content
+                .contextMenu {
+                    Button { editing = rec } label: { Label("Edit", systemImage: "pencil") }
+                }
+                .overlay(alignment: .topTrailing) {
+                    Button { editing = rec } label: {
+                        Image(systemName: "pencil")
+                            .font(.system(size: 12, weight: .semibold))
+                            .foregroundStyle(RexColor.mutedForeground)
+                            .padding(7)
+                            .background(RexColor.card)
+                            .clipShape(Circle())
+                            .overlay(Circle().stroke(RexColor.border, lineWidth: 1))
+                    }
+                    .buttonStyle(.plain)
+                    .padding(10)
+                }
+        } else {
+            content
+        }
+    }
 }

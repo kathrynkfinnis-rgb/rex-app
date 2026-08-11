@@ -891,6 +891,66 @@ final class RexAPI {
         }
     }
 
+    /// Comment counts for a page of recs, in one round trip.
+    func fetchCommentCounts(recommendationIds: [String]) async throws -> [String: Int] {
+        guard !recommendationIds.isEmpty else { return [:] }
+        let token = try await validToken()
+        let list = recommendationIds.joined(separator: ",")
+        var components = URLComponents(url: baseURL.appendingPathComponent("/rest/v1/recommendation_comments"), resolvingAgainstBaseURL: false)!
+        components.queryItems = [
+            URLQueryItem(name: "select", value: "recommendation_id"),
+            URLQueryItem(name: "recommendation_id", value: "in.(\(list))"),
+        ]
+        var request = URLRequest(url: components.url!)
+        request.setValue(anonKey, forHTTPHeaderField: "apikey")
+        request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+        let (data, response) = try await URLSession.shared.data(for: request)
+        guard let http = response as? HTTPURLResponse, http.statusCode < 400 else { return [:] }
+        struct Row: Codable { let recommendation_id: String }
+        let rows = (try? JSONDecoder().decode([Row].self, from: data)) ?? []
+        return rows.reduce(into: [:]) { $0[$1.recommendation_id, default: 0] += 1 }
+    }
+
+    /// A blast — asking friends for a recommendation.
+    func createRequest(type: String, title: String, note: String?) async throws {
+        let token = try await validToken()
+        guard let userId = currentUserId else { throw RexAPIError.notSignedIn }
+        var request = URLRequest(url: baseURL.appendingPathComponent("/rest/v1/requests"))
+        request.httpMethod = "POST"
+        request.setValue(anonKey, forHTTPHeaderField: "apikey")
+        request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        var body: [String: Any] = ["user_id": userId, "type": type, "title": title]
+        body["note"] = note ?? NSNull()
+        request.httpBody = try JSONSerialization.data(withJSONObject: body)
+        let (data, response) = try await URLSession.shared.data(for: request)
+        guard let http = response as? HTTPURLResponse, http.statusCode < 400 else {
+            let body = String(data: data, encoding: .utf8) ?? ""
+            throw RexAPIError.server("Couldn't send your blast. \(body)")
+        }
+    }
+
+    /// Anonymous feedback goes in with user_id null so it can't be traced back.
+    func sendFeedback(message: String, anonymous: Bool, page: String?) async throws {
+        let token = try await validToken()
+        var request = URLRequest(url: baseURL.appendingPathComponent("/rest/v1/feedback"))
+        request.httpMethod = "POST"
+        request.setValue(anonKey, forHTTPHeaderField: "apikey")
+        request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        var body: [String: Any] = [
+            "message": message, "kind": "app", "is_anonymous": anonymous,
+        ]
+        body["page"] = page ?? NSNull()
+        body["user_id"] = anonymous ? NSNull() : (currentUserId ?? NSNull())
+        request.httpBody = try JSONSerialization.data(withJSONObject: body)
+        let (data, response) = try await URLSession.shared.data(for: request)
+        guard let http = response as? HTTPURLResponse, http.statusCode < 400 else {
+            let body = String(data: data, encoding: .utf8) ?? ""
+            throw RexAPIError.server("Couldn't send that. \(body)")
+        }
+    }
+
     func fetchComments(recommendationId: String) async throws -> [RexComment] {
         let token = try await validToken()
         var components = URLComponents(url: baseURL.appendingPathComponent("/rest/v1/recommendation_comments"), resolvingAgainstBaseURL: false)!

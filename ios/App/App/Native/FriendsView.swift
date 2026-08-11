@@ -37,6 +37,9 @@ struct FriendsView: View {
 
     var body: some View {
         ScrollView {
+            TopRexxersView()
+                .padding(.horizontal, RexSpacing.page)
+                .padding(.top, RexSpacing.sm)
             if isLoading {
                 ProgressView().padding(.top, 80)
             } else if let errorMessage {
