@@ -258,7 +258,12 @@ final class RexAPI {
         address: String?,
         hit: RexSearchHit? = nil,
         genre: String? = nil,
-        linkURL: String? = nil
+        linkURL: String? = nil,
+        externalId: String? = nil,
+        externalSource: String? = nil,
+        imageURL: String? = nil,
+        lat: Double? = nil,
+        lng: Double? = nil
     ) async throws -> String {
         let token = try await validToken()
         var request = URLRequest(url: baseURL.appendingPathComponent("/rest/v1/items"))
@@ -282,6 +287,11 @@ final class RexAPI {
         // An explicit subcategory choice wins over whatever the catalogue guessed.
         if let genre, !genre.isEmpty { body["genre"] = genre }
         if let linkURL, !linkURL.isEmpty { body["link_url"] = linkURL }
+        if let externalId { body["external_id"] = externalId }
+        if let externalSource { body["external_source"] = externalSource }
+        if let imageURL { body["image_url"] = imageURL }
+        if let lat { body["lat"] = lat }
+        if let lng { body["lng"] = lng }
         request.httpBody = try JSONSerialization.data(withJSONObject: body)
 
         let (data, response) = try await URLSession.shared.data(for: request)
@@ -296,13 +306,17 @@ final class RexAPI {
     }
 
     /// Creates a brand-new recommendation (used right after createItem — no existing row to merge with).
+    @discardableResult
     func createRecommendation(
         itemId: String,
         rating: Double,
         note: String?,
         photoURLs: [String] = [],
-        tags: [String] = []
-    ) async throws {
+        tags: [String] = [],
+        tripId: String? = nil,
+        tripSection: String? = nil,
+        returningId: Bool = false
+    ) async throws -> String {
         let token = try await validToken()
         guard let userId = currentUserId else { throw RexAPIError.notSignedIn }
         var request = URLRequest(url: baseURL.appendingPathComponent("/rest/v1/recommendations"))
@@ -316,13 +330,23 @@ final class RexAPI {
         body["photo_url"] = photoURLs.first ?? NSNull()
         body["photo_urls"] = photoURLs
         body["tags"] = tags
+        if let tripId { body["trip_id"] = tripId }
+        if let tripSection, !tripSection.isEmpty { body["trip_section"] = tripSection }
         request.httpBody = try JSONSerialization.data(withJSONObject: body)
+        if returningId {
+            request.setValue("return=representation", forHTTPHeaderField: "Prefer")
+        }
 
         let (data, response) = try await URLSession.shared.data(for: request)
         guard let http = response as? HTTPURLResponse, http.statusCode < 400 else {
             let body = String(data: data, encoding: .utf8) ?? ""
             throw RexAPIError.server("Couldn't post your Rex. \(body)")
         }
+        guard returningId else { return "" }
+        struct Created: Codable { let id: String }
+        let rows = try JSONDecoder().decode([Created].self, from: data)
+        guard let id = rows.first?.id else { throw RexAPIError.invalidResponse }
+        return id
     }
 
     /// Marks an item as "want to try/watch/visit" instead of rating it — inserts into `wants`.

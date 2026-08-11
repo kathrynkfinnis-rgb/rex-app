@@ -34,6 +34,7 @@ struct AddRexView: View {
     @State private var photoURLs: [String] = []
     @State private var subcategories: Set<String> = []
     @State private var productLink = ""
+    @State private var tripStops: [DraftStop] = []
 
     var body: some View {
         NavigationStack {
@@ -99,6 +100,10 @@ struct AddRexView: View {
 
             if category == .place || category == .event {
                 field("Address", text: $address, placeholder: "Optional")
+            }
+
+            if category == .trip {
+                TripStopsBuilderView(stops: $tripStops)
             }
 
             if let options = rexSubcategories[category], !options.isEmpty {
@@ -379,6 +384,41 @@ struct AddRexView: View {
                 genre: subcategories.isEmpty ? nil : subcategories.sorted().joined(separator: ", "),
                 linkURL: productLink.trimmingCharacters(in: .whitespaces).isEmpty ? nil : productLink.trimmingCharacters(in: .whitespaces)
             )
+            // Trip stops become their own Rex, linked to the trip.
+            if category == .trip, !tripStops.isEmpty {
+                let tripRecId = try await RexAPI.shared.createRecommendation(
+                    itemId: itemId,
+                    rating: rating,
+                    note: note.isEmpty ? nil : note,
+                    photoURLs: photoURLs,
+                    returningId: true
+                )
+                for stop in tripStops {
+                    let stopItemId = try await RexAPI.shared.createItem(
+                        type: stop.type.rawValue,
+                        title: stop.title,
+                        subtitle: stop.subtitle,
+                        address: stop.address,
+                        genre: stop.genre,
+                        externalId: stop.externalId,
+                        externalSource: stop.externalSource,
+                        imageURL: stop.imageURL,
+                        lat: stop.lat,
+                        lng: stop.lng
+                    )
+                    _ = try await RexAPI.shared.createRecommendation(
+                        itemId: stopItemId,
+                        rating: stop.rating,
+                        note: stop.note.isEmpty ? nil : stop.note,
+                        tripId: tripRecId,
+                        tripSection: stop.section
+                    )
+                }
+                withAnimation { didPost = true }
+                isSaving = false
+                return
+            }
+
             switch mode {
             case .rated:
                 try await RexAPI.shared.createRecommendation(
