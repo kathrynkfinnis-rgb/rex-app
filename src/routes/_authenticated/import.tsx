@@ -20,6 +20,7 @@ import {
   MapPin,
   Film,
   Luggage,
+  Bookmark,
 } from "lucide-react";
 import mammoth from "mammoth";
 import {
@@ -31,6 +32,7 @@ import {
   resolveStagingRow,
   approveStagingRow,
   approveStagingAsTrip,
+  approveStagingAsCollections,
 } from "@/lib/import.functions";
 
 
@@ -55,6 +57,9 @@ function ImportPage() {
   const [gmapsUrl, setGmapsUrl] = useState("");
   const [loading, setLoading] = useState(false);
   const [tripName, setTripName] = useState("");
+  const [collectionName, setCollectionName] = useState("");
+  const [collectionLoading, setCollectionLoading] = useState(false);
+  const [splitBySection, setSplitBySection] = useState(true);
   const [tripLoading, setTripLoading] = useState(false);
 
   const fetchSheet = useServerFn(fetchSheetCsv);
@@ -65,6 +70,7 @@ function ImportPage() {
   const resolve = useServerFn(resolveStagingRow);
   const approve = useServerFn(approveStagingRow);
   const makeTrip = useServerFn(approveStagingAsTrip);
+  const makeCollections = useServerFn(approveStagingAsCollections);
 
 
   const { data: staging } = useQuery({
@@ -80,6 +86,16 @@ function ImportPage() {
   });
 
   const placeRows = (staging ?? []).filter((r) => r.suggested_type === "place");
+
+  // Headings across everything in the queue, not just places — a reading list
+  // grouped under "Fiction" / "Non-fiction" splits just as well as an itinerary.
+  const allSections = Array.from(
+    (staging ?? []).reduce((set, r) => {
+      const s = (r as any).raw_section?.trim();
+      if (s) set.add(s);
+      return set;
+    }, new Set<string>()),
+  );
 
   // Headings the extractor found in the source document, in the order they
   // first appear — shown so you can see the trip will keep its structure.
@@ -109,6 +125,33 @@ function ImportPage() {
     }
   }
 
+
+  async function onMakeCollections() {
+    const rows = staging ?? [];
+    if (!collectionName.trim() || rows.length === 0) return;
+    setCollectionLoading(true);
+    try {
+      const { added, collections } = await makeCollections({
+        data: {
+          ids: rows.map((r) => r.id),
+          name: collectionName.trim(),
+          splitBySection: splitBySection && allSections.length > 0,
+        },
+      });
+      toast.success(
+        collections > 1
+          ? `${collections} collections created with ${added} Rex`
+          : `Collection created with ${added} Rex`,
+      );
+      setCollectionName("");
+      qc.invalidateQueries({ queryKey: ["import-staging"] });
+      navigate({ to: "/you" });
+    } catch (e: any) {
+      toast.error(e.message ?? "Couldn't create the collection");
+    } finally {
+      setCollectionLoading(false);
+    }
+  }
 
   async function runExtract(text: string, source: string) {
     if (!text.trim()) {
@@ -588,6 +631,64 @@ function ImportPage() {
             >
               {tripLoading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Luggage className="mr-2 h-4 w-4" />}
               Make a trip from these {placeRows.length}
+            </Button>
+          </div>
+        )}
+
+        {(staging?.length ?? 0) >= 2 && (
+          <div className="space-y-3 rounded-2xl bg-card p-4 ring-1 ring-border">
+            <div className="flex items-center gap-2 text-sm font-semibold">
+              <Bookmark className="h-4 w-4 text-primary" />
+              Save these as a collection
+            </div>
+            <p className="text-xs text-muted-foreground">
+              Turn the whole queue into a collection you can share — a reading list,
+              a shortlist of restaurants, whatever the document was.
+            </p>
+
+            {allSections.length > 0 && (
+              <label className="flex items-start gap-2.5 rounded-xl bg-muted/40 p-3 text-xs">
+                <input
+                  type="checkbox"
+                  checked={splitBySection}
+                  onChange={(e) => setSplitBySection(e.target.checked)}
+                  className="mt-0.5 h-4 w-4 accent-primary"
+                />
+                <span>
+                  <span className="font-medium">
+                    Split into {allSections.length} collections, one per heading
+                  </span>
+                  <span className="mt-1 block text-muted-foreground">
+                    {allSections.slice(0, 4).join(" · ")}
+                    {allSections.length > 4 ? ` · +${allSections.length - 4} more` : ""}
+                  </span>
+                </span>
+              </label>
+            )}
+
+            <Input
+              value={collectionName}
+              onChange={(e) => setCollectionName(e.target.value)}
+              placeholder={
+                splitBySection && allSections.length > 0
+                  ? "Name for anything without a heading"
+                  : "Collection name, e.g. Best pubs in London"
+              }
+              className="h-11 bg-background"
+            />
+            <Button
+              onClick={onMakeCollections}
+              disabled={collectionLoading || !collectionName.trim()}
+              className="h-11 w-full rounded-full"
+            >
+              {collectionLoading ? (
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+              ) : (
+                <Bookmark className="mr-2 h-4 w-4" />
+              )}
+              {splitBySection && allSections.length > 0
+                ? `Make ${allSections.length} collections`
+                : `Make a collection from these ${staging?.length ?? 0}`}
             </Button>
           </div>
         )}

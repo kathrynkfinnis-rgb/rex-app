@@ -363,7 +363,12 @@ async function approveRow(
   supabase: any,
   userId: string,
   row: any,
-  opts: { rating?: number | null; note?: string | null; tripId?: string | null } = {},
+  opts: {
+    rating?: number | null;
+    note?: string | null;
+    tripId?: string | null;
+    listId?: string | null;
+  } = {},
 ) {
   if (!row.suggested_type) throw new Error("Set a type before approving");
 
@@ -403,17 +408,31 @@ async function approveRow(
       ? Math.round(row.raw_rating)
       : 8;
 
-  const { error: rErr } = await supabase.from("recommendations").insert({
-    user_id: userId,
-    item_id: itemId,
-    rating,
-    note: (opts.note ?? row.raw_note ?? null)?.slice(0, 2000) || null,
-    trip_id: opts.tripId ?? null,
-    // Keeps the imported document's own structure — stops land under the
-    // heading they appeared beneath ("Brunch", "Museums", "Day 2").
-    trip_section: opts.tripId ? row.raw_section ?? null : null,
-  });
+  const { data: rec, error: rErr } = await supabase
+    .from("recommendations")
+    .insert({
+      user_id: userId,
+      item_id: itemId,
+      rating,
+      note: (opts.note ?? row.raw_note ?? null)?.slice(0, 2000) || null,
+      trip_id: opts.tripId ?? null,
+      // Keeps the imported document's own structure — stops land under the
+      // heading they appeared beneath ("Brunch", "Museums", "Day 2").
+      trip_section: opts.tripId ? row.raw_section ?? null : null,
+    })
+    .select("id")
+    .single();
   if (rErr) throw new Error(rErr.message);
+
+  // Drop it straight into a collection when the import is building one.
+  if (opts.listId) {
+    await supabase
+      .from("saved_posts")
+      .upsert(
+        { user_id: userId, recommendation_id: rec.id, list_id: opts.listId },
+        { onConflict: "user_id,recommendation_id,list_id", ignoreDuplicates: true },
+      );
+  }
 
   await supabase
     .from("import_staging")
@@ -502,3 +521,78 @@ export const approveStagingAsTrip = createServerFn({ method: "POST" })
     return { tripId: tripRec.id as string, added };
   });
 
+
+// -------- Approve a batch of staged rows into collections --------
+//
+// A document with headings ("Pubs", "Galleries", "Day 2") becomes one
+// collection per heading when `splitBySection` is on; otherwise everything
+// lands in a single collection called `name`. Hyperlinks in the document are
+// already carried through by approveRow as the item's link_url.
+export const approveStagingAsCollections = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d: { ids: string[]; name: string; splitBySection?: boolean }) =>
+    z
+      .object({
+        ids: z.array(z.string().uuid()).min(1).max(200),
+        name: z.string().min(1).max(200),
+        splitBySection: z.boolean().optional(),
+      })
+      .parse(d),
+  )
+  .handler(async ({ data, context }) => {
+    const { data: rows, error } = await context.supabase
+      .from("import_staging")
+      .select("*")
+      .in("id", data.ids)
+      .eq("status", "pending");
+    if (error) throw new Error(error.message);
+    if (!rows?.length) throw new Error("Nothing to import");
+
+    // Group by the document's own headings, or lump everything together.
+    // Cast because raw_section post-dates the generated types.
+    const groups = new Map<string, any[]>();
+    for (const row of rows as any[]) {
+      const key =
+        data.splitBySection && row.raw_section ? String(row.raw_section) : data.name.trim();
+      const bucket = groups.get(key);
+      if (bucket) bucket.push(row);
+      else groups.set(key, [row]);
+    }
+
+    const listIds: string[] = [];
+    let added = 0;
+
+    for (const [listName, groupRows] of groups) {
+      // Type the collection by whatever it mostly holds.
+      const counts = new Map<string, number>();
+      for (const r of groupRows) {
+        if (r.suggested_type) counts.set(r.suggested_type, (counts.get(r.suggested_type) ?? 0) + 1);
+      }
+      const itemType = [...counts.entries()].sort((a, b) => b[1] - a[1])[0]?.[0] ?? "other";
+
+      const { data: list, error: lErr } = await context.supabase
+        .from("hitlist_lists")
+        .insert({
+          user_id: context.userId,
+          name: listName.slice(0, 200),
+          item_type: itemType,
+          // Imports start private — share them once you've tidied them up.
+          visibility: "draft",
+        })
+        .select("id")
+        .single();
+      if (lErr) throw new Error(lErr.message);
+      listIds.push(list.id);
+
+      for (const row of groupRows) {
+        try {
+          await approveRow(context.supabase, context.userId, row, { listId: list.id });
+          added++;
+        } catch {
+          // Leave rows we can't resolve in the queue rather than losing them.
+        }
+      }
+    }
+
+    return { listIds, added, collections: groups.size };
+  });
