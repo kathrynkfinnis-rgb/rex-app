@@ -218,13 +218,62 @@ let rexAllCategories: [RexCategory] = [
 struct FlowChips: View {
     let options: [String]
     @Binding var selected: Set<String>
+    /// Offer a free-text chip for anything the fixed list doesn't cover.
+    var allowsCustom: Bool = true
+
+    @State private var addingCustom = false
+    @State private var customText = ""
+    @FocusState private var customFocused: Bool
+
+    /// Anything chosen that isn't one of the suggestions — someone's own word,
+    /// kept visible so it can be unpicked like the rest.
+    private var customChosen: [String] {
+        selected.subtracting(options).sorted()
+    }
 
     var body: some View {
+        VStack(alignment: .leading, spacing: RexSpacing.sm) {
+            chipRow
+
+            if addingCustom {
+                HStack(spacing: RexSpacing.sm) {
+                    TextField("Your own — e.g. Wine bar", text: $customText)
+                        .font(RexFont.text(14))
+                        .focused($customFocused)
+                        .submitLabel(.done)
+                        .onSubmit { commitCustom() }
+                        .padding(.horizontal, RexSpacing.md)
+                        .frame(height: 40)
+                        .background(RexColor.card)
+                        .clipShape(RoundedRectangle(cornerRadius: RexRadius.input, style: .continuous))
+                        .overlay(
+                            RoundedRectangle(cornerRadius: RexRadius.input, style: .continuous)
+                                .stroke(RexColor.primary, lineWidth: 1)
+                        )
+                    Button("Add") { commitCustom() }
+                        .font(RexFont.text(14, weight: .semibold))
+                        .foregroundStyle(RexColor.primary)
+                        .disabled(customText.trimmingCharacters(in: .whitespaces).isEmpty)
+                }
+            }
+        }
+    }
+
+    private func commitCustom() {
+        let value = customText.trimmingCharacters(in: .whitespaces)
+        guard !value.isEmpty else { return }
+        selected.insert(value)
+        customText = ""
+        addingCustom = false
+        customFocused = false
+    }
+
+    private var chipRow: some View {
         // A horizontal scroller keeps this predictable on narrow screens
         // without needing a custom wrapping layout.
         ScrollView(.horizontal, showsIndicators: false) {
             HStack(spacing: RexSpacing.sm) {
-                ForEach(options, id: \.self) { option in
+                ForEach(options + customChosen, id: \.self) { option in
                     let isOn = selected.contains(option)
                     Button {
                         if isOn { selected.remove(option) } else { selected.insert(option) }
@@ -237,6 +286,25 @@ struct FlowChips: View {
                             .background(isOn ? RexColor.primary : RexColor.card)
                             .clipShape(Capsule())
                             .overlay(Capsule().stroke(isOn ? RexColor.primary : RexColor.border, lineWidth: 1))
+                    }
+                    .buttonStyle(.plain)
+                }
+
+                if allowsCustom && !addingCustom {
+                    Button {
+                        addingCustom = true
+                        customFocused = true
+                    } label: {
+                        HStack(spacing: 4) {
+                            Image(systemName: "plus").font(.system(size: 10, weight: .semibold))
+                            Text("Add your own").font(RexFont.text(13))
+                        }
+                        .foregroundStyle(RexColor.mutedForeground)
+                        .padding(.horizontal, RexSpacing.md)
+                        .padding(.vertical, 7)
+                        .overlay(
+                            Capsule().stroke(RexColor.border, style: StrokeStyle(lineWidth: 1, dash: [4, 3]))
+                        )
                     }
                     .buttonStyle(.plain)
                 }
