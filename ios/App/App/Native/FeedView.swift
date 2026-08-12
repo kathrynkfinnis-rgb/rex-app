@@ -80,23 +80,16 @@ struct FeedView: View {
                                 askForRexCard
                             }
                             ForEach(visible) { rec in
+                              // Swiping only offers to delete your own Rex.
+                              // There's nothing sensible to remove on someone
+                              // else's, so those don't swipe at all.
+                              SwipeIfMine(
+                                rec: rec,
+                                onTap: { open(rec) },
+                                onDelete: { await deleteRex(rec) }
+                              ) {
                                 Group {
-                                    // Trips open their itinerary; everything
-                                    // else opens the item screen.
-                                    if RexCategory(rawType: rec.items?.type) == .trip {
-                                        NavigationLink(value: TripRoute(
-                                            recommendationId: rec.id,
-                                            title: rec.items?.title ?? "Trip",
-                                        )) {
-                                            RecommendationCardView(rec: rec)
-                                        }
-                                        .buttonStyle(.plain)
-                                    } else {
-                                        NavigationLink(value: rec.item_id) {
-                                            RecommendationCardView(rec: rec)
-                                        }
-                                        .buttonStyle(.plain)
-                                    }
+                                    RecommendationCardView(rec: rec)
                                 }
                                 .modifier(EditableIfMine(rec: rec, editing: $editing))
                                 // Drag a card over to Collections and drop it on
@@ -116,6 +109,7 @@ struct FeedView: View {
                                         }
                                     }
                                 }
+                              }
                             }
                         }
                     }
@@ -330,6 +324,25 @@ struct FeedView: View {
         .buttonStyle(.plain)
     }
 
+    /// Trips open their itinerary; everything else opens the item screen.
+    private func open(_ rec: FeedRecommendation) {
+        if RexCategory(rawType: rec.items?.type) == .trip {
+            path.append(TripRoute(recommendationId: rec.id, title: rec.items?.title ?? "Trip"))
+        } else {
+            path.append(rec.item_id)
+        }
+    }
+
+    private func deleteRex(_ rec: FeedRecommendation) async {
+        recommendations.removeAll { $0.id == rec.id }
+        do {
+            try await RexAPI.shared.deleteRecommendation(id: rec.id)
+        } catch {
+            // Put it back rather than pretending it's gone.
+            await loadFeed()
+        }
+    }
+
     private func loadFeed() async {
         isLoading = recommendations.isEmpty
         errorMessage = nil
@@ -394,6 +407,32 @@ func splitGenres(_ raw: String?) -> [String] {
         .split(separator: ",")
         .map { $0.trimmingCharacters(in: .whitespaces) }
         .filter { !$0.isEmpty }
+}
+
+/// Swipe-to-delete, but only on your own Rex — other people's cards scroll
+/// normally rather than offering an action that would do nothing.
+struct SwipeIfMine<Content: View>: View {
+    let rec: FeedRecommendation
+    let onTap: () -> Void
+    let onDelete: () async -> Void
+    @ViewBuilder var content: () -> Content
+
+    var body: some View {
+        if rec.user_id == RexAPI.shared.currentUserId {
+            SwipeToRemove(
+                label: "Delete",
+                systemImage: "trash",
+                confirmMessage: "Delete this Rex? It'll disappear from your friends' feeds too.",
+                onTap: onTap,
+                action: onDelete,
+                content: content
+            )
+        } else {
+            content()
+                .contentShape(Rectangle())
+                .onTapGesture(perform: onTap)
+        }
+    }
 }
 
 /// Adds an edit affordance to a card, but only on your own Rex.

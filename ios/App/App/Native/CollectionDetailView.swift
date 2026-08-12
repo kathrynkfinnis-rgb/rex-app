@@ -24,6 +24,7 @@ struct CollectionDetailView: View {
     @State private var draftName = ""
     @State private var draftEmoji = ""
     @State private var confirmingDelete = false
+    @State private var pushedItemId: String?
 
     init(route: CollectionRoute) {
         self.route = route
@@ -71,23 +72,31 @@ struct CollectionDetailView: View {
                 } else {
                     ForEach(rows) { row in
                         if let rec = row.recommendations {
-                            NavigationLink(value: rec.item_id) {
-                                RecommendationCardView(rec: rec)
-                            }
-                            .buttonStyle(.plain)
-                            // Drag a card out to drop it into another collection.
-                            // Dropping copies — a Rex can live in several lists.
-                            .draggable(rec.id) {
-                                dragPreview(rec)
-                            }
-                            .contextMenu {
-                                if route.isMine {
-                                    Button(role: .destructive) {
-                                        Task { await remove(rec.id) }
-                                    } label: {
-                                        Label("Remove from collection", systemImage: "minus.circle")
-                                    }
+                            SwipeToRemove(
+                                label: "Remove",
+                                systemImage: "minus.circle",
+                                onTap: { pushedItemId = rec.item_id },
+                                action: {
+                                    guard route.isMine else { return }
+                                    await remove(rec.id)
                                 }
+                            ) {
+                                RecommendationCardView(rec: rec)
+                                    // Drag a card out to drop it into another
+                                    // collection. Dropping copies — a Rex can
+                                    // live in several lists.
+                                    .draggable(rec.id) {
+                                        dragPreview(rec)
+                                    }
+                                    .contextMenu {
+                                        if route.isMine {
+                                            Button(role: .destructive) {
+                                                Task { await remove(rec.id) }
+                                            } label: {
+                                                Label("Remove from collection", systemImage: "minus.circle")
+                                            }
+                                        }
+                                    }
                             }
                         }
                     }
@@ -99,6 +108,7 @@ struct CollectionDetailView: View {
         .background(RexColor.background.ignoresSafeArea())
         .navigationTitle(name)
         .navigationBarTitleDisplayMode(.inline)
+        .navigationDestination(item: $pushedItemId) { ItemDetailView(itemId: $0) }
         .toolbar {
             if route.isMine {
                 ToolbarItem(placement: .topBarTrailing) {

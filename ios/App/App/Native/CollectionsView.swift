@@ -25,6 +25,8 @@ struct CollectionsView: View {
     @State private var isLoading = true
     @State private var errorMessage: String?
     @State private var dropTarget: String?
+    /// Swiping rows can't be NavigationLinks, so taps push through here instead.
+    @State private var pushedItemId: String?
 
     /// "My list" grouped by category — Places to eat, Trips to take, and so on.
     private var wantsByCategory: [(category: RexCategory, items: [WantRow])] {
@@ -121,6 +123,7 @@ struct CollectionsView: View {
         }
         .navigationTitle("")
         .navigationBarTitleDisplayMode(.inline)
+        .navigationDestination(item: $pushedItemId) { ItemDetailView(itemId: $0) }
         .task { await load() }
     }
 
@@ -218,7 +221,12 @@ struct CollectionsView: View {
 
                     ForEach(group.items) { want in
                         if let item = want.items {
-                            NavigationLink(value: item.id) {
+                            SwipeToRemove(
+                                label: "Remove",
+                                systemImage: "bookmark.slash",
+                                onTap: { pushedItemId = item.id },
+                                action: { await removeWant(want) }
+                            ) {
                                 HStack(spacing: RexSpacing.md) {
                                     thumb(item)
                                     VStack(alignment: .leading, spacing: 2) {
@@ -238,7 +246,6 @@ struct CollectionsView: View {
                                 .padding(RexSpacing.md)
                                 .rexCard()
                             }
-                            .buttonStyle(.plain)
                         }
                     }
                 }
@@ -434,6 +441,12 @@ struct CollectionsView: View {
         }
         .padding(RexSpacing.xxl)
         .frame(maxWidth: .infinity)
+    }
+
+    private func removeWant(_ want: WantRow) async {
+        guard let itemId = want.items?.id else { return }
+        wants.removeAll { $0.id == want.id }
+        try? await RexAPI.shared.removeWant(itemId: itemId)
     }
 
     private func drop(_ recommendationIds: [String], into list: RexList) async {
