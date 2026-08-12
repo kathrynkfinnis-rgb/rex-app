@@ -149,7 +149,10 @@ struct FeedView: View {
                                     RecommendationCardView(
                                         rec: rec,
                                         rexCount: rexCounts[rec.item_id] ?? 0,
-                                        isOnMyList: myWantItemIds.contains(rec.item_id)
+                                        isOnMyList: myWantItemIds.contains(rec.item_id),
+                                        onAuthorTap: { userId, name in
+                                            path.append(UserProfileRoute(userId: userId, name: name))
+                                        }
                                     )
                                 }
                                 .modifier(EditableIfMine(rec: rec, editing: $editing))

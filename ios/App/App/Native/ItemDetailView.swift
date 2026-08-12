@@ -212,17 +212,24 @@ struct ItemDetailView: View {
             ForEach(recs) { rec in
                 VStack(alignment: .leading, spacing: 6) {
                     HStack {
-                        HStack(spacing: 6) {
-                            UserAvatarView(
-                                url: rec.profiles?.avatar_url,
-                                name: rec.profiles?.display_name ?? rec.profiles?.username ?? "?",
-                                size: 24
-                            )
+                        // Whoever said it is as interesting as what they said.
+                        NavigationLink(value: UserProfileRoute(
+                            userId: rec.user_id,
+                            name: rec.profiles?.display_name ?? rec.profiles?.username ?? "Someone"
+                        )) {
+                            HStack(spacing: 6) {
+                                UserAvatarView(
+                                    url: rec.profiles?.avatar_url,
+                                    name: rec.profiles?.display_name ?? rec.profiles?.username ?? "?",
+                                    size: 24
+                                )
 
-                            Text(rec.profiles?.display_name ?? rec.profiles?.username ?? "Someone")
-                                .font(.system(size: 14, weight: .semibold))
-                                .foregroundStyle(RexColor.foreground)
+                                Text(rec.profiles?.display_name ?? rec.profiles?.username ?? "Someone")
+                                    .font(.system(size: 14, weight: .semibold))
+                                    .foregroundStyle(RexColor.foreground)
+                            }
                         }
+                        .buttonStyle(.plain)
                         Spacer()
                         HStack(spacing: 2) {
                             Image(systemName: "crown.fill").font(.system(size: 11)).foregroundStyle(RexColor.primary)

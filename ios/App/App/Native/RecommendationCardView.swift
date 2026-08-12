@@ -6,6 +6,10 @@ struct RecommendationCardView: View {
     var rexCount: Int = 0
     /// Already on your list — you want to go/read/watch it.
     var isOnMyList: Bool = false
+    /// Opening the author's profile. The card is one tap target now (so it can
+    /// swipe), so the author row can't be its own NavigationLink — the parent
+    /// swallowed it. The feed hands the push back in through here.
+    var onAuthorTap: ((String, String) -> Void)? = nil
 
     @State private var noteExpanded = false
 
@@ -94,9 +98,12 @@ struct RecommendationCardView: View {
 
                         if let note = rec.note, !note.isEmpty {
                             VStack(alignment: .leading, spacing: 2) {
-                                Text("\u{201C}\(note)\u{201D}")
+                                // Links people paste into a note become
+                                // tappable rather than dead text.
+                                Text(linkified("\u{201C}\(note)\u{201D}"))
                                     .font(RexFont.text(14))
                                     .foregroundStyle(RexColor.foreground.opacity(0.88))
+                                    .tint(RexColor.primary)
                                     .lineLimit(noteExpanded ? nil : 3)
                                     .fixedSize(horizontal: false, vertical: true)
                                 // Only offer to expand when there's more to see.
@@ -262,24 +269,23 @@ struct RecommendationCardView: View {
                     .foregroundStyle(RexColor.mutedForeground)
             }
         } else if let author = rec.profiles {
-            // Tapping the author opens their profile.
-            NavigationLink(value: UserProfileRoute(
-                userId: rec.user_id,
-                name: author.display_name ?? author.username
-            )) {
-                HStack(spacing: RexSpacing.sm) {
-                    UserAvatarView(
-                        url: author.avatar_url,
-                        name: author.display_name ?? author.username,
-                        size: 24
-                    )
-                    Text(author.display_name ?? author.username)
-                        .font(RexFont.text(13, weight: .medium))
-                        .foregroundStyle(RexColor.foreground)
-                        .lineLimit(1)
-                }
+            // Tapping the author opens their profile. A nested tap gesture wins
+            // over the card's, which a NavigationLink here did not.
+            HStack(spacing: RexSpacing.sm) {
+                UserAvatarView(
+                    url: author.avatar_url,
+                    name: author.display_name ?? author.username,
+                    size: 24
+                )
+                Text(author.display_name ?? author.username)
+                    .font(RexFont.text(13, weight: .medium))
+                    .foregroundStyle(RexColor.foreground)
+                    .lineLimit(1)
             }
-            .buttonStyle(.plain)
+            .contentShape(Rectangle())
+            .onTapGesture {
+                onAuthorTap?(rec.user_id, author.display_name ?? author.username)
+            }
         } else {
             Text("Someone")
                 .font(RexFont.text(13, weight: .medium))

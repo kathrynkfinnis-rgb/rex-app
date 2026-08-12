@@ -313,3 +313,25 @@ struct FlowChips: View {
         }
     }
 }
+
+/// Turns bare URLs in free text into tappable links.
+///
+/// People paste booking links, menus and articles into notes; as plain Text
+/// those were dead. AttributedString's link attribute makes them open without
+/// us having to parse or re-render the surrounding text.
+func linkified(_ text: String) -> AttributedString {
+    var attributed = AttributedString(text)
+    guard let detector = try? NSDataDetector(types: NSTextCheckingResult.CheckingType.link.rawValue) else {
+        return attributed
+    }
+    let ns = text as NSString
+    let matches = detector.matches(in: text, range: NSRange(location: 0, length: ns.length))
+    for match in matches {
+        guard let url = match.url,
+              let range = Range(match.range, in: text),
+              let attrRange = Range(range, in: attributed) else { continue }
+        attributed[attrRange].link = url
+        attributed[attrRange].underlineStyle = .single
+    }
+    return attributed
+}
