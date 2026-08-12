@@ -38,7 +38,39 @@ struct FeedView: View {
         return set.sorted()
     }
 
-    private var visible: [FeedRecommendation] {
+    /// Bursts the reader has chosen to see in full.
+    @State private var expandedBursts: Set<String> = []
+
+    /// A mass import — someone's whole Goodreads or IMDb history in one go —
+    /// otherwise buries everyone else. More than five in a row from the same
+    /// person in the same minute collapses to five plus a "show the rest".
+    private var visible: [FeedRow] {
+        let rows = matching
+        var out: [FeedRow] = []
+        var index = 0
+        while index < rows.count {
+            let key = burstKey(rows[index])
+            var run = index
+            while run < rows.count, burstKey(rows[run]) == key { run += 1 }
+            let burst = Array(rows[index..<run])
+            if burst.count > 5, !expandedBursts.contains(key) {
+                out.append(contentsOf: burst.prefix(5).map { FeedRow.rex($0) })
+                let who = burst[0].profiles?.display_name ?? burst[0].profiles?.username
+                out.append(.more(key: key, count: burst.count - 5, by: who ?? "They"))
+            } else {
+                out.append(contentsOf: burst.map { FeedRow.rex($0) })
+            }
+            index = run
+        }
+        return out
+    }
+
+    /// Same person, same minute — close enough to call one import.
+    private func burstKey(_ rec: FeedRecommendation) -> String {
+        "\(rec.user_id)|\(rec.created_at.prefix(16))"
+    }
+
+    private var matching: [FeedRecommendation] {
         recommendations.filter { rec in
             if let filter, RexCategory(rawType: rec.items?.type) != filter { return false }
             if let subFilter, !splitGenres(rec.items?.genre).contains(subFilter) { return false }
@@ -79,7 +111,29 @@ struct FeedView: View {
                             if filter == nil && subFilter == nil && query.isEmpty {
                                 askForRexCard
                             }
-                            ForEach(visible) { rec in
+                            ForEach(visible) { row in
+                              switch row {
+                              case .more(let key, let count, let by):
+                                Button {
+                                    expandedBursts.insert(key)
+                                } label: {
+                                    HStack(spacing: RexSpacing.sm) {
+                                        Image(systemName: "square.stack")
+                                            .font(.system(size: 13))
+                                        Text("\(by) added \(count) more at once")
+                                            .font(RexFont.text(14, weight: .medium))
+                                        Spacer()
+                                        Text("Show all")
+                                            .font(RexFont.text(13, weight: .semibold))
+                                    }
+                                    .foregroundStyle(RexColor.mutedForeground)
+                                    .padding(RexSpacing.md)
+                                    .contentShape(Rectangle())
+                                    .rexCard()
+                                }
+                                .buttonStyle(.plain)
+
+                              case .rex(let rec):
                               // Swiping only offers to delete your own Rex.
                               // There's nothing sensible to remove on someone
                               // else's, so those don't swipe at all.
@@ -109,6 +163,7 @@ struct FeedView: View {
                                         }
                                     }
                                 }
+                              }
                               }
                             }
                         }
@@ -407,6 +462,19 @@ func splitGenres(_ raw: String?) -> [String] {
         .split(separator: ",")
         .map { $0.trimmingCharacters(in: .whitespaces) }
         .filter { !$0.isEmpty }
+}
+
+/// A feed row is either a Rex or the tail of a collapsed mass import.
+enum FeedRow: Identifiable {
+    case rex(FeedRecommendation)
+    case more(key: String, count: Int, by: String)
+
+    var id: String {
+        switch self {
+        case .rex(let r): return r.id
+        case .more(let key, _, _): return "more-\(key)"
+        }
+    }
 }
 
 /// Swipe-to-delete, but only on your own Rex — other people's cards scroll
