@@ -3,9 +3,11 @@ import SwiftUI
 /// Route marker so a trip card can navigate to the itinerary rather than the
 /// generic item screen. Trips are addressed by their *recommendation* id,
 /// because that's what a stop's trip_id points at.
-struct TripRoute: Hashable {
+struct TripRoute: Hashable, Identifiable {
     let recommendationId: String
     let title: String
+
+    var id: String { recommendationId }
 }
 
 /// The itinerary for a trip: every stop, grouped under its optional heading,

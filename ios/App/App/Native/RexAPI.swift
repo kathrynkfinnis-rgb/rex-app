@@ -1355,10 +1355,37 @@ final class RexAPI {
 
     /// One row per place/event that has at least one live Rex (matches the web app's
     /// `!inner` join — items whose only recommendation got deleted never linger as pins).
+    /// Titles for a set of trips, keyed by the trip's recommendation id — what
+    /// map pins carry in `trip_id`.
+    func fetchTripTitles(recommendationIds: [String]) async throws -> [String: String] {
+        guard !recommendationIds.isEmpty else { return [:] }
+        let token = try await validToken()
+        var components = URLComponents(url: baseURL.appendingPathComponent("/rest/v1/recommendations"), resolvingAgainstBaseURL: false)!
+        components.queryItems = [
+            URLQueryItem(name: "select", value: "id,items(title)"),
+            URLQueryItem(name: "id", value: "in.(\(recommendationIds.joined(separator: ",")))"),
+        ]
+        var request = URLRequest(url: components.url!)
+        request.setValue(anonKey, forHTTPHeaderField: "apikey")
+        request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+
+        let (data, response) = try await URLSession.shared.data(for: request)
+        guard let http = response as? HTTPURLResponse, http.statusCode < 400 else { return [:] }
+        struct Row: Codable {
+            let id: String
+            struct Item: Codable { let title: String }
+            let items: Item?
+        }
+        let rows = (try? JSONDecoder().decode([Row].self, from: data)) ?? []
+        return Dictionary(uniqueKeysWithValues: rows.compactMap { row in
+            row.items.map { (row.id, $0.title) }
+        })
+    }
+
     func fetchMapPlaces() async throws -> [MapPlace] {
         let token = try await validToken()
         let select = "id,title,subtitle,type,genre,address,lat,lng,image_url," +
-            "recommendations!inner(id,rating,user_id,profiles(username,display_name,avatar_url))"
+            "recommendations!inner(id,rating,user_id,trip_id,profiles(username,display_name,avatar_url))"
         var components = URLComponents(url: baseURL.appendingPathComponent("/rest/v1/items"), resolvingAgainstBaseURL: false)!
         components.queryItems = [
             URLQueryItem(name: "select", value: select),

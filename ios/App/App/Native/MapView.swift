@@ -12,13 +12,20 @@ struct RexMapView: View {
     @State private var userCoordinate: CLLocationCoordinate2D?
     @State private var areaName: String?
     @State private var filter: RexCategory?
+    /// Recommendation id of the trip we're following, if any.
+    @State private var tripFilter: String?
+    @State private var tripTitles: [String: String] = [:]
+    @State private var openTrip: TripRoute?
 
     private static let milesToMeters = 1609.34
     private var radiusMeters: Double { 10 * Self.milesToMeters }
 
     private var visiblePlaces: [MapPlace] {
-        guard let filter else { return places }
-        return places.filter { RexCategory(rawType: $0.type) == filter }
+        var out = places
+        // Following a trip shows only its stops, the way the web map does.
+        if let tripFilter { out = out.filter { $0.tripIds.contains(tripFilter) } }
+        if let filter { out = out.filter { RexCategory(rawType: $0.type) == filter } }
+        return out
     }
 
     /// Centre on the user if we have them, otherwise the middle of the pins.
@@ -66,8 +73,10 @@ struct RexMapView: View {
         }
         .sheet(item: $selectedPlace) { place in
             placeSheet(place)
-                .presentationDetents([.height(240)])
+                // Compact by default; drag up when a place is on several trips.
+                .presentationDetents([.height(260), .height(440)])
         }
+        .navigationDestination(item: $openTrip) { TripDetailView(route: $0) }
     }
 
     /// Location indicator + category filters, floating over the map.
@@ -88,6 +97,23 @@ struct RexMapView: View {
                     .padding(.vertical, 3)
                     .background(RexColor.badgeBackground)
                     .clipShape(Capsule())
+            }
+
+            if let tripFilter, let title = tripTitles[tripFilter] {
+                HStack(spacing: RexSpacing.sm) {
+                    Image(systemName: "suitcase.fill").font(.system(size: 11))
+                    Text("Following \(title)")
+                        .font(RexFont.text(13, weight: .medium))
+                        .lineLimit(1)
+                    Spacer()
+                    Button("Show all") { self.tripFilter = nil }
+                        .font(RexFont.text(12, weight: .semibold))
+                }
+                .foregroundStyle(RexColor.primary)
+                .padding(.horizontal, RexSpacing.sm + 2)
+                .padding(.vertical, 7)
+                .background(RexColor.badgeBackground)
+                .clipShape(Capsule())
             }
 
             ScrollView(.horizontal, showsIndicators: false) {
@@ -128,6 +154,8 @@ struct RexMapView: View {
         errorMessage = nil
         do {
             places = try await RexAPI.shared.fetchMapPlaces()
+            let tripIds = Array(Set(places.flatMap { $0.tripIds }))
+            tripTitles = (try? await RexAPI.shared.fetchTripTitles(recommendationIds: tripIds)) ?? [:]
         } catch {
             errorMessage = error.localizedDescription
         }
@@ -198,6 +226,57 @@ struct RexMapView: View {
                     Text("/10").font(RexFont.text(12)).foregroundStyle(RexColor.mutedForeground)
                     Text("· \(place.recommenderSummary)")
                         .font(RexFont.text(13)).foregroundStyle(RexColor.mutedForeground)
+                }
+
+                // A stop usually belongs to a trip — let people jump to the
+                // whole itinerary, or follow it on the map.
+                let trips = place.tripIds.compactMap { id in
+                    tripTitles[id].map { (id: id, title: $0) }
+                }
+                if !trips.isEmpty {
+                    VStack(alignment: .leading, spacing: RexSpacing.sm) {
+                        Text("Part of")
+                            .font(RexFont.text(12, weight: .semibold))
+                            .foregroundStyle(RexColor.mutedForeground)
+                        ForEach(trips, id: \.id) { trip in
+                            HStack(spacing: RexSpacing.sm) {
+                                Button {
+                                    selectedPlace = nil
+                                    openTrip = TripRoute(recommendationId: trip.id, title: trip.title)
+                                } label: {
+                                    HStack(spacing: RexSpacing.sm) {
+                                        Image(systemName: "suitcase")
+                                            .font(.system(size: 13))
+                                        Text(trip.title)
+                                            .font(RexFont.text(14, weight: .medium))
+                                            .lineLimit(1)
+                                        Spacer()
+                                        Image(systemName: "chevron.right")
+                                            .font(.system(size: 11, weight: .semibold))
+                                    }
+                                    .foregroundStyle(RexColor.foreground)
+                                    .padding(RexSpacing.md)
+                                    .contentShape(Rectangle())
+                                    .rexCard()
+                                }
+                                .buttonStyle(.plain)
+
+                                Button {
+                                    tripFilter = trip.id
+                                    selectedPlace = nil
+                                } label: {
+                                    Text("Map it")
+                                        .font(RexFont.text(12, weight: .semibold))
+                                        .foregroundStyle(RexColor.primary)
+                                        .padding(.horizontal, RexSpacing.sm + 2)
+                                        .padding(.vertical, 8)
+                                        .overlay(Capsule().stroke(RexColor.primary.opacity(0.4), lineWidth: 1))
+                                }
+                                .buttonStyle(.plain)
+                            }
+                        }
+                    }
+                    .padding(.top, RexSpacing.sm)
                 }
 
                 NavigationLink(value: place.id) {

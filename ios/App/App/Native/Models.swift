@@ -143,6 +143,9 @@ struct MapRecStub: Codable {
     let id: String
     let rating: Double
     let user_id: String
+    /// The trip this stop belongs to, if any — points at the trip's own
+    /// recommendation id, not an item id.
+    let trip_id: String?
     let profiles: RexProfile?
 }
 
@@ -164,6 +167,11 @@ struct MapPlace: Codable, Identifiable {
     var averageRating: Double {
         guard !recommendations.isEmpty else { return 0 }
         return recommendations.reduce(0) { $0 + $1.rating } / Double(recommendations.count)
+    }
+
+    /// Trips this place is a stop on.
+    var tripIds: [String] {
+        Array(Set(recommendations.compactMap { $0.trip_id }))
     }
 
     /// "Ava" if one recommender, "Rex'd by several friends" if more than one.
