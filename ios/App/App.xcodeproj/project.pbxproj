@@ -32,6 +32,7 @@
 		FEED014B0000000000000000 /* MainTabView.swift in Sources */ = {isa = PBXBuildFile; fileRef = FEED014A0000000000000000 /* MainTabView.swift */; };
 		FEED015B0000000000000000 /* MapView.swift in Sources */ = {isa = PBXBuildFile; fileRef = FEED015A0000000000000000 /* MapView.swift */; };
 		FEED032B0000000000000000 /* AddToCollectionView.swift in Sources */ = {isa = PBXBuildFile; fileRef = FEED032A0000000000000000 /* AddToCollectionView.swift */; };
+		FEED033B0000000000000000 /* CollectionDetailView.swift in Sources */ = {isa = PBXBuildFile; fileRef = FEED033A0000000000000000 /* CollectionDetailView.swift */; };
 		FEED031B0000000000000000 /* AskForRexView.swift in Sources */ = {isa = PBXBuildFile; fileRef = FEED031A0000000000000000 /* AskForRexView.swift */; };
 		FEED030B0000000000000000 /* FeedbackView.swift in Sources */ = {isa = PBXBuildFile; fileRef = FEED030A0000000000000000 /* FeedbackView.swift */; };
 		FEED029B0000000000000000 /* RecipeEditorView.swift in Sources */ = {isa = PBXBuildFile; fileRef = FEED029A0000000000000000 /* RecipeEditorView.swift */; };
@@ -78,6 +79,7 @@
 		FEED014A0000000000000000 /* MainTabView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MainTabView.swift; sourceTree = "<group>"; };
 		FEED015A0000000000000000 /* MapView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MapView.swift; sourceTree = "<group>"; };
 		FEED032A0000000000000000 /* AddToCollectionView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AddToCollectionView.swift; sourceTree = "<group>"; };
+		FEED033A0000000000000000 /* CollectionDetailView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CollectionDetailView.swift; sourceTree = "<group>"; };
 		FEED031A0000000000000000 /* AskForRexView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AskForRexView.swift; sourceTree = "<group>"; };
 		FEED030A0000000000000000 /* FeedbackView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FeedbackView.swift; sourceTree = "<group>"; };
 		FEED029A0000000000000000 /* RecipeEditorView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RecipeEditorView.swift; sourceTree = "<group>"; };
@@ -161,6 +163,7 @@
 				FEED014A0000000000000000 /* MainTabView.swift */,
 				FEED015A0000000000000000 /* MapView.swift */,
 				FEED032A0000000000000000 /* AddToCollectionView.swift */,
+				FEED033A0000000000000000 /* CollectionDetailView.swift */,
 				FEED031A0000000000000000 /* AskForRexView.swift */,
 				FEED030A0000000000000000 /* FeedbackView.swift */,
 				FEED029A0000000000000000 /* RecipeEditorView.swift */,
@@ -282,6 +285,7 @@
 				FEED014B0000000000000000 /* MainTabView.swift in Sources */,
 				FEED015B0000000000000000 /* MapView.swift in Sources */,
 				FEED032B0000000000000000 /* AddToCollectionView.swift in Sources */,
+				FEED033B0000000000000000 /* CollectionDetailView.swift in Sources */,
 				FEED031B0000000000000000 /* AskForRexView.swift in Sources */,
 				FEED030B0000000000000000 /* FeedbackView.swift in Sources */,
 				FEED029B0000000000000000 /* RecipeEditorView.swift in Sources */,

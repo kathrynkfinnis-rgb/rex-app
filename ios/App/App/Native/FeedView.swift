@@ -99,6 +99,9 @@ struct FeedView: View {
                                     }
                                 }
                                 .modifier(EditableIfMine(rec: rec, editing: $editing))
+                                // Drag a card over to Collections and drop it on
+                                // a list. Dropping copies, so the Rex stays here.
+                                .draggable(rec.id)
                                 // One menu only — a second `.contextMenu` replaces
                                 // the first rather than adding to it.
                                 .contextMenu {

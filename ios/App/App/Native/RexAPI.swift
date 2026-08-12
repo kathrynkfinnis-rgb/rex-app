@@ -157,10 +157,22 @@ final class RexAPI {
     }
 
     func fetchItem(id: String) async throws -> RexItem {
+        // The Google rating columns only exist once that migration has been run.
+        // Ask for them, but fall back to the base columns rather than failing the
+        // whole page — an item detail that can't open is far worse than a missing
+        // star rating. Drop the fallback once the migration is everywhere.
+        let base = "id,type,title,subtitle,image_url,genre,address"
+        if let item = try? await fetchItem(id: id, select: base + ",google_rating,google_rating_count") {
+            return item
+        }
+        return try await fetchItem(id: id, select: base)
+    }
+
+    private func fetchItem(id: String, select: String) async throws -> RexItem {
         let token = try await validToken()
         var components = URLComponents(url: baseURL.appendingPathComponent("/rest/v1/items"), resolvingAgainstBaseURL: false)!
         components.queryItems = [
-            URLQueryItem(name: "select", value: "id,type,title,subtitle,image_url,genre,address,google_rating,google_rating_count"),
+            URLQueryItem(name: "select", value: select),
             URLQueryItem(name: "id", value: "eq.\(id)"),
         ]
         var request = URLRequest(url: components.url!)
@@ -299,7 +311,16 @@ final class RexAPI {
         if let recipeText, !recipeText.isEmpty { body["recipe_text"] = recipeText }
         request.httpBody = try JSONSerialization.data(withJSONObject: body)
 
-        let (data, response) = try await URLSession.shared.data(for: request)
+        var (data, response) = try await URLSession.shared.data(for: request)
+        // Same story as fetchItem: if the Google rating columns aren't there yet,
+        // save the item without them rather than losing the whole Rex.
+        if let http = response as? HTTPURLResponse, http.statusCode >= 400,
+           body["google_rating"] != nil || body["google_rating_count"] != nil {
+            body["google_rating"] = nil
+            body["google_rating_count"] = nil
+            request.httpBody = try JSONSerialization.data(withJSONObject: body)
+            (data, response) = try await URLSession.shared.data(for: request)
+        }
         guard let http = response as? HTTPURLResponse, http.statusCode < 400 else {
             let body = String(data: data, encoding: .utf8) ?? ""
             throw RexAPIError.server("Couldn't create this item. \(body)")
@@ -976,7 +997,11 @@ final class RexAPI {
         request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
         request.setValue("return=representation", forHTTPHeaderField: "Prefer")
-        var body: [String: Any] = ["user_id": userId, "name": name, "item_type": itemType]
+        // New collections start private. `draft` is the schema's private state —
+        // the enum is draft | friends | public, same as the web app uses.
+        var body: [String: Any] = [
+            "user_id": userId, "name": name, "item_type": itemType, "visibility": "draft",
+        ]
         body["emoji"] = emoji ?? NSNull()
         request.httpBody = try JSONSerialization.data(withJSONObject: body)
         let (data, response) = try await URLSession.shared.data(for: request)
@@ -1007,6 +1032,39 @@ final class RexAPI {
         guard let http = response as? HTTPURLResponse, http.statusCode < 400 else {
             let body = String(data: data, encoding: .utf8) ?? ""
             throw RexAPIError.server("Couldn't rename that collection. \(body)")
+        }
+    }
+
+    /// `draft` (only you), `friends`, or `public`.
+    func setCollectionVisibility(id: String, visibility: String) async throws {
+        let token = try await validToken()
+        var components = URLComponents(url: baseURL.appendingPathComponent("/rest/v1/hitlist_lists"), resolvingAgainstBaseURL: false)!
+        components.queryItems = [URLQueryItem(name: "id", value: "eq.\(id)")]
+        var request = URLRequest(url: components.url!)
+        request.httpMethod = "PATCH"
+        request.setValue(anonKey, forHTTPHeaderField: "apikey")
+        request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        request.httpBody = try JSONSerialization.data(withJSONObject: ["visibility": visibility])
+        let (data, response) = try await URLSession.shared.data(for: request)
+        guard let http = response as? HTTPURLResponse, http.statusCode < 400 else {
+            let body = String(data: data, encoding: .utf8) ?? ""
+            throw RexAPIError.server("Couldn't change who can see that. \(body)")
+        }
+    }
+
+    func deleteCollection(id: String) async throws {
+        let token = try await validToken()
+        var components = URLComponents(url: baseURL.appendingPathComponent("/rest/v1/hitlist_lists"), resolvingAgainstBaseURL: false)!
+        components.queryItems = [URLQueryItem(name: "id", value: "eq.\(id)")]
+        var request = URLRequest(url: components.url!)
+        request.httpMethod = "DELETE"
+        request.setValue(anonKey, forHTTPHeaderField: "apikey")
+        request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+        let (data, response) = try await URLSession.shared.data(for: request)
+        guard let http = response as? HTTPURLResponse, http.statusCode < 400 else {
+            let body = String(data: data, encoding: .utf8) ?? ""
+            throw RexAPIError.server("Couldn't delete that collection. \(body)")
         }
     }
 
@@ -1170,6 +1228,33 @@ final class RexAPI {
         guard let http = response as? HTTPURLResponse, http.statusCode < 400 else {
             let body = String(data: data, encoding: .utf8) ?? ""
             throw RexAPIError.server("Couldn't load your saved posts. \(body)")
+        }
+        return try JSONDecoder().decode([SavedPost].self, from: data)
+    }
+
+    /// What's inside one collection. Unlike `fetchSavedPosts` this isn't scoped
+    /// to you — it's how you browse a friend's collection too, so RLS on
+    /// hitlist_lists is what decides whether you can see it.
+    func fetchCollectionItems(listId: String) async throws -> [SavedPost] {
+        let token = try await validToken()
+        let select = "id,created_at,list_id,recommendation_id," +
+            "recommendations(id,rating,note,created_at,photo_url,photo_urls,tags,user_id,item_id," +
+            "items(id,type,title,subtitle,image_url,genre)," +
+            "profiles!recommendations_user_id_fkey(username,display_name,avatar_url))"
+        var components = URLComponents(url: baseURL.appendingPathComponent("/rest/v1/saved_posts"), resolvingAgainstBaseURL: false)!
+        components.queryItems = [
+            URLQueryItem(name: "select", value: select),
+            URLQueryItem(name: "list_id", value: "eq.\(listId)"),
+            URLQueryItem(name: "order", value: "created_at.desc"),
+        ]
+        var request = URLRequest(url: components.url!)
+        request.setValue(anonKey, forHTTPHeaderField: "apikey")
+        request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+
+        let (data, response) = try await URLSession.shared.data(for: request)
+        guard let http = response as? HTTPURLResponse, http.statusCode < 400 else {
+            let body = String(data: data, encoding: .utf8) ?? ""
+            throw RexAPIError.server("Couldn't load that collection. \(body)")
         }
         return try JSONDecoder().decode([SavedPost].self, from: data)
     }
