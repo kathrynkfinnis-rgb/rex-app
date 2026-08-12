@@ -166,6 +166,19 @@ struct AddRexView: View {
 
             modePicker(for: category)
 
+            if mode == .want {
+                Text("Why? (optional)").font(.system(size: 14, weight: .semibold)).foregroundStyle(RexColor.foreground)
+                TextField("Who told you about it, what caught your eye…", text: $note, axis: .vertical)
+                    .lineLimit(2...4)
+                    .padding(12)
+                    .background(RexColor.card)
+                    .clipShape(RoundedRectangle(cornerRadius: 14))
+                    .overlay(RoundedRectangle(cornerRadius: 14).stroke(RexColor.border, lineWidth: 1))
+                Text("This goes in your friends' feed so they can chime in.")
+                    .font(RexFont.text(12))
+                    .foregroundStyle(RexColor.mutedForeground)
+            }
+
             if mode == .rated {
                 Text("Your rating").font(.system(size: 14, weight: .semibold)).foregroundStyle(RexColor.foreground)
                 CrownRatingInput(value: $rating)
@@ -490,7 +503,10 @@ struct AddRexView: View {
                 )
                 didWant = false
             case .want:
-                try await RexAPI.shared.createWant(itemId: itemId)
+                try await RexAPI.shared.createWant(
+                    itemId: itemId,
+                    note: note.trimmingCharacters(in: .whitespaces).isEmpty ? nil : note
+                )
                 didWant = true
             }
             withAnimation { didPost = true }

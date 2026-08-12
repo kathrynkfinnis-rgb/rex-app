@@ -51,6 +51,17 @@ struct RecommendationCardView: View {
                                     .lineLimit(1)
                             }
                             Spacer(minLength: RexSpacing.sm)
+                            // A want has no rating — say what it is instead of
+                            // showing an empty space where the crown goes.
+                            if rec.isWant {
+                                HStack(spacing: 4) {
+                                    Image(systemName: "bookmark")
+                                        .font(.system(size: 10))
+                                    Text("Wants to try")
+                                        .font(RexFont.text(12, weight: .semibold))
+                                }
+                                .foregroundStyle(RexColor.mutedForeground)
+                            }
                             // Rating is an "important icon" — one of the few
                             // places the spec allows forest green.
                             if rec.rating > 0 {
@@ -137,7 +148,12 @@ struct RecommendationCardView: View {
                 HStack(spacing: RexSpacing.sm) {
                     authorRow
                     Spacer(minLength: RexSpacing.sm)
-                    RexCardActions(rec: rec)
+                    // Likes and comments key off a recommendation id, which a
+                    // want doesn't have — so those actions stay off until wants
+                    // and Rex share a table.
+                    if !rec.isWant {
+                        RexCardActions(rec: rec)
+                    }
                 }
                 .padding(.horizontal, RexSpacing.cardPadding)
                 .padding(.vertical, RexSpacing.md)

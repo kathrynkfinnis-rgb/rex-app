@@ -210,6 +210,10 @@ struct FeedRecommendation: Codable, Identifiable {
     /// database where the migration hasn't been run.
     let is_anonymous: Bool?
 
+    /// A want rather than a Rex — someone saying they'd like to try this. The
+    /// feed carries both, and an unrated row is what marks the difference.
+    var isWant: Bool { id.hasPrefix("want-") }
+
     private static let isoFormatter: ISO8601DateFormatter = {
         let f = ISO8601DateFormatter()
         f.formatOptions = [.withInternetDateTime, .withFractionalSeconds]

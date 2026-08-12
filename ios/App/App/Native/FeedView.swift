@@ -409,7 +409,13 @@ struct FeedView: View {
         isLoading = recommendations.isEmpty
         errorMessage = nil
         do {
-            recommendations = try await RexAPI.shared.fetchFeed()
+            // Friends' wants sit in the feed alongside Rex, newest first, so
+            // "I want to try this" is something people can answer.
+            async let rex = RexAPI.shared.fetchFeed()
+            async let wantsFeed = RexAPI.shared.fetchWantsFeed()
+            let merged = (try await rex) + ((try? await wantsFeed) ?? [])
+            recommendations = merged.sorted { $0.created_at > $1.created_at }
+
             let itemIds = Array(Set(recommendations.map { $0.item_id }))
             async let counts = RexAPI.shared.fetchRexCounts(itemIds: itemIds)
             async let wants = RexAPI.shared.fetchWants()

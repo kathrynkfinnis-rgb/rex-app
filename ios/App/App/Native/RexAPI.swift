@@ -460,7 +460,7 @@ final class RexAPI {
     }
 
     /// Marks an item as "want to try/watch/visit" instead of rating it — inserts into `wants`.
-    func createWant(itemId: String) async throws {
+    func createWant(itemId: String, note: String? = nil) async throws {
         let token = try await validToken()
         guard let userId = currentUserId else { throw RexAPIError.notSignedIn }
         var request = URLRequest(url: baseURL.appendingPathComponent("/rest/v1/wants"))
@@ -470,7 +470,10 @@ final class RexAPI {
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
         request.setValue("resolution=merge-duplicates", forHTTPHeaderField: "Prefer")
 
-        let body: [String: Any] = ["user_id": userId, "item_id": itemId]
+        var body: [String: Any] = ["user_id": userId, "item_id": itemId]
+        // Only sent when there's something to say, so the column being absent
+        // can't break saving.
+        if let note, !note.isEmpty { body["note"] = note }
         request.httpBody = try JSONSerialization.data(withJSONObject: body)
 
         var urlComponents = URLComponents(url: request.url!, resolvingAgainstBaseURL: false)!
@@ -1383,6 +1386,85 @@ final class RexAPI {
 
     /// One row per place/event that has at least one live Rex (matches the web app's
     /// `!inner` join — items whose only recommendation got deleted never linger as pins).
+    /// Wants worth putting in the feed — someone saying "I want to try this"
+    /// is an invitation for friends to chime in, which they can't do while it
+    /// sits on a private list.
+    ///
+    /// Presented as recommendations with no rating so the feed can render them
+    /// with everything else; `rating: 0` is what marks them as a want.
+    func fetchWantsFeed() async throws -> [FeedRecommendation] {
+        let token = try await validToken()
+        guard let userId = currentUserId else { return [] }
+        let noteField = await wantNoteField()
+        let select = "id,created_at,item_id,user_id\(noteField)," +
+            "items!inner(id,type,title,subtitle,image_url,genre)," +
+            "profiles!wants_user_id_fkey(username,display_name,avatar_url)"
+        var components = URLComponents(url: baseURL.appendingPathComponent("/rest/v1/wants"), resolvingAgainstBaseURL: false)!
+        components.queryItems = [
+            URLQueryItem(name: "select", value: select),
+            // Your own wants already live on your list; the feed is other people.
+            URLQueryItem(name: "user_id", value: "neq.\(userId)"),
+            URLQueryItem(name: "order", value: "created_at.desc"),
+            URLQueryItem(name: "limit", value: "30"),
+        ]
+        var request = URLRequest(url: components.url!)
+        request.setValue(anonKey, forHTTPHeaderField: "apikey")
+        request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+
+        let (data, response) = try await URLSession.shared.data(for: request)
+        guard let http = response as? HTTPURLResponse, http.statusCode < 400 else { return [] }
+        struct Row: Codable {
+            let id: String
+            let created_at: String
+            let item_id: String
+            let user_id: String
+            let note: String?
+            let items: RexItem?
+            let profiles: RexProfile?
+        }
+        let rows = (try? JSONDecoder().decode([Row].self, from: data)) ?? []
+        return rows.map { row in
+            FeedRecommendation(
+                id: "want-\(row.id)",
+                rating: 0,
+                note: row.note,
+                created_at: row.created_at,
+                photo_url: nil,
+                photo_urls: nil,
+                tags: nil,
+                user_id: row.user_id,
+                item_id: row.item_id,
+                items: row.items,
+                profiles: row.profiles,
+                creators: nil,
+                trip_section: nil,
+                is_anonymous: false
+            )
+        }
+    }
+
+    /// Same guard as the anonymous column — the note only exists once that
+    /// migration has been run, and selecting it blind would fail the query.
+    private var wantNoteColumn: Bool?
+
+    private func wantNoteField() async -> String {
+        if let wantNoteColumn { return wantNoteColumn ? ",note" : "" }
+        guard let token = try? await validToken() else { return "" }
+        var components = URLComponents(url: baseURL.appendingPathComponent("/rest/v1/wants"), resolvingAgainstBaseURL: false)!
+        components.queryItems = [
+            URLQueryItem(name: "select", value: "note"),
+            URLQueryItem(name: "limit", value: "1"),
+        ]
+        var request = URLRequest(url: components.url!)
+        request.setValue(anonKey, forHTTPHeaderField: "apikey")
+        request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+        let ok = (try? await URLSession.shared.data(for: request))
+            .flatMap { ($0.1 as? HTTPURLResponse)?.statusCode }
+            .map { $0 < 400 } ?? false
+        wantNoteColumn = ok
+        return ok ? ",note" : ""
+    }
+
     /// How many people have Rex'd each of these items. Counted client-side
     /// because PostgREST has no group-by; the id list is one feed page, so this
     /// stays small.
