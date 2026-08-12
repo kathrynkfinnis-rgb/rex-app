@@ -27,6 +27,7 @@ struct CollectionsView: View {
     @State private var dropTarget: String?
     /// Swiping rows can't be NavigationLinks, so taps push through here instead.
     @State private var pushedItemId: String?
+    @State private var creatingCollection = false
 
     /// "My list" grouped by category — Places to eat, Trips to take, and so on.
     private var wantsByCategory: [(category: RexCategory, items: [WantRow])] {
@@ -104,9 +105,27 @@ struct CollectionsView: View {
                     } else if errorMessage == nil || !(wants.isEmpty && lists.isEmpty) {
                         switch tab {
                         case .mine: myList
-                        case .collections: collectionList(filtered(lists), emptyTitle: "No collections yet",
-                                                          emptyBody: "Make a list to share — like \u{201C}My favourite pubs in London\u{201D}.",
-                                                          isMine: true)
+                        case .collections:
+                            if lists.isEmpty {
+                                VStack(spacing: RexSpacing.sm) {
+                                    Text("No collections yet")
+                                        .font(RexFont.display(20, weight: .semibold))
+                                        .foregroundStyle(RexColor.foreground)
+                                    Text("Make a list to share — like \u{201C}My favourite pubs in London\u{201D}.")
+                                        .font(RexFont.text(14))
+                                        .foregroundStyle(RexColor.mutedForeground)
+                                        .multilineTextAlignment(.center)
+                                    Button("New collection") { creatingCollection = true }
+                                        .buttonStyle(RexPrimaryButtonStyle())
+                                        .padding(.top, RexSpacing.md)
+                                }
+                                .padding(RexSpacing.xxl)
+                                .frame(maxWidth: .infinity)
+                            } else {
+                                collectionList(filtered(lists), emptyTitle: "Nothing matches that filter",
+                                               emptyBody: "Try a different type.",
+                                               isMine: true)
+                            }
                         case .followed: collectionList(filtered(followed), emptyTitle: "Nothing saved yet",
                                                        emptyBody: "Save a friend's collection and it'll live here.",
                                                        showOwner: true)
@@ -124,14 +143,36 @@ struct CollectionsView: View {
         .navigationTitle("")
         .navigationBarTitleDisplayMode(.inline)
         .navigationDestination(item: $pushedItemId) { ItemDetailView(itemId: $0) }
+        .sheet(isPresented: $creatingCollection) {
+            NewCollectionView { _ in
+                tab = .collections
+                Task { await load() }
+            }
+        }
         .task { await load() }
     }
 
     private var header: some View {
         VStack(alignment: .leading, spacing: RexSpacing.md) {
-            Text("Collections")
-                .font(RexFont.display(32, weight: .semibold))
-                .foregroundStyle(RexColor.foreground)
+            HStack(alignment: .firstTextBaseline) {
+                Text("Collections")
+                    .font(RexFont.display(32, weight: .semibold))
+                    .foregroundStyle(RexColor.foreground)
+                Spacer()
+                Button { creatingCollection = true } label: {
+                    HStack(spacing: 5) {
+                        Image(systemName: "plus")
+                            .font(.system(size: 12, weight: .semibold))
+                        Text("New").font(RexFont.text(13, weight: .semibold))
+                    }
+                    .foregroundStyle(RexColor.primaryForeground)
+                    .padding(.horizontal, RexSpacing.md)
+                    .padding(.vertical, 7)
+                    .background(RexColor.primary)
+                    .clipShape(Capsule())
+                }
+                .buttonStyle(.plain)
+            }
 
             ScrollView(.horizontal, showsIndicators: false) {
                 HStack(spacing: RexSpacing.sm) {
