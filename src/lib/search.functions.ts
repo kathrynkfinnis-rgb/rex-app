@@ -34,11 +34,35 @@ const querySchema = z.object({ q: z.string().min(1).max(120) });
 export const searchBooks = createServerFn({ method: "GET" })
   .inputValidator((d: { q: string }) => querySchema.parse(d))
   .handler(async ({ data }): Promise<SearchHit[]> => {
-    const url = `https://www.googleapis.com/books/v1/volumes?q=${encodeURIComponent(data.q)}&maxResults=12&printType=books`;
-    const res = await fetch(url);
-    if (!res.ok) return [];
-    const json: any = await res.json();
-    const items: any[] = json.items ?? [];
+    // `intitle:` on the typed words makes a partial title match, rather than
+    // waiting for the full title and author. The bare query runs too, so
+    // "long island toibin" still works, and the two are merged title-first.
+    const words = data.q.trim().split(/\s+/).filter(Boolean);
+    const titleQuery = words.map((w) => `intitle:${w}`).join(" ");
+    const [titleRes, generalRes] = await Promise.all([
+      fetch(
+        `https://www.googleapis.com/books/v1/volumes?q=${encodeURIComponent(titleQuery)}&maxResults=12&printType=books`,
+      ),
+      words.length >= 2
+        ? fetch(
+            `https://www.googleapis.com/books/v1/volumes?q=${encodeURIComponent(data.q)}&maxResults=12&printType=books`,
+          )
+        : Promise.resolve(null),
+    ]);
+
+    const collect = async (res: Response | null): Promise<any[]> => {
+      if (!res || !res.ok) return [];
+      const json: any = await res.json();
+      return json.items ?? [];
+    };
+
+    const seen = new Set<string>();
+    const items: any[] = [];
+    for (const it of [...(await collect(titleRes)), ...(await collect(generalRes))]) {
+      if (seen.has(it.id)) continue;
+      seen.add(it.id);
+      items.push(it);
+    }
     return items.map((it) => {
       const v = it.volumeInfo ?? {};
       const img: string | undefined = v.imageLinks?.thumbnail ?? v.imageLinks?.smallThumbnail;

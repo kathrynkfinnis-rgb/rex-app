@@ -73,8 +73,40 @@ enum RexSearch {
     // MARK: - Providers
 
     /// OpenLibrary — no key, generous quota.
+    ///
+    /// Two searches, merged. OpenLibrary's plain `q` needs nearly the whole
+    /// title before the right book surfaces — "long isl" returns Long Isle Iced
+    /// Tea, not Colm Tóibín — so the main pass is a field-scoped title search
+    /// with a trailing wildcard on the last word, which does match as you type.
+    /// The plain search still earns its place for "title author" queries.
     private static func books(_ q: String) async throws -> [RexSearchHit] {
-        let url = "https://openlibrary.org/search.json?q=\(esc(q))&limit=15&fields=key,title,author_name,first_publish_year,cover_i,subject"
+        async let titleHits = openLibrary("title=\(esc(wildcardLastWord(q)))")
+        async let generalHits: [RexSearchHit] = q.split(separator: " ").count >= 2
+            ? openLibrary("q=\(esc(q))")
+            : []
+
+        // Title matches lead; the general pass fills in behind, deduped.
+        var seen = Set<String>()
+        var out: [RexSearchHit] = []
+        for hit in (try await titleHits) + (try await generalHits) where !seen.contains(hit.externalId) {
+            seen.insert(hit.externalId)
+            out.append(hit)
+        }
+        return Array(out.prefix(15))
+    }
+
+    /// "long isl" → "long isl*", so a half-typed word still matches. Left alone
+    /// if the last word is a single character, where the wildcard matches
+    /// everything and ranking falls apart.
+    private static func wildcardLastWord(_ q: String) -> String {
+        var words = q.split(separator: " ").map(String.init)
+        guard let last = words.last, last.count >= 2, !last.hasSuffix("*") else { return q }
+        words[words.count - 1] = last + "*"
+        return words.joined(separator: " ")
+    }
+
+    private static func openLibrary(_ queryPart: String) async throws -> [RexSearchHit] {
+        let url = "https://openlibrary.org/search.json?\(queryPart)&limit=15&fields=key,title,author_name,first_publish_year,cover_i,subject"
         let json = try await getJSON(url)
         let docs = json["docs"] as? [[String: Any]] ?? []
         return docs.compactMap { d in

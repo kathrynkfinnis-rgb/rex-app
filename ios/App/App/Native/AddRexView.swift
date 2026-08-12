@@ -155,10 +155,14 @@ struct AddRexView: View {
                 FlowChips(options: options, selected: $subcategories)
             }
 
-            // Somewhere to put a link to the thing itself — most useful on
-            // Other (products, services) but harmless everywhere.
-            field("Link (optional)", text: $productLink, placeholder: "https://…")
-                .textInputAutocapitalization(.never)
+            // A link to the thing itself: the point of Other (products,
+            // services) and useful for places and events. Books, films, TV and
+            // podcasts come from a catalogue with their own page, so a link
+            // field there is just another box to ignore.
+            if ![.book, .movie, .tv, .podcast].contains(category) {
+                field("Link (optional)", text: $productLink, placeholder: "https://…")
+                    .textInputAutocapitalization(.never)
+            }
 
             modePicker(for: category)
 
@@ -496,6 +500,26 @@ struct AddRexView: View {
         isSaving = false
     }
 
+    /// Clear the form but keep the category — you're usually adding another of
+    /// the same kind. Tags deliberately don't carry over; that was a bug once.
+    private func startAnother() {
+        withAnimation {
+            didPost = false
+            didWant = false
+            title = ""
+            note = ""
+            productLink = ""
+            photoURLs = []
+            subcategories = []
+            anonymous = false
+            rating = 8
+            picked = nil
+            hits = []
+            manualEntry = false
+            errorMessage = nil
+        }
+    }
+
     private var successState: some View {
         VStack(spacing: 16) {
             Image(systemName: didWant ? "bookmark.fill" : "checkmark.circle.fill")
@@ -508,13 +532,19 @@ struct AddRexView: View {
                 .font(.system(size: 15))
                 .foregroundStyle(RexColor.mutedForeground)
                 .multilineTextAlignment(.center)
-            Button("Back to feed") { onDone() }
+            // People rarely add just one, so offer to go again without
+            // having to come back in through the + button.
+            Button("Add another") { startAnother() }
                 .frame(maxWidth: .infinity)
                 .frame(height: 48)
                 .background(RexColor.primary)
                 .foregroundStyle(RexColor.primaryForeground)
                 .clipShape(Capsule())
                 .padding(.top, 8)
+
+            Button("Back to feed") { onDone() }
+                .font(RexFont.text(15, weight: .semibold))
+                .foregroundStyle(RexColor.primary)
         }
         .padding(32)
         .frame(maxWidth: .infinity)
