@@ -122,6 +122,62 @@ final class RexAPI {
         refreshTokenValue = decoded.refresh_token
     }
 
+    func signUp(email: String, password: String) async throws {
+        var request = URLRequest(url: baseURL.appendingPathComponent("/auth/v1/signup"))
+        request.httpMethod = "POST"
+        request.setValue(anonKey, forHTTPHeaderField: "apikey")
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        request.httpBody = try JSONSerialization.data(withJSONObject: ["email": email, "password": password])
+
+        let (data, response) = try await URLSession.shared.data(for: request)
+        guard let http = response as? HTTPURLResponse else { throw RexAPIError.invalidResponse }
+        if http.statusCode >= 400 {
+            let body = (try? JSONSerialization.jsonObject(with: data)) as? [String: Any]
+            let message = (body?["error_description"] as? String) ?? (body?["msg"] as? String)
+                ?? "Couldn't create your account."
+            throw RexAPIError.server(message)
+        }
+        // With email confirmation on, signup returns a user but no session —
+        // the caller shows "check your inbox" rather than barging into the feed.
+        struct SignUpResponse: Codable { let access_token: String?; let refresh_token: String? }
+        let decoded = try JSONDecoder().decode(SignUpResponse.self, from: data)
+        accessToken = decoded.access_token
+        refreshTokenValue = decoded.refresh_token
+    }
+
+    /// Whether signup produced a usable session, or the account still needs
+    /// confirming by email.
+    var hasSession: Bool { accessToken != nil }
+
+    /// Sign in with the identity token Apple handed us. Supabase verifies it
+    /// against the bundle ID listed in its Apple provider settings, so this
+    /// needs no client secret.
+    func signInWithApple(idToken: String, nonce: String) async throws {
+        var request = URLRequest(url: baseURL.appendingPathComponent("/auth/v1/token"))
+        var components = URLComponents(url: request.url!, resolvingAgainstBaseURL: false)!
+        components.queryItems = [URLQueryItem(name: "grant_type", value: "id_token")]
+        request.url = components.url
+        request.httpMethod = "POST"
+        request.setValue(anonKey, forHTTPHeaderField: "apikey")
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        request.httpBody = try JSONSerialization.data(withJSONObject: [
+            "provider": "apple", "id_token": idToken, "nonce": nonce,
+        ])
+
+        let (data, response) = try await URLSession.shared.data(for: request)
+        guard let http = response as? HTTPURLResponse else { throw RexAPIError.invalidResponse }
+        if http.statusCode >= 400 {
+            let body = (try? JSONSerialization.jsonObject(with: data)) as? [String: Any]
+            let message = (body?["error_description"] as? String) ?? (body?["msg"] as? String)
+                ?? "Couldn't sign in with Apple."
+            throw RexAPIError.server(message)
+        }
+        struct TokenResponse: Codable { let access_token: String; let refresh_token: String }
+        let decoded = try JSONDecoder().decode(TokenResponse.self, from: data)
+        accessToken = decoded.access_token
+        refreshTokenValue = decoded.refresh_token
+    }
+
     func signOut() {
         accessToken = nil
         refreshTokenValue = nil
