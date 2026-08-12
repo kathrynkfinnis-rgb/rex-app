@@ -213,7 +213,7 @@ final class RexAPI {
         let token = try await validToken()
 
         let select = "id,rating,note,created_at,photo_url,photo_urls,tags\(await anonymousField()),user_id,item_id,trip_id," +
-            "items!inner(id,type,title,subtitle,image_url,genre)," +
+            "items!inner(id,type,title,subtitle,image_url,genre,address)," +
             "profiles!recommendations_user_id_fkey(username,display_name,avatar_url)," +
             "creators(slug,name,color,emoji)"
 
@@ -275,7 +275,7 @@ final class RexAPI {
     func fetchTripStops(tripRecommendationId: String) async throws -> [FeedRecommendation] {
         let token = try await validToken()
         let select = "id,rating,note,created_at,photo_url,photo_urls,tags\(await anonymousField()),user_id,item_id,trip_id,trip_section," +
-            "items!inner(id,type,title,subtitle,image_url,genre)," +
+            "items!inner(id,type,title,subtitle,image_url,genre,address)," +
             "profiles!recommendations_user_id_fkey(username,display_name,avatar_url)"
         var components = URLComponents(url: baseURL.appendingPathComponent("/rest/v1/recommendations"), resolvingAgainstBaseURL: false)!
         components.queryItems = [
@@ -391,6 +391,13 @@ final class RexAPI {
         if let r = hit?.googleRating { body["google_rating"] = r }
         if let c = hit?.googleRatingCount { body["google_rating_count"] = c }
         if let recipeText, !recipeText.isEmpty { body["recipe_text"] = recipeText }
+        // Google's photo URLs only serve an image to a request carrying our
+        // bundle id, which AsyncImage doesn't send — so they render blank. They
+        // also embed the API key in a URL we'd be storing. Fetch the image once
+        // here and keep our own copy instead.
+        if let raw = body["image_url"] as? String, raw.contains("places.googleapis.com") {
+            body["image_url"] = (await copyGooglePhoto(raw)) ?? NSNull()
+        }
         request.httpBody = try JSONSerialization.data(withJSONObject: body)
 
         var (data, response) = try await URLSession.shared.data(for: request)
@@ -510,7 +517,7 @@ final class RexAPI {
     func fetchRecommendations(forUser userId: String) async throws -> [FeedRecommendation] {
         let token = try await validToken()
         let select = "id,rating,note,created_at,photo_url,photo_urls,tags\(await anonymousField()),user_id,item_id," +
-            "items!inner(id,type,title,subtitle,image_url,genre)," +
+            "items!inner(id,type,title,subtitle,image_url,genre,address)," +
             "profiles!recommendations_user_id_fkey(username,display_name,avatar_url)," +
             "creators(slug,name,color,emoji)"
         var components = URLComponents(url: baseURL.appendingPathComponent("/rest/v1/recommendations"), resolvingAgainstBaseURL: false)!
@@ -754,6 +761,22 @@ final class RexAPI {
     /// Uploads image data to the rec-photos bucket and returns a long-lived
     /// signed URL. Files go under the user's own folder, which is what the
     /// storage RLS policy checks.
+    /// Downloads a Google Places photo using the headers its key restriction
+    /// requires, and re-hosts it in our own storage. Returns nil rather than
+    /// failing the save — a place without a picture still beats no place.
+    private func copyGooglePhoto(_ urlString: String) async -> String? {
+        guard let url = URL(string: urlString) else { return nil }
+        var request = URLRequest(url: url)
+        if let bundleId = Bundle.main.bundleIdentifier {
+            request.setValue(bundleId, forHTTPHeaderField: "X-Ios-Bundle-Identifier")
+        }
+        guard let (data, response) = try? await URLSession.shared.data(for: request),
+              let http = response as? HTTPURLResponse, http.statusCode < 400,
+              !data.isEmpty
+        else { return nil }
+        return try? await uploadPhoto(data: data)
+    }
+
     func uploadPhoto(data imageData: Data, fileExtension: String = "jpg") async throws -> String {
         let token = try await validToken()
         guard let userId = currentUserId else { throw RexAPIError.notSignedIn }
@@ -1397,7 +1420,7 @@ final class RexAPI {
         guard let userId = currentUserId else { return [] }
         let noteField = await wantNoteField()
         let select = "id,created_at,item_id,user_id\(noteField)," +
-            "items!inner(id,type,title,subtitle,image_url,genre)," +
+            "items!inner(id,type,title,subtitle,image_url,genre,address)," +
             "profiles!wants_user_id_fkey(username,display_name,avatar_url)"
         var components = URLComponents(url: baseURL.appendingPathComponent("/rest/v1/wants"), resolvingAgainstBaseURL: false)!
         components.queryItems = [

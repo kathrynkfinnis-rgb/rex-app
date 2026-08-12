@@ -38,6 +38,7 @@ export const PLACE_SUBCATEGORIES = [
   "Accommodation",
   "Shop",
   "Activity",
+  "Town",
   "Other",
 ] as const;
 export type PlaceSubcategory = (typeof PLACE_SUBCATEGORIES)[number];

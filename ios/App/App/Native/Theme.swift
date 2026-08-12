@@ -187,7 +187,7 @@ enum RexCategory: String {
 /// comma-separated in items.genre.
 let rexSubcategories: [RexCategory: [String]] = [
     .place: ["Restaurant", "Private dining", "Bar", "Café", "Beauty",
-             "Accommodation", "Shop", "Activity", "Other"],
+             "Accommodation", "Shop", "Activity", "Town", "Other"],
     .trip: ["City break", "Beach", "Road trip", "Countryside", "Ski", "Adventure",
             "Family", "Weekend away", "Honeymoon", "Work trip", "Other"],
     .recipe: ["Salad", "Soup", "Pasta", "Rice & grains", "Meat", "Fish & seafood",
@@ -334,4 +334,25 @@ func linkified(_ text: String) -> AttributedString {
         attributed[attrRange].underlineStyle = .single
     }
     return attributed
+}
+
+/// The recognisable middle of an address — "Peckham", "Bristol" — rather than
+/// the house number or the postcode.
+///
+/// Google formats as "165 Tyers St, London SE11 5HS, UK": the last component is
+/// the country and the second-to-last carries the town and postcode, so we take
+/// that and drop the postcode off the end.
+func shortLocality(_ address: String?) -> String? {
+    guard let address, !address.isEmpty else { return nil }
+    let parts = address.split(separator: ",").map { $0.trimmingCharacters(in: .whitespaces) }
+    guard parts.count >= 2 else { return parts.first }
+
+    let candidate = parts[parts.count - 2]
+    // Drop the postcode wherever it sits — after the town in the UK
+    // ("London SE11 5HS"), before it in France ("29241 Locquirec"). A postcode
+    // chunk contains a digit; a place name generally doesn't.
+    let words = candidate.split(separator: " ").map(String.init)
+    let cleaned = words.filter { !$0.contains(where: \.isNumber) }
+    let result = cleaned.joined(separator: " ")
+    return result.isEmpty ? candidate : result
 }

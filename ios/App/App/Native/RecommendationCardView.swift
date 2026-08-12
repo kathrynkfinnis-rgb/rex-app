@@ -96,6 +96,21 @@ struct RecommendationCardView: View {
                                 .lineLimit(1)
                         }
 
+                        // Whereabouts, at a glance. "Is it near me?" is the
+                        // first question about a place and the full address is
+                        // too long to scan, so this is the useful middle bit:
+                        // Peckham, or Bristol.
+                        if let locality = shortLocality(item.address) {
+                            HStack(spacing: 3) {
+                                Image(systemName: "mappin")
+                                    .font(.system(size: 9))
+                                Text(locality)
+                                    .font(RexFont.text(12, weight: .medium))
+                                    .lineLimit(1)
+                            }
+                            .foregroundStyle(RexColor.mutedForeground)
+                        }
+
                         if let note = rec.note, !note.isEmpty {
                             VStack(alignment: .leading, spacing: 2) {
                                 // Links people paste into a note become
