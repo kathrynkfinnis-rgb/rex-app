@@ -22,6 +22,7 @@ struct AddRexView: View {
     @State private var rating: Double = 10
     @State private var note = ""
     @State private var isSaving = false
+    @State private var anonymous = false
     @State private var errorMessage: String?
     @State private var didPost = false
     @State private var didWant = false
@@ -175,6 +176,18 @@ struct AddRexView: View {
 
                 Text("Photos").font(.system(size: 14, weight: .semibold)).foregroundStyle(RexColor.foreground)
                 PhotoPickerView(photoURLs: $photoURLs)
+
+                Toggle(isOn: $anonymous) {
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text("Post anonymously")
+                            .font(.system(size: 14, weight: .semibold))
+                            .foregroundStyle(RexColor.foreground)
+                        Text("Your name won't show. It still counts toward your Rex.")
+                            .font(RexFont.text(12))
+                            .foregroundStyle(RexColor.mutedForeground)
+                    }
+                }
+                .tint(RexColor.primary)
             }
 
             if let errorMessage {
@@ -468,7 +481,8 @@ struct AddRexView: View {
                     itemId: itemId,
                     rating: rating,
                     note: note.isEmpty ? nil : note,
-                    photoURLs: photoURLs
+                    photoURLs: photoURLs,
+                    anonymous: anonymous
                 )
                 didWant = false
             case .want:

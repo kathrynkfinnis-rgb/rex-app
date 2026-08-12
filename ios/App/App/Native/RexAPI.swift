@@ -122,6 +122,32 @@ final class RexAPI {
         refreshTokenValue = decoded.refresh_token
     }
 
+    /// Whether the `is_anonymous` migration has been run.
+    ///
+    /// Asking PostgREST for a column that doesn't exist makes it reject the
+    /// whole query, so selecting this blind would take the entire feed down
+    /// until the SQL is run — which is exactly what the Google rating columns
+    /// did. Probe once, then remember.
+    private var anonymousColumn: Bool?
+
+    private func anonymousField() async -> String {
+        if let anonymousColumn { return anonymousColumn ? ",is_anonymous" : "" }
+        guard let token = try? await validToken() else { return "" }
+        var components = URLComponents(url: baseURL.appendingPathComponent("/rest/v1/recommendations"), resolvingAgainstBaseURL: false)!
+        components.queryItems = [
+            URLQueryItem(name: "select", value: "is_anonymous"),
+            URLQueryItem(name: "limit", value: "1"),
+        ]
+        var request = URLRequest(url: components.url!)
+        request.setValue(anonKey, forHTTPHeaderField: "apikey")
+        request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+        let ok = (try? await URLSession.shared.data(for: request))
+            .flatMap { ($0.1 as? HTTPURLResponse)?.statusCode }
+            .map { $0 < 400 } ?? false
+        anonymousColumn = ok
+        return ok ? ",is_anonymous" : ""
+    }
+
     func signUp(email: String, password: String) async throws {
         var request = URLRequest(url: baseURL.appendingPathComponent("/auth/v1/signup"))
         request.httpMethod = "POST"
@@ -186,7 +212,7 @@ final class RexAPI {
     func fetchFeed() async throws -> [FeedRecommendation] {
         let token = try await validToken()
 
-        let select = "id,rating,note,created_at,photo_url,photo_urls,tags,user_id,item_id,trip_id," +
+        let select = "id,rating,note,created_at,photo_url,photo_urls,tags\(await anonymousField()),user_id,item_id,trip_id," +
             "items!inner(id,type,title,subtitle,image_url,genre)," +
             "profiles!recommendations_user_id_fkey(username,display_name,avatar_url)," +
             "creators(slug,name,color,emoji)"
@@ -248,7 +274,7 @@ final class RexAPI {
     /// Ordered oldest-first so the itinerary reads in the order it was built.
     func fetchTripStops(tripRecommendationId: String) async throws -> [FeedRecommendation] {
         let token = try await validToken()
-        let select = "id,rating,note,created_at,photo_url,photo_urls,tags,user_id,item_id,trip_id,trip_section," +
+        let select = "id,rating,note,created_at,photo_url,photo_urls,tags\(await anonymousField()),user_id,item_id,trip_id,trip_section," +
             "items!inner(id,type,title,subtitle,image_url,genre)," +
             "profiles!recommendations_user_id_fkey(username,display_name,avatar_url)"
         var components = URLComponents(url: baseURL.appendingPathComponent("/rest/v1/recommendations"), resolvingAgainstBaseURL: false)!
@@ -271,7 +297,7 @@ final class RexAPI {
 
     func fetchRecommendations(forItem itemId: String) async throws -> [FeedRecommendation] {
         let token = try await validToken()
-        let select = "id,rating,note,created_at,photo_url,photo_urls,tags,user_id,item_id," +
+        let select = "id,rating,note,created_at,photo_url,photo_urls,tags\(await anonymousField()),user_id,item_id," +
             "profiles!recommendations_user_id_fkey(username,display_name,avatar_url)"
         var components = URLComponents(url: baseURL.appendingPathComponent("/rest/v1/recommendations"), resolvingAgainstBaseURL: false)!
         components.queryItems = [
@@ -397,6 +423,7 @@ final class RexAPI {
         tags: [String] = [],
         tripId: String? = nil,
         tripSection: String? = nil,
+        anonymous: Bool = false,
         returningId: Bool = false
     ) async throws -> String {
         let token = try await validToken()
@@ -414,6 +441,7 @@ final class RexAPI {
         body["tags"] = tags
         if let tripId { body["trip_id"] = tripId }
         if let tripSection, !tripSection.isEmpty { body["trip_section"] = tripSection }
+        if anonymous { body["is_anonymous"] = true }
         request.httpBody = try JSONSerialization.data(withJSONObject: body)
         if returningId {
             request.setValue("return=representation", forHTTPHeaderField: "Prefer")
@@ -478,7 +506,7 @@ final class RexAPI {
 
     func fetchRecommendations(forUser userId: String) async throws -> [FeedRecommendation] {
         let token = try await validToken()
-        let select = "id,rating,note,created_at,photo_url,photo_urls,tags,user_id,item_id," +
+        let select = "id,rating,note,created_at,photo_url,photo_urls,tags\(await anonymousField()),user_id,item_id," +
             "items!inner(id,type,title,subtitle,image_url,genre)," +
             "profiles!recommendations_user_id_fkey(username,display_name,avatar_url)," +
             "creators(slug,name,color,emoji)"
@@ -1267,7 +1295,7 @@ final class RexAPI {
         let token = try await validToken()
         guard let userId = currentUserId else { throw RexAPIError.notSignedIn }
         let select = "id,created_at,list_id,recommendation_id," +
-            "recommendations(id,rating,note,created_at,photo_url,photo_urls,tags,user_id,item_id," +
+            "recommendations(id,rating,note,created_at,photo_url,photo_urls,tags\(await anonymousField()),user_id,item_id," +
             "items(id,type,title,subtitle,image_url,genre)," +
             "profiles!recommendations_user_id_fkey(username,display_name,avatar_url))"
         var components = URLComponents(url: baseURL.appendingPathComponent("/rest/v1/saved_posts"), resolvingAgainstBaseURL: false)!
@@ -1294,7 +1322,7 @@ final class RexAPI {
     func fetchCollectionItems(listId: String) async throws -> [SavedPost] {
         let token = try await validToken()
         let select = "id,created_at,list_id,recommendation_id," +
-            "recommendations(id,rating,note,created_at,photo_url,photo_urls,tags,user_id,item_id," +
+            "recommendations(id,rating,note,created_at,photo_url,photo_urls,tags\(await anonymousField()),user_id,item_id," +
             "items(id,type,title,subtitle,image_url,genre)," +
             "profiles!recommendations_user_id_fkey(username,display_name,avatar_url))"
         var components = URLComponents(url: baseURL.appendingPathComponent("/rest/v1/saved_posts"), resolvingAgainstBaseURL: false)!

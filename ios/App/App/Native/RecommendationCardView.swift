@@ -172,6 +172,20 @@ struct RecommendationCardView: View {
             .padding(.vertical, 3)
             .background(Color(hex: creator.color.replacingOccurrences(of: "#", with: "")))
             .clipShape(Capsule())
+        } else if rec.is_anonymous == true, rec.user_id != RexAPI.shared.currentUserId {
+            // Posted anonymously — no name, no link to the profile. It still
+            // counts toward their tally, we just don't say whose it is.
+            HStack(spacing: RexSpacing.sm) {
+                Image(systemName: "person.fill.questionmark")
+                    .font(.system(size: 12))
+                    .foregroundStyle(RexColor.mutedForeground)
+                    .frame(width: 24, height: 24)
+                    .background(RexColor.muted)
+                    .clipShape(Circle())
+                Text("Anonymous")
+                    .font(RexFont.text(13, weight: .medium))
+                    .foregroundStyle(RexColor.mutedForeground)
+            }
         } else if let author = rec.profiles {
             // Tapping the author opens their profile.
             NavigationLink(value: UserProfileRoute(

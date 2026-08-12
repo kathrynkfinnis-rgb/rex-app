@@ -206,6 +206,9 @@ struct FeedRecommendation: Codable, Identifiable {
     /// Optional heading a trip stop sits under (e.g. "Brunch"). Only present on
     /// trip-stop queries, hence optional everywhere else.
     let trip_section: String?
+    /// Posted without a name on it. Optional so the app keeps working against a
+    /// database where the migration hasn't been run.
+    let is_anonymous: Bool?
 
     private static let isoFormatter: ISO8601DateFormatter = {
         let f = ISO8601DateFormatter()
