@@ -40,6 +40,9 @@ struct FeedView: View {
 
     /// Bursts the reader has chosen to see in full.
     @State private var expandedBursts: Set<String> = []
+    /// How many people have Rex'd each item, and what's already on your list.
+    @State private var rexCounts: [String: Int] = [:]
+    @State private var myWantItemIds: Set<String> = []
 
     /// A mass import — someone's whole Goodreads or IMDb history in one go —
     /// otherwise buries everyone else. More than five in a row from the same
@@ -143,7 +146,11 @@ struct FeedView: View {
                                 onDelete: { await deleteRex(rec) }
                               ) {
                                 Group {
-                                    RecommendationCardView(rec: rec)
+                                    RecommendationCardView(
+                                        rec: rec,
+                                        rexCount: rexCounts[rec.item_id] ?? 0,
+                                        isOnMyList: myWantItemIds.contains(rec.item_id)
+                                    )
                                 }
                                 .modifier(EditableIfMine(rec: rec, editing: $editing))
                                 // Drag a card over to Collections and drop it on
@@ -403,6 +410,11 @@ struct FeedView: View {
         errorMessage = nil
         do {
             recommendations = try await RexAPI.shared.fetchFeed()
+            let itemIds = Array(Set(recommendations.map { $0.item_id }))
+            async let counts = RexAPI.shared.fetchRexCounts(itemIds: itemIds)
+            async let wants = RexAPI.shared.fetchWants()
+            rexCounts = (try? await counts) ?? [:]
+            myWantItemIds = Set(((try? await wants) ?? []).compactMap { $0.items?.id })
         } catch {
             errorMessage = error.localizedDescription
         }

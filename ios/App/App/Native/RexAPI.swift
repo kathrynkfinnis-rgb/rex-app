@@ -1383,6 +1383,30 @@ final class RexAPI {
 
     /// One row per place/event that has at least one live Rex (matches the web app's
     /// `!inner` join — items whose only recommendation got deleted never linger as pins).
+    /// How many people have Rex'd each of these items. Counted client-side
+    /// because PostgREST has no group-by; the id list is one feed page, so this
+    /// stays small.
+    func fetchRexCounts(itemIds: [String]) async throws -> [String: Int] {
+        guard !itemIds.isEmpty else { return [:] }
+        let token = try await validToken()
+        var components = URLComponents(url: baseURL.appendingPathComponent("/rest/v1/recommendations"), resolvingAgainstBaseURL: false)!
+        components.queryItems = [
+            URLQueryItem(name: "select", value: "item_id"),
+            URLQueryItem(name: "item_id", value: "in.(\(itemIds.joined(separator: ",")))"),
+            URLQueryItem(name: "trip_id", value: "is.null"),
+            URLQueryItem(name: "limit", value: "2000"),
+        ]
+        var request = URLRequest(url: components.url!)
+        request.setValue(anonKey, forHTTPHeaderField: "apikey")
+        request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+
+        let (data, response) = try await URLSession.shared.data(for: request)
+        guard let http = response as? HTTPURLResponse, http.statusCode < 400 else { return [:] }
+        struct Row: Codable { let item_id: String }
+        let rows = (try? JSONDecoder().decode([Row].self, from: data)) ?? []
+        return rows.reduce(into: [:]) { counts, row in counts[row.item_id, default: 0] += 1 }
+    }
+
     /// Titles for a set of trips, keyed by the trip's recommendation id — what
     /// map pins carry in `trip_id`.
     func fetchTripTitles(recommendationIds: [String]) async throws -> [String: String] {

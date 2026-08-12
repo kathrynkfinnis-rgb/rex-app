@@ -2,6 +2,12 @@ import SwiftUI
 
 struct RecommendationCardView: View {
     let rec: FeedRecommendation
+    /// Total people who've Rex'd this item, including the author.
+    var rexCount: Int = 0
+    /// Already on your list — you want to go/read/watch it.
+    var isOnMyList: Bool = false
+
+    @State private var noteExpanded = false
 
     private var category: RexCategory { RexCategory(rawType: rec.items?.type) }
 
@@ -76,12 +82,29 @@ struct RecommendationCardView: View {
                         }
 
                         if let note = rec.note, !note.isEmpty {
-                            Text("\u{201C}\(note)\u{201D}")
-                                .font(RexFont.text(14))
-                                .foregroundStyle(RexColor.foreground.opacity(0.88))
-                                .lineLimit(3)
-                                .padding(.top, RexSpacing.xs)
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text("\u{201C}\(note)\u{201D}")
+                                    .font(RexFont.text(14))
+                                    .foregroundStyle(RexColor.foreground.opacity(0.88))
+                                    .lineLimit(noteExpanded ? nil : 3)
+                                    .fixedSize(horizontal: false, vertical: true)
+                                // Only offer to expand when there's more to see.
+                                if !noteExpanded, note.count > 140 {
+                                    Text("Read more")
+                                        .font(RexFont.text(12, weight: .semibold))
+                                        .foregroundStyle(RexColor.primary)
+                                }
+                            }
+                            .padding(.top, RexSpacing.xs)
+                            .contentShape(Rectangle())
+                            .onTapGesture {
+                                if note.count > 140 {
+                                    withAnimation(.snappy) { noteExpanded.toggle() }
+                                }
+                            }
                         }
+
+                        rexdByRow
 
                         if let tags = rec.tags, !tags.isEmpty {
                             // Neutral, not green — tags aren't an accent surface.
@@ -121,6 +144,42 @@ struct RecommendationCardView: View {
             }
             .rexCard()
         )
+    }
+
+    /// Social proof and your own state with this item, both of which are the
+    /// point of REX and were previously buried.
+    @ViewBuilder
+    private var rexdByRow: some View {
+        let others = max(0, rexCount - 1)
+        if others > 0 || isOnMyList {
+            HStack(spacing: RexSpacing.sm) {
+                if others > 0 {
+                    HStack(spacing: 4) {
+                        // Three or more people is worth calling hot.
+                        Image(systemName: others >= 3 ? "flame.fill" : "person.2.fill")
+                            .font(.system(size: 10))
+                        Text(others >= 3
+                             ? "Hot — \(others + 1) friends Rex'd this"
+                             : "Also Rex'd by \(others) \(others == 1 ? "friend" : "friends")")
+                            .font(RexFont.text(12, weight: .semibold))
+                    }
+                    .foregroundStyle(others >= 3 ? RexColor.accent : RexColor.primary)
+                    .padding(.horizontal, RexSpacing.sm)
+                    .padding(.vertical, 4)
+                    .background(others >= 3 ? RexColor.accent.opacity(0.1) : RexColor.badgeBackground)
+                    .clipShape(Capsule())
+                }
+
+                if isOnMyList {
+                    HStack(spacing: 4) {
+                        Image(systemName: "bookmark.fill").font(.system(size: 9))
+                        Text("On your list").font(RexFont.text(11, weight: .medium))
+                    }
+                    .foregroundStyle(RexColor.mutedForeground)
+                }
+            }
+            .padding(.top, RexSpacing.xs)
+        }
     }
 
     private var categoryBadge: some View {
