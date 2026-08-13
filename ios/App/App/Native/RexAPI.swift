@@ -361,6 +361,21 @@ final class RexAPI {
         recipeText: String? = nil
     ) async throws -> String {
         let token = try await validToken()
+
+        // The catalogue has a uniqueness constraint on (external_source,
+        // external_id) — two people picking the same Ticketmaster event or
+        // Google place must land on the same item row. The web importer
+        // already checks before inserting; this didn't, so re-adding
+        // anything that already existed threw a raw Postgres 23505 straight
+        // at the user ("Couldn't create this item... duplicate key value
+        // violates unique constraint"). Look it up first and reuse it.
+        let resolvedExternalId = externalId ?? hit?.externalId
+        let resolvedExternalSource = externalSource ?? hit?.externalSource
+        if let resolvedExternalId, let resolvedExternalSource,
+           let existingId = try? await findItem(externalId: resolvedExternalId, externalSource: resolvedExternalSource) {
+            return existingId
+        }
+
         var request = URLRequest(url: baseURL.appendingPathComponent("/rest/v1/items"))
         request.httpMethod = "POST"
         request.setValue(anonKey, forHTTPHeaderField: "apikey")
@@ -411,13 +426,40 @@ final class RexAPI {
             (data, response) = try await URLSession.shared.data(for: request)
         }
         guard let http = response as? HTTPURLResponse, http.statusCode < 400 else {
-            let body = String(data: data, encoding: .utf8) ?? ""
-            throw RexAPIError.server("Couldn't create this item. \(body)")
+            let responseBody = String(data: data, encoding: .utf8) ?? ""
+            // The lookup above closes the normal case; this only fires when
+            // someone else's insert lands in the gap between our lookup and
+            // our own insert. One more lookup resolves it instead of
+            // surfacing Postgres's constraint error.
+            if responseBody.contains("23505"), let resolvedExternalId, let resolvedExternalSource,
+               let existingId = try? await findItem(externalId: resolvedExternalId, externalSource: resolvedExternalSource) {
+                return existingId
+            }
+            throw RexAPIError.server("Couldn't create this item. \(responseBody)")
         }
         struct CreatedItem: Codable { let id: String }
         let created = try JSONDecoder().decode([CreatedItem].self, from: data)
         guard let itemId = created.first?.id else { throw RexAPIError.server("Item wasn't created.") }
         return itemId
+    }
+
+    /// An item already in the catalogue under this external id, if any.
+    private func findItem(externalId: String, externalSource: String) async throws -> String? {
+        let token = try await validToken()
+        var components = URLComponents(url: baseURL.appendingPathComponent("/rest/v1/items"), resolvingAgainstBaseURL: false)!
+        components.queryItems = [
+            URLQueryItem(name: "select", value: "id"),
+            URLQueryItem(name: "external_id", value: "eq.\(externalId)"),
+            URLQueryItem(name: "external_source", value: "eq.\(externalSource)"),
+            URLQueryItem(name: "limit", value: "1"),
+        ]
+        var request = URLRequest(url: components.url!)
+        request.setValue(anonKey, forHTTPHeaderField: "apikey")
+        request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+        let (data, response) = try await URLSession.shared.data(for: request)
+        guard let http = response as? HTTPURLResponse, http.statusCode < 400 else { return nil }
+        struct Row: Codable { let id: String }
+        return (try? JSONDecoder().decode([Row].self, from: data))?.first?.id
     }
 
     /// Creates a brand-new recommendation (used right after createItem — no existing row to merge with).

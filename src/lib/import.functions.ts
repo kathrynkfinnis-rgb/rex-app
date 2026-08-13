@@ -509,16 +509,21 @@ export const approveStagingAsTrip = createServerFn({ method: "POST" })
     if (trErr) throw new Error(trErr.message);
 
     let added = 0;
+    // Real failures used to vanish silently — a 36-stop import that landed
+    // 16 gave no way to tell why. Every miss is now named and reasoned.
+    const failed: { title: string; reason: string }[] = [];
     for (const row of rows) {
       try {
         await approveRow(context.supabase, context.userId, row, { tripId: tripRec.id });
         added++;
-      } catch {
-        // skip rows that can't be resolved; they stay in the queue
+      } catch (e: any) {
+        const reason = e?.message ?? "Unknown error";
+        failed.push({ title: row.raw_title, reason });
+        console.error(`approveStagingAsTrip: failed on "${row.raw_title}": ${reason}`);
       }
     }
 
-    return { tripId: tripRec.id as string, added };
+    return { tripId: tripRec.id as string, added, failed };
   });
 
 
@@ -560,6 +565,7 @@ export const approveStagingAsCollections = createServerFn({ method: "POST" })
     }
 
     const listIds: string[] = [];
+    const failed: { title: string; reason: string }[] = [];
     let added = 0;
 
     for (const [listName, groupRows] of groups) {
@@ -588,11 +594,13 @@ export const approveStagingAsCollections = createServerFn({ method: "POST" })
         try {
           await approveRow(context.supabase, context.userId, row, { listId: list.id });
           added++;
-        } catch {
-          // Leave rows we can't resolve in the queue rather than losing them.
+        } catch (e: any) {
+          const reason = e?.message ?? "Unknown error";
+          failed.push({ title: row.raw_title, reason });
+          console.error(`approveStagingAsCollections: failed on "${row.raw_title}": ${reason}`);
         }
       }
     }
 
-    return { listIds, added, collections: groups.size };
+    return { listIds, added, collections: groups.size, failed };
   });

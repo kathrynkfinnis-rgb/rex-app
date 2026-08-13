@@ -60,6 +60,7 @@ function ImportPage() {
   const [collectionName, setCollectionName] = useState("");
   const [collectionLoading, setCollectionLoading] = useState(false);
   const [splitBySection, setSplitBySection] = useState(true);
+  const [failedImport, setFailedImport] = useState<{ title: string; reason: string }[] | null>(null);
   const [tripLoading, setTripLoading] = useState(false);
 
   const fetchSheet = useServerFn(fetchSheetCsv);
@@ -111,10 +112,17 @@ function ImportPage() {
     if (!tripName.trim() || placeRows.length === 0) return;
     setTripLoading(true);
     try {
-      const { tripId, added } = await makeTrip({
+      const { tripId, added, failed } = await makeTrip({
         data: { ids: placeRows.map((r) => r.id), tripName: tripName.trim() },
       });
-      toast.success(`Trip created with ${added} Rex`);
+      // A 36-stop trip that silently landed 16 with no explanation was the
+      // actual bug report — every miss is named now instead of vanishing.
+      if (failed?.length) {
+        toast.warning(`Trip created with ${added} of ${added + failed.length} Rex`);
+        setFailedImport(failed);
+      } else {
+        toast.success(`Trip created with ${added} Rex`);
+      }
       setTripName("");
       qc.invalidateQueries({ queryKey: ["import-staging"] });
       navigate({ to: "/trip/$id", params: { id: tripId } });
@@ -131,18 +139,22 @@ function ImportPage() {
     if (!collectionName.trim() || rows.length === 0) return;
     setCollectionLoading(true);
     try {
-      const { added, collections } = await makeCollections({
+      const { added, collections, failed } = await makeCollections({
         data: {
           ids: rows.map((r) => r.id),
           name: collectionName.trim(),
           splitBySection: splitBySection && allSections.length > 0,
         },
       });
-      toast.success(
-        collections > 1
-          ? `${collections} collections created with ${added} Rex`
-          : `Collection created with ${added} Rex`,
-      );
+      const label = collections > 1
+        ? `${collections} collections created with ${added} Rex`
+        : `Collection created with ${added} Rex`;
+      if (failed?.length) {
+        toast.warning(`${label} — ${failed.length} couldn't be added`);
+        setFailedImport(failed);
+      } else {
+        toast.success(label);
+      }
       setCollectionName("");
       qc.invalidateQueries({ queryKey: ["import-staging"] });
       navigate({ to: "/you" });
@@ -693,10 +705,41 @@ function ImportPage() {
           </div>
         )}
 
+        {failedImport && failedImport.length > 0 && (
+          <div className="space-y-2 rounded-2xl bg-destructive/10 p-4 ring-1 ring-destructive/30">
+            <div className="flex items-center justify-between">
+              <span className="text-sm font-semibold text-destructive">
+                {failedImport.length} couldn't be added
+              </span>
+              <button
+                onClick={() => setFailedImport(null)}
+                className="text-xs font-medium text-muted-foreground"
+              >
+                Dismiss
+              </button>
+            </div>
+            <ul className="space-y-1 text-xs text-muted-foreground">
+              {failedImport.map((f, i) => (
+                <li key={i}>
+                  <span className="font-medium text-foreground">{f.title}</span> — {f.reason}
+                </li>
+              ))}
+            </ul>
+            <p className="text-xs text-muted-foreground">
+              They're still in the queue below — Match or Add them individually.
+            </p>
+          </div>
+        )}
+
         <section>
           <h2 className="mb-2 text-xs font-semibold uppercase tracking-widest text-muted-foreground">
             Review queue {staging && staging.length > 0 ? `(${staging.length})` : ""}
           </h2>
+          {staging && staging.length > 0 && (
+            <p className="mb-2 text-xs text-muted-foreground">
+              Add posts it right away · Skip removes it from the list — both happen immediately, there's nothing further to submit.
+            </p>
+          )}
           {!staging || staging.length === 0 ? (
             <div className="rounded-2xl bg-muted/40 p-6 text-center text-sm text-muted-foreground">
               Nothing to review yet.
