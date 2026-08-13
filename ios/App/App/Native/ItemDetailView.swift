@@ -39,6 +39,9 @@ struct ItemDetailView: View {
         .background(RexColor.background.ignoresSafeArea())
         .navigationTitle(item?.title ?? "")
         .navigationBarTitleDisplayMode(.inline)
+        // A drag can drop the keyboard too, so the comment field and its Post
+        // button aren't only reachable via the keyboard's own Done button.
+        .scrollDismissesKeyboard(.interactively)
         .task { await load() }
     }
 

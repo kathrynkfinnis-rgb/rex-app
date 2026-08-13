@@ -15,9 +15,17 @@ struct UserAvatarView: View {
         Group {
             if let url, let parsed = URL(string: url), !url.isEmpty {
                 AsyncImage(url: parsed) { phase in
-                    if let image = phase.image {
+                    switch phase {
+                    case .success(let image):
                         image.resizable().aspectRatio(contentMode: .fill)
-                    } else {
+                    case .empty:
+                        // Still loading — on a weak connection this can sit
+                        // here a while. Showing the same blank initial as a
+                        // genuine failure made a slow photo look broken.
+                        fallback.overlay(ProgressView().scaleEffect(0.6))
+                    case .failure:
+                        fallback
+                    @unknown default:
                         fallback
                     }
                 }

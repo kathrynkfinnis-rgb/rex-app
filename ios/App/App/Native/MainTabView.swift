@@ -33,7 +33,11 @@ struct MainTabView: View {
                 }
                 .tag(2)
 
-                NavigationStack { FriendsView() }.tag(3)
+                NavigationStack {
+                    FriendsView()
+                        .navigationDestination(for: UserProfileRoute.self) { UserProfileView(route: $0) }
+                }
+                .tag(3)
 
                 NavigationStack {
                     ProfileView(onSignedOut: onSignedOut)

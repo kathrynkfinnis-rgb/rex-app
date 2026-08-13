@@ -215,20 +215,27 @@ struct FriendsView: View {
     @ViewBuilder
     private func personRow<Trailing: View>(_ profile: RexProfileDetail, @ViewBuilder trailing: () -> Trailing) -> some View {
         HStack(spacing: 12) {
-            ZStack {
-                Circle().fill(RexColor.secondary)
-                Text(String((profile.display_name ?? profile.username).prefix(1)).uppercased())
-                    .font(.system(size: 15, weight: .semibold))
-                    .foregroundStyle(RexColor.secondaryForeground)
+            // The name and photo open their profile; the trailing action
+            // (accept/reject/add) stays its own tap target outside the link.
+            NavigationLink(value: UserProfileRoute(
+                userId: profile.id,
+                name: profile.display_name ?? profile.username
+            )) {
+                HStack(spacing: 12) {
+                    UserAvatarView(
+                        url: profile.avatar_url,
+                        name: profile.display_name ?? profile.username,
+                        size: 40
+                    )
+                    VStack(alignment: .leading, spacing: 1) {
+                        Text(profile.display_name ?? profile.username)
+                            .font(.system(size: 14, weight: .semibold))
+                            .foregroundStyle(RexColor.foreground)
+                        Text("@\(profile.username)").font(.system(size: 12)).foregroundStyle(RexColor.mutedForeground)
+                    }
+                }
             }
-            .frame(width: 40, height: 40)
-
-            VStack(alignment: .leading, spacing: 1) {
-                Text(profile.display_name ?? profile.username)
-                    .font(.system(size: 14, weight: .semibold))
-                    .foregroundStyle(RexColor.foreground)
-                Text("@\(profile.username)").font(.system(size: 12)).foregroundStyle(RexColor.mutedForeground)
-            }
+            .buttonStyle(.plain)
             Spacer()
             trailing()
         }

@@ -12,6 +12,10 @@ class SceneDelegate: UIResponder, UIWindowSceneDelegate {
         // Native SwiftUI rewrite in progress — screens not yet ported still live only
         // in the Capacitor/WebView build. See CAPBridgeViewController() for that path.
         window?.rootViewController = UIHostingController(rootView: RootView())
+        // Belt and braces alongside RootView's .preferredColorScheme — this
+        // catches anything hosted directly off the window rather than through
+        // that SwiftUI tree (a UIKit-presented sheet, for instance).
+        window?.overrideUserInterfaceStyle = .light
         window?.makeKeyAndVisible()
 
         SceneDelegateProxy.shared.scene(scene, willConnectTo: session, options: connectionOptions)

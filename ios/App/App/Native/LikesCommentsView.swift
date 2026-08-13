@@ -11,6 +11,7 @@ struct LikesCommentsView: View {
     @State private var draft = ""
     @State private var isPosting = false
     @State private var isLoading = true
+    @FocusState private var draftFocused: Bool
 
     var body: some View {
         VStack(alignment: .leading, spacing: RexSpacing.md) {
@@ -76,6 +77,9 @@ struct LikesCommentsView: View {
             HStack(spacing: RexSpacing.sm) {
                 TextField("Add a comment…", text: $draft)
                     .font(RexFont.text(14))
+                    .focused($draftFocused)
+                    .submitLabel(.send)
+                    .onSubmit { Task { await post() } }
                     .padding(.horizontal, RexSpacing.md)
                     .frame(height: 42)
                     .background(RexColor.card)
@@ -84,6 +88,15 @@ struct LikesCommentsView: View {
                         RoundedRectangle(cornerRadius: RexRadius.input, style: .continuous)
                             .stroke(RexColor.border, lineWidth: 1)
                     )
+                    // The keyboard could otherwise sit over the Post button
+                    // with no way to reach it — this toolbar gives an explicit
+                    // way to dismiss it, and Return now posts directly too.
+                    .toolbar {
+                        ToolbarItemGroup(placement: .keyboard) {
+                            Spacer()
+                            Button("Done") { draftFocused = false }
+                        }
+                    }
 
                 Button {
                     Task { await post() }
