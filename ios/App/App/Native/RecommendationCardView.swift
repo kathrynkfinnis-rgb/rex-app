@@ -55,6 +55,16 @@ struct RecommendationCardView: View {
                                     .lineLimit(1)
                             }
                             Spacer(minLength: RexSpacing.sm)
+                            // A blast is a question, not a verdict.
+                            if rec.isBlast {
+                                HStack(spacing: 4) {
+                                    Image(systemName: "sparkles")
+                                        .font(.system(size: 10))
+                                    Text("Asking")
+                                        .font(RexFont.text(12, weight: .semibold))
+                                }
+                                .foregroundStyle(RexColor.accent)
+                            }
                             // A want has no rating — say what it is instead of
                             // showing an empty space where the crown goes.
                             if rec.isWant {
@@ -173,7 +183,7 @@ struct RecommendationCardView: View {
                     // Likes and comments key off a recommendation id, which a
                     // want doesn't have — so those actions stay off until wants
                     // and Rex share a table.
-                    if !rec.isWant {
+                    if !rec.isWant && !rec.isBlast {
                         RexCardActions(rec: rec)
                     }
                 }

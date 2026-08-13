@@ -1178,6 +1178,64 @@ final class RexAPI {
         }
     }
 
+    /// Blasts, for the feed. A blast is a question, and a question sitting on
+    /// its own screen doesn't get answered — so it goes where people look.
+    ///
+    /// Shaped as a recommendation, like wants, so the feed renders one list.
+    func fetchBlastsFeed() async throws -> [FeedRecommendation] {
+        let token = try await validToken()
+        let select = "id,created_at,title,note,type,user_id," +
+            "profiles!requests_user_id_profiles_fkey(username,display_name,avatar_url)"
+        var components = URLComponents(url: baseURL.appendingPathComponent("/rest/v1/requests"), resolvingAgainstBaseURL: false)!
+        components.queryItems = [
+            URLQueryItem(name: "select", value: select),
+            URLQueryItem(name: "order", value: "created_at.desc"),
+            URLQueryItem(name: "limit", value: "20"),
+        ]
+        var request = URLRequest(url: components.url!)
+        request.setValue(anonKey, forHTTPHeaderField: "apikey")
+        request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+
+        let (data, response) = try await URLSession.shared.data(for: request)
+        guard let http = response as? HTTPURLResponse, http.statusCode < 400 else { return [] }
+        struct Row: Codable {
+            let id: String
+            let created_at: String
+            let title: String
+            let note: String?
+            let type: String?
+            let user_id: String
+            let profiles: RexProfile?
+        }
+        let rows = (try? JSONDecoder().decode([Row].self, from: data)) ?? []
+        return rows.map { row in
+            FeedRecommendation(
+                id: "blast-\(row.id)",
+                rating: 0,
+                note: row.note,
+                created_at: row.created_at,
+                photo_url: nil,
+                photo_urls: nil,
+                tags: nil,
+                user_id: row.user_id,
+                // A blast has no item — the ask itself is the content.
+                item_id: "blast-\(row.id)",
+                items: RexItem(
+                    id: "blast-\(row.id)",
+                    type: row.type ?? "other",
+                    title: row.title,
+                    subtitle: nil,
+                    image_url: nil,
+                    genre: nil
+                ),
+                profiles: row.profiles,
+                creators: nil,
+                trip_section: nil,
+                is_anonymous: false
+            )
+        }
+    }
+
     /// A blast — asking friends for a recommendation.
     func createRequest(type: String, title: String, note: String?) async throws {
         let token = try await validToken()

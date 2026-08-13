@@ -214,6 +214,9 @@ struct FeedRecommendation: Codable, Identifiable {
     /// feed carries both, and an unrated row is what marks the difference.
     var isWant: Bool { id.hasPrefix("want-") }
 
+    /// A blast — someone asking for recommendations rather than giving one.
+    var isBlast: Bool { id.hasPrefix("blast-") }
+
     private static let isoFormatter: ISO8601DateFormatter = {
         let f = ISO8601DateFormatter()
         f.formatOptions = [.withInternetDateTime, .withFractionalSeconds]

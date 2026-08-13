@@ -16,6 +16,7 @@ struct FeedView: View {
     @State private var showingAddRex = false
     @State private var filter: RexCategory?
     @State private var subFilter: String?
+    @State private var blastsOnly = false
     @State private var query = ""
     @State private var myProfile: RexProfileDetail?
     @State private var editing: FeedRecommendation?
@@ -24,7 +25,9 @@ struct FeedView: View {
     /// Categories that actually appear in the feed, so we don't show filters
     /// that would return nothing.
     private var availableCategories: [RexCategory] {
-        let present = Set(recommendations.compactMap { RexCategory(rawType: $0.items?.type) })
+        // A blast's type ("place", "book"...) describes what's being asked
+        // for, not a Rex — it belongs under Blasts, not mixed into Place.
+        let present = Set(recommendations.filter { !$0.isBlast }.compactMap { RexCategory(rawType: $0.items?.type) })
         return rexAllCategories.filter { present.contains($0) }
     }
 
@@ -75,6 +78,8 @@ struct FeedView: View {
 
     private var matching: [FeedRecommendation] {
         recommendations.filter { rec in
+            if blastsOnly { return rec.isBlast }
+            if rec.isBlast { return filter == nil } // never in a category filter
             if let filter, RexCategory(rawType: rec.items?.type) != filter { return false }
             if let subFilter, !splitGenres(rec.items?.genre).contains(subFilter) { return false }
             if !query.trimmingCharacters(in: .whitespaces).isEmpty {
@@ -279,13 +284,19 @@ struct FeedView: View {
             if !availableCategories.isEmpty {
                 ScrollView(.horizontal, showsIndicators: false) {
                     HStack(spacing: RexSpacing.sm) {
-                        filterChip(title: "All", isActive: filter == nil) {
-                            filter = nil; subFilter = nil
+                        filterChip(title: "All", isActive: filter == nil && !blastsOnly) {
+                            filter = nil; subFilter = nil; blastsOnly = false
+                        }
+                        if recommendations.contains(where: \.isBlast) {
+                            filterChip(title: "Blasts", isActive: blastsOnly) {
+                                blastsOnly.toggle()
+                                filter = nil; subFilter = nil
+                            }
                         }
                         ForEach(availableCategories, id: \.self) { category in
                             filterChip(title: category.label, isActive: filter == category) {
                                 filter = (filter == category) ? nil : category
-                                subFilter = nil
+                                subFilter = nil; blastsOnly = false
                             }
                         }
                     }
@@ -391,6 +402,9 @@ struct FeedView: View {
 
     /// Trips open their itinerary; everything else opens the item screen.
     private func open(_ rec: FeedRecommendation) {
+        // Blasts and wants aren't backed by a real item — there's nowhere to
+        // push to. Comments are the whole point of a blast, so that's next up.
+        guard !rec.isBlast, !rec.isWant else { return }
         if RexCategory(rawType: rec.items?.type) == .trip {
             path.append(TripRoute(recommendationId: rec.id, title: rec.items?.title ?? "Trip"))
         } else {
@@ -416,7 +430,10 @@ struct FeedView: View {
             // "I want to try this" is something people can answer.
             async let rex = RexAPI.shared.fetchFeed()
             async let wantsFeed = RexAPI.shared.fetchWantsFeed()
-            let merged = (try await rex) + ((try? await wantsFeed) ?? [])
+            async let blastsFeed = RexAPI.shared.fetchBlastsFeed()
+            let merged = (try await rex)
+                + ((try? await wantsFeed) ?? [])
+                + ((try? await blastsFeed) ?? [])
             recommendations = merged.sorted { $0.created_at > $1.created_at }
 
             let itemIds = Array(Set(recommendations.map { $0.item_id }))
