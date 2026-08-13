@@ -39,41 +39,45 @@ export const PLACE_SUBCATEGORIES = [
   "Shop",
   "Activity",
   "Town",
+  "For kids",
   "Other",
 ] as const;
 export type PlaceSubcategory = (typeof PLACE_SUBCATEGORIES)[number];
 
+// "For kids" on every category, not just the ones that already had a "Kids"
+// entry (book/movie/tv) — a family trip, a kids' recipe, or a kids' event
+// are just as real as a kids' film.
 export const SUBCATEGORIES: Record<ItemType, readonly string[]> = {
   place: PLACE_SUBCATEGORIES,
   trip: [
     "City break", "Beach", "Road trip", "Countryside", "Ski", "Adventure",
-    "Family", "Weekend away", "Honeymoon", "Work trip", "Other",
+    "Family", "Weekend away", "Honeymoon", "Work trip", "For kids", "Other",
   ],
   recipe: [
     "Salad", "Soup", "Pasta", "Rice & grains", "Meat", "Fish & seafood",
     "Vegetarian", "Vegan", "Breakfast", "Dessert", "Baking", "Snack",
-    "Drink", "Sauce & dressing", "Other",
+    "Drink", "Sauce & dressing", "For kids", "Other",
   ],
   book: [
     "Fiction", "Non-fiction", "Thriller", "Mystery", "Sci-fi", "Fantasy",
     "Romance", "Biography", "History", "Business", "Self-help", "Poetry",
-    "Kids", "Other",
+    "For kids", "Other",
   ],
   movie: [
     "Action", "Comedy", "Drama", "Thriller", "Horror", "Sci-fi",
-    "Documentary", "Romance", "Animation", "Kids", "Other",
+    "Documentary", "Romance", "Animation", "For kids", "Other",
   ],
   tv: [
     "Drama", "Comedy", "Documentary", "Reality", "Crime", "Sci-fi",
-    "Kids", "Sport", "Other",
+    "For kids", "Sport", "Other",
   ],
   podcast: [
     "Comedy", "News", "History", "Business", "Interview", "True crime",
-    "Society", "Sport", "Tech", "Other",
+    "Society", "Sport", "Tech", "For kids", "Other",
   ],
   event: [
     "Concert", "Exhibition", "Theatre", "Comedy", "Sport", "Talk",
-    "Festival", "Film", "Other",
+    "Festival", "Film", "For kids", "Other",
   ],
   other: [
     // Things
@@ -81,7 +85,7 @@ export const SUBCATEGORIES: Record<ItemType, readonly string[]> = {
     // Services — tradespeople and the like, requested as its own grouping
     "Tradesperson", "Beauty", "Gardener", "Cleaner", "Childcare",
     "Health & fitness", "Other service",
-    "Hidden gem", "Other",
+    "Hidden gem", "For kids", "Other",
   ],
 };
 
