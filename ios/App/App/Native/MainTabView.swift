@@ -30,6 +30,8 @@ struct MainTabView: View {
                         .navigationDestination(for: String.self) { ItemDetailView(itemId: $0) }
                         .navigationDestination(for: UserProfileRoute.self) { UserProfileView(route: $0) }
                         .navigationDestination(for: CollectionRoute.self) { CollectionDetailView(route: $0) }
+                        .navigationDestination(for: CollectionsSectionRoute.self) { CollectionsSectionListView(route: $0) }
+                        .navigationDestination(for: WishListRoute.self) { WishListCategoryView(route: $0) }
                 }
                 .tag(2)
 

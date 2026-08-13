@@ -32,6 +32,8 @@
 		FEED014B0000000000000000 /* MainTabView.swift in Sources */ = {isa = PBXBuildFile; fileRef = FEED014A0000000000000000 /* MainTabView.swift */; };
 		FEED015B0000000000000000 /* MapView.swift in Sources */ = {isa = PBXBuildFile; fileRef = FEED015A0000000000000000 /* MapView.swift */; };
 		FEED032B0000000000000000 /* AddToCollectionView.swift in Sources */ = {isa = PBXBuildFile; fileRef = FEED032A0000000000000000 /* AddToCollectionView.swift */; };
+		FEED038B0000000000000000 /* CollectionsSectionListView.swift in Sources */ = {isa = PBXBuildFile; fileRef = FEED038A0000000000000000 /* CollectionsSectionListView.swift */; };
+		FEED039B0000000000000000 /* WishListCategoryView.swift in Sources */ = {isa = PBXBuildFile; fileRef = FEED039A0000000000000000 /* WishListCategoryView.swift */; };
 		FEED033B0000000000000000 /* CollectionDetailView.swift in Sources */ = {isa = PBXBuildFile; fileRef = FEED033A0000000000000000 /* CollectionDetailView.swift */; };
 		FEED034B0000000000000000 /* SwipeToRemove.swift in Sources */ = {isa = PBXBuildFile; fileRef = FEED034A0000000000000000 /* SwipeToRemove.swift */; };
 		FEED035B0000000000000000 /* NewCollectionView.swift in Sources */ = {isa = PBXBuildFile; fileRef = FEED035A0000000000000000 /* NewCollectionView.swift */; };
@@ -82,6 +84,8 @@
 		FEED014A0000000000000000 /* MainTabView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MainTabView.swift; sourceTree = "<group>"; };
 		FEED015A0000000000000000 /* MapView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MapView.swift; sourceTree = "<group>"; };
 		FEED032A0000000000000000 /* AddToCollectionView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AddToCollectionView.swift; sourceTree = "<group>"; };
+		FEED038A0000000000000000 /* CollectionsSectionListView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CollectionsSectionListView.swift; sourceTree = "<group>"; };
+		FEED039A0000000000000000 /* WishListCategoryView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WishListCategoryView.swift; sourceTree = "<group>"; };
 		FEED033A0000000000000000 /* CollectionDetailView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CollectionDetailView.swift; sourceTree = "<group>"; };
 		FEED034A0000000000000000 /* SwipeToRemove.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SwipeToRemove.swift; sourceTree = "<group>"; };
 		FEED035A0000000000000000 /* NewCollectionView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NewCollectionView.swift; sourceTree = "<group>"; };
@@ -170,6 +174,8 @@
 				FEED014A0000000000000000 /* MainTabView.swift */,
 				FEED015A0000000000000000 /* MapView.swift */,
 				FEED032A0000000000000000 /* AddToCollectionView.swift */,
+				FEED038A0000000000000000 /* CollectionsSectionListView.swift */,
+				FEED039A0000000000000000 /* WishListCategoryView.swift */,
 				FEED033A0000000000000000 /* CollectionDetailView.swift */,
 				FEED034A0000000000000000 /* SwipeToRemove.swift */,
 				FEED035A0000000000000000 /* NewCollectionView.swift */,
@@ -295,6 +301,8 @@
 				FEED014B0000000000000000 /* MainTabView.swift in Sources */,
 				FEED015B0000000000000000 /* MapView.swift in Sources */,
 				FEED032B0000000000000000 /* AddToCollectionView.swift in Sources */,
+				FEED038B0000000000000000 /* CollectionsSectionListView.swift in Sources */,
+				FEED039B0000000000000000 /* WishListCategoryView.swift in Sources */,
 				FEED033B0000000000000000 /* CollectionDetailView.swift in Sources */,
 				FEED034B0000000000000000 /* SwipeToRemove.swift in Sources */,
 				FEED035B0000000000000000 /* NewCollectionView.swift in Sources */,
@@ -456,7 +464,7 @@
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CODE_SIGN_ENTITLEMENTS = App/App.entitlements;
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 9;
+				CURRENT_PROJECT_VERSION = 10;
 				DEVELOPMENT_TEAM = X54V2C674U;
 				INFOPLIST_FILE = App/Info.plist;
 				IPHONEOS_DEPLOYMENT_TARGET = 18.0;
@@ -480,7 +488,7 @@
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CODE_SIGN_ENTITLEMENTS = App/App.entitlements;
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 9;
+				CURRENT_PROJECT_VERSION = 10;
 				DEVELOPMENT_TEAM = X54V2C674U;
 				INFOPLIST_FILE = App/Info.plist;
 				IPHONEOS_DEPLOYMENT_TARGET = 18.0;

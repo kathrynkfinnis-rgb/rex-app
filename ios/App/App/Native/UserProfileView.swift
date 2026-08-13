@@ -17,6 +17,9 @@ struct UserProfileView: View {
     @State private var isLoading = true
     @State private var errorMessage: String?
     @State private var filter: RexCategory?
+    @State private var theirLists: [RexList] = []
+    @State private var myFollowedListIds: Set<String> = []
+    @State private var followBusyIds: Set<String> = []
 
     private var availableCategories: [RexCategory] {
         let present = Set(recommendations.compactMap { RexCategory(rawType: $0.items?.type) })
@@ -38,6 +41,10 @@ struct UserProfileView: View {
         ScrollView {
             VStack(alignment: .leading, spacing: RexSpacing.lg) {
                 header
+
+                if !theirLists.isEmpty {
+                    collectionsShelf
+                }
 
                 if !availableCategories.isEmpty {
                     ScrollView(.horizontal, showsIndicators: false) {
@@ -136,6 +143,90 @@ struct UserProfileView: View {
         .padding(.top, RexSpacing.sm)
     }
 
+    /// Their public and friends-visible collections — never `draft`, those
+    /// aren't yours to see. Save one and it shows up in your own "Friends'
+    /// Collections" shelf.
+    private var collectionsShelf: some View {
+        VStack(alignment: .leading, spacing: RexSpacing.sm) {
+            HStack(spacing: RexSpacing.sm) {
+                Image(systemName: "folder.fill")
+                    .font(.system(size: 12))
+                    .foregroundStyle(RexColor.primary)
+                Text("Collections")
+                    .font(RexFont.display(17, weight: .semibold))
+                    .foregroundStyle(RexColor.foreground)
+            }
+
+            ScrollView(.horizontal, showsIndicators: false) {
+                HStack(alignment: .top, spacing: RexSpacing.md) {
+                    ForEach(theirLists) { list in
+                        collectionTile(list)
+                    }
+                }
+                .padding(.horizontal, 1)
+            }
+        }
+    }
+
+    private func collectionTile(_ list: RexList) -> some View {
+        let saved = myFollowedListIds.contains(list.id)
+        let busy = followBusyIds.contains(list.id)
+        return VStack(alignment: .leading, spacing: 6) {
+            NavigationLink(value: CollectionRoute(listId: list.id, name: list.name, isMine: false)) {
+                ZStack {
+                    RoundedRectangle(cornerRadius: RexRadius.card, style: .continuous)
+                        .fill(RexColor.badgeBackground)
+                    Text(list.emoji ?? "\u{1F4D2}").font(.system(size: 28))
+                }
+                .frame(width: 112, height: 112)
+            }
+            .buttonStyle(.plain)
+
+            Text(list.name)
+                .font(RexFont.text(13, weight: .semibold))
+                .foregroundStyle(RexColor.foreground)
+                .lineLimit(1)
+                .frame(width: 112, alignment: .leading)
+
+            Button {
+                Task { await toggleFollow(list) }
+            } label: {
+                if busy {
+                    ProgressView().controlSize(.mini)
+                } else {
+                    Text(saved ? "Saved" : "Save")
+                        .font(RexFont.text(11, weight: .semibold))
+                        .foregroundStyle(saved ? RexColor.mutedForeground : RexColor.primaryForeground)
+                        .padding(.horizontal, RexSpacing.sm)
+                        .padding(.vertical, 4)
+                        .background(saved ? RexColor.card : RexColor.primary)
+                        .clipShape(Capsule())
+                        .overlay(Capsule().stroke(saved ? RexColor.border : .clear, lineWidth: 1))
+                }
+            }
+            .buttonStyle(.plain)
+            .disabled(busy)
+        }
+        .frame(width: 112, alignment: .leading)
+    }
+
+    private func toggleFollow(_ list: RexList) async {
+        followBusyIds.insert(list.id)
+        let wasSaved = myFollowedListIds.contains(list.id)
+        do {
+            if wasSaved {
+                try await RexAPI.shared.unfollowList(listId: list.id)
+                myFollowedListIds.remove(list.id)
+            } else {
+                try await RexAPI.shared.followList(listId: list.id)
+                myFollowedListIds.insert(list.id)
+            }
+        } catch {
+            // Leave the toggle where it was — the button just reverts.
+        }
+        followBusyIds.remove(list.id)
+    }
+
     private func chip(_ title: String, active: Bool, action: @escaping () -> Void) -> some View {
         Button(action: action) {
             Text(title)
@@ -156,9 +247,13 @@ struct UserProfileView: View {
         do {
             async let profileTask = RexAPI.shared.fetchProfiles(ids: [route.userId])
             async let recsTask = RexAPI.shared.fetchRecommendations(forUser: route.userId)
-            let (profiles, recs) = try await (profileTask, recsTask)
+            async let listsTask = RexAPI.shared.fetchLists(forUser: route.userId)
+            async let followedTask = RexAPI.shared.fetchFollowedLists()
+            let (profiles, recs, lists, followedLists) = try await (profileTask, recsTask, listsTask, followedTask)
             profile = profiles.first
             recommendations = recs
+            theirLists = lists
+            myFollowedListIds = Set(followedLists.map { $0.id })
         } catch {
             errorMessage = error.localizedDescription
         }
