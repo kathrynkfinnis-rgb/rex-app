@@ -17,6 +17,9 @@ struct FeedView: View {
     @State private var filter: RexCategory?
     @State private var subFilter: String?
     @State private var blastsOnly = false
+    private enum SortMode { case recent, mostLiked }
+    @State private var sortMode: SortMode = .recent
+    @State private var likeCounts: [String: Int] = [:]
     @State private var query = ""
     @State private var myProfile: RexProfileDetail?
     @State private var editing: FeedRecommendation?
@@ -51,7 +54,7 @@ struct FeedView: View {
     /// otherwise buries everyone else. More than five in a row from the same
     /// person in the same minute collapses to five plus a "show the rest".
     private var visible: [FeedRow] {
-        let rows = matching
+        let rows = sorted
         var out: [FeedRow] = []
         var index = 0
         while index < rows.count {
@@ -92,6 +95,27 @@ struct FeedView: View {
             }
             return true
         }
+    }
+
+    /// Newest-first is already how loadFeed merges everything, so only
+    /// "Most liked" needs an actual re-sort here.
+    private var sorted: [FeedRecommendation] {
+        guard sortMode == .mostLiked else { return matching }
+        return matching.sorted { a, b in
+            let la = likeCounts[a.id] ?? 0, lb = likeCounts[b.id] ?? 0
+            if la != lb { return la > lb }
+            return a.created_at > b.created_at // tie-break: newest first
+        }
+    }
+
+    /// Like counts are fetched on demand, not on every feed load — most
+    /// visits never touch "Most liked", so there's no reason to pay for a
+    /// second network round trip they'll never see.
+    private func loadLikeCountsIfNeeded() async {
+        guard likeCounts.isEmpty else { return }
+        let ids = recommendations.filter { !$0.isWant && !$0.isBlast }.map { $0.id }
+        let state = (try? await RexAPI.shared.fetchLikeState(recommendationIds: ids)) ?? [:]
+        likeCounts = state.mapValues { $0.count }
     }
 
     var body: some View {
@@ -279,7 +303,33 @@ struct FeedView: View {
         VStack(alignment: .leading, spacing: RexSpacing.md) {
             // No "Your feed" heading — the feed is the home screen, so naming
             // it just eats vertical space above the content.
-            searchField
+            HStack(spacing: RexSpacing.sm) {
+                searchField
+                Menu {
+                    Button {
+                        sortMode = .recent
+                    } label: {
+                        Label("Most recent", systemImage: sortMode == .recent ? "checkmark" : "")
+                    }
+                    Button {
+                        sortMode = .mostLiked
+                        Task { await loadLikeCountsIfNeeded() }
+                    } label: {
+                        Label("Most liked", systemImage: sortMode == .mostLiked ? "checkmark" : "")
+                    }
+                } label: {
+                    Image(systemName: "arrow.up.arrow.down")
+                        .font(.system(size: 15, weight: .medium))
+                        .foregroundStyle(RexColor.foreground)
+                        .frame(width: 46, height: 46)
+                        .background(RexColor.card)
+                        .clipShape(RoundedRectangle(cornerRadius: RexRadius.input, style: .continuous))
+                        .overlay(
+                            RoundedRectangle(cornerRadius: RexRadius.input, style: .continuous)
+                                .stroke(RexColor.border, lineWidth: 1)
+                        )
+                }
+            }
 
             if !availableCategories.isEmpty {
                 ScrollView(.horizontal, showsIndicators: false) {
