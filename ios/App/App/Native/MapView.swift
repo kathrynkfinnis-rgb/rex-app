@@ -220,10 +220,11 @@ struct RexMapView: View {
                 }
 
                 HStack(spacing: 6) {
-                    Image(systemName: "crown.fill").font(.system(size: 12)).foregroundStyle(RexColor.primary)
-                    Text(String(format: "%.1f", place.averageRating))
-                        .font(RexFont.text(14, weight: .semibold))
-                    Text("/10").font(RexFont.text(12)).foregroundStyle(RexColor.mutedForeground)
+                    if place.recommendations.count == 1 {
+                        RexRatingBadge(raw: place.recommendations[0].rating)
+                    } else {
+                        RexRatingAverageBadge(ratings: place.recommendations.map { $0.rating })
+                    }
                     Text("· \(place.recommenderSummary)")
                         .font(RexFont.text(13)).foregroundStyle(RexColor.mutedForeground)
                 }

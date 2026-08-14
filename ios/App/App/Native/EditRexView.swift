@@ -40,7 +40,7 @@ struct EditRexView: View {
 
                     VStack(alignment: .leading, spacing: RexSpacing.sm) {
                         Text("Your rating").font(RexFont.text(14, weight: .semibold))
-                        CrownRatingInput(value: $rating, clearable: true)
+                        RexRatingPicker(value: $rating, clearable: true)
                     }
 
                     VStack(alignment: .leading, spacing: RexSpacing.sm) {

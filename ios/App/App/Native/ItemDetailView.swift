@@ -16,11 +16,6 @@ struct ItemDetailView: View {
         recs.first { $0.user_id == RexAPI.shared.currentUserId }
     }
 
-    private var averageRating: Double {
-        guard !recs.isEmpty else { return 0 }
-        return recs.reduce(0) { $0 + $1.rating } / Double(recs.count)
-    }
-
     var body: some View {
         ScrollView {
             if isLoading {
@@ -127,9 +122,11 @@ struct ItemDetailView: View {
 
             if !recs.isEmpty {
                 HStack(spacing: 6) {
-                    Image(systemName: "crown.fill").foregroundStyle(RexColor.primary)
-                    Text(String(format: "%.1f", averageRating)).font(.system(size: 15, weight: .semibold))
-                    Text("/10").foregroundStyle(RexColor.mutedForeground).font(.system(size: 13))
+                    if recs.count == 1 {
+                        RexRatingBadge(raw: recs[0].rating)
+                    } else {
+                        RexRatingAverageBadge(ratings: recs.map { $0.rating })
+                    }
                     Text("· \(recs.count) Rex\(recs.count == 1 ? "" : "es")")
                         .font(.system(size: 13)).foregroundStyle(RexColor.mutedForeground)
                 }
@@ -144,7 +141,7 @@ struct ItemDetailView: View {
                 .font(.system(size: 20, weight: .semibold, design: .rounded))
                 .foregroundStyle(RexColor.foreground)
 
-            CrownRatingInput(value: $rating)
+            RexRatingPicker(value: $rating)
 
             TextField("What did you love about it?", text: $note, axis: .vertical)
                 .lineLimit(3...5)
@@ -234,13 +231,7 @@ struct ItemDetailView: View {
                         }
                         .buttonStyle(.plain)
                         Spacer()
-                        HStack(spacing: 2) {
-                            Image(systemName: "crown.fill").font(.system(size: 11)).foregroundStyle(RexColor.primary)
-                            Text(String(format: rec.rating.truncatingRemainder(dividingBy: 1) == 0 ? "%.0f" : "%.1f", rec.rating))
-                                .fontWeight(.semibold)
-                            Text("/10").foregroundStyle(RexColor.mutedForeground)
-                        }
-                        .font(.system(size: 13))
+                        RexRatingBadge(raw: rec.rating)
                     }
                     if let note = rec.note, !note.isEmpty {
                         Text("\u{201C}\(note)\u{201D}").font(.system(size: 13)).foregroundStyle(RexColor.foreground.opacity(0.9))
@@ -270,27 +261,5 @@ struct ItemDetailView: View {
     }
 }
 
-struct CrownRatingInput: View {
-    @Binding var value: Double
-    /// Allow 0 ("not rated") by tapping the crown that's already selected.
-    var clearable: Bool = false
-
-    var body: some View {
-        HStack(spacing: RexSpacing.xs) {
-            ForEach(1...10, id: \.self) { i in
-                Image(systemName: Double(i) <= value ? "crown.fill" : "crown")
-                    .font(.system(size: 18))
-                    .foregroundStyle(Double(i) <= value ? RexColor.primary : RexColor.border)
-                    .onTapGesture {
-                        value = (clearable && value == Double(i)) ? 0 : Double(i)
-                    }
-            }
-            if clearable && value == 0 {
-                Text("Not rated")
-                    .font(RexFont.text(12))
-                    .foregroundStyle(RexColor.mutedForeground)
-                    .padding(.leading, RexSpacing.xs)
-            }
-        }
-    }
-}
+// The ten-crown picker moved to RexRatingScale.swift as RexRatingPicker,
+// which is the five-tier scale (Do not Rex / Meh / Rex / Loved / Obsessed).

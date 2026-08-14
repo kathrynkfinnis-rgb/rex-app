@@ -33,10 +33,6 @@ struct ProfileView: View {
         return recommendations.filter { $0.items?.type == selectedFilter.rawValue }
     }
 
-    private var averageRating: Double? {
-        guard !recommendations.isEmpty else { return nil }
-        return recommendations.reduce(0) { $0 + $1.rating } / Double(recommendations.count)
-    }
 
     var body: some View {
         ScrollView {
@@ -164,12 +160,7 @@ struct ProfileView: View {
                 }
                 HStack(spacing: 10) {
                     Text("\(recommendations.count) Rex").font(.system(size: 12)).foregroundStyle(RexColor.mutedForeground)
-                    if let averageRating {
-                        HStack(spacing: 2) {
-                            Image(systemName: "crown.fill").font(.system(size: 10)).foregroundStyle(RexColor.primary)
-                            Text("avg \(String(format: "%.1f", averageRating))").font(.system(size: 12)).foregroundStyle(RexColor.mutedForeground)
-                        }
-                    }
+                    RexRatingAverageBadge(ratings: recommendations.map { $0.rating })
                 }
                 .padding(.top, 2)
             }

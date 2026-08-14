@@ -33,12 +33,6 @@ struct UserProfileView: View {
         return recommendations.filter { RexCategory(rawType: $0.items?.type) == filter }
     }
 
-    private var averageRating: Double? {
-        let rated = recommendations.filter { $0.rating > 0 }
-        guard !rated.isEmpty else { return nil }
-        return rated.reduce(0) { $0 + $1.rating } / Double(rated.count)
-    }
-
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: RexSpacing.lg) {
@@ -139,16 +133,7 @@ struct UserProfileView: View {
                     Text("\(recommendations.count) Rex")
                         .font(RexFont.text(12))
                         .foregroundStyle(RexColor.mutedForeground)
-                    if let averageRating {
-                        HStack(spacing: 3) {
-                            Image(systemName: "crown.fill")
-                                .font(.system(size: 10))
-                                .foregroundStyle(RexColor.primary)
-                            Text("avg \(String(format: "%.1f", averageRating))")
-                                .font(RexFont.text(12))
-                                .foregroundStyle(RexColor.mutedForeground)
-                        }
-                    }
+                    RexRatingAverageBadge(ratings: recommendations.map { $0.rating })
                 }
                 .padding(.top, 2)
             }

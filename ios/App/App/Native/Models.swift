@@ -164,11 +164,6 @@ struct MapPlace: Codable, Identifiable {
     let image_url: String?
     let recommendations: [MapRecStub]
 
-    var averageRating: Double {
-        guard !recommendations.isEmpty else { return 0 }
-        return recommendations.reduce(0) { $0 + $1.rating } / Double(recommendations.count)
-    }
-
     /// Trips this place is a stop on.
     var tripIds: [String] {
         Array(Set(recommendations.compactMap { $0.trip_id }))

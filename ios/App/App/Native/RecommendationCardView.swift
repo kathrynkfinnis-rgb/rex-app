@@ -26,12 +26,6 @@ struct RecommendationCardView: View {
         return Self.relativeFormatter.localizedString(for: date, relativeTo: Date())
     }
 
-    private var ratingText: String {
-        rec.rating.truncatingRemainder(dividingBy: 1) == 0
-            ? String(format: "%.0f", rec.rating)
-            : String(format: "%.1f", rec.rating)
-    }
-
     var body: some View {
         guard let item = rec.items else { return AnyView(EmptyView()) }
         return AnyView(
@@ -76,22 +70,23 @@ struct RecommendationCardView: View {
                                 }
                                 .foregroundStyle(RexColor.mutedForeground)
                             }
-                            // Rating is an "important icon" — one of the few
-                            // places the spec allows forest green.
+                            // Rating is an "important element" — one of the
+                            // few places the spec allows forest green. Emoji
+                            // only here: the header row already carries the
+                            // category and genre badges, and a full label
+                            // ("Do not Rex") ran under the edit-pencil overlay
+                            // in the corner. The word appears on the detail
+                            // screen instead, where there's room for it.
                             if rec.rating > 0 {
-                                HStack(spacing: 3) {
-                                    Image(systemName: "crown.fill")
-                                        .font(.system(size: 11))
-                                        .foregroundStyle(RexColor.primary)
-                                    Text(ratingText)
-                                        .font(RexFont.text(14, weight: .semibold))
-                                        .foregroundStyle(RexColor.foreground)
-                                    Text("/10")
-                                        .font(RexFont.text(12))
-                                        .foregroundStyle(RexColor.mutedForeground)
-                                }
+                                RexRatingBadge(raw: rec.rating, compact: true)
                             }
                         }
+                        // Your own cards get an edit-pencil floating in this
+                        // exact corner (EditableIfMine, applied outside this
+                        // view) — without this, anything flush-right here
+                        // rendered underneath the opaque pencil circle and
+                        // just vanished.
+                        .padding(.trailing, 26)
 
                         Text(item.title)
                             .font(RexFont.display(19, weight: .semibold))

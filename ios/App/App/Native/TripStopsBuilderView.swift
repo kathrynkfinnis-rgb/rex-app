@@ -266,7 +266,7 @@ struct TripStopsBuilderView: View {
             Text("Rating (optional)")
                 .font(RexFont.text(13, weight: .semibold))
                 .foregroundStyle(RexColor.foreground)
-            CrownRatingInput(value: $rating, clearable: true)
+            RexRatingPicker(value: $rating, clearable: true)
 
             input("Why are you Rexing it?", text: $note)
 

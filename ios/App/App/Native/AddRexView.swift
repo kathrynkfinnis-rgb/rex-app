@@ -181,7 +181,7 @@ struct AddRexView: View {
 
             if mode == .rated {
                 Text("Your rating").font(.system(size: 14, weight: .semibold)).foregroundStyle(RexColor.foreground)
-                CrownRatingInput(value: $rating)
+                RexRatingPicker(value: $rating)
 
                 Text("Note").font(.system(size: 14, weight: .semibold)).foregroundStyle(RexColor.foreground)
                 TextField("What did you love about it?", text: $note, axis: .vertical)
