@@ -20,6 +20,8 @@ struct ProfileView: View {
     @State private var confirmBulkDelete = false
     @State private var isDeleting = false
     @State private var editingProfile = false
+    @State private var addingToCollection: FeedRecommendation?
+    @State private var rexCounts: [String: Int] = [:]
 
     private var availableCategories: [RexCategory] {
         let present = Set(recommendations.compactMap { RexCategory(rawValue: $0.items?.type ?? "") })
@@ -109,6 +111,9 @@ struct ProfileView: View {
                 onDeleted: { Task { await load() } }
             )
         }
+        .sheet(item: $addingToCollection) { rec in
+            AddToCollectionView(rec: rec) { addingToCollection = nil }
+        }
     }
 
     private func bulkDelete() async {
@@ -132,6 +137,10 @@ struct ProfileView: View {
             let fetchedProfile = try await profileTask
             profile = fetchedProfile
             recommendations = try await RexAPI.shared.fetchRecommendations(forUser: fetchedProfile.id)
+            // "Who else has Rex'd this" was missing on your own profile —
+            // it's the same social proof the feed already shows.
+            let itemIds = Array(Set(recommendations.map { $0.item_id }))
+            rexCounts = (try? await RexAPI.shared.fetchRexCounts(itemIds: itemIds)) ?? [:]
         } catch {
             errorMessage = error.localizedDescription
         }
@@ -223,7 +232,7 @@ struct ProfileView: View {
                                 if selectedIds.contains(rec.id) { selectedIds.remove(rec.id) }
                                 else { selectedIds.insert(rec.id) }
                             } label: {
-                                RecommendationCardView(rec: rec)
+                                RecommendationCardView(rec: rec, rexCount: rexCounts[rec.item_id] ?? 0)
                                     .overlay(alignment: .topLeading) {
                                         Image(systemName: selectedIds.contains(rec.id) ? "checkmark.circle.fill" : "circle")
                                             .font(.system(size: 22))
@@ -236,13 +245,20 @@ struct ProfileView: View {
                             .buttonStyle(.plain)
                         } else {
                             NavigationLink(value: rec.item_id) {
-                                RecommendationCardView(rec: rec)
+                                RecommendationCardView(rec: rec, rexCount: rexCounts[rec.item_id] ?? 0)
                             }
                             .buttonStyle(.plain)
                         }
                     }
-                    // These are all your own Rex, so every one is editable.
+                    // These are all your own Rex, so every one is editable —
+                    // plus the same "add to collection" the feed offers,
+                    // requested here separately three times.
                     .contextMenu {
+                        Button {
+                            addingToCollection = rec
+                        } label: {
+                            Label("Add to collection", systemImage: "folder.badge.plus")
+                        }
                         Button {
                             editing = rec
                         } label: {

@@ -78,9 +78,13 @@ struct RexCardActions: View {
                     .font(.system(size: 15))
                     .foregroundStyle(tint)
                 if isActive, let activeLabel {
+                    // Text wraps by default once an HStack runs short on
+                    // room — "Saved" was wrapping one letter per line. This
+                    // pins it to its natural single-line width instead.
                     Text(activeLabel)
                         .font(RexFont.text(11, weight: .medium))
                         .foregroundStyle(tint)
+                        .fixedSize()
                 } else if count > 0 {
                     Text("\(count)")
                         .font(RexFont.text(11))

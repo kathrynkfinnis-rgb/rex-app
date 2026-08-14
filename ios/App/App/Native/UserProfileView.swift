@@ -20,6 +20,8 @@ struct UserProfileView: View {
     @State private var theirLists: [RexList] = []
     @State private var myFollowedListIds: Set<String> = []
     @State private var followBusyIds: Set<String> = []
+    @State private var addingToCollection: FeedRecommendation?
+    @State private var rexCounts: [String: Int] = [:]
 
     private var availableCategories: [RexCategory] {
         let present = Set(recommendations.compactMap { RexCategory(rawType: $0.items?.type) })
@@ -77,19 +79,28 @@ struct UserProfileView: View {
                 } else {
                     LazyVStack(spacing: RexSpacing.betweenCards) {
                         ForEach(visible) { rec in
-                            if RexCategory(rawType: rec.items?.type) == .trip {
-                                NavigationLink(value: TripRoute(
-                                    recommendationId: rec.id,
-                                    title: rec.items?.title ?? "Trip",
-                                )) {
-                                    RecommendationCardView(rec: rec)
+                            Group {
+                                if RexCategory(rawType: rec.items?.type) == .trip {
+                                    NavigationLink(value: TripRoute(
+                                        recommendationId: rec.id,
+                                        title: rec.items?.title ?? "Trip",
+                                    )) {
+                                        RecommendationCardView(rec: rec, rexCount: rexCounts[rec.item_id] ?? 0)
+                                    }
+                                    .buttonStyle(.plain)
+                                } else {
+                                    NavigationLink(value: rec.item_id) {
+                                        RecommendationCardView(rec: rec, rexCount: rexCounts[rec.item_id] ?? 0)
+                                    }
+                                    .buttonStyle(.plain)
                                 }
-                                .buttonStyle(.plain)
-                            } else {
-                                NavigationLink(value: rec.item_id) {
-                                    RecommendationCardView(rec: rec)
+                            }
+                            .contextMenu {
+                                Button {
+                                    addingToCollection = rec
+                                } label: {
+                                    Label("Add to collection", systemImage: "folder.badge.plus")
                                 }
-                                .buttonStyle(.plain)
                             }
                         }
                     }
@@ -101,6 +112,9 @@ struct UserProfileView: View {
         .background(RexColor.background.ignoresSafeArea())
         .navigationTitle(profile?.display_name ?? route.name)
         .navigationBarTitleDisplayMode(.inline)
+        .sheet(item: $addingToCollection) { rec in
+            AddToCollectionView(rec: rec) { addingToCollection = nil }
+        }
         .task { await load() }
     }
 
@@ -260,6 +274,8 @@ struct UserProfileView: View {
             recommendations = recs
             theirLists = lists
             myFollowedListIds = Set(followedLists.map { $0.id })
+            let itemIds = Array(Set(recs.map { $0.item_id }))
+            rexCounts = (try? await RexAPI.shared.fetchRexCounts(itemIds: itemIds)) ?? [:]
         } catch {
             errorMessage = error.localizedDescription
         }
