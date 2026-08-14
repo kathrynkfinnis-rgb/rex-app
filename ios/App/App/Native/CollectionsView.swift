@@ -19,15 +19,37 @@ struct CollectionsView: View {
     @State private var isLoading = true
     @State private var errorMessage: String?
     @State private var creatingCollection = false
+    @State private var searchQuery = ""
 
     /// The "friends" shelf is followed + collaborating merged — both are
     /// someone else's collection you have access to, just with different
     /// permissions once you're inside it.
     private var friendsLists: [RexList] { followed + sharedWithMe }
 
+    private var trimmedQuery: String { searchQuery.trimmingCharacters(in: .whitespaces).lowercased() }
+    private var isSearching: Bool { !trimmedQuery.isEmpty }
+
+    private var filteredWants: [WantRow] {
+        guard isSearching else { return wants }
+        return wants.filter { ($0.items?.title.lowercased() ?? "").contains(trimmedQuery) }
+    }
+
+    /// A collection matches a search if its own name does, or anything
+    /// saved inside it does — "search collections" should find the Rex you
+    /// tucked away, not just the folder it's in.
+    private func filteredLists(_ items: [RexList]) -> [RexList] {
+        guard isSearching else { return items }
+        return items.filter { list in
+            if list.name.lowercased().contains(trimmedQuery) { return true }
+            return (contents[list.id] ?? []).contains {
+                ($0.recommendations?.items?.title.lowercased() ?? "").contains(trimmedQuery)
+            }
+        }
+    }
+
     private var wantsByCategory: [(category: RexCategory, items: [WantRow])] {
         var buckets: [RexCategory: [WantRow]] = [:]
-        for want in wants {
+        for want in filteredWants {
             let c = RexCategory(rawType: want.items?.type)
             buckets[c, default: []].append(want)
         }
@@ -37,6 +59,10 @@ struct CollectionsView: View {
         }
     }
 
+    private var noSearchResults: Bool {
+        isSearching && wantsByCategory.isEmpty && filteredLists(lists).isEmpty && filteredLists(friendsLists).isEmpty
+    }
+
     var body: some View {
         ZStack {
             RexColor.background.ignoresSafeArea()
@@ -44,6 +70,7 @@ struct CollectionsView: View {
             ScrollView {
                 VStack(alignment: .leading, spacing: RexSpacing.xl) {
                     header
+                    searchField
 
                     if let errorMessage, wants.isEmpty && lists.isEmpty {
                         errorState(errorMessage)
@@ -65,12 +92,14 @@ struct CollectionsView: View {
                                 .fill(RexColor.muted)
                                 .frame(height: 148)
                         }
+                    } else if noSearchResults {
+                        empty("No matches", "Nothing in your collections matches \u{201C}\(searchQuery)\u{201D}.")
                     } else {
                         wishListsShelf
                         myCollectionsShelf
                         friendsCollectionsShelf
 
-                        if wants.isEmpty && lists.isEmpty && friendsLists.isEmpty {
+                        if !isSearching && wants.isEmpty && lists.isEmpty && friendsLists.isEmpty {
                             empty("Nothing here yet",
                                   "Save a Rex with the bookmark button, or make your first collection.")
                         }
@@ -86,6 +115,34 @@ struct CollectionsView: View {
             NewCollectionView { _ in Task { await load() } }
         }
         .task { await load() }
+    }
+
+    private var searchField: some View {
+        HStack(spacing: RexSpacing.sm) {
+            Image(systemName: "magnifyingglass")
+                .font(.system(size: 15))
+                .foregroundStyle(RexColor.placeholder)
+            TextField("Search your collections\u{2026}", text: $searchQuery)
+                .font(RexFont.text(15))
+                .foregroundStyle(RexColor.foreground)
+                .autocorrectionDisabled()
+            if !searchQuery.isEmpty {
+                Button { searchQuery = "" } label: {
+                    Image(systemName: "xmark.circle.fill")
+                        .font(.system(size: 15))
+                        .foregroundStyle(RexColor.placeholder)
+                }
+            }
+        }
+        .padding(.horizontal, RexSpacing.lg)
+        .frame(height: 46)
+        .background(RexColor.card)
+        .clipShape(RoundedRectangle(cornerRadius: RexRadius.input, style: .continuous))
+        .overlay(
+            RoundedRectangle(cornerRadius: RexRadius.input, style: .continuous)
+                .stroke(RexColor.border, lineWidth: 1)
+        )
+        .padding(.horizontal, RexSpacing.page)
     }
 
     private var header: some View {
@@ -139,21 +196,25 @@ struct CollectionsView: View {
 
     @ViewBuilder
     private var myCollectionsShelf: some View {
-        shelf(title: "My Collections", systemImage: "folder.fill") {
-            ForEach(lists.prefix(8)) { list in
-                NavigationLink(value: CollectionRoute(listId: list.id, name: list.name, isMine: true)) {
-                    shelfTile(
-                        title: list.name,
-                        count: (contents[list.id] ?? []).count,
-                        emoji: list.emoji,
-                        locked: list.visibility == "draft",
-                        thumbnails: (contents[list.id] ?? []).compactMap { $0.recommendations?.items?.image_url }
-                    )
+        let matched = filteredLists(lists)
+        // Search should never hide the way to make a new one.
+        if !isSearching || !matched.isEmpty {
+            shelf(title: "My Collections", systemImage: "folder.fill") {
+                ForEach(matched.prefix(8)) { list in
+                    NavigationLink(value: CollectionRoute(listId: list.id, name: list.name, isMine: true)) {
+                        shelfTile(
+                            title: list.name,
+                            count: (contents[list.id] ?? []).count,
+                            emoji: list.emoji,
+                            locked: list.visibility == "draft",
+                            thumbnails: (contents[list.id] ?? []).compactMap { $0.recommendations?.items?.image_url }
+                        )
+                    }
+                    .buttonStyle(.plain)
                 }
-                .buttonStyle(.plain)
+                if !isSearching { newCollectionTile }
+                if matched.count > 8 { seeAllTile(destination: .mine) }
             }
-            newCollectionTile
-            if lists.count > 8 { seeAllTile(destination: .mine) }
         }
     }
 
@@ -180,9 +241,10 @@ struct CollectionsView: View {
 
     @ViewBuilder
     private var friendsCollectionsShelf: some View {
-        if !friendsLists.isEmpty {
+        let matched = filteredLists(friendsLists)
+        if !matched.isEmpty {
             shelf(title: "Friends' Collections", systemImage: "person.2.fill") {
-                ForEach(friendsLists.prefix(8)) { list in
+                ForEach(matched.prefix(8)) { list in
                     let isMine = sharedWithMe.contains(where: { $0.id == list.id })
                     NavigationLink(value: CollectionRoute(listId: list.id, name: list.name, isMine: isMine)) {
                         shelfTile(
@@ -195,7 +257,7 @@ struct CollectionsView: View {
                     }
                     .buttonStyle(.plain)
                 }
-                if friendsLists.count > 8 { seeAllTile(destination: .friends) }
+                if matched.count > 8 { seeAllTile(destination: .friends) }
             }
         }
     }

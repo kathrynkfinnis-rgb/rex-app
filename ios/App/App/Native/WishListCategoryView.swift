@@ -1,7 +1,7 @@
 import SwiftUI
 
-/// One category's worth of wants — "Places to go", "Books to read" — reached
-/// by tapping its tile on the Collections home shelf.
+/// Where a "My Wish Lists" shelf tile leads — every want in one category, as
+/// a plain swipe-to-remove list.
 struct WishListRoute: Hashable {
     let category: RexCategory
 }
@@ -28,54 +28,52 @@ struct WishListCategoryView: View {
     }
 
     var body: some View {
-        ZStack {
-            RexColor.background.ignoresSafeArea()
-            ScrollView {
-                LazyVStack(alignment: .leading, spacing: RexSpacing.sm) {
-                    if isLoading {
-                        ForEach(0..<4, id: \.self) { _ in
-                            RoundedRectangle(cornerRadius: RexRadius.card)
-                                .fill(RexColor.muted)
-                                .frame(height: 70)
-                        }
-                    } else if wants.isEmpty {
-                        empty()
-                    } else {
-                        ForEach(wants) { want in
-                            if let item = want.items {
-                                SwipeToRemove(
-                                    label: "Remove",
-                                    systemImage: "bookmark.slash",
-                                    onTap: { pushedItemId = item.id },
-                                    action: { await removeWant(want) }
-                                ) {
-                                    HStack(spacing: RexSpacing.md) {
-                                        thumb(item)
-                                        VStack(alignment: .leading, spacing: 2) {
-                                            Text(item.title)
-                                                .font(RexFont.text(15, weight: .medium))
-                                                .foregroundStyle(RexColor.foreground)
+        ScrollView {
+            VStack(alignment: .leading, spacing: RexSpacing.sm) {
+                if isLoading {
+                    ForEach(0..<4, id: \.self) { _ in
+                        RoundedRectangle(cornerRadius: RexRadius.card)
+                            .fill(RexColor.muted)
+                            .frame(height: 66)
+                    }
+                } else if wants.isEmpty {
+                    empty()
+                } else {
+                    ForEach(wants) { want in
+                        if let item = want.items {
+                            SwipeToRemove(
+                                label: "Remove",
+                                systemImage: "bookmark.slash",
+                                onTap: { pushedItemId = item.id },
+                                action: { await remove(want) }
+                            ) {
+                                HStack(spacing: RexSpacing.md) {
+                                    thumb(item)
+                                    VStack(alignment: .leading, spacing: 2) {
+                                        Text(item.title)
+                                            .font(RexFont.text(15, weight: .medium))
+                                            .foregroundStyle(RexColor.foreground)
+                                            .lineLimit(1)
+                                        if let sub = item.subtitle ?? item.address, !sub.isEmpty {
+                                            Text(sub)
+                                                .font(RexFont.text(12))
+                                                .foregroundStyle(RexColor.mutedForeground)
                                                 .lineLimit(1)
-                                            if let sub = item.subtitle ?? item.address, !sub.isEmpty {
-                                                Text(sub)
-                                                    .font(RexFont.text(12))
-                                                    .foregroundStyle(RexColor.mutedForeground)
-                                                    .lineLimit(1)
-                                            }
                                         }
-                                        Spacer()
                                     }
-                                    .padding(RexSpacing.md)
-                                    .rexCard()
+                                    Spacer()
                                 }
+                                .padding(RexSpacing.md)
+                                .rexCard()
                             }
                         }
                     }
                 }
-                .padding(RexSpacing.page)
             }
-            .refreshable { await load() }
+            .padding(.horizontal, RexSpacing.page)
+            .padding(.vertical, RexSpacing.lg)
         }
+        .background(RexColor.background.ignoresSafeArea())
         .navigationTitle(title)
         .navigationBarTitleDisplayMode(.inline)
         .navigationDestination(item: $pushedItemId) { ItemDetailView(itemId: $0) }
@@ -116,14 +114,14 @@ struct WishListCategoryView: View {
         .frame(maxWidth: .infinity)
     }
 
-    private func removeWant(_ want: WantRow) async {
+    private func remove(_ want: WantRow) async {
         guard let itemId = want.items?.id else { return }
         wants.removeAll { $0.id == want.id }
         try? await RexAPI.shared.removeWant(itemId: itemId)
     }
 
     private func load() async {
-        isLoading = wants.isEmpty
+        isLoading = true
         let all = (try? await RexAPI.shared.fetchWants()) ?? []
         wants = all.filter { RexCategory(rawType: $0.items?.type) == route.category }
         isLoading = false

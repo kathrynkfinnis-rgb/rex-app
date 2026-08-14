@@ -1,4 +1,5 @@
 import SwiftUI
+import UIKit
 
 extension Color {
     init(hex: String) {
@@ -355,4 +356,66 @@ func shortLocality(_ address: String?) -> String? {
     let cleaned = words.filter { !$0.contains(where: \.isNumber) }
     let result = cleaned.joined(separator: " ")
     return result.isEmpty ? candidate : result
+}
+
+/// A button that only fires on a deliberate hold, not a tap — for actions
+/// sitting inside a horizontal scroll row, where a quick tap is often really
+/// a swipe that missed. Fills left-to-right over `holdDuration` as visual
+/// feedback for how much longer to hold, and lets go cleanly if the finger
+/// lifts or drags away early.
+struct PressAndHoldButton: View {
+    let label: String
+    var holdDuration: Double = 0.6
+    let action: () -> Void
+
+    @State private var progress: Double = 0
+    @State private var holdTask: Task<Void, Never>?
+
+    var body: some View {
+        Text(label)
+            .font(RexFont.text(11, weight: .semibold))
+            .foregroundStyle(RexColor.primaryForeground)
+            .padding(.horizontal, RexSpacing.sm)
+            .padding(.vertical, 4)
+            .background(
+                GeometryReader { geo in
+                    ZStack(alignment: .leading) {
+                        RexColor.primary.opacity(0.4)
+                        RexColor.primary.frame(width: geo.size.width * progress)
+                    }
+                }
+            )
+            .clipShape(Capsule())
+            .contentShape(Capsule())
+            .gesture(
+                DragGesture(minimumDistance: 0)
+                    .onChanged { _ in startHoldIfNeeded() }
+                    .onEnded { _ in cancelHold() }
+            )
+    }
+
+    private func startHoldIfNeeded() {
+        guard holdTask == nil else { return }
+        holdTask = Task {
+            let steps = 30
+            for i in 1...steps {
+                try? await Task.sleep(nanoseconds: UInt64(holdDuration / Double(steps) * 1_000_000_000))
+                if Task.isCancelled { return }
+                await MainActor.run { progress = Double(i) / Double(steps) }
+            }
+            guard !Task.isCancelled else { return }
+            await MainActor.run {
+                let generator = UIImpactFeedbackGenerator(style: .medium)
+                generator.impactOccurred()
+                action()
+                progress = 0
+            }
+        }
+    }
+
+    private func cancelHold() {
+        holdTask?.cancel()
+        holdTask = nil
+        withAnimation(.easeOut(duration: 0.2)) { progress = 0 }
+    }
 }

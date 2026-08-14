@@ -188,24 +188,30 @@ struct UserProfileView: View {
                 .lineLimit(1)
                 .frame(width: 112, alignment: .leading)
 
-            Button {
-                Task { await toggleFollow(list) }
-            } label: {
-                if busy {
-                    ProgressView().controlSize(.mini)
-                } else {
-                    Text(saved ? "Saved" : "Save")
+            // Press-and-hold to save, not a tap — this tile sits inside a
+            // horizontal scroll row, where a quick tap is often really a
+            // swipe that missed.
+            if busy {
+                ProgressView().controlSize(.mini).frame(height: 24)
+            } else if saved {
+                Button {
+                    Task { await toggleFollow(list) }
+                } label: {
+                    Text("Saved")
                         .font(RexFont.text(11, weight: .semibold))
-                        .foregroundStyle(saved ? RexColor.mutedForeground : RexColor.primaryForeground)
+                        .foregroundStyle(RexColor.mutedForeground)
                         .padding(.horizontal, RexSpacing.sm)
                         .padding(.vertical, 4)
-                        .background(saved ? RexColor.card : RexColor.primary)
+                        .background(RexColor.card)
                         .clipShape(Capsule())
-                        .overlay(Capsule().stroke(saved ? RexColor.border : .clear, lineWidth: 1))
+                        .overlay(Capsule().stroke(RexColor.border, lineWidth: 1))
+                }
+                .buttonStyle(.plain)
+            } else {
+                PressAndHoldButton(label: "Hold to save") {
+                    Task { await toggleFollow(list) }
                 }
             }
-            .buttonStyle(.plain)
-            .disabled(busy)
         }
         .frame(width: 112, alignment: .leading)
     }
