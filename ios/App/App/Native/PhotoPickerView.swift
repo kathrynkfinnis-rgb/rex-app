@@ -94,9 +94,7 @@ struct PhotoPickerView: View {
             guard photoURLs.count < maxPhotos else { break }
             do {
                 guard let data = try await item.loadTransferable(type: Data.self) else { continue }
-                // Re-encode as JPEG so HEIC from the camera roll uploads as
-                // something every client can display.
-                let jpeg = UIImage(data: data)?.jpegData(compressionQuality: 0.8) ?? data
+                let jpeg = downscaledJPEG(data)
                 let url = try await RexAPI.shared.uploadPhoto(data: jpeg, fileExtension: "jpg")
                 photoURLs.append(url)
             } catch {

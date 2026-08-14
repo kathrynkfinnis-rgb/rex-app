@@ -15,6 +15,14 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
         if let key = Bundle.main.object(forInfoDictionaryKey: "GMSApiKey") as? String, !key.isEmpty {
             GMSServices.provideAPIKey(key)
         }
+        // AsyncImage rides on URLSession.shared, whose default cache is a few
+        // hundred KB — barely one thumbnail. Feed photos were re-downloading
+        // on every scroll-back for lack of anywhere to keep them. This is the
+        // other half of the slow-photos fix alongside downscaling on upload.
+        URLCache.shared = URLCache(
+            memoryCapacity: 50 * 1024 * 1024,
+            diskCapacity: 300 * 1024 * 1024
+        )
         return true
     }
 

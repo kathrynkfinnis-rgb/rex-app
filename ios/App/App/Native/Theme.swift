@@ -419,3 +419,22 @@ struct PressAndHoldButton: View {
         withAnimation(.easeOut(duration: 0.2)) { progress = 0 }
     }
 }
+
+/// Downscales an image before it goes anywhere near the network. A 12MP
+/// camera photo re-encoded at high quality but full resolution was routinely
+/// several MB — vast overkill for a card thumbnail, and the reason feed
+/// photos were slow to load. Caps the longest edge at 1600px, which still
+/// looks sharp at any size we display, and re-encodes as JPEG so HEIC from
+/// the camera roll uploads as something every client can decode.
+func downscaledJPEG(_ data: Data, maxDimension: CGFloat = 1600, quality: CGFloat = 0.8) -> Data {
+    guard let image = UIImage(data: data) else { return data }
+    let longest = max(image.size.width, image.size.height)
+    guard longest > maxDimension else {
+        return image.jpegData(compressionQuality: quality) ?? data
+    }
+    let scale = maxDimension / longest
+    let targetSize = CGSize(width: image.size.width * scale, height: image.size.height * scale)
+    let renderer = UIGraphicsImageRenderer(size: targetSize)
+    let resized = renderer.image { _ in image.draw(in: CGRect(origin: .zero, size: targetSize)) }
+    return resized.jpegData(compressionQuality: quality) ?? data
+}

@@ -117,9 +117,8 @@ struct EditProfileView: View {
         errorMessage = nil
         do {
             if let data = try await item.loadTransferable(type: Data.self) {
-                // Re-encode so HEIC from the camera roll uploads as something
-                // every client can render.
-                let jpeg = UIImage(data: data)?.jpegData(compressionQuality: 0.85) ?? data
+                // Avatars render at most ~104pt — 600px is plenty.
+                let jpeg = downscaledJPEG(data, maxDimension: 600)
                 avatarURL = try await RexAPI.shared.uploadAvatar(data: jpeg)
             }
         } catch {
