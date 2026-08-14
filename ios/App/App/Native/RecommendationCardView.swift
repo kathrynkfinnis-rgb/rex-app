@@ -255,6 +255,10 @@ struct RecommendationCardView: View {
                         RexColor.muted
                     }
                 }
+                // Places added before the URL fix never render — whichever
+                // card sees it first repairs it for everyone, since items
+                // aren't per-user.
+                .task { await RexAPI.shared.repairPlacePhotoIfNeeded(itemId: item.id, imageURL: urlString) }
             } else {
                 RexColor.muted.overlay(
                     Image(systemName: category.symbol)

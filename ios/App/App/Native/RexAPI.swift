@@ -806,6 +806,34 @@ final class RexAPI {
     /// Downloads a Google Places photo using the headers its key restriction
     /// requires, and re-hosts it in our own storage. Returns nil rather than
     /// failing the save — a place without a picture still beats no place.
+    /// Places thumbnails saved before this fix still carry Google's media URL,
+    /// which never rendered (see copyGooglePhoto). There's no SQL backfill for
+    /// this — Postgres can't fetch an external image — and items aren't
+    /// per-user, so a one-off migration script would only fix what one
+    /// session touches. Self-healing instead: cards call this once when they
+    /// render, and whichever device happens to see a broken photo first
+    /// fixes it for everyone, since the row is shared.
+    private static var repairedItemIds = Set<String>()
+
+    func repairPlacePhotoIfNeeded(itemId: String, imageURL: String?) async {
+        guard let imageURL, imageURL.contains("places.googleapis.com") else { return }
+        guard !Self.repairedItemIds.contains(itemId) else { return }
+        Self.repairedItemIds.insert(itemId)
+
+        guard let fixed = await copyGooglePhoto(imageURL) else { return }
+        let token = try? await validToken()
+        guard let token else { return }
+        var components = URLComponents(url: baseURL.appendingPathComponent("/rest/v1/items"), resolvingAgainstBaseURL: false)!
+        components.queryItems = [URLQueryItem(name: "id", value: "eq.\(itemId)")]
+        var request = URLRequest(url: components.url!)
+        request.httpMethod = "PATCH"
+        request.setValue(anonKey, forHTTPHeaderField: "apikey")
+        request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        request.httpBody = try? JSONSerialization.data(withJSONObject: ["image_url": fixed])
+        _ = try? await URLSession.shared.data(for: request)
+    }
+
     private func copyGooglePhoto(_ urlString: String) async -> String? {
         guard let url = URL(string: urlString) else { return nil }
         var request = URLRequest(url: url)
