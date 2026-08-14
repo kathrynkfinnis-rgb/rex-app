@@ -46,7 +46,18 @@ struct MainTabView: View {
                 ProfileView(onSignedOut: onSignedOut)
                     .tag(4)
             }
-            .tabViewStyle(.page(indexDisplayMode: .never))
+            // Deliberately NOT .page style. That style pages on a horizontal
+            // swipe ANYWHERE on screen, not just via the tab bar — which is
+            // exactly what was eating SwipeToRemove's DragGesture on the feed
+            // and profile the whole time. Confirmed directly: after making
+            // SwipeToRemove's drag a .highPriorityGesture (so it would beat a
+            // ScrollView's own pan), a swipe on a card started paging straight
+            // to the Map tab instead of revealing Delete. Default style
+            // doesn't respond to swipe at all — only to `selection` changes —
+            // so it's driven purely by tapping bottomBar's own buttons, same
+            // as before, just without silently hijacking every other
+            // horizontal gesture in the app.
+            .toolbar(.hidden, for: .tabBar)
 
             bottomBar
         }

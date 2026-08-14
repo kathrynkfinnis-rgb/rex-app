@@ -60,7 +60,17 @@ struct SwipeToRemove<Content: View>: View {
                     // A tap while the action is showing just puts it away.
                     if offset < 0 { close() } else { onTap() }
                 }
-                .gesture(
+                // .highPriorityGesture rather than plain .gesture: this view
+                // lives inside a ScrollView, and ScrollView's own pan gesture
+                // (backed by UIScrollView.panGestureRecognizer, a separate
+                // UIKit recognizer from SwiftUI's gesture system) was winning
+                // outright on any drag, including clearly-horizontal ones —
+                // confirmed by testing: a horizontal swipe just scrolled the
+                // list vertically instead of revealing the delete action.
+                // highPriorityGesture is the documented way to make a child's
+                // gesture take precedence over an ancestor's, which plain
+                // .gesture does not do.
+                .highPriorityGesture(
                     DragGesture(minimumDistance: 14)
                         .onChanged { value in
                             // Ignore anything that's really a scroll.
