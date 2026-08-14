@@ -118,6 +118,11 @@ struct FeedView: View {
         likeCounts = state.mapValues { $0.count }
     }
 
+    /// Explicit scroll-position tracking rather than relying on SwiftUI to
+    /// infer it — tapping into a Rex and pressing back was landing you at
+    /// the top of the feed instead of where you'd scrolled to.
+    @State private var scrolledRowID: String?
+
     var body: some View {
         NavigationStack(path: $path) {
             ZStack {
@@ -126,6 +131,7 @@ struct FeedView: View {
                 ScrollView {
                     LazyVStack(spacing: RexSpacing.betweenCards) {
                         header
+                            .id("top")
 
                         if isLoading {
                             ForEach(0..<3, id: \.self) { _ in
@@ -185,9 +191,13 @@ struct FeedView: View {
                                     )
                                 }
                                 .modifier(EditableIfMine(rec: rec, editing: $editing))
-                                // Drag a card over to Collections and drop it on
-                                // a list. Dropping copies, so the Rex stays here.
-                                .draggable(rec.id)
+                                // No .draggable() here: Collections isn't
+                                // visible at the same time as the feed (they're
+                                // different tabs), so there's never a drop
+                                // target on screen to drag onto — it did
+                                // nothing useful except win the gesture
+                                // conflict against SwipeToRemove's plain
+                                // DragGesture and silently break swiping.
                                 // One menu only — a second `.contextMenu` replaces
                                 // the first rather than adding to it.
                                 .contextMenu {
@@ -210,6 +220,7 @@ struct FeedView: View {
                     .padding(.horizontal, RexSpacing.page)
                     .padding(.bottom, RexSpacing.xxl)
                 }
+                .scrollPosition(id: $scrolledRowID)
                 .refreshable { await loadFeed() }
             }
             .navigationBarTitleDisplayMode(.inline)
@@ -279,6 +290,7 @@ struct FeedView: View {
         .tint(RexColor.primary)
         .onChange(of: popToRootSignal) { _, _ in
             path = NavigationPath()
+            withAnimation { scrolledRowID = "top" }
         }
         .task {
             await loadFeed()

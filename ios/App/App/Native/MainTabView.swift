@@ -41,12 +41,10 @@ struct MainTabView: View {
                 }
                 .tag(3)
 
-                NavigationStack {
-                    ProfileView(onSignedOut: onSignedOut)
-                        .navigationDestination(for: String.self) { ItemDetailView(itemId: $0) }
-                        .navigationDestination(for: UserProfileRoute.self) { UserProfileView(route: $0) }
-                }
-                .tag(4)
+                // No wrapping NavigationStack here — ProfileView owns its
+                // own now, so a swiped row can push onto a real bound path.
+                ProfileView(onSignedOut: onSignedOut)
+                    .tag(4)
             }
             .tabViewStyle(.page(indexDisplayMode: .never))
 

@@ -22,6 +22,10 @@ struct ProfileView: View {
     @State private var editingProfile = false
     @State private var addingToCollection: FeedRecommendation?
     @State private var rexCounts: [String: Int] = [:]
+    /// Owned here rather than by the caller, so a swiped row's tap can push
+    /// onto it directly — the wrapping NavigationStack used to live in
+    /// MainTabView with no bindable path for this view to reach into.
+    @State private var path = NavigationPath()
 
     private var availableCategories: [RexCategory] {
         let present = Set(recommendations.compactMap { RexCategory(rawValue: $0.items?.type ?? "") })
@@ -35,6 +39,10 @@ struct ProfileView: View {
 
 
     var body: some View {
+        // Owns its own NavigationStack now, rather than relying on one
+        // MainTabView wrapped it in — that outer stack had no bound path,
+        // so a swiped row had nowhere to programmatically push to.
+        NavigationStack(path: $path) {
         ScrollView {
             if isLoading {
                 ProgressView().padding(.top, 80)
@@ -109,6 +117,19 @@ struct ProfileView: View {
         }
         .sheet(item: $addingToCollection) { rec in
             AddToCollectionView(rec: rec) { addingToCollection = nil }
+        }
+        .navigationDestination(for: String.self) { ItemDetailView(itemId: $0) }
+        .navigationDestination(for: UserProfileRoute.self) { UserProfileView(route: $0) }
+        }
+    }
+
+    private func delete(_ rec: FeedRecommendation) async {
+        recommendations.removeAll { $0.id == rec.id }
+        do {
+            try await RexAPI.shared.deleteRecommendation(id: rec.id)
+        } catch {
+            // Put it back rather than pretending it's gone.
+            await load()
         }
     }
 
@@ -235,10 +256,22 @@ struct ProfileView: View {
                             }
                             .buttonStyle(.plain)
                         } else {
-                            NavigationLink(value: rec.item_id) {
+                            // These are all your own Rex, so every one is
+                            // swipeable — this was never wired here, only on
+                            // the feed, hence "swipe doesn't work on my
+                            // profile". Same tap-callback pattern as the
+                            // feed: SwipeToRemove's content can't be a
+                            // NavigationLink (its own gesture would win),
+                            // so the push happens through onTap instead.
+                            SwipeToRemove(
+                                label: "Delete",
+                                systemImage: "trash",
+                                confirmMessage: "Delete this Rex? It'll disappear from your friends' feeds too.",
+                                onTap: { path.append(rec.item_id) },
+                                action: { await delete(rec) }
+                            ) {
                                 RecommendationCardView(rec: rec, rexCount: rexCounts[rec.item_id] ?? 0)
                             }
-                            .buttonStyle(.plain)
                         }
                     }
                     // These are all your own Rex, so every one is editable —
