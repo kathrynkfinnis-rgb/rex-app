@@ -1722,6 +1722,31 @@ final class RexAPI {
         })
     }
 
+    /// Item ids for a set of recommendations, keyed by the recommendation id —
+    /// what a "rec_like"/"rec_comment"/"rec_saved"/"mention"/"friend_new_rec"
+    /// notification carries in entity_id. Notifications can outlive the
+    /// recommendation they point at (e.g. you deleted the Rex after someone
+    /// liked it), so a missing key here just means "nothing to open" rather
+    /// than an error — callers should treat an absent id as non-fatal.
+    func fetchItemIds(forRecommendations recommendationIds: [String]) async throws -> [String: String] {
+        guard !recommendationIds.isEmpty else { return [:] }
+        let token = try await validToken()
+        var components = URLComponents(url: baseURL.appendingPathComponent("/rest/v1/recommendations"), resolvingAgainstBaseURL: false)!
+        components.queryItems = [
+            URLQueryItem(name: "select", value: "id,item_id"),
+            URLQueryItem(name: "id", value: "in.(\(recommendationIds.joined(separator: ",")))"),
+        ]
+        var request = URLRequest(url: components.url!)
+        request.setValue(anonKey, forHTTPHeaderField: "apikey")
+        request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+
+        let (data, response) = try await URLSession.shared.data(for: request)
+        guard let http = response as? HTTPURLResponse, http.statusCode < 400 else { return [:] }
+        struct Row: Codable { let id: String; let item_id: String }
+        let rows = (try? JSONDecoder().decode([Row].self, from: data)) ?? []
+        return Dictionary(uniqueKeysWithValues: rows.map { ($0.id, $0.item_id) })
+    }
+
     func fetchMapPlaces() async throws -> [MapPlace] {
         let token = try await validToken()
         let select = "id,title,subtitle,type,genre,address,lat,lng,image_url," +

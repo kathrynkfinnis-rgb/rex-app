@@ -15,6 +15,19 @@ struct NotificationsView: View {
     @State private var isLoading = true
     @State private var errorMessage: String?
     @State private var filter: Filter = .all
+    /// Item id for each recommendation a notification points at, resolved in
+    /// one batch after load — entity_id on a notification is a recommendation
+    /// id, not an item id, and PostgREST can't embed it directly since it's
+    /// polymorphic (could be a recommendation, a friendship, or a request).
+    @State private var recItemIds: [String: String] = [:]
+    /// Friend request currently mid-Accept/Decline, so its buttons can show a
+    /// spinner and the row can't be double-tapped.
+    @State private var respondingId: String?
+    /// Once a friend request notification has been acted on, remember the
+    /// outcome locally rather than refetching — the notification row itself
+    /// doesn't change server-side, only the underlying friendship does.
+    @State private var respondedOutcome: [String: Bool] = [:]
+    @State private var respondErrorMessage: String?
 
     /// Friend requests/accepts are "social"; likes, comments, saves, mentions
     /// and blasts are "activity" — same split the web uses.
@@ -73,6 +86,14 @@ struct NotificationsView: View {
             }
         }
         .task { await load(markRead: false) }
+        .alert("Couldn't update request", isPresented: Binding(
+            get: { respondErrorMessage != nil },
+            set: { if !$0 { respondErrorMessage = nil } }
+        )) {
+            Button("OK", role: .cancel) {}
+        } message: {
+            Text(respondErrorMessage ?? "")
+        }
     }
 
     private var header: some View {
@@ -113,16 +134,21 @@ struct NotificationsView: View {
         .padding(.top, RexSpacing.sm)
     }
 
-    /// Wraps the row in whichever destination the notification points at:
-    /// a trip itinerary, an item, the friends screen, or nothing.
+    /// Wraps the row in whichever destination the notification points at: a
+    /// trip itinerary, an item, inline friend-request actions, the friends
+    /// screen, or nothing.
     @ViewBuilder
     private func row(_ n: RexNotification) -> some View {
-        if n.isTrip, let recId = n.entity_id {
+        if n.type == "friend_request" {
+            // Answerable right here rather than only deep-linking to Friends
+            // and making you find the request again over there.
+            friendRequestRow(n)
+        } else if n.isTrip, let recId = n.entity_id {
             NavigationLink(value: TripRoute(recommendationId: recId, title: n.linkedTitle ?? "Trip")) {
                 rowContent(n)
             }
             .buttonStyle(.plain)
-        } else if let itemId = n.linkedItemId {
+        } else if let recId = n.linkedRecommendationId, let itemId = recItemIds[recId] {
             NavigationLink(value: itemId) { rowContent(n) }.buttonStyle(.plain)
         } else if n.linksToFriends {
             NavigationLink(value: FriendsRoute()) { rowContent(n) }.buttonStyle(.plain)
@@ -131,7 +157,82 @@ struct NotificationsView: View {
         }
     }
 
+    /// A friend_request row: the usual content, plus Accept/Decline right on
+    /// the card once (unless already answered this session). entity_id here
+    /// is the friendship row's own id, which is exactly what
+    /// respondToFriendRequest(id:) expects.
+    private func friendRequestRow(_ n: RexNotification) -> some View {
+        VStack(alignment: .leading, spacing: RexSpacing.md) {
+            rowContentInner(n)
+
+            if let accepted = respondedOutcome[n.id] {
+                Text(accepted ? "Accepted" : "Declined")
+                    .font(RexFont.text(12, weight: .semibold))
+                    .foregroundStyle(accepted ? RexColor.primary : RexColor.mutedForeground)
+            } else {
+                HStack(spacing: RexSpacing.sm) {
+                    Button {
+                        Task { await respond(n, accept: true) }
+                    } label: {
+                        Group {
+                            if respondingId == n.id {
+                                ProgressView().tint(.white)
+                            } else {
+                                Text("Accept")
+                            }
+                        }
+                        .frame(maxWidth: .infinity)
+                    }
+                    .font(RexFont.text(13, weight: .semibold))
+                    .foregroundStyle(.white)
+                    .padding(.vertical, 8)
+                    .background(RexColor.primary)
+                    .clipShape(Capsule())
+
+                    Button {
+                        Task { await respond(n, accept: false) }
+                    } label: {
+                        Text("Decline").frame(maxWidth: .infinity)
+                    }
+                    .font(RexFont.text(13, weight: .semibold))
+                    .foregroundStyle(RexColor.foreground)
+                    .padding(.vertical, 8)
+                    .background(RexColor.background)
+                    .clipShape(Capsule())
+                    .overlay(Capsule().stroke(RexColor.border, lineWidth: 1))
+                }
+                .buttonStyle(.plain)
+                .disabled(respondingId != nil)
+            }
+        }
+        .padding(RexSpacing.cardPadding)
+        .rexCard()
+    }
+
+    private func respond(_ n: RexNotification, accept: Bool) async {
+        guard let friendshipId = n.entity_id else { return }
+        respondingId = n.id
+        do {
+            try await RexAPI.shared.respondToFriendRequest(id: friendshipId, accept: accept)
+            respondedOutcome[n.id] = accept
+            // Acting on it implies you've seen it.
+            try? await RexAPI.shared.markNotificationsRead(ids: [n.id])
+        } catch {
+            respondErrorMessage = error.localizedDescription
+        }
+        respondingId = nil
+    }
+
     private func rowContent(_ n: RexNotification) -> some View {
+        rowContentInner(n)
+            .padding(RexSpacing.cardPadding)
+            .rexCard()
+    }
+
+    /// Just the avatar/copy/timestamp/unread-dot row, with no padding or card
+    /// background — so friendRequestRow can put its own action buttons inside
+    /// the same card underneath, instead of stacking two separate cards.
+    private func rowContentInner(_ n: RexNotification) -> some View {
         HStack(alignment: .top, spacing: RexSpacing.md) {
             UserAvatarView(
                 url: n.actor?.avatar_url,
@@ -158,8 +259,6 @@ struct NotificationsView: View {
                 Circle().fill(RexColor.primary).frame(width: 8, height: 8).padding(.top, 5)
             }
         }
-        .padding(RexSpacing.cardPadding)
-        .rexCard()
     }
 
     private func load(markRead: Bool) async {
@@ -168,6 +267,10 @@ struct NotificationsView: View {
         do {
             notifications = try await RexAPI.shared.fetchNotifications()
             if markRead { await markAllRead() }
+            // Best-effort: a failed lookup just means those rows fall back to
+            // non-tappable rather than the whole screen erroring out.
+            let recIds = Array(Set(notifications.compactMap(\.linkedRecommendationId)))
+            recItemIds = (try? await RexAPI.shared.fetchItemIds(forRecommendations: recIds)) ?? [:]
         } catch {
             errorMessage = error.localizedDescription
         }

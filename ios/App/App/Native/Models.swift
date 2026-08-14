@@ -120,8 +120,16 @@ struct RexNotification: Codable, Identifiable {
         }
     }
 
-    /// Item id to deep-link to, if this notification points at a (non-trip) recommendation.
-    var linkedItemId: String? {
+    /// Recommendation id this notification points at, for non-trip "recommendation"
+    /// entity_type notifications (likes, comments, saves, mentions, a friend's new
+    /// Rex). This is the *recommendation* id, not the item id — every trigger that
+    /// writes entity_type='recommendation' sets entity_id to recommendations.id
+    /// (see the notify_rec_like/rec_comment/rec_saved/mention/friend_new_rec
+    /// triggers), so passing it straight to ItemDetailView(itemId:) as this used
+    /// to do just 404'd. NotificationsView resolves it to the actual item id via
+    /// a batched lookup instead, since entity_id is polymorphic and can't be
+    /// embedded in the notifications query itself.
+    var linkedRecommendationId: String? {
         guard entity_type == "recommendation", let id = entity_id else { return nil }
         guard data?["category"]?.stringValue != "trip" else { return nil }
         return id
