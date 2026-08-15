@@ -392,6 +392,34 @@ final class RexAPI {
         }
     }
 
+    /// Your own trips (draft or published) to add a new stop to — task #104's
+    /// "Add to trip" card action. trip_id is.null means it's a trip itself,
+    /// not one of its own stops.
+    func fetchMyTrips() async throws -> [FeedRecommendation] {
+        let token = try await validToken()
+        guard let userId = currentUserId else { throw RexAPIError.notSignedIn }
+        let select = "id,rating,note,created_at,photo_url,photo_urls,tags,user_id,item_id,trip_id," +
+            "items!inner(id,type,title,subtitle,image_url,genre,address)," +
+            "profiles!recommendations_user_id_fkey(username,display_name,avatar_url)"
+        var components = URLComponents(url: baseURL.appendingPathComponent("/rest/v1/recommendations"), resolvingAgainstBaseURL: false)!
+        components.queryItems = [
+            URLQueryItem(name: "select", value: select),
+            URLQueryItem(name: "user_id", value: "eq.\(userId)"),
+            URLQueryItem(name: "trip_id", value: "is.null"),
+            URLQueryItem(name: "items.type", value: "eq.trip"),
+            URLQueryItem(name: "order", value: "created_at.desc"),
+        ]
+        var request = URLRequest(url: components.url!)
+        request.setValue(anonKey, forHTTPHeaderField: "apikey")
+        request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+
+        let (data, response) = try await URLSession.shared.data(for: request)
+        guard let http = response as? HTTPURLResponse, http.statusCode < 400 else {
+            throw RexAPIError.server(friendlyError(data, fallback: "Couldn't load your trips."))
+        }
+        return try JSONDecoder().decode([FeedRecommendation].self, from: data)
+    }
+
     /// Your own draft trips — trip_id is.null (a trip itself, not a stop)
     /// and published_at is.null (never published). Only ever your own by
     /// construction: RLS hides anyone else's drafts before this query even

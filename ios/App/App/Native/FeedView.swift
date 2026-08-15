@@ -31,6 +31,7 @@ struct FeedView: View {
     @State private var myProfile: RexProfileDetail?
     @State private var editing: FeedRecommendation?
     @State private var addingToCollection: FeedRecommendation?
+    @State private var addingToTrip: FeedRecommendation?
 
     /// Categories that actually appear in the feed, so we don't show filters
     /// that would return nothing.
@@ -237,6 +238,17 @@ struct FeedView: View {
                                             Label("Add to collection", systemImage: "folder.badge.plus")
                                         }
                                     }
+                                    // Places only (#104) — a trip is a
+                                    // sequence of places, so "add this to a
+                                    // trip" only makes sense for the same
+                                    // category TripStopsBuilderView deals in.
+                                    if !rec.isWant, RexCategory(rawType: rec.items?.type) == .place {
+                                        Button {
+                                            addingToTrip = rec
+                                        } label: {
+                                            Label("Add to trip", systemImage: "bag.badge.plus")
+                                        }
+                                    }
                                     if rec.user_id == RexAPI.shared.currentUserId {
                                         Button { editing = rec } label: {
                                             Label("Edit", systemImage: "pencil")
@@ -351,6 +363,9 @@ struct FeedView: View {
         }
         .sheet(item: $addingToCollection) { rec in
             AddToCollectionView(rec: rec, onDone: {})
+        }
+        .sheet(item: $addingToTrip) { rec in
+            AddToTripView(itemId: rec.item_id, itemTitle: rec.items?.title ?? "This place", onDone: {})
         }
         .sheet(isPresented: $showingProfile, onDismiss: { Task { await loadFeed() } }) {
             ProfileView(onSignedOut: onSignedOut)
