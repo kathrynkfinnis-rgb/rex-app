@@ -65,6 +65,14 @@ struct ProfileView: View {
         .navigationTitle(profile?.display_name ?? profile?.username ?? "Profile")
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
+            ToolbarItem(placement: .topBarLeading) {
+                Button {
+                    path.append(DraftsRoute())
+                } label: {
+                    Image(systemName: "doc.text")
+                }
+                .foregroundStyle(RexColor.primary)
+            }
             ToolbarItem(placement: .topBarTrailing) {
                 if !recommendations.isEmpty {
                     Button(selecting ? "Done" : "Select") {
@@ -121,6 +129,7 @@ struct ProfileView: View {
         .navigationDestination(for: String.self) { ItemDetailView(itemId: $0) }
         .navigationDestination(for: UserProfileRoute.self) { UserProfileView(route: $0) }
         .navigationDestination(for: AuthorRoute.self) { AuthorBooksView(route: $0) }
+        .navigationDestination(for: DraftsRoute.self) { _ in DraftsView() }
         }
     }
 

@@ -41,6 +41,7 @@
 		FEED044B0000000000000000 /* GoogleSafeAsyncImage.swift in Sources */ = {isa = PBXBuildFile; fileRef = FEED044A0000000000000000 /* GoogleSafeAsyncImage.swift */; };
 		FEED045B0000000000000000 /* TripSearchView.swift in Sources */ = {isa = PBXBuildFile; fileRef = FEED045A0000000000000000 /* TripSearchView.swift */; };
 		FEED046B0000000000000000 /* AddWantToListView.swift in Sources */ = {isa = PBXBuildFile; fileRef = FEED046A0000000000000000 /* AddWantToListView.swift */; };
+		FEED047B0000000000000000 /* DraftsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = FEED047A0000000000000000 /* DraftsView.swift */; };
 		FEED035B0000000000000000 /* NewCollectionView.swift in Sources */ = {isa = PBXBuildFile; fileRef = FEED035A0000000000000000 /* NewCollectionView.swift */; };
 		FEED037B0000000000000000 /* AppleSignInButton.swift in Sources */ = {isa = PBXBuildFile; fileRef = FEED037A0000000000000000 /* AppleSignInButton.swift */; };
 		FEED031B0000000000000000 /* AskForRexView.swift in Sources */ = {isa = PBXBuildFile; fileRef = FEED031A0000000000000000 /* AskForRexView.swift */; };
@@ -98,6 +99,7 @@
 		FEED044A0000000000000000 /* GoogleSafeAsyncImage.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GoogleSafeAsyncImage.swift; sourceTree = "<group>"; };
 		FEED045A0000000000000000 /* TripSearchView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TripSearchView.swift; sourceTree = "<group>"; };
 		FEED046A0000000000000000 /* AddWantToListView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AddWantToListView.swift; sourceTree = "<group>"; };
+		FEED047A0000000000000000 /* DraftsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DraftsView.swift; sourceTree = "<group>"; };
 		FEED035A0000000000000000 /* NewCollectionView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NewCollectionView.swift; sourceTree = "<group>"; };
 		FEED037A0000000000000000 /* AppleSignInButton.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppleSignInButton.swift; sourceTree = "<group>"; };
 		FEED036A0000000000000000 /* App.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = App.entitlements; sourceTree = "<group>"; };
@@ -193,6 +195,7 @@
 				FEED044A0000000000000000 /* GoogleSafeAsyncImage.swift */,
 				FEED045A0000000000000000 /* TripSearchView.swift */,
 				FEED046A0000000000000000 /* AddWantToListView.swift */,
+				FEED047A0000000000000000 /* DraftsView.swift */,
 				FEED035A0000000000000000 /* NewCollectionView.swift */,
 				FEED037A0000000000000000 /* AppleSignInButton.swift */,
 				FEED031A0000000000000000 /* AskForRexView.swift */,
@@ -325,6 +328,7 @@
 				FEED044B0000000000000000 /* GoogleSafeAsyncImage.swift in Sources */,
 				FEED045B0000000000000000 /* TripSearchView.swift in Sources */,
 				FEED046B0000000000000000 /* AddWantToListView.swift in Sources */,
+				FEED047B0000000000000000 /* DraftsView.swift in Sources */,
 				FEED035B0000000000000000 /* NewCollectionView.swift in Sources */,
 				FEED037B0000000000000000 /* AppleSignInButton.swift in Sources */,
 				FEED031B0000000000000000 /* AskForRexView.swift in Sources */,
@@ -484,7 +488,7 @@
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CODE_SIGN_ENTITLEMENTS = App/App.entitlements;
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 12;
+				CURRENT_PROJECT_VERSION = 13;
 				DEVELOPMENT_TEAM = X54V2C674U;
 				INFOPLIST_FILE = App/Info.plist;
 				IPHONEOS_DEPLOYMENT_TARGET = 18.0;
@@ -508,7 +512,7 @@
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CODE_SIGN_ENTITLEMENTS = App/App.entitlements;
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 12;
+				CURRENT_PROJECT_VERSION = 13;
 				DEVELOPMENT_TEAM = X54V2C674U;
 				INFOPLIST_FILE = App/Info.plist;
 				IPHONEOS_DEPLOYMENT_TARGET = 18.0;

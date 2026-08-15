@@ -319,6 +319,85 @@ final class RexAPI {
         return try JSONDecoder().decode(RexItem.self, from: data)
     }
 
+    /// Whether a trip (or any recommendation) is still a draft — see
+    /// migration 20260815162631. Own drafts stay visible to their author via
+    /// RLS, so this is safe to call for a trip you're looking at even before
+    /// it's published.
+    func isDraft(recommendationId: String) async throws -> Bool {
+        let token = try await validToken()
+        var components = URLComponents(url: baseURL.appendingPathComponent("/rest/v1/recommendations"), resolvingAgainstBaseURL: false)!
+        components.queryItems = [
+            URLQueryItem(name: "select", value: "published_at"),
+            URLQueryItem(name: "id", value: "eq.\(recommendationId)"),
+        ]
+        var request = URLRequest(url: components.url!)
+        request.setValue(anonKey, forHTTPHeaderField: "apikey")
+        request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+        request.setValue("application/vnd.pgrst.object+json", forHTTPHeaderField: "Accept")
+
+        let (data, response) = try await URLSession.shared.data(for: request)
+        guard let http = response as? HTTPURLResponse, http.statusCode < 400 else {
+            throw RexAPIError.server("Couldn't check this trip's status.")
+        }
+        struct Row: Codable { let published_at: String? }
+        let row = try JSONDecoder().decode(Row.self, from: data)
+        return row.published_at == nil
+    }
+
+    /// Publishes a draft trip and every stop journaled onto it in one go —
+    /// the whole point of drafting a trip is adding stops over time and
+    /// then sharing the finished itinerary all at once, not stop by stop.
+    func publishTrip(tripRecommendationId: String) async throws {
+        let token = try await validToken()
+        var components = URLComponents(url: baseURL.appendingPathComponent("/rest/v1/recommendations"), resolvingAgainstBaseURL: false)!
+        components.queryItems = [
+            URLQueryItem(name: "or", value: "(id.eq.\(tripRecommendationId),trip_id.eq.\(tripRecommendationId))"),
+        ]
+        var request = URLRequest(url: components.url!)
+        request.httpMethod = "PATCH"
+        request.setValue(anonKey, forHTTPHeaderField: "apikey")
+        request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        request.httpBody = try JSONSerialization.data(withJSONObject: [
+            "published_at": ISO8601DateFormatter().string(from: Date()),
+        ])
+
+        let (data, response) = try await URLSession.shared.data(for: request)
+        guard let http = response as? HTTPURLResponse, http.statusCode < 400 else {
+            throw RexAPIError.server(friendlyError(data, fallback: "Couldn't publish this trip."))
+        }
+    }
+
+    /// Your own draft trips — trip_id is.null (a trip itself, not a stop)
+    /// and published_at is.null (never published). Only ever your own by
+    /// construction: RLS hides anyone else's drafts before this query even
+    /// runs, so there's no need to filter user_id client-side too.
+    func fetchDraftTrips() async throws -> [FeedRecommendation] {
+        let token = try await validToken()
+        guard let userId = currentUserId else { throw RexAPIError.notSignedIn }
+        let select = "id,rating,note,created_at,photo_url,photo_urls,tags,user_id,item_id,trip_id," +
+            "items!inner(id,type,title,subtitle,image_url,genre,address)," +
+            "profiles!recommendations_user_id_fkey(username,display_name,avatar_url)"
+        var components = URLComponents(url: baseURL.appendingPathComponent("/rest/v1/recommendations"), resolvingAgainstBaseURL: false)!
+        components.queryItems = [
+            URLQueryItem(name: "select", value: select),
+            URLQueryItem(name: "user_id", value: "eq.\(userId)"),
+            URLQueryItem(name: "trip_id", value: "is.null"),
+            URLQueryItem(name: "published_at", value: "is.null"),
+            URLQueryItem(name: "items.type", value: "eq.trip"),
+            URLQueryItem(name: "order", value: "created_at.desc"),
+        ]
+        var request = URLRequest(url: components.url!)
+        request.setValue(anonKey, forHTTPHeaderField: "apikey")
+        request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+
+        let (data, response) = try await URLSession.shared.data(for: request)
+        guard let http = response as? HTTPURLResponse, http.statusCode < 400 else {
+            throw RexAPIError.server(friendlyError(data, fallback: "Couldn't load your drafts."))
+        }
+        return try JSONDecoder().decode([FeedRecommendation].self, from: data)
+    }
+
     /// Stops on a trip. A stop is a recommendation whose `trip_id` points at the
     /// trip's *recommendation* id (not its item id), mirroring the web trip page.
     /// Ordered oldest-first so the itinerary reads in the order it was built.
@@ -547,7 +626,8 @@ final class RexAPI {
         tripId: String? = nil,
         tripSection: String? = nil,
         anonymous: Bool = false,
-        returningId: Bool = false
+        returningId: Bool = false,
+        asDraft: Bool = false
     ) async throws -> String {
         let token = try await validToken()
         guard let userId = currentUserId else { throw RexAPIError.notSignedIn }
@@ -565,6 +645,11 @@ final class RexAPI {
         if let tripId { body["trip_id"] = tripId }
         if let tripSection, !tripSection.isEmpty { body["trip_section"] = tripSection }
         if anonymous { body["is_anonymous"] = true }
+        // NULL published_at is what makes a row a draft — see migration
+        // 20260815162631. Everything else (feed, item pages, map,
+        // leaderboard) already excludes these via RLS, not a client filter,
+        // so there's nothing else to thread this through.
+        if asDraft { body["published_at"] = NSNull() }
         request.httpBody = try JSONSerialization.data(withJSONObject: body)
         if returningId {
             request.setValue("return=representation", forHTTPHeaderField: "Prefer")

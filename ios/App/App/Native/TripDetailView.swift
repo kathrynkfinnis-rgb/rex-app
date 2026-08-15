@@ -18,6 +18,9 @@ struct TripDetailView: View {
     @State private var stops: [FeedRecommendation] = []
     @State private var isLoading = true
     @State private var errorMessage: String?
+    @State private var isDraft = false
+    @State private var isPublishing = false
+    @State private var publishError: String?
 
     /// Stops grouped by heading, preserving the order both groups and stops
     /// first appear in — same rule as the web's groupStops().
@@ -100,14 +103,79 @@ struct TripDetailView: View {
                     .font(.footnote)
                     .foregroundStyle(RexColor.mutedForeground)
             }
+
+            if isDraft {
+                draftBanner
+            }
         }
+    }
+
+    /// Only ever shown to the trip's own author — RLS hides a draft from
+    /// anyone else before this view could even load it.
+    private var draftBanner: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            HStack(spacing: 6) {
+                Image(systemName: "doc.text").font(.system(size: 12))
+                Text("Draft — only you can see this")
+                    .font(RexFont.text(13, weight: .medium))
+                Spacer()
+            }
+            .foregroundStyle(RexColor.mutedForeground)
+
+            Button {
+                Task { await publish() }
+            } label: {
+                if isPublishing {
+                    ProgressView().tint(RexColor.primaryForeground).frame(maxWidth: .infinity)
+                } else {
+                    Text("Publish trip").fontWeight(.semibold).frame(maxWidth: .infinity)
+                }
+            }
+            .frame(height: 44)
+            .background(RexColor.primary)
+            .foregroundStyle(RexColor.primaryForeground)
+            .clipShape(Capsule())
+            .disabled(isPublishing || stops.isEmpty)
+
+            if stops.isEmpty {
+                Text("Add at least one stop before publishing.")
+                    .font(RexFont.text(12))
+                    .foregroundStyle(RexColor.mutedForeground)
+            }
+
+            if let publishError {
+                Text(publishError)
+                    .font(RexFont.text(12))
+                    .foregroundStyle(RexColor.destructive)
+            }
+        }
+        .padding(12)
+        .background(RexColor.badgeBackground)
+        .clipShape(RoundedRectangle(cornerRadius: 14))
+    }
+
+    private func publish() async {
+        isPublishing = true
+        publishError = nil
+        do {
+            try await RexAPI.shared.publishTrip(tripRecommendationId: route.recommendationId)
+            isDraft = false
+        } catch {
+            publishError = error.localizedDescription
+        }
+        isPublishing = false
     }
 
     private func load() async {
         isLoading = true
         errorMessage = nil
         do {
-            stops = try await RexAPI.shared.fetchTripStops(tripRecommendationId: route.recommendationId)
+            async let stopsTask = RexAPI.shared.fetchTripStops(tripRecommendationId: route.recommendationId)
+            async let draftTask = RexAPI.shared.isDraft(recommendationId: route.recommendationId)
+            stops = try await stopsTask
+            // Best-effort: not knowing whether it's a draft shouldn't block
+            // seeing the itinerary itself.
+            isDraft = (try? await draftTask) ?? false
         } catch {
             errorMessage = error.localizedDescription
         }

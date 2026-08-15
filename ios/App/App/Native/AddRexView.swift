@@ -30,6 +30,8 @@ struct AddRexView: View {
     @State private var errorMessage: String?
     @State private var didPost = false
     @State private var didWant = false
+    /// Trips only, for now — see AddRexView's "Save as draft" button.
+    @State private var didSaveDraft = false
     /// The item just saved as "want to try" — kept around so the success
     /// screen can offer an immediate undo. RexAPI already had removeWant for
     /// this; there was just nowhere in Add-a-Rex that called it, so tapping
@@ -240,6 +242,22 @@ struct AddRexView: View {
             .clipShape(Capsule())
             .disabled(isSaving || title.trimmingCharacters(in: .whitespaces).isEmpty)
             .padding(.top, 6)
+
+            // Drafts only make sense for trips right now — journaling stops
+            // over several sittings and publishing the finished itinerary
+            // at the end. A single Rex is a one-shot post; there's nothing
+            // to draft.
+            if category == .trip && mode == .rated {
+                Button {
+                    Task { await post(category: category, asDraft: true) }
+                } label: {
+                    Text("Save as draft").font(RexFont.text(14, weight: .semibold))
+                }
+                .foregroundStyle(RexColor.primary)
+                .disabled(isSaving || title.trimmingCharacters(in: .whitespaces).isEmpty)
+                .frame(maxWidth: .infinity)
+                .padding(.top, 4)
+            }
             }
         }
         .padding(16)
@@ -460,7 +478,7 @@ struct AddRexView: View {
         }
     }
 
-    private func post(category: RexCategory) async {
+    private func post(category: RexCategory, asDraft: Bool = false) async {
         isSaving = true
         errorMessage = nil
         postingProgress = nil
@@ -482,7 +500,8 @@ struct AddRexView: View {
                     rating: rating,
                     note: note.isEmpty ? nil : note,
                     photoURLs: photoURLs,
-                    returningId: true
+                    returningId: true,
+                    asDraft: asDraft
                 )
                 // Posting is several sequential network calls; if one stop
                 // partway through fails, the trip used to just be left half
@@ -511,7 +530,8 @@ struct AddRexView: View {
                             note: stop.note.isEmpty ? nil : stop.note,
                             tripId: tripRecId,
                             tripSection: stop.section,
-                            returningId: true
+                            returningId: true,
+                            asDraft: asDraft
                         )
                         createdStopRecIds.append(stopRecId)
                     }
@@ -526,6 +546,7 @@ struct AddRexView: View {
                     throw error
                 }
                 postingProgress = nil
+                didSaveDraft = asDraft
                 withAnimation { didPost = true }
                 isSaving = false
                 return
@@ -538,9 +559,11 @@ struct AddRexView: View {
                     rating: rating,
                     note: note.isEmpty ? nil : note,
                     photoURLs: photoURLs,
-                    anonymous: anonymous
+                    anonymous: anonymous,
+                    asDraft: category == .trip && asDraft
                 )
                 didWant = false
+                didSaveDraft = category == .trip && asDraft
             case .want:
                 try await RexAPI.shared.createWant(
                     itemId: itemId,
@@ -574,6 +597,7 @@ struct AddRexView: View {
         withAnimation {
             didPost = false
             didWant = false
+            didSaveDraft = false
             lastWantItemId = nil
             title = ""
             note = ""
@@ -591,13 +615,17 @@ struct AddRexView: View {
 
     private var successState: some View {
         VStack(spacing: 16) {
-            Image(systemName: didWant ? "bookmark.fill" : "checkmark.circle.fill")
+            Image(systemName: didWant ? "bookmark.fill" : didSaveDraft ? "doc.text" : "checkmark.circle.fill")
                 .font(.system(size: 44))
                 .foregroundStyle(RexColor.primary)
-            Text(didWant ? "Saved" : "Posted")
+            Text(didWant ? "Saved" : didSaveDraft ? "Saved as draft" : "Posted")
                 .font(RexFont.display(26, weight: .semibold))
                 .foregroundStyle(RexColor.foreground)
-            Text(didWant ? "\"\(title)\" is on your want-to list." : "\"\(title)\" is in your feed.")
+            Text(
+                didWant ? "\"\(title)\" is on your want-to list."
+                : didSaveDraft ? "\"\(title)\" is saved in Drafts. Nobody sees it until you publish."
+                : "\"\(title)\" is in your feed."
+            )
                 .font(.system(size: 15))
                 .foregroundStyle(RexColor.mutedForeground)
                 .multilineTextAlignment(.center)
