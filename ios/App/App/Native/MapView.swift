@@ -14,16 +14,28 @@ struct RexMapView: View {
     @State private var filter: RexCategory?
     /// Recommendation id of the trip we're following, if any.
     @State private var tripFilter: String?
+    /// Set alongside tripFilter whenever we follow a trip, so the "Following
+    /// X" banner doesn't depend on tripTitles having that trip in it (see
+    /// focusedTripPlaces below for why that's no longer a safe assumption).
+    @State private var followingTripTitle: String?
     @State private var tripTitles: [String: String] = [:]
+    /// A followed trip's own stops, fetched directly rather than filtered
+    /// out of `places` — that array is only the most-recently-added 200
+    /// places overall, which was fine when the only way to follow a trip was
+    /// tapping a chip built from that same sample. TripSearchView lets you
+    /// pick any trip, so a followed trip needs a guaranteed-complete fetch.
+    @State private var focusedTripPlaces: [MapPlace]?
     @State private var openTrip: TripRoute?
+    @State private var showingTripSearch = false
 
     private static let milesToMeters = 1609.34
     private var radiusMeters: Double { 10 * Self.milesToMeters }
 
     private var visiblePlaces: [MapPlace] {
-        var out = places
-        // Following a trip shows only its stops, the way the web map does.
-        if let tripFilter { out = out.filter { $0.tripIds.contains(tripFilter) } }
+        // Following a trip shows only its stops, the way the web map does —
+        // from their own dedicated fetch, not filtered out of the general
+        // sample (see focusedTripPlaces).
+        var out = tripFilter != nil ? (focusedTripPlaces ?? []) : places
         if let filter { out = out.filter { RexCategory(rawType: $0.type) == filter } }
         return out
     }
@@ -77,6 +89,26 @@ struct RexMapView: View {
                 .presentationDetents([.height(260), .height(440)])
         }
         .navigationDestination(item: $openTrip) { TripDetailView(route: $0) }
+        .sheet(isPresented: $showingTripSearch) {
+            TripSearchView(onSelect: { id, title in followTrip(id: id, title: title) })
+        }
+    }
+
+    /// Follows a trip on the map, fetching its stops directly rather than
+    /// hoping they're already in `places` (see focusedTripPlaces).
+    private func followTrip(id: String, title: String) {
+        tripFilter = id
+        followingTripTitle = title
+        focusedTripPlaces = nil
+        Task {
+            focusedTripPlaces = (try? await RexAPI.shared.fetchMapPlaces(forTrip: id)) ?? []
+        }
+    }
+
+    private func unfollowTrip() {
+        tripFilter = nil
+        followingTripTitle = nil
+        focusedTripPlaces = nil
     }
 
     /// Location indicator + category filters, floating over the map.
@@ -99,14 +131,14 @@ struct RexMapView: View {
                     .clipShape(Capsule())
             }
 
-            if let tripFilter, let title = tripTitles[tripFilter] {
+            if tripFilter != nil, let title = followingTripTitle {
                 HStack(spacing: RexSpacing.sm) {
                     Image(systemName: "suitcase.fill").font(.system(size: 11))
                     Text("Following \(title)")
                         .font(RexFont.text(13, weight: .medium))
                         .lineLimit(1)
                     Spacer()
-                    Button("Show all") { self.tripFilter = nil }
+                    Button("Show all") { unfollowTrip() }
                         .font(RexFont.text(12, weight: .semibold))
                 }
                 .foregroundStyle(RexColor.primary)
@@ -114,6 +146,28 @@ struct RexMapView: View {
                 .padding(.vertical, 7)
                 .background(RexColor.badgeBackground)
                 .clipShape(Capsule())
+            } else {
+                // The trip chip row on the map itself doesn't scale once
+                // there are many trips — this is the dedicated search/browse
+                // screen instead.
+                Button {
+                    showingTripSearch = true
+                } label: {
+                    HStack(spacing: RexSpacing.sm) {
+                        Image(systemName: "magnifyingglass").font(.system(size: 11))
+                        Text("Looking for a trip?")
+                            .font(RexFont.text(13, weight: .medium))
+                        Spacer()
+                        Image(systemName: "chevron.right").font(.system(size: 10, weight: .semibold))
+                    }
+                    .foregroundStyle(RexColor.mutedForeground)
+                    .padding(.horizontal, RexSpacing.sm + 2)
+                    .padding(.vertical, 7)
+                    .background(RexColor.card)
+                    .clipShape(Capsule())
+                    .overlay(Capsule().stroke(RexColor.border, lineWidth: 1))
+                }
+                .buttonStyle(.plain)
             }
 
             ScrollView(.horizontal, showsIndicators: false) {
@@ -263,7 +317,7 @@ struct RexMapView: View {
                                 .buttonStyle(.plain)
 
                                 Button {
-                                    tripFilter = trip.id
+                                    followTrip(id: trip.id, title: trip.title)
                                     selectedPlace = nil
                                 } label: {
                                     Text("Map it")

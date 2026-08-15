@@ -259,6 +259,35 @@ final class RexAPI {
         return try JSONDecoder().decode([FeedRecommendation].self, from: data)
     }
 
+    /// Every trip (not stops — trip_id is.null the same way fetchFeed's main
+    /// pass is) visible under RLS, for the dedicated trip search screen.
+    /// fetchFeed caps at 50 most-recent-of-everything, which is exactly what
+    /// stops scaling once there are many trips mixed in with everything
+    /// else — this is trip-only and capped much higher.
+    func fetchTrips() async throws -> [FeedRecommendation] {
+        let token = try await validToken()
+        let select = "id,rating,note,created_at,photo_url,photo_urls,tags\(await anonymousField()),user_id,item_id,trip_id," +
+            "items!inner(id,type,title,subtitle,image_url,genre,address)," +
+            "profiles!recommendations_user_id_fkey(username,display_name,avatar_url)"
+        var components = URLComponents(url: baseURL.appendingPathComponent("/rest/v1/recommendations"), resolvingAgainstBaseURL: false)!
+        components.queryItems = [
+            URLQueryItem(name: "select", value: select),
+            URLQueryItem(name: "trip_id", value: "is.null"),
+            URLQueryItem(name: "items.type", value: "eq.trip"),
+            URLQueryItem(name: "order", value: "created_at.desc"),
+            URLQueryItem(name: "limit", value: "300"),
+        ]
+        var request = URLRequest(url: components.url!)
+        request.setValue(anonKey, forHTTPHeaderField: "apikey")
+        request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+
+        let (data, response) = try await URLSession.shared.data(for: request)
+        guard let http = response as? HTTPURLResponse, http.statusCode < 400 else {
+            throw RexAPIError.server(friendlyError(data, fallback: "Couldn't load trips."))
+        }
+        return try JSONDecoder().decode([FeedRecommendation].self, from: data)
+    }
+
     func fetchItem(id: String) async throws -> RexItem {
         // The Google rating columns only exist once that migration has been run.
         // Ask for them, but fall back to the base columns rather than failing the
@@ -1789,6 +1818,35 @@ final class RexAPI {
         }
         let places = try JSONDecoder().decode([MapPlace].self, from: data)
         // lat/lng are nullable in the schema even though we need them to place a pin.
+        return places.filter { $0.lat != nil && $0.lng != nil }
+    }
+
+    /// A specific trip's own stops, regardless of whether they're in
+    /// fetchMapPlaces' most-recent-200 sample. "Following" a trip used to
+    /// only work if its stops happened to already be loaded, which was fine
+    /// when the only way to pick a trip was tapping a chip built from that
+    /// same sample — TripSearchView breaks that assumption by letting you
+    /// pick any trip, so following it needs its own fetch.
+    func fetchMapPlaces(forTrip tripRecommendationId: String) async throws -> [MapPlace] {
+        let token = try await validToken()
+        let select = "id,title,subtitle,type,genre,address,lat,lng,image_url," +
+            "recommendations!inner(id,rating,user_id,trip_id,profiles(username,display_name,avatar_url))"
+        var components = URLComponents(url: baseURL.appendingPathComponent("/rest/v1/items"), resolvingAgainstBaseURL: false)!
+        components.queryItems = [
+            URLQueryItem(name: "select", value: select),
+            URLQueryItem(name: "type", value: "in.(place,event)"),
+            URLQueryItem(name: "recommendations.trip_id", value: "eq.\(tripRecommendationId)"),
+            URLQueryItem(name: "limit", value: "200"),
+        ]
+        var request = URLRequest(url: components.url!)
+        request.setValue(anonKey, forHTTPHeaderField: "apikey")
+        request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+
+        let (data, response) = try await URLSession.shared.data(for: request)
+        guard let http = response as? HTTPURLResponse, http.statusCode < 400 else {
+            throw RexAPIError.server(friendlyError(data, fallback: "Couldn't load this trip's stops."))
+        }
+        let places = try JSONDecoder().decode([MapPlace].self, from: data)
         return places.filter { $0.lat != nil && $0.lng != nil }
     }
 }

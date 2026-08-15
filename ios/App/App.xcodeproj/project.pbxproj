@@ -39,6 +39,7 @@
 		FEED042B0000000000000000 /* RexRatingScale.swift in Sources */ = {isa = PBXBuildFile; fileRef = FEED042A0000000000000000 /* RexRatingScale.swift */; };
 		FEED043B0000000000000000 /* AuthorBooksView.swift in Sources */ = {isa = PBXBuildFile; fileRef = FEED043A0000000000000000 /* AuthorBooksView.swift */; };
 		FEED044B0000000000000000 /* GoogleSafeAsyncImage.swift in Sources */ = {isa = PBXBuildFile; fileRef = FEED044A0000000000000000 /* GoogleSafeAsyncImage.swift */; };
+		FEED045B0000000000000000 /* TripSearchView.swift in Sources */ = {isa = PBXBuildFile; fileRef = FEED045A0000000000000000 /* TripSearchView.swift */; };
 		FEED035B0000000000000000 /* NewCollectionView.swift in Sources */ = {isa = PBXBuildFile; fileRef = FEED035A0000000000000000 /* NewCollectionView.swift */; };
 		FEED037B0000000000000000 /* AppleSignInButton.swift in Sources */ = {isa = PBXBuildFile; fileRef = FEED037A0000000000000000 /* AppleSignInButton.swift */; };
 		FEED031B0000000000000000 /* AskForRexView.swift in Sources */ = {isa = PBXBuildFile; fileRef = FEED031A0000000000000000 /* AskForRexView.swift */; };
@@ -94,6 +95,7 @@
 		FEED042A0000000000000000 /* RexRatingScale.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RexRatingScale.swift; sourceTree = "<group>"; };
 		FEED043A0000000000000000 /* AuthorBooksView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AuthorBooksView.swift; sourceTree = "<group>"; };
 		FEED044A0000000000000000 /* GoogleSafeAsyncImage.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GoogleSafeAsyncImage.swift; sourceTree = "<group>"; };
+		FEED045A0000000000000000 /* TripSearchView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TripSearchView.swift; sourceTree = "<group>"; };
 		FEED035A0000000000000000 /* NewCollectionView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NewCollectionView.swift; sourceTree = "<group>"; };
 		FEED037A0000000000000000 /* AppleSignInButton.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppleSignInButton.swift; sourceTree = "<group>"; };
 		FEED036A0000000000000000 /* App.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = App.entitlements; sourceTree = "<group>"; };
@@ -187,6 +189,7 @@
 				FEED042A0000000000000000 /* RexRatingScale.swift */,
 				FEED043A0000000000000000 /* AuthorBooksView.swift */,
 				FEED044A0000000000000000 /* GoogleSafeAsyncImage.swift */,
+				FEED045A0000000000000000 /* TripSearchView.swift */,
 				FEED035A0000000000000000 /* NewCollectionView.swift */,
 				FEED037A0000000000000000 /* AppleSignInButton.swift */,
 				FEED031A0000000000000000 /* AskForRexView.swift */,
@@ -317,6 +320,7 @@
 				FEED042B0000000000000000 /* RexRatingScale.swift in Sources */,
 				FEED043B0000000000000000 /* AuthorBooksView.swift in Sources */,
 				FEED044B0000000000000000 /* GoogleSafeAsyncImage.swift in Sources */,
+				FEED045B0000000000000000 /* TripSearchView.swift in Sources */,
 				FEED035B0000000000000000 /* NewCollectionView.swift in Sources */,
 				FEED037B0000000000000000 /* AppleSignInButton.swift in Sources */,
 				FEED031B0000000000000000 /* AskForRexView.swift in Sources */,
