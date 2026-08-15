@@ -95,6 +95,22 @@ enum RexSearch {
         return Array(out.prefix(15))
     }
 
+    /// Everything OpenLibrary has by a given author — the real bibliography,
+    /// not just what's been Rex'd on the app. AuthorBooksView cross-references
+    /// this against our own items table to know which entries are tappable.
+    static func byAuthor(_ author: String) async throws -> [RexSearchHit] {
+        let hits = try await openLibrary("author=\(esc(author))")
+        // OpenLibrary's author search does substring/loose matching and can
+        // surface anthologies crediting dozens of people — keep only entries
+        // that actually list this author, sorted by year so the catalogue
+        // reads chronologically rather than by search-relevance noise.
+        return hits
+            .filter { hit in
+                guard let subtitle = hit.subtitle else { return false }
+                return subtitle.range(of: author, options: [.caseInsensitive]) != nil
+            }
+    }
+
     /// "long isl" → "long isl*", so a half-typed word still matches. Left alone
     /// if the last word is a single character, where the wildcard matches
     /// everything and ranking falls apart.

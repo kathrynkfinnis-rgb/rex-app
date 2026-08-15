@@ -10,6 +10,10 @@ struct RecommendationCardView: View {
     /// swipe), so the author row can't be its own NavigationLink — the parent
     /// swallowed it. The feed hands the push back in through here.
     var onAuthorTap: ((String, String) -> Void)? = nil
+    /// Tapping a book's author (in the subtitle) opens everyone's other Rex'd
+    /// books by them. Same nested-tap-gesture trick as onAuthorTap, and the
+    /// same reason it has to be handed back up rather than pushed here.
+    var onBookAuthorTap: ((String) -> Void)? = nil
 
     @State private var noteExpanded = false
 
@@ -95,10 +99,14 @@ struct RecommendationCardView: View {
                             .fixedSize(horizontal: false, vertical: true)
 
                         if let subtitle = item.subtitle, !subtitle.isEmpty {
-                            Text(subtitle)
-                                .font(RexFont.text(13))
-                                .foregroundStyle(RexColor.mutedForeground)
-                                .lineLimit(1)
+                            if category == .book, let onBookAuthorTap {
+                                bookSubtitleRow(subtitle, onTap: onBookAuthorTap)
+                            } else {
+                                Text(subtitle)
+                                    .font(RexFont.text(13))
+                                    .foregroundStyle(RexColor.mutedForeground)
+                                    .lineLimit(1)
+                            }
                         }
 
                         // Whereabouts, at a glance. "Is it near me?" is the
@@ -225,6 +233,31 @@ struct RecommendationCardView: View {
         }
     }
 
+    /// A book's subtitle is "Author Name · 2022" (see RexSearch's
+    /// OpenLibrary import) — only the author part should read as tappable,
+    /// not the publication year tacked on after it, so this splits on the
+    /// " · " separator rather than making the whole string one tap target.
+    private func bookSubtitleRow(_ subtitle: String, onTap: @escaping (String) -> Void) -> some View {
+        let parts = subtitle.components(separatedBy: " · ")
+        let author = parts.first ?? subtitle
+        let rest = parts.count > 1 ? " · " + parts.dropFirst().joined(separator: " · ") : ""
+        return HStack(spacing: 0) {
+            Text(author)
+                .font(RexFont.text(13))
+                .foregroundStyle(RexColor.primary)
+                .underline()
+                .lineLimit(1)
+                .contentShape(Rectangle())
+                .onTapGesture { onTap(author) }
+            if !rest.isEmpty {
+                Text(rest)
+                    .font(RexFont.text(13))
+                    .foregroundStyle(RexColor.mutedForeground)
+                    .lineLimit(1)
+            }
+        }
+    }
+
     private var categoryBadge: some View {
         HStack(spacing: 4) {
             Image(systemName: category.symbol).font(.system(size: 9))
@@ -305,6 +338,10 @@ struct RecommendationCardView: View {
                     .font(RexFont.text(13, weight: .medium))
                     .foregroundStyle(RexColor.foreground)
                     .lineLimit(1)
+                    // Tighter icon row (see RexCardActions) frees up the
+                    // width; this makes sure the name actually gets to keep
+                    // it instead of the Spacer eating the gain.
+                    .layoutPriority(1)
             }
             .contentShape(Rectangle())
             .onTapGesture {

@@ -187,6 +187,9 @@ struct FeedView: View {
                                         isOnMyList: myWantItemIds.contains(rec.item_id),
                                         onAuthorTap: { userId, name in
                                             path.append(UserProfileRoute(userId: userId, name: name))
+                                        },
+                                        onBookAuthorTap: { author in
+                                            path.append(AuthorRoute(author: author))
                                         }
                                     )
                                 }
@@ -235,6 +238,9 @@ struct FeedView: View {
             }
             .navigationDestination(for: NotificationsRoute.self) { _ in
                 NotificationsView()
+            }
+            .navigationDestination(for: AuthorRoute.self) { r in
+                AuthorBooksView(route: r)
             }
             .navigationDestination(for: ProfileRoute.self) { _ in
                 ProfileView(onSignedOut: onSignedOut)

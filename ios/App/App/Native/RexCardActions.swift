@@ -19,7 +19,12 @@ struct RexCardActions: View {
     }
 
     var body: some View {
-        HStack(spacing: RexSpacing.lg) {
+        // .md rather than .lg between icons — at 16pt-per-gap this row was
+        // routinely 130pt+ wide (4 icons, some with counts/labels) and won
+        // the fight against the poster's name on the other end of the row,
+        // which is what actually truncated first since Text compresses
+        // before a Button's intrinsic icon size does.
+        HStack(spacing: RexSpacing.md) {
             action(
                 icon: liked ? "heart.fill" : "heart",
                 tint: liked ? RexColor.accent : RexColor.mutedForeground,

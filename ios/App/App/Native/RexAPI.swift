@@ -316,6 +316,32 @@ final class RexAPI {
         return try JSONDecoder().decode([FeedRecommendation].self, from: data)
     }
 
+    /// Other books by the same author. There's no normalized author field —
+    /// a book's subtitle is just the joined author names as OpenLibrary
+    /// returned them (see RexSearch) — so this is a substring match against
+    /// subtitle rather than an exact/foreign-key lookup. Good enough for
+    /// "tap an author, see what else they wrote" without a schema change.
+    func fetchBooksByAuthor(_ author: String) async throws -> [RexItem] {
+        let token = try await validToken()
+        var components = URLComponents(url: baseURL.appendingPathComponent("/rest/v1/items"), resolvingAgainstBaseURL: false)!
+        components.queryItems = [
+            URLQueryItem(name: "select", value: "id,type,title,subtitle,image_url,genre"),
+            URLQueryItem(name: "type", value: "eq.book"),
+            URLQueryItem(name: "subtitle", value: "ilike.*\(author)*"),
+            URLQueryItem(name: "order", value: "title.asc"),
+            URLQueryItem(name: "limit", value: "100"),
+        ]
+        var request = URLRequest(url: components.url!)
+        request.setValue(anonKey, forHTTPHeaderField: "apikey")
+        request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+
+        let (data, response) = try await URLSession.shared.data(for: request)
+        guard let http = response as? HTTPURLResponse, http.statusCode < 400 else {
+            throw RexAPIError.server("Couldn't load books by this author.")
+        }
+        return try JSONDecoder().decode([RexItem].self, from: data)
+    }
+
     func upsertRecommendation(itemId: String, rating: Double, note: String?) async throws {
         let token = try await validToken()
         guard let userId = currentUserId else { throw RexAPIError.notSignedIn }

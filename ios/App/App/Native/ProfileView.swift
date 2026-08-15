@@ -120,6 +120,7 @@ struct ProfileView: View {
         }
         .navigationDestination(for: String.self) { ItemDetailView(itemId: $0) }
         .navigationDestination(for: UserProfileRoute.self) { UserProfileView(route: $0) }
+        .navigationDestination(for: AuthorRoute.self) { AuthorBooksView(route: $0) }
         }
     }
 
@@ -270,7 +271,13 @@ struct ProfileView: View {
                                 onTap: { path.append(rec.item_id) },
                                 action: { await delete(rec) }
                             ) {
-                                RecommendationCardView(rec: rec, rexCount: rexCounts[rec.item_id] ?? 0)
+                                RecommendationCardView(
+                                    rec: rec,
+                                    rexCount: rexCounts[rec.item_id] ?? 0,
+                                    onBookAuthorTap: { author in
+                                        path.append(AuthorRoute(author: author))
+                                    }
+                                )
                             }
                         }
                     }
