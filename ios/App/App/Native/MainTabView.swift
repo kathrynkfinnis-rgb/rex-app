@@ -12,6 +12,13 @@ struct MainTabView: View {
     /// and pops back to the top, so "home" always means the feed rather than
     /// whatever Rex you were last looking at.
     @State private var feedPopSignal = 0
+    /// Bumped every time the Map tab becomes active. TabView keeps every tab
+    /// alive rather than recreating it, so RexMapView's own .task only ever
+    /// runs once per app launch — delete a Rex from Feed or Profile, and its
+    /// pin just sat there on the map until the app was relaunched. This
+    /// gives it a reason to reload without needing pull-to-refresh (which
+    /// would fight the map's own pan gesture).
+    @State private var mapRefreshSignal = 0
 
     var body: some View {
         ZStack(alignment: .bottom) {
@@ -19,7 +26,7 @@ struct MainTabView: View {
                 FeedView(onSignedOut: onSignedOut, popToRootSignal: feedPopSignal).tag(0)
 
                 NavigationStack {
-                    RexMapView()
+                    RexMapView(refreshSignal: mapRefreshSignal)
                         .navigationDestination(for: String.self) { ItemDetailView(itemId: $0) }
                         .navigationDestination(for: UserProfileRoute.self) { UserProfileView(route: $0) }
                 }
@@ -112,6 +119,9 @@ struct MainTabView: View {
         Button {
             // Tapping the tab you're already on returns you to its root.
             if selection == index && index == 0 { feedPopSignal += 1 }
+            // Switching onto the Map tab reloads it, so anything deleted
+            // elsewhere doesn't linger as a stale pin (see mapRefreshSignal).
+            if selection != index && index == 1 { mapRefreshSignal += 1 }
             selection = index
         } label: {
             VStack(spacing: 4) {

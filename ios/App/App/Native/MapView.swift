@@ -5,6 +5,11 @@ import CoreLocation
 /// Opens centred on the user with a 10-mile radius; falls back to fitting the
 /// pins when location isn't available.
 struct RexMapView: View {
+    /// Bumped by MainTabView every time this tab becomes active — TabView
+    /// keeps tabs alive rather than recreating them, so without this a
+    /// deleted item's pin would sit on the map until the app relaunched.
+    var refreshSignal: Int = 0
+
     @State private var places: [MapPlace] = []
     @State private var isLoading = true
     @State private var errorMessage: String?
@@ -82,6 +87,13 @@ struct RexMapView: View {
             async let placesTask: () = load()
             async let locationTask: () = resolveLocation()
             _ = await (placesTask, locationTask)
+        }
+        .onChange(of: refreshSignal) { _, _ in
+            // Not isLoading = true here — that would blank the map behind
+            // the spinner every time you just glance at the tab. Places
+            // swap in once the fresh fetch lands; nothing visible changes
+            // if nothing actually changed server-side.
+            Task { await load() }
         }
         .sheet(item: $selectedPlace) { place in
             placeSheet(place)
@@ -204,7 +216,10 @@ struct RexMapView: View {
     }
 
     private func load() async {
-        isLoading = true
+        // Only the very first load shows the spinner-instead-of-map state —
+        // a tab-return refresh (see refreshSignal) should swap places in
+        // quietly, not blank the map you're already looking at.
+        isLoading = places.isEmpty
         errorMessage = nil
         do {
             places = try await RexAPI.shared.fetchMapPlaces()

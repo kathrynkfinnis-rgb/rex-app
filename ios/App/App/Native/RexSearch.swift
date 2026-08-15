@@ -200,7 +200,24 @@ enum RexSearch {
             "places.primaryTypeDisplayName,places.photos,places.rating,places.userRatingCount",
             forHTTPHeaderField: "X-Goog-FieldMask"
         )
-        request.httpBody = try JSONSerialization.data(withJSONObject: ["textQuery": q, "pageSize": 10])
+        // Text Search (New) defaults to biasing toward wherever Google
+        // thinks the request originated, which in practice skewed heavily
+        // American for ambiguous names ("that pub called The Crown" etc).
+        // locationBias is soft — it still returns results outside the box,
+        // just ranks matches inside it higher — so this doesn't hide a
+        // genuine non-European place, it just stops Europe from losing
+        // ties it should win. Rough bounding rectangle for mainland Europe
+        // + UK/Ireland + Scandinavia.
+        request.httpBody = try JSONSerialization.data(withJSONObject: [
+            "textQuery": q,
+            "pageSize": 10,
+            "locationBias": [
+                "rectangle": [
+                    "low": ["latitude": 34.0, "longitude": -12.0],
+                    "high": ["latitude": 71.0, "longitude": 40.0],
+                ]
+            ],
+        ])
 
         let (data, response) = try await URLSession.shared.data(for: request)
         guard let http = response as? HTTPURLResponse, http.statusCode < 400 else { return [] }
