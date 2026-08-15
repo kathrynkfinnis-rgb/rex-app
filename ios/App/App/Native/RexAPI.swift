@@ -14,6 +14,28 @@ enum RexAPIError: LocalizedError {
     }
 }
 
+/// PostgREST error bodies are raw Postgres internals — e.g. the trip-posting
+/// bug this was written for surfaced `{"code":"23514","details":null,
+/// "hint":null,"message":"new row for relation \"recommendations\" violates
+/// check constraint \"recommendations_rating_check\""}` directly in an alert.
+/// Every `throw RexAPIError.server(...)` in this file used to interpolate
+/// the raw response body straight into the message shown to the user; this
+/// picks a friendly line for the Postgres error codes worth naming and
+/// otherwise just returns the fallback, never the raw JSON.
+private func friendlyError(_ data: Data, fallback: String) -> String {
+    guard let obj = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+          let code = obj["code"] as? String else {
+        return fallback
+    }
+    switch code {
+    case "23505": return "\(fallback) That already exists."
+    case "23514": return "\(fallback) One of the values wasn't valid — please try again."
+    case "23503": return "\(fallback) Something it depends on is missing."
+    case "42501": return "\(fallback) You don't have permission to do that."
+    default: return fallback
+    }
+}
+
 /// Minimal hand-rolled Supabase REST client (PostgREST + GoTrue over HTTPS).
 /// Same project/keys the web app uses (see .env: VITE_SUPABASE_URL / VITE_SUPABASE_PUBLISHABLE_KEY).
 /// NOTE: stores the session in UserDefaults for this prototype pass — move to Keychain before
@@ -232,8 +254,7 @@ final class RexAPI {
         let (data, response) = try await URLSession.shared.data(for: request)
         guard let http = response as? HTTPURLResponse else { throw RexAPIError.invalidResponse }
         if http.statusCode >= 400 {
-            let body = String(data: data, encoding: .utf8) ?? ""
-            throw RexAPIError.server("Couldn't load your feed (\(http.statusCode)). \(body)")
+            throw RexAPIError.server(friendlyError(data, fallback: "Couldn't load your feed (\(http.statusCode))."))
         }
         return try JSONDecoder().decode([FeedRecommendation].self, from: data)
     }
@@ -289,8 +310,7 @@ final class RexAPI {
 
         let (data, response) = try await URLSession.shared.data(for: request)
         guard let http = response as? HTTPURLResponse, http.statusCode < 400 else {
-            let body = String(data: data, encoding: .utf8) ?? ""
-            throw RexAPIError.server("Couldn't load this trip. \(body)")
+            throw RexAPIError.server(friendlyError(data, fallback: "Couldn't load this trip."))
         }
         return try JSONDecoder().decode([FeedRecommendation].self, from: data)
     }
@@ -362,8 +382,7 @@ final class RexAPI {
 
         let (data, response) = try await URLSession.shared.data(for: request)
         guard let http = response as? HTTPURLResponse, http.statusCode < 400 else {
-            let body = String(data: data, encoding: .utf8) ?? ""
-            throw RexAPIError.server("Couldn't save your take. \(body)")
+            throw RexAPIError.server(friendlyError(data, fallback: "Couldn't save your take."))
         }
     }
 
@@ -524,8 +543,7 @@ final class RexAPI {
 
         let (data, response) = try await URLSession.shared.data(for: request)
         guard let http = response as? HTTPURLResponse, http.statusCode < 400 else {
-            let body = String(data: data, encoding: .utf8) ?? ""
-            throw RexAPIError.server("Couldn't post your Rex. \(body)")
+            throw RexAPIError.server(friendlyError(data, fallback: "Couldn't post your Rex."))
         }
         guard returningId else { return "" }
         struct Created: Codable { let id: String }
@@ -557,8 +575,7 @@ final class RexAPI {
 
         let (data, response) = try await URLSession.shared.data(for: request)
         guard let http = response as? HTTPURLResponse, http.statusCode < 400 else {
-            let body = String(data: data, encoding: .utf8) ?? ""
-            throw RexAPIError.server("Couldn't save. \(body)")
+            throw RexAPIError.server(friendlyError(data, fallback: "Couldn't save."))
         }
     }
 
@@ -676,8 +693,7 @@ final class RexAPI {
 
         let (data, response) = try await URLSession.shared.data(for: request)
         guard let http = response as? HTTPURLResponse, http.statusCode < 400 else {
-            let body = String(data: data, encoding: .utf8) ?? ""
-            throw RexAPIError.server("Couldn't send request. \(body)")
+            throw RexAPIError.server(friendlyError(data, fallback: "Couldn't send request."))
         }
     }
 
@@ -696,8 +712,7 @@ final class RexAPI {
 
         let (data, response) = try await URLSession.shared.data(for: request)
         guard let http = response as? HTTPURLResponse, http.statusCode < 400 else {
-            let body = String(data: data, encoding: .utf8) ?? ""
-            throw RexAPIError.server("Couldn't update request. \(body)")
+            throw RexAPIError.server(friendlyError(data, fallback: "Couldn't update request."))
         }
     }
 
@@ -722,8 +737,7 @@ final class RexAPI {
 
         let (data, response) = try await URLSession.shared.data(for: request)
         guard let http = response as? HTTPURLResponse, http.statusCode < 400 else {
-            let body = String(data: data, encoding: .utf8) ?? ""
-            throw RexAPIError.server("Couldn't load notifications. \(body)")
+            throw RexAPIError.server(friendlyError(data, fallback: "Couldn't load notifications."))
         }
         var notifications = try JSONDecoder().decode([RexNotification].self, from: data)
 
@@ -781,8 +795,7 @@ final class RexAPI {
 
         let (upData, upResponse) = try await URLSession.shared.data(for: upload)
         guard let upHttp = upResponse as? HTTPURLResponse, upHttp.statusCode < 400 else {
-            let body = String(data: upData, encoding: .utf8) ?? ""
-            throw RexAPIError.server("Couldn't upload that photo. \(body)")
+            throw RexAPIError.server(friendlyError(upData, fallback: "Couldn't upload that photo."))
         }
 
         var sign = URLRequest(url: baseURL.appendingPathComponent("/storage/v1/object/sign/avatars/\(path)"))
@@ -819,8 +832,7 @@ final class RexAPI {
 
         let (data, response) = try await URLSession.shared.data(for: request)
         guard let http = response as? HTTPURLResponse, http.statusCode < 400 else {
-            let body = String(data: data, encoding: .utf8) ?? ""
-            throw RexAPIError.server("Couldn't save your profile. \(body)")
+            throw RexAPIError.server(friendlyError(data, fallback: "Couldn't save your profile."))
         }
     }
 
@@ -887,8 +899,7 @@ final class RexAPI {
 
         let (upData, upResponse) = try await URLSession.shared.data(for: upload)
         guard let upHttp = upResponse as? HTTPURLResponse, upHttp.statusCode < 400 else {
-            let body = String(data: upData, encoding: .utf8) ?? ""
-            throw RexAPIError.server("Couldn't upload that photo. \(body)")
+            throw RexAPIError.server(friendlyError(upData, fallback: "Couldn't upload that photo."))
         }
 
         // 5 years, matching the web uploader.
@@ -934,8 +945,7 @@ final class RexAPI {
 
         let (data, response) = try await URLSession.shared.data(for: request)
         guard let http = response as? HTTPURLResponse, http.statusCode < 400 else {
-            let body = String(data: data, encoding: .utf8) ?? ""
-            throw RexAPIError.server("Couldn't save your changes. \(body)")
+            throw RexAPIError.server(friendlyError(data, fallback: "Couldn't save your changes."))
         }
     }
 
@@ -949,8 +959,7 @@ final class RexAPI {
         request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
         let (data, response) = try await URLSession.shared.data(for: request)
         guard let http = response as? HTTPURLResponse, http.statusCode < 400 else {
-            let body = String(data: data, encoding: .utf8) ?? ""
-            throw RexAPIError.server("Couldn't delete that Rex. \(body)")
+            throw RexAPIError.server(friendlyError(data, fallback: "Couldn't delete that Rex."))
         }
     }
 
@@ -1049,8 +1058,7 @@ final class RexAPI {
 
         let (data, response) = try await URLSession.shared.data(for: request)
         guard let http = response as? HTTPURLResponse, http.statusCode < 400 else {
-            let body = String(data: data, encoding: .utf8) ?? ""
-            throw RexAPIError.server("Couldn't load the leaderboard. \(body)")
+            throw RexAPIError.server(friendlyError(data, fallback: "Couldn't load the leaderboard."))
         }
         return try JSONDecoder().decode([TopRexxer].self, from: data)
     }
@@ -1154,8 +1162,7 @@ final class RexAPI {
         ])
         let (data, response) = try await URLSession.shared.data(for: request)
         guard let http = response as? HTTPURLResponse, http.statusCode < 400 else {
-            let body = String(data: data, encoding: .utf8) ?? ""
-            throw RexAPIError.server("Couldn't add that to your collection. \(body)")
+            throw RexAPIError.server(friendlyError(data, fallback: "Couldn't add that to your collection."))
         }
     }
 
@@ -1212,8 +1219,7 @@ final class RexAPI {
         request.httpBody = try JSONSerialization.data(withJSONObject: body)
         let (data, response) = try await URLSession.shared.data(for: request)
         guard let http = response as? HTTPURLResponse, http.statusCode < 400 else {
-            let body = String(data: data, encoding: .utf8) ?? ""
-            throw RexAPIError.server("Couldn't create that collection. \(body)")
+            throw RexAPIError.server(friendlyError(data, fallback: "Couldn't create that collection."))
         }
         struct Created: Codable { let id: String }
         guard let id = (try? JSONDecoder().decode([Created].self, from: data))?.first?.id else {
@@ -1236,8 +1242,7 @@ final class RexAPI {
         request.httpBody = try JSONSerialization.data(withJSONObject: body)
         let (data, response) = try await URLSession.shared.data(for: request)
         guard let http = response as? HTTPURLResponse, http.statusCode < 400 else {
-            let body = String(data: data, encoding: .utf8) ?? ""
-            throw RexAPIError.server("Couldn't rename that collection. \(body)")
+            throw RexAPIError.server(friendlyError(data, fallback: "Couldn't rename that collection."))
         }
     }
 
@@ -1254,8 +1259,7 @@ final class RexAPI {
         request.httpBody = try JSONSerialization.data(withJSONObject: ["visibility": visibility])
         let (data, response) = try await URLSession.shared.data(for: request)
         guard let http = response as? HTTPURLResponse, http.statusCode < 400 else {
-            let body = String(data: data, encoding: .utf8) ?? ""
-            throw RexAPIError.server("Couldn't change who can see that. \(body)")
+            throw RexAPIError.server(friendlyError(data, fallback: "Couldn't change who can see that."))
         }
     }
 
@@ -1269,8 +1273,7 @@ final class RexAPI {
         request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
         let (data, response) = try await URLSession.shared.data(for: request)
         guard let http = response as? HTTPURLResponse, http.statusCode < 400 else {
-            let body = String(data: data, encoding: .utf8) ?? ""
-            throw RexAPIError.server("Couldn't delete that collection. \(body)")
+            throw RexAPIError.server(friendlyError(data, fallback: "Couldn't delete that collection."))
         }
     }
 
@@ -1346,8 +1349,7 @@ final class RexAPI {
         request.httpBody = try JSONSerialization.data(withJSONObject: body)
         let (data, response) = try await URLSession.shared.data(for: request)
         guard let http = response as? HTTPURLResponse, http.statusCode < 400 else {
-            let body = String(data: data, encoding: .utf8) ?? ""
-            throw RexAPIError.server("Couldn't send your blast. \(body)")
+            throw RexAPIError.server(friendlyError(data, fallback: "Couldn't send your blast."))
         }
     }
 
@@ -1367,8 +1369,7 @@ final class RexAPI {
         request.httpBody = try JSONSerialization.data(withJSONObject: body)
         let (data, response) = try await URLSession.shared.data(for: request)
         guard let http = response as? HTTPURLResponse, http.statusCode < 400 else {
-            let body = String(data: data, encoding: .utf8) ?? ""
-            throw RexAPIError.server("Couldn't send that. \(body)")
+            throw RexAPIError.server(friendlyError(data, fallback: "Couldn't send that."))
         }
     }
 
@@ -1386,8 +1387,7 @@ final class RexAPI {
 
         let (data, response) = try await URLSession.shared.data(for: request)
         guard let http = response as? HTTPURLResponse, http.statusCode < 400 else {
-            let body = String(data: data, encoding: .utf8) ?? ""
-            throw RexAPIError.server("Couldn't load comments. \(body)")
+            throw RexAPIError.server(friendlyError(data, fallback: "Couldn't load comments."))
         }
         return try JSONDecoder().decode([RexComment].self, from: data)
     }
@@ -1405,8 +1405,7 @@ final class RexAPI {
         ])
         let (data, response) = try await URLSession.shared.data(for: request)
         guard let http = response as? HTTPURLResponse, http.statusCode < 400 else {
-            let body = String(data: data, encoding: .utf8) ?? ""
-            throw RexAPIError.server("Couldn't post your comment. \(body)")
+            throw RexAPIError.server(friendlyError(data, fallback: "Couldn't post your comment."))
         }
     }
 
@@ -1487,8 +1486,7 @@ final class RexAPI {
         request.url = urlComponents.url
         let (data, response) = try await URLSession.shared.data(for: request)
         guard let http = response as? HTTPURLResponse, http.statusCode < 400 else {
-            let body = String(data: data, encoding: .utf8) ?? ""
-            throw RexAPIError.server("Couldn't save that collection. \(body)")
+            throw RexAPIError.server(friendlyError(data, fallback: "Couldn't save that collection."))
         }
     }
 
@@ -1545,8 +1543,7 @@ final class RexAPI {
 
         let (data, response) = try await URLSession.shared.data(for: request)
         guard let http = response as? HTTPURLResponse, http.statusCode < 400 else {
-            let body = String(data: data, encoding: .utf8) ?? ""
-            throw RexAPIError.server("Couldn't load your saved posts. \(body)")
+            throw RexAPIError.server(friendlyError(data, fallback: "Couldn't load your saved posts."))
         }
         return try JSONDecoder().decode([SavedPost].self, from: data)
     }
@@ -1572,8 +1569,7 @@ final class RexAPI {
 
         let (data, response) = try await URLSession.shared.data(for: request)
         guard let http = response as? HTTPURLResponse, http.statusCode < 400 else {
-            let body = String(data: data, encoding: .utf8) ?? ""
-            throw RexAPIError.server("Couldn't load that collection. \(body)")
+            throw RexAPIError.server(friendlyError(data, fallback: "Couldn't load that collection."))
         }
         return try JSONDecoder().decode([SavedPost].self, from: data)
     }
@@ -1609,8 +1605,7 @@ final class RexAPI {
 
         let (data, response) = try await URLSession.shared.data(for: request)
         guard let http = response as? HTTPURLResponse, http.statusCode < 400 else {
-            let body = String(data: data, encoding: .utf8) ?? ""
-            throw RexAPIError.server("Couldn't remove. \(body)")
+            throw RexAPIError.server(friendlyError(data, fallback: "Couldn't remove."))
         }
     }
 

@@ -22,6 +22,10 @@ struct AddRexView: View {
     @State private var rating: Double = 10
     @State private var note = ""
     @State private var isSaving = false
+    /// Posting a trip is several sequential network calls (the trip itself,
+    /// then each stop) — without this it just looks stuck for however many
+    /// stops there are.
+    @State private var postingProgress: String?
     @State private var anonymous = false
     @State private var errorMessage: String?
     @State private var didPost = false
@@ -209,6 +213,10 @@ struct AddRexView: View {
 
             if let errorMessage {
                 Text(errorMessage).font(.footnote).foregroundStyle(RexColor.destructive)
+            }
+
+            if let postingProgress {
+                Text(postingProgress).font(.footnote).foregroundStyle(RexColor.mutedForeground)
             }
 
             Button(action: { Task { await post(category: category) } }) {
@@ -446,6 +454,7 @@ struct AddRexView: View {
     private func post(category: RexCategory) async {
         isSaving = true
         errorMessage = nil
+        postingProgress = nil
         do {
             let itemId = try await RexAPI.shared.createItem(
                 type: category.rawValue,
@@ -466,27 +475,48 @@ struct AddRexView: View {
                     photoURLs: photoURLs,
                     returningId: true
                 )
-                for stop in tripStops {
-                    let stopItemId = try await RexAPI.shared.createItem(
-                        type: stop.type.rawValue,
-                        title: stop.title,
-                        subtitle: stop.subtitle,
-                        address: stop.address,
-                        genre: stop.genre,
-                        externalId: stop.externalId,
-                        externalSource: stop.externalSource,
-                        imageURL: stop.imageURL,
-                        lat: stop.lat,
-                        lng: stop.lng
-                    )
-                    _ = try await RexAPI.shared.createRecommendation(
-                        itemId: stopItemId,
-                        rating: stop.rating,
-                        note: stop.note.isEmpty ? nil : stop.note,
-                        tripId: tripRecId,
-                        tripSection: stop.section
-                    )
+                // Posting is several sequential network calls; if one stop
+                // partway through fails, the trip used to just be left half
+                // -built with no way to retry cleanly. Track what's been
+                // created so a failure can roll it all back instead.
+                var createdStopRecIds: [String] = []
+                do {
+                    for (index, stop) in tripStops.enumerated() {
+                        postingProgress = tripStops.count > 1
+                            ? "Adding stop \(index + 1) of \(tripStops.count)…" : "Adding stop…"
+                        let stopItemId = try await RexAPI.shared.createItem(
+                            type: stop.type.rawValue,
+                            title: stop.title,
+                            subtitle: stop.subtitle,
+                            address: stop.address,
+                            genre: stop.genre,
+                            externalId: stop.externalId,
+                            externalSource: stop.externalSource,
+                            imageURL: stop.imageURL,
+                            lat: stop.lat,
+                            lng: stop.lng
+                        )
+                        let stopRecId = try await RexAPI.shared.createRecommendation(
+                            itemId: stopItemId,
+                            rating: stop.rating,
+                            note: stop.note.isEmpty ? nil : stop.note,
+                            tripId: tripRecId,
+                            tripSection: stop.section,
+                            returningId: true
+                        )
+                        createdStopRecIds.append(stopRecId)
+                    }
+                } catch {
+                    postingProgress = "Undoing partial trip…"
+                    // Best-effort: these are cleanup after a failure we're
+                    // about to report anyway, so a second error here
+                    // shouldn't replace the one the user needs to see.
+                    for id in createdStopRecIds { try? await RexAPI.shared.deleteRecommendation(id: id) }
+                    try? await RexAPI.shared.deleteRecommendation(id: tripRecId)
+                    postingProgress = nil
+                    throw error
                 }
+                postingProgress = nil
                 withAnimation { didPost = true }
                 isSaving = false
                 return
