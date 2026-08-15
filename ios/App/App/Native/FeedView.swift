@@ -17,6 +17,9 @@ struct FeedView: View {
     @State private var filter: RexCategory?
     @State private var subFilter: String?
     @State private var blastsOnly = false
+    /// Independent of category/genre — "Loved places" and "Loved books" are
+    /// both valid, so this doesn't get cleared when the category changes.
+    @State private var ratingFilter: RexRatingTier?
     private enum SortMode { case recent, mostLiked }
     @State private var sortMode: SortMode = .recent
     @State private var likeCounts: [String: Int] = [:]
@@ -32,6 +35,14 @@ struct FeedView: View {
         // for, not a Rex — it belongs under Blasts, not mixed into Place.
         let present = Set(recommendations.filter { !$0.isBlast }.compactMap { RexCategory(rawType: $0.items?.type) })
         return rexAllCategories.filter { present.contains($0) }
+    }
+
+    /// Only the tiers actually represented, same reasoning as
+    /// availableCategories — no point offering a filter that would empty
+    /// the feed.
+    private var availableRatingTiers: [RexRatingTier] {
+        let present = Set(recommendations.filter { $0.rating > 0 }.map { RexRatingTier.tier(forRaw: $0.rating) })
+        return RexRatingTier.allCases.filter { present.contains($0) }
     }
 
     /// Subcategories (genres) within the selected category, mirroring the web.
@@ -85,6 +96,12 @@ struct FeedView: View {
             if rec.isBlast { return filter == nil } // never in a category filter
             if let filter, RexCategory(rawType: rec.items?.type) != filter { return false }
             if let subFilter, !splitGenres(rec.items?.genre).contains(subFilter) { return false }
+            // Wants and blasts have no rating to bucket into a tier, so a
+            // rating filter naturally hides them rather than matching by
+            // accident on the zero sentinel.
+            if let ratingFilter {
+                guard rec.rating > 0, RexRatingTier.tier(forRaw: rec.rating) == ratingFilter else { return false }
+            }
             if !query.trimmingCharacters(in: .whitespaces).isEmpty {
                 let q = query.lowercased()
                 let haystack = [
@@ -352,8 +369,8 @@ struct FeedView: View {
             if !availableCategories.isEmpty {
                 ScrollView(.horizontal, showsIndicators: false) {
                     HStack(spacing: RexSpacing.sm) {
-                        filterChip(title: "All", isActive: filter == nil && !blastsOnly) {
-                            filter = nil; subFilter = nil; blastsOnly = false
+                        filterChip(title: "All", isActive: filter == nil && !blastsOnly && ratingFilter == nil) {
+                            filter = nil; subFilter = nil; blastsOnly = false; ratingFilter = nil
                         }
                         if recommendations.contains(where: \.isBlast) {
                             filterChip(title: "Blasts", isActive: blastsOnly) {
@@ -365,6 +382,19 @@ struct FeedView: View {
                             filterChip(title: category.label, isActive: filter == category) {
                                 filter = (filter == category) ? nil : category
                                 subFilter = nil; blastsOnly = false
+                            }
+                        }
+                    }
+                    .padding(.horizontal, 1)
+                }
+            }
+
+            if !availableRatingTiers.isEmpty {
+                ScrollView(.horizontal, showsIndicators: false) {
+                    HStack(spacing: RexSpacing.sm) {
+                        ForEach(availableRatingTiers) { tier in
+                            filterChip(title: "\(tier.emoji) \(tier.label)", isActive: ratingFilter == tier, small: true) {
+                                ratingFilter = (ratingFilter == tier) ? nil : tier
                             }
                         }
                     }
