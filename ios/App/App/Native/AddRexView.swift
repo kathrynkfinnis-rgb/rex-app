@@ -329,10 +329,12 @@ struct AddRexView: View {
     private func thumb(_ hit: RexSearchHit) -> some View {
         Group {
             if let s = hit.imageURL, let url = URL(string: s) {
-                AsyncImage(url: url) { phase in
-                    if let image = phase.image {
-                        image.resizable().aspectRatio(contentMode: .fill)
-                    } else { RexColor.muted }
+                // Plain AsyncImage silently never loads a Google Places
+                // photo — see GoogleSafeAsyncImage for why.
+                GoogleSafeAsyncImage(url: url) { image in
+                    image.resizable().aspectRatio(contentMode: .fill)
+                } placeholder: {
+                    RexColor.muted
                 }
             } else {
                 RexColor.muted
