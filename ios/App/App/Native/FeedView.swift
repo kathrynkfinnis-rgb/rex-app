@@ -1,7 +1,6 @@
 import SwiftUI
 
 struct NotificationsRoute: Hashable {}
-struct ProfileRoute: Hashable {}
 
 struct FeedView: View {
     var onSignedOut: () -> Void
@@ -14,6 +13,9 @@ struct FeedView: View {
     @State private var isLoading = true
     @State private var errorMessage: String?
     @State private var showingAddRex = false
+    /// A sheet, not a NavigationLink push — see the comment on the avatar
+    /// button for why.
+    @State private var showingProfile = false
     @State private var filter: RexCategory?
     @State private var subFilter: String?
     @State private var blastsOnly = false
@@ -268,9 +270,6 @@ struct FeedView: View {
             .navigationDestination(for: AuthorRoute.self) { r in
                 AuthorBooksView(route: r)
             }
-            .navigationDestination(for: ProfileRoute.self) { _ in
-                ProfileView(onSignedOut: onSignedOut)
-            }
             .navigationDestination(for: FriendsRoute.self) { _ in
                 FriendsView()
             }
@@ -306,8 +305,20 @@ struct FeedView: View {
                         }
                         .accessibilityLabel("Notifications")
 
-                        // Your own picture, not a generic glyph.
-                        NavigationLink(value: ProfileRoute()) {
+                        // Your own picture, not a generic glyph. A sheet
+                        // rather than a NavigationLink push deliberately —
+                        // ProfileView owns its own NavigationStack (needed
+                        // so a swiped row can push onto a real bound path
+                        // when Profile is the tab root), and pushing it
+                        // inside Feed's NavigationStack nested one
+                        // NavigationStack inside another. That's explicitly
+                        // unsupported in SwiftUI and rendered as a blank
+                        // screen with a dead back button — a real bug this
+                        // session caught, not a hypothetical. A sheet is its
+                        // own presentation context, so there's no nesting.
+                        Button {
+                            showingProfile = true
+                        } label: {
                             UserAvatarView(
                                 url: myProfile?.avatar_url,
                                 name: myProfile?.display_name ?? myProfile?.username ?? "?",
@@ -340,6 +351,9 @@ struct FeedView: View {
         }
         .sheet(item: $addingToCollection) { rec in
             AddToCollectionView(rec: rec, onDone: {})
+        }
+        .sheet(isPresented: $showingProfile, onDismiss: { Task { await loadFeed() } }) {
+            ProfileView(onSignedOut: onSignedOut)
         }
     }
 
