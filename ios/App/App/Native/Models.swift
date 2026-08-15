@@ -37,6 +37,16 @@ struct RexProfileDetail: Codable, Identifiable {
     let avatar_url: String?
 }
 
+/// A friends-of-friends candidate from suggested_friends_for_me, ranked by
+/// how many mutual friends you share.
+struct SuggestedFriend: Codable, Identifiable {
+    let id: String
+    let username: String
+    let display_name: String?
+    let avatar_url: String?
+    let mutual_count: Int
+}
+
 struct WantRow: Codable, Identifiable {
     let id: String
     let created_at: String

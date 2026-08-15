@@ -709,6 +709,30 @@ final class RexAPI {
         return try JSONDecoder().decode([RexProfileDetail].self, from: data)
     }
 
+    /// Friends-of-friends, ranked by mutual count. Calls
+    /// suggested_friends_for_me rather than the web's suggested_friends_for
+    /// — that one takes an explicit _caller argument and is locked to
+    /// service_role only (safe for the web's own server function, not safe
+    /// to open up to any authenticated caller, who could pass someone
+    /// else's id). The _for_me version reads auth.uid() internally instead,
+    /// so it's safe to call directly. Needs migration
+    /// 20260815151101_suggested_friends_for_me.sql run first.
+    func fetchSuggestedFriends(limit: Int = 20) async throws -> [SuggestedFriend] {
+        let token = try await validToken()
+        var request = URLRequest(url: baseURL.appendingPathComponent("/rest/v1/rpc/suggested_friends_for_me"))
+        request.httpMethod = "POST"
+        request.setValue(anonKey, forHTTPHeaderField: "apikey")
+        request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        request.httpBody = try JSONSerialization.data(withJSONObject: ["_limit": limit])
+
+        let (data, response) = try await URLSession.shared.data(for: request)
+        guard let http = response as? HTTPURLResponse, http.statusCode < 400 else {
+            throw RexAPIError.server(friendlyError(data, fallback: "Couldn't load suggested friends."))
+        }
+        return try JSONDecoder().decode([SuggestedFriend].self, from: data)
+    }
+
     func sendFriendRequest(addresseeId: String) async throws {
         let token = try await validToken()
         guard let userId = currentUserId else { throw RexAPIError.notSignedIn }

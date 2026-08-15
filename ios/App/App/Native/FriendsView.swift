@@ -13,6 +13,11 @@ struct FriendsView: View {
     @State private var searchResults: [RexProfileDetail] = []
     @State private var isSearching = false
     @State private var pendingActionIds = Set<String>()
+    /// Friends-of-friends, ranked by mutual count. Filtered against
+    /// `alreadyConnected` rather than removed on send — that way a
+    /// successful request just naturally drops out once `load()` refreshes
+    /// friendships, no separate bookkeeping needed.
+    @State private var suggested: [SuggestedFriend] = []
 
     private var myId: String? { RexAPI.shared.currentUserId }
 
@@ -48,6 +53,10 @@ struct FriendsView: View {
                 VStack(alignment: .leading, spacing: 0) {
                     searchSection
                     if !searchResults.isEmpty { searchResultsSection }
+                    let suggestedVisible = suggested.filter { !alreadyConnected($0.id) }
+                    if !suggestedVisible.isEmpty {
+                        section("Suggested for you", rows: suggestedVisible.map { .suggested($0) })
+                    }
                     if !incoming.isEmpty { section("Requests for you", rows: incoming.map { .request($0) }) }
                     if !outgoing.isEmpty { section("Pending", rows: outgoing.map { .pending($0) }) }
                     section("Your friends\(accepted.isEmpty ? "" : " (\(accepted.count))")", rows: accepted.map { .friend($0) }, emptyText: "No friends yet. Search above to add someone.")
@@ -72,6 +81,9 @@ struct FriendsView: View {
         } catch {
             errorMessage = error.localizedDescription
         }
+        // Best-effort: needs migration 20260815151101 run first, and
+        // shouldn't block the rest of the screen if it 404s before then.
+        suggested = (try? await RexAPI.shared.fetchSuggestedFriends()) ?? []
         isLoading = false
     }
 
@@ -116,11 +128,12 @@ struct FriendsView: View {
     }
 
     private enum Row: Identifiable {
-        case request(Friendship), pending(Friendship), friend(Friendship), searchResult(RexProfileDetail)
+        case request(Friendship), pending(Friendship), friend(Friendship), searchResult(RexProfileDetail), suggested(SuggestedFriend)
         var id: String {
             switch self {
             case .request(let f), .pending(let f), .friend(let f): return f.id
             case .searchResult(let p): return "search-\(p.id)"
+            case .suggested(let s): return "suggested-\(s.id)"
             }
         }
     }
@@ -209,11 +222,37 @@ struct FriendsView: View {
                 .overlay(Capsule().stroke(RexColor.border, lineWidth: connected ? 1 : 0))
                 .disabled(connected || pending)
             }
+        case .suggested(let s):
+            let profile = RexProfileDetail(id: s.id, username: s.username, display_name: s.display_name, avatar_url: s.avatar_url)
+            personRow(
+                profile,
+                subtitle: s.mutual_count == 1 ? "1 mutual friend" : "\(s.mutual_count) mutual friends"
+            ) {
+                let pending = pendingActionIds.contains(profile.id)
+                Button {
+                    Task { await sendRequest(profile.id) }
+                } label: {
+                    if pending {
+                        ProgressView()
+                    } else {
+                        Text("Add").font(.system(size: 13, weight: .semibold))
+                    }
+                }
+                .padding(.horizontal, 14).padding(.vertical, 8)
+                .background(RexColor.primary)
+                .foregroundStyle(RexColor.primaryForeground)
+                .clipShape(Capsule())
+                .disabled(pending)
+            }
         }
     }
 
     @ViewBuilder
-    private func personRow<Trailing: View>(_ profile: RexProfileDetail, @ViewBuilder trailing: () -> Trailing) -> some View {
+    private func personRow<Trailing: View>(
+        _ profile: RexProfileDetail,
+        subtitle: String? = nil,
+        @ViewBuilder trailing: () -> Trailing
+    ) -> some View {
         HStack(spacing: 12) {
             // The name and photo open their profile; the trailing action
             // (accept/reject/add) stays its own tap target outside the link.
@@ -231,7 +270,7 @@ struct FriendsView: View {
                         Text(profile.display_name ?? profile.username)
                             .font(.system(size: 14, weight: .semibold))
                             .foregroundStyle(RexColor.foreground)
-                        Text("@\(profile.username)").font(.system(size: 12)).foregroundStyle(RexColor.mutedForeground)
+                        Text(subtitle ?? "@\(profile.username)").font(.system(size: 12)).foregroundStyle(RexColor.mutedForeground)
                     }
                 }
             }
