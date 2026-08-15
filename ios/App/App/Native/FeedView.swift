@@ -223,10 +223,17 @@ struct FeedView: View {
                                 // One menu only — a second `.contextMenu` replaces
                                 // the first rather than adding to it.
                                 .contextMenu {
-                                    Button {
-                                        addingToCollection = rec
-                                    } label: {
-                                        Label("Add to collection", systemImage: "folder.badge.plus")
+                                    // A want has no recommendation row, so
+                                    // there's nothing for saved_posts to
+                                    // reference — this silently 404'd before.
+                                    // Your own wants get the real thing from
+                                    // WishListCategoryView instead.
+                                    if !rec.isWant {
+                                        Button {
+                                            addingToCollection = rec
+                                        } label: {
+                                            Label("Add to collection", systemImage: "folder.badge.plus")
+                                        }
                                     }
                                     if rec.user_id == RexAPI.shared.currentUserId {
                                         Button { editing = rec } label: {

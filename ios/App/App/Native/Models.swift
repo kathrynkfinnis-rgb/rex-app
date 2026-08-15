@@ -51,6 +51,8 @@ struct WantRow: Codable, Identifiable {
     let id: String
     let created_at: String
     let item_id: String
+    /// Which collection this want sits in, if any — see RexAPI.setWantList.
+    var list_id: String?
     let items: RexItem?
 }
 

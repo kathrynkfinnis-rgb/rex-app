@@ -1632,7 +1632,7 @@ final class RexAPI {
         guard let userId = currentUserId else { throw RexAPIError.notSignedIn }
         var components = URLComponents(url: baseURL.appendingPathComponent("/rest/v1/wants"), resolvingAgainstBaseURL: false)!
         components.queryItems = [
-            URLQueryItem(name: "select", value: "id,created_at,item_id,items(id,type,title,subtitle,image_url,genre,address)"),
+            URLQueryItem(name: "select", value: "id,created_at,item_id,list_id,items(id,type,title,subtitle,image_url,genre,address)"),
             URLQueryItem(name: "user_id", value: "eq.\(userId)"),
             URLQueryItem(name: "order", value: "created_at.desc"),
         ]
@@ -1645,6 +1645,28 @@ final class RexAPI {
             throw RexAPIError.server("Couldn't load your want-to list.")
         }
         return try JSONDecoder().decode([WantRow].self, from: data)
+    }
+
+    /// Puts a want in a collection, or takes it out (listId: nil). Unlike a
+    /// Rex — which can sit in several collections via saved_posts — a want
+    /// only ever belongs to one, directly via wants.list_id (that column
+    /// already existed, just unused by any client until now).
+    func setWantList(wantId: String, listId: String?) async throws {
+        let token = try await validToken()
+        var components = URLComponents(url: baseURL.appendingPathComponent("/rest/v1/wants"), resolvingAgainstBaseURL: false)!
+        components.queryItems = [URLQueryItem(name: "id", value: "eq.\(wantId)")]
+        var request = URLRequest(url: components.url!)
+        request.httpMethod = "PATCH"
+        request.setValue(anonKey, forHTTPHeaderField: "apikey")
+        request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        let body: [String: Any] = ["list_id": listId == nil ? NSNull() : listId!]
+        request.httpBody = try JSONSerialization.data(withJSONObject: body)
+
+        let (data, response) = try await URLSession.shared.data(for: request)
+        guard let http = response as? HTTPURLResponse, http.statusCode < 400 else {
+            throw RexAPIError.server(friendlyError(data, fallback: "Couldn't update that collection."))
+        }
     }
 
     func deleteWant(id: String) async throws {

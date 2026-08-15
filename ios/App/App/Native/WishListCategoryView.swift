@@ -12,6 +12,7 @@ struct WishListCategoryView: View {
     @State private var wants: [WantRow] = []
     @State private var isLoading = true
     @State private var pushedItemId: String?
+    @State private var addingToCollection: WantRow?
 
     private var title: String {
         switch route.category {
@@ -65,6 +66,30 @@ struct WishListCategoryView: View {
                                 }
                                 .padding(RexSpacing.md)
                                 .rexCard()
+                                // A folder badge when it's already in one —
+                                // otherwise there was no way to tell without
+                                // opening the sheet.
+                                .overlay(alignment: .topTrailing) {
+                                    if want.list_id != nil {
+                                        Image(systemName: "folder.fill")
+                                            .font(.system(size: 10, weight: .semibold))
+                                            .foregroundStyle(RexColor.primaryForeground)
+                                            .padding(5)
+                                            .background(RexColor.primary)
+                                            .clipShape(Circle())
+                                            .padding(6)
+                                    }
+                                }
+                            }
+                            .contextMenu {
+                                Button {
+                                    addingToCollection = want
+                                } label: {
+                                    Label(
+                                        want.list_id != nil ? "Change collection" : "Add to collection",
+                                        systemImage: "folder.badge.plus"
+                                    )
+                                }
                             }
                         }
                     }
@@ -77,6 +102,13 @@ struct WishListCategoryView: View {
         .navigationTitle(title)
         .navigationBarTitleDisplayMode(.inline)
         .navigationDestination(item: $pushedItemId) { ItemDetailView(itemId: $0) }
+        .sheet(item: $addingToCollection) { want in
+            AddWantToListView(want: want) { newListId in
+                if let index = wants.firstIndex(where: { $0.id == want.id }) {
+                    wants[index].list_id = newListId
+                }
+            }
+        }
         .task { await load() }
     }
 
