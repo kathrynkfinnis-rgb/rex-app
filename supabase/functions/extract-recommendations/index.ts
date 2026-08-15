@@ -17,8 +17,6 @@
 // inserts into import_staging itself with its own token. Keeps this function
 // to one job.
 
-import "jsr:@supabase/functions-js/edge-runtime.d.ts";
-
 const EXTRACTION_TOOL = {
   name: "extract_recommendations",
   description: "Return the recommendations extracted from the user's text.",
