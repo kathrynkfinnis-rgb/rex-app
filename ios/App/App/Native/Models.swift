@@ -283,3 +283,41 @@ struct TopRexxer: Codable, Identifiable {
 
     var id: String { user_id }
 }
+
+// MARK: - Import (#109 "Lists" category, #15/#38 native trip import)
+
+/// One recommendation as the extraction edge function returned it, before
+/// it's ever touched the database. Mirrors the web importer's ExtractedRec
+/// (src/lib/import.functions.ts) and the edge function's EXTRACTION_TOOL
+/// schema exactly — same shape either client asked for it.
+struct ExtractedRec: Codable {
+    let title: String
+    let creator: String?
+    let note: String?
+    let rating: Double?
+    let type: String?
+    let section: String?
+    let url: String?
+}
+
+/// A row in import_staging — an extracted recommendation waiting to be
+/// reviewed and turned into a real item + recommendation. Field names match
+/// the table columns directly since this is decoded straight from PostgREST.
+struct ImportStagingRow: Codable, Identifiable, Hashable {
+    let id: String
+    let source: String
+    let raw_title: String
+    let raw_creator: String?
+    let raw_note: String?
+    let raw_rating: Double?
+    let suggested_type: String?
+    let raw_section: String?
+    let raw_url: String?
+    let resolved_item_id: String?
+    let resolved_external_id: String?
+    let resolved_external_source: String?
+    let resolved_image_url: String?
+    let resolved_subtitle: String?
+    let resolved_genre: String?
+    let status: String
+}

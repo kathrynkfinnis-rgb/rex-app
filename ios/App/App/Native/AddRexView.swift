@@ -53,6 +53,7 @@ struct AddRexView: View {
     /// Searchable categories open on a search field; the full form only
     /// appears once something's picked or you choose to type it in manually.
     @State private var manualEntry = false
+    @State private var showingListsImport = false
 
     var body: some View {
         NavigationStack {
@@ -92,25 +93,62 @@ struct AddRexView: View {
     }
 
     private var categoryPicker: some View {
-        LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 12) {
-            ForEach(creatableCategories, id: \.self) { cat in
-                Button {
-                    withAnimation { category = cat }
-                } label: {
-                    VStack(spacing: 8) {
-                        Image(systemName: cat.symbol).font(.system(size: 22)).foregroundStyle(RexColor.primary)
-                        Text(cat.label).font(.system(size: 14, weight: .semibold)).foregroundStyle(RexColor.foreground)
+        VStack(spacing: 16) {
+            LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 12) {
+                ForEach(creatableCategories, id: \.self) { cat in
+                    Button {
+                        withAnimation { category = cat }
+                    } label: {
+                        VStack(spacing: 8) {
+                            Image(systemName: cat.symbol).font(.system(size: 22)).foregroundStyle(RexColor.primary)
+                            Text(cat.label).font(.system(size: 14, weight: .semibold)).foregroundStyle(RexColor.foreground)
+                        }
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 20)
+                        .background(RexColor.card)
+                        .clipShape(RoundedRectangle(cornerRadius: 18))
+                        .overlay(RoundedRectangle(cornerRadius: 18).stroke(RexColor.border, lineWidth: 1))
                     }
-                    .frame(maxWidth: .infinity)
-                    .padding(.vertical, 20)
-                    .background(RexColor.card)
-                    .clipShape(RoundedRectangle(cornerRadius: 18))
-                    .overlay(RoundedRectangle(cornerRadius: 18).stroke(RexColor.border, lineWidth: 1))
+                    .buttonStyle(.plain)
                 }
-                .buttonStyle(.plain)
             }
+
+            // #109 — same entry point the web offers ("Import a collection"),
+            // but this one runs the extraction itself rather than deep
+            // -linking to the web importer: paste text in, review what came
+            // out, save as a Trip or a Collection.
+            Button {
+                showingListsImport = true
+            } label: {
+                HStack(spacing: RexSpacing.md) {
+                    ZStack {
+                        RoundedRectangle(cornerRadius: RexRadius.input, style: .continuous)
+                            .fill(RexColor.badgeBackground)
+                        Image(systemName: "doc.text")
+                            .font(.system(size: 20))
+                            .foregroundStyle(RexColor.primary)
+                    }
+                    .frame(width: 48, height: 48)
+
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text("Import a list")
+                            .font(RexFont.display(17, weight: .semibold))
+                            .foregroundStyle(RexColor.foreground)
+                        Text("Paste from Notes, a Word doc, or an itinerary.")
+                            .font(RexFont.text(13))
+                            .foregroundStyle(RexColor.mutedForeground)
+                    }
+                    Spacer()
+                }
+                .padding(RexSpacing.md)
+                .rexCard()
+            }
+            .buttonStyle(.plain)
         }
         .padding(16)
+        .sheet(isPresented: $showingListsImport) {
+            ListsImportView(onDone: { showingListsImport = false; onDone() })
+        }
     }
 
     @ViewBuilder

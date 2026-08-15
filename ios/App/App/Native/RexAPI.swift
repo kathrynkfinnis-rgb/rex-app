@@ -2054,4 +2054,291 @@ final class RexAPI {
         let places = try JSONDecoder().decode([MapPlace].self, from: data)
         return places.filter { $0.lat != nil && $0.lng != nil }
     }
+
+    // MARK: - Import (#109 "Lists" category, #15/#38 native trip import)
+
+    /// Sends pasted text to the extract-recommendations edge function and
+    /// gets back the parsed items — nothing touches the database here. The
+    /// LLM call is the one piece of this pipeline that needs a secret
+    /// (ANTHROPIC_API_KEY), which is why it's the one piece not done as a
+    /// plain PostgREST call the way everything else in this file is.
+    func extractRecommendations(text: String) async throws -> [ExtractedRec] {
+        let token = try await validToken()
+        var request = URLRequest(url: baseURL.appendingPathComponent("/functions/v1/extract-recommendations"))
+        request.httpMethod = "POST"
+        request.setValue(anonKey, forHTTPHeaderField: "apikey")
+        request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        request.httpBody = try JSONSerialization.data(withJSONObject: ["text": text])
+
+        let (data, response) = try await URLSession.shared.data(for: request)
+        guard let http = response as? HTTPURLResponse, http.statusCode < 400 else {
+            throw RexAPIError.server(friendlyError(data, fallback: "Couldn't read recommendations out of that text."))
+        }
+        struct Response: Codable { let items: [ExtractedRec] }
+        return try JSONDecoder().decode(Response.self, from: data).items
+    }
+
+    /// Stages extracted items for review — nothing becomes a real Rex until
+    /// the user approves it (individually, or in bulk as a trip/collection).
+    @discardableResult
+    func insertStagingRows(_ items: [ExtractedRec], source: String) async throws -> Int {
+        let token = try await validToken()
+        guard let userId = currentUserId else { throw RexAPIError.notSignedIn }
+        let rows: [[String: Any]] = items.prefix(200).map { item in
+            var row: [String: Any] = [
+                "user_id": userId,
+                "source": source,
+                "raw_title": String(item.title.prefix(300)),
+                "status": "pending",
+            ]
+            row["raw_creator"] = item.creator.map { String($0.prefix(200)) } ?? NSNull()
+            row["raw_note"] = item.note.map { String($0.prefix(2000)) } ?? NSNull()
+            row["raw_rating"] = item.rating.map { max(1, min(10, $0)) } ?? NSNull()
+            row["suggested_type"] = item.type ?? NSNull()
+            let section = item.section?.trimmingCharacters(in: .whitespaces)
+            row["raw_section"] = (section?.isEmpty == false ? String(section!.prefix(120)) : nil) ?? NSNull()
+            let url = item.url?.trimmingCharacters(in: .whitespaces)
+            row["raw_url"] = (url?.isEmpty == false ? String(url!.prefix(2000)) : nil) ?? NSNull()
+            return row
+        }
+        guard !rows.isEmpty else { return 0 }
+
+        var request = URLRequest(url: baseURL.appendingPathComponent("/rest/v1/import_staging"))
+        request.httpMethod = "POST"
+        request.setValue(anonKey, forHTTPHeaderField: "apikey")
+        request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        request.httpBody = try JSONSerialization.data(withJSONObject: rows)
+
+        let (data, response) = try await URLSession.shared.data(for: request)
+        guard let http = response as? HTTPURLResponse, http.statusCode < 400 else {
+            throw RexAPIError.server(friendlyError(data, fallback: "Couldn't save the extracted items."))
+        }
+        return rows.count
+    }
+
+    func fetchStagingRows(source: String) async throws -> [ImportStagingRow] {
+        let token = try await validToken()
+        guard let userId = currentUserId else { throw RexAPIError.notSignedIn }
+        var components = URLComponents(url: baseURL.appendingPathComponent("/rest/v1/import_staging"), resolvingAgainstBaseURL: false)!
+        components.queryItems = [
+            URLQueryItem(name: "select", value: "*"),
+            URLQueryItem(name: "user_id", value: "eq.\(userId)"),
+            URLQueryItem(name: "source", value: "eq.\(source)"),
+            URLQueryItem(name: "status", value: "eq.pending"),
+            URLQueryItem(name: "order", value: "created_at.asc"),
+        ]
+        var request = URLRequest(url: components.url!)
+        request.setValue(anonKey, forHTTPHeaderField: "apikey")
+        request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+
+        let (data, response) = try await URLSession.shared.data(for: request)
+        guard let http = response as? HTTPURLResponse, http.statusCode < 400 else {
+            throw RexAPIError.server(friendlyError(data, fallback: "Couldn't load what was extracted."))
+        }
+        return try JSONDecoder().decode([ImportStagingRow].self, from: data)
+    }
+
+    /// Drops rows the user deselected during review — declining is real
+    /// deletion, not just a client-side filter, so a re-opened review
+    /// doesn't resurrect things already dismissed.
+    func deleteStagingRows(ids: [String]) async throws {
+        guard !ids.isEmpty else { return }
+        let token = try await validToken()
+        var components = URLComponents(url: baseURL.appendingPathComponent("/rest/v1/import_staging"), resolvingAgainstBaseURL: false)!
+        components.queryItems = [URLQueryItem(name: "id", value: "in.(\(ids.joined(separator: ",")))")]
+        var request = URLRequest(url: components.url!)
+        request.httpMethod = "DELETE"
+        request.setValue(anonKey, forHTTPHeaderField: "apikey")
+        request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+
+        let (data, response) = try await URLSession.shared.data(for: request)
+        guard let http = response as? HTTPURLResponse, http.statusCode < 400 else {
+            throw RexAPIError.server(friendlyError(data, fallback: "Couldn't remove that."))
+        }
+    }
+
+    /// Best-effort match against the app's own search — same catalogues
+    /// (OpenLibrary, TMDB, Google Places) Add-a-Rex already searches, run
+    /// client-side rather than through a server round trip since the native
+    /// app already has direct clients for all four. A miss just leaves the
+    /// row unresolved; approving it still works, it just creates a plain
+    /// unlinked item the way manual entry always has.
+    func resolveStagingRow(_ row: ImportStagingRow) async throws {
+        guard let type = row.suggested_type else { return }
+        let category: RexCategory
+        switch type {
+        case "book": category = .book
+        case "movie": category = .movie
+        case "tv": category = .tv
+        case "place": category = .place
+        default: return
+        }
+        let query = [row.raw_title, row.raw_creator].compactMap { $0 }.joined(separator: " ")
+        guard let hit = await RexSearch.search(category: category, query: query).first else { return }
+
+        let token = try await validToken()
+        var components = URLComponents(url: baseURL.appendingPathComponent("/rest/v1/import_staging"), resolvingAgainstBaseURL: false)!
+        components.queryItems = [URLQueryItem(name: "id", value: "eq.\(row.id)")]
+        var request = URLRequest(url: components.url!)
+        request.httpMethod = "PATCH"
+        request.setValue(anonKey, forHTTPHeaderField: "apikey")
+        request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        var patchBody: [String: Any] = [
+            "resolved_external_id": hit.externalId,
+            "resolved_external_source": hit.externalSource,
+        ]
+        patchBody["resolved_image_url"] = hit.imageURL ?? NSNull()
+        patchBody["resolved_subtitle"] = hit.subtitle ?? row.raw_creator ?? NSNull()
+        patchBody["resolved_genre"] = hit.genre ?? NSNull()
+        request.httpBody = try JSONSerialization.data(withJSONObject: patchBody)
+
+        let (data, response) = try await URLSession.shared.data(for: request)
+        guard let http = response as? HTTPURLResponse, http.statusCode < 400 else {
+            throw RexAPIError.server(friendlyError(data, fallback: "Couldn't resolve this item."))
+        }
+    }
+
+    /// A staged row succeeded or failed to become a real Rex; batch imports
+    /// name every miss instead of letting it vanish silently, matching the
+    /// web importer's own "16 of 36 stops landed" transparency.
+    struct ImportFailure { let title: String; let reason: String }
+
+    /// One staging row -> a real item (find-or-create) + recommendation,
+    /// then marks the row imported. Mirrors the web importer's approveRow
+    /// (src/lib/import.functions.ts) step for step, including reusing
+    /// createItem's own find-or-create-by-external-id behavior rather than
+    /// re-implementing that lookup here.
+    @discardableResult
+    private func approveOneStagingRow(
+        _ row: ImportStagingRow,
+        rating: Double?,
+        note: String?,
+        tripId: String?,
+        tripSection: String?,
+        listId: String?
+    ) async throws -> String {
+        guard let type = row.suggested_type, !type.isEmpty else {
+            throw RexAPIError.server("Set a type before approving.")
+        }
+        let itemId: String
+        if let existing = row.resolved_item_id {
+            itemId = existing
+        } else {
+            itemId = try await createItem(
+                type: type,
+                title: row.raw_title,
+                subtitle: row.resolved_subtitle ?? row.raw_creator,
+                address: nil,
+                genre: row.resolved_genre,
+                linkURL: row.raw_url,
+                externalId: row.resolved_external_id,
+                externalSource: row.resolved_external_source,
+                imageURL: row.resolved_image_url
+            )
+        }
+
+        let finalRating = rating ?? row.raw_rating.map { max(1, min(10, $0.rounded())) } ?? 8
+        let recId = try await createRecommendation(
+            itemId: itemId,
+            rating: finalRating,
+            note: note ?? row.raw_note,
+            tripId: tripId,
+            tripSection: tripId != nil ? tripSection : nil,
+            returningId: true
+        )
+
+        if let listId {
+            try await addToCollection(recommendationId: recId, listId: listId)
+        }
+
+        let token = try await validToken()
+        var components = URLComponents(url: baseURL.appendingPathComponent("/rest/v1/import_staging"), resolvingAgainstBaseURL: false)!
+        components.queryItems = [URLQueryItem(name: "id", value: "eq.\(row.id)")]
+        var request = URLRequest(url: components.url!)
+        request.httpMethod = "PATCH"
+        request.setValue(anonKey, forHTTPHeaderField: "apikey")
+        request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        request.httpBody = try JSONSerialization.data(withJSONObject: ["status": "imported", "resolved_item_id": itemId])
+        _ = try? await URLSession.shared.data(for: request)
+
+        return itemId
+    }
+
+    /// Approves one staged row on its own — the individual-review path,
+    /// as opposed to the batch trip/collection paths below.
+    @discardableResult
+    func approveStagingRow(_ row: ImportStagingRow, rating: Double? = nil, note: String? = nil) async throws -> String {
+        try await approveOneStagingRow(row, rating: rating, note: note, tripId: nil, tripSection: nil, listId: nil)
+    }
+
+    /// Turns a batch of staged rows into one new Trip, each row becoming a
+    /// stop under the heading it was extracted with (raw_section) — the
+    /// document's own structure carries straight through, same as the web
+    /// importer's approveStagingAsTrip.
+    func approveStagingAsTrip(
+        rows: [ImportStagingRow], tripName: String, note: String?
+    ) async throws -> (tripId: String, added: Int, failed: [ImportFailure]) {
+        guard !rows.isEmpty else { throw RexAPIError.server("Nothing to import.") }
+        let tripItemId = try await createItem(type: "trip", title: tripName.trimmingCharacters(in: .whitespaces), subtitle: nil, address: nil)
+        let tripRecId = try await createRecommendation(itemId: tripItemId, rating: 8, note: note, returningId: true)
+
+        var added = 0
+        var failed: [ImportFailure] = []
+        for row in rows {
+            do {
+                try await approveOneStagingRow(row, rating: nil, note: nil, tripId: tripRecId, tripSection: row.raw_section, listId: nil)
+                added += 1
+            } catch {
+                failed.append(ImportFailure(title: row.raw_title, reason: error.localizedDescription))
+            }
+        }
+        return (tripRecId, added, failed)
+    }
+
+    /// Turns a batch of staged rows into one or more Collections. With
+    /// splitBySection on, a document organised under headings ("Pubs",
+    /// "Galleries") becomes one collection per heading instead of a single
+    /// dumping-ground list — same behavior as the web importer's
+    /// approveStagingAsCollections.
+    func approveStagingAsCollections(
+        rows: [ImportStagingRow], name: String, splitBySection: Bool
+    ) async throws -> (added: Int, collections: Int, failed: [ImportFailure]) {
+        guard !rows.isEmpty else { throw RexAPIError.server("Nothing to import.") }
+        let trimmedName = name.trimmingCharacters(in: .whitespaces)
+
+        var order: [String] = []
+        var groups: [String: [ImportStagingRow]] = [:]
+        for row in rows {
+            let section = splitBySection ? row.raw_section?.trimmingCharacters(in: .whitespaces) : nil
+            let key = (section?.isEmpty == false ? section! : nil) ?? trimmedName
+            if groups[key] == nil { order.append(key) }
+            groups[key, default: []].append(row)
+        }
+
+        var added = 0
+        var failed: [ImportFailure] = []
+        for key in order {
+            let groupRows = groups[key] ?? []
+            var counts: [String: Int] = [:]
+            for r in groupRows {
+                if let t = r.suggested_type { counts[t, default: 0] += 1 }
+            }
+            let itemType = counts.max(by: { $0.value < $1.value })?.key ?? "other"
+            let listId = try await createCollection(name: key, emoji: nil, itemType: itemType)
+
+            for row in groupRows {
+                do {
+                    try await approveOneStagingRow(row, rating: nil, note: nil, tripId: nil, tripSection: nil, listId: listId)
+                    added += 1
+                } catch {
+                    failed.append(ImportFailure(title: row.raw_title, reason: error.localizedDescription))
+                }
+            }
+        }
+        return (added, order.count, failed)
+    }
 }
