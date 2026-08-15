@@ -87,6 +87,9 @@ final class RexAPI {
         return Date(timeIntervalSince1970: exp) < Date().addingTimeInterval(60)
     }
 
+    /// An in-flight refresh, if one's already running — see validToken() below.
+    private var refreshTask: Task<String, Error>?
+
     /// Returns a valid (non-expired) access token, transparently refreshing it first if needed.
     /// This is what actually fixes the "logged out after an hour" bug — every authenticated call
     /// routes through here instead of reading the possibly-stale token directly.
@@ -94,31 +97,52 @@ final class RexAPI {
         guard let token = accessToken else { throw RexAPIError.notSignedIn }
         if !accessTokenNeedsRefresh { return token }
 
-        guard let refreshToken = refreshTokenValue else {
-            signOut()
-            throw RexAPIError.notSignedIn
+        // Piggyback on an already-running refresh rather than starting a
+        // second one. This used to be THE cause of "logged out constantly":
+        // opening the app after the token expired fires a dozen-plus
+        // concurrent authenticated calls at once (feed, profile, and every
+        // card's likes/comments/want state), and every one of them called
+        // validToken() independently. Supabase rotates the refresh token on
+        // every use, so only the first of those concurrent refresh requests
+        // succeeds — every other one gets "already used" back and hit
+        // signOut(), wiping out the session the winning request had just
+        // written moments earlier. Single-flighting the refresh means there
+        // is only ever one request in flight, and everyone else just awaits
+        // its result.
+        if let refreshTask {
+            return try await refreshTask.value
         }
 
-        var request = URLRequest(url: baseURL.appendingPathComponent("/auth/v1/token"))
-        var components = URLComponents(url: request.url!, resolvingAgainstBaseURL: false)!
-        components.queryItems = [URLQueryItem(name: "grant_type", value: "refresh_token")]
-        request.url = components.url
-        request.httpMethod = "POST"
-        request.setValue(anonKey, forHTTPHeaderField: "apikey")
-        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
-        request.httpBody = try JSONSerialization.data(withJSONObject: ["refresh_token": refreshToken])
+        let task = Task<String, Error> {
+            defer { refreshTask = nil }
+            guard let refreshToken = refreshTokenValue else {
+                signOut()
+                throw RexAPIError.notSignedIn
+            }
 
-        let (data, response) = try await URLSession.shared.data(for: request)
-        guard let http = response as? HTTPURLResponse, http.statusCode < 400 else {
-            // Refresh token itself is dead — only real fix is signing in again.
-            signOut()
-            throw RexAPIError.notSignedIn
+            var request = URLRequest(url: baseURL.appendingPathComponent("/auth/v1/token"))
+            var components = URLComponents(url: request.url!, resolvingAgainstBaseURL: false)!
+            components.queryItems = [URLQueryItem(name: "grant_type", value: "refresh_token")]
+            request.url = components.url
+            request.httpMethod = "POST"
+            request.setValue(anonKey, forHTTPHeaderField: "apikey")
+            request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+            request.httpBody = try JSONSerialization.data(withJSONObject: ["refresh_token": refreshToken])
+
+            let (data, response) = try await URLSession.shared.data(for: request)
+            guard let http = response as? HTTPURLResponse, http.statusCode < 400 else {
+                // Refresh token itself is dead — only real fix is signing in again.
+                signOut()
+                throw RexAPIError.notSignedIn
+            }
+            struct TokenResponse: Codable { let access_token: String; let refresh_token: String }
+            let decoded = try JSONDecoder().decode(TokenResponse.self, from: data)
+            accessToken = decoded.access_token
+            refreshTokenValue = decoded.refresh_token
+            return decoded.access_token
         }
-        struct TokenResponse: Codable { let access_token: String; let refresh_token: String }
-        let decoded = try JSONDecoder().decode(TokenResponse.self, from: data)
-        accessToken = decoded.access_token
-        refreshTokenValue = decoded.refresh_token
-        return decoded.access_token
+        refreshTask = task
+        return try await task.value
     }
 
     func signIn(email: String, password: String) async throws {
