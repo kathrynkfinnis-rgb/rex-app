@@ -32,6 +32,31 @@ struct RexMapView: View {
     @State private var focusedTripPlaces: [MapPlace]?
     @State private var openTrip: TripRoute?
     @State private var showingTripSearch = false
+    /// #106 — a list alongside the map, for when scanning names beats
+    /// panning pins around, plus a sort the map itself has no use for.
+    @State private var showingList = false
+    @State private var sortMode: MapSortMode = .recent
+    /// topBar floats over the map (by design — the map should still be
+    /// visible/pannable underneath it), but the list needs to know its
+    /// actual height to avoid starting underneath it. Measured rather than
+    /// guessed since the bar's height changes (trip banner, sort row).
+    @State private var topBarHeight: CGFloat = 160
+
+    enum MapSortMode: String, CaseIterable {
+        case recent = "Most recent"
+        case mostRexd = "Most Rex'd"
+    }
+
+    /// fetchMapPlaces already orders by the item's created_at descending, so
+    /// "most recent" is just the array's existing order — no extra fetch or
+    /// model field needed. "Most Rex'd" sorts by how many recommendations
+    /// are embedded per place, which is already fetched too.
+    private var sortedVisiblePlaces: [MapPlace] {
+        switch sortMode {
+        case .recent: return visiblePlaces
+        case .mostRexd: return visiblePlaces.sorted { $0.recommendations.count > $1.recommendations.count }
+        }
+    }
 
     private static let milesToMeters = 1609.34
     private var radiusMeters: Double { 10 * Self.milesToMeters }
@@ -68,6 +93,8 @@ struct RexMapView: View {
                 ProgressView()
             } else if let errorMessage {
                 errorState(errorMessage)
+            } else if showingList {
+                placesList
             } else {
                 GoogleMapView(
                     places: visiblePlaces,
@@ -141,6 +168,19 @@ struct RexMapView: View {
                     .padding(.vertical, 3)
                     .background(RexColor.badgeBackground)
                     .clipShape(Capsule())
+
+                Button {
+                    withAnimation(.snappy) { showingList.toggle() }
+                } label: {
+                    Image(systemName: showingList ? "map" : "list.bullet")
+                        .font(.system(size: 13, weight: .semibold))
+                        .foregroundStyle(RexColor.primary)
+                        .frame(width: 30, height: 30)
+                        .background(RexColor.badgeBackground)
+                        .clipShape(Circle())
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel(showingList ? "Show map" : "Show list")
             }
 
             if tripFilter != nil, let title = followingTripTitle {
@@ -189,16 +229,101 @@ struct RexMapView: View {
                     chip("Events", active: filter == .event) { filter = filter == .event ? nil : .event }
                 }
             }
+
+            if showingList {
+                ScrollView(.horizontal, showsIndicators: false) {
+                    HStack(spacing: RexSpacing.sm) {
+                        ForEach(MapSortMode.allCases, id: \.self) { mode in
+                            chip(mode.rawValue, active: sortMode == mode) { sortMode = mode }
+                        }
+                    }
+                }
+            }
         }
         .padding(.horizontal, RexSpacing.lg)
         .padding(.vertical, RexSpacing.md)
         .background(
-            RexColor.card.opacity(0.96)
-                .overlay(alignment: .bottom) {
-                    Rectangle().fill(RexColor.border).frame(height: 1)
-                }
-                .ignoresSafeArea(edges: .top)
+            GeometryReader { proxy in
+                RexColor.card.opacity(0.96)
+                    .overlay(alignment: .bottom) {
+                        Rectangle().fill(RexColor.border).frame(height: 1)
+                    }
+                    .ignoresSafeArea(edges: .top)
+                    .onAppear { topBarHeight = proxy.size.height }
+                    .onChange(of: proxy.size.height) { _, h in topBarHeight = h }
+            }
         )
+    }
+
+    private var placesList: some View {
+        ScrollView {
+            VStack(spacing: RexSpacing.md) {
+                if sortedVisiblePlaces.isEmpty {
+                    Text("Nothing here yet")
+                        .font(RexFont.text(14))
+                        .foregroundStyle(RexColor.mutedForeground)
+                        .padding(.top, RexSpacing.xxl)
+                } else {
+                    ForEach(sortedVisiblePlaces) { place in
+                        Button { selectedPlace = place } label: {
+                            listRow(place)
+                        }
+                        .buttonStyle(.plain)
+                    }
+                }
+            }
+            .padding(.horizontal, RexSpacing.page)
+            .padding(.top, topBarHeight + RexSpacing.md)
+            .padding(.bottom, RexSpacing.xxxl)
+        }
+    }
+
+    private func listRow(_ place: MapPlace) -> some View {
+        HStack(spacing: RexSpacing.md) {
+            Group {
+                if let urlString = place.image_url, let url = URL(string: urlString) {
+                    AsyncImage(url: url) { phase in
+                        if let image = phase.image {
+                            image.resizable().aspectRatio(contentMode: .fill)
+                        } else {
+                            RexColor.muted
+                        }
+                    }
+                } else {
+                    RexColor.muted.overlay(
+                        Image(systemName: RexCategory(rawType: place.type).symbol)
+                            .foregroundStyle(RexColor.mutedForeground)
+                    )
+                }
+            }
+            .frame(width: 52, height: 52)
+            .clipShape(RoundedRectangle(cornerRadius: RexRadius.input, style: .continuous))
+
+            VStack(alignment: .leading, spacing: 3) {
+                Text(place.title)
+                    .font(RexFont.text(15, weight: .semibold))
+                    .foregroundStyle(RexColor.foreground)
+                    .lineLimit(1)
+                HStack(spacing: 6) {
+                    if place.recommendations.count == 1 {
+                        RexRatingBadge(raw: place.recommendations[0].rating, compact: true)
+                    } else {
+                        RexRatingAverageBadge(ratings: place.recommendations.map { $0.rating })
+                    }
+                    Text("\u{00B7} \(place.recommenderSummary)")
+                        .font(RexFont.text(12))
+                        .foregroundStyle(RexColor.mutedForeground)
+                        .lineLimit(1)
+                }
+            }
+
+            Spacer(minLength: RexSpacing.sm)
+            Image(systemName: "chevron.right")
+                .font(.system(size: 12, weight: .semibold))
+                .foregroundStyle(RexColor.mutedForeground)
+        }
+        .padding(RexSpacing.cardPadding)
+        .rexCard()
     }
 
     private func chip(_ title: String, active: Bool, action: @escaping () -> Void) -> some View {
