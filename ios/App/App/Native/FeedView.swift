@@ -24,6 +24,8 @@ struct FeedView: View {
     @State private var sortMode: SortMode = .recent
     @State private var likeCounts: [String: Int] = [:]
     @State private var query = ""
+    @FocusState private var searchFocused: Bool
+    @State private var noInspirationFor: RexCategory?
     @State private var myProfile: RexProfileDetail?
     @State private var editing: FeedRecommendation?
     @State private var addingToCollection: FeedRecommendation?
@@ -366,6 +368,13 @@ struct FeedView: View {
                 }
             }
 
+            // Tapping the empty search bar offers a shortcut past "type the
+            // exact thing you want" — pick a category, get handed a random
+            // Rex from it instead.
+            if searchFocused && query.isEmpty {
+                inspirationPanel
+            }
+
             if !availableCategories.isEmpty {
                 ScrollView(.horizontal, showsIndicators: false) {
                     HStack(spacing: RexSpacing.sm) {
@@ -448,6 +457,56 @@ struct FeedView: View {
         .buttonStyle(.plain)
     }
 
+    /// "Need Inspiration Fast?" — a shortcut for when you know the vibe you
+    /// want but not the specific thing, picking a random already-Rex'd item
+    /// from a category rather than making you scroll or type anything.
+    private var inspirationPanel: some View {
+        VStack(alignment: .leading, spacing: RexSpacing.sm) {
+            Text("Need Inspiration Fast?")
+                .font(RexFont.text(15, weight: .semibold))
+                .foregroundStyle(RexColor.foreground)
+            Text("Pick a category and we'll hand you a random Rex.")
+                .font(RexFont.text(13))
+                .foregroundStyle(RexColor.mutedForeground)
+
+            ScrollView(.horizontal, showsIndicators: false) {
+                HStack(spacing: RexSpacing.sm) {
+                    ForEach(availableCategories, id: \.self) { category in
+                        filterChip(title: category.label, isActive: noInspirationFor == category) {
+                            surpriseMe(in: category)
+                        }
+                    }
+                }
+                .padding(.horizontal, 1)
+            }
+
+            if noInspirationFor != nil {
+                Text("Nothing left to surprise you with there yet.")
+                    .font(RexFont.text(12))
+                    .foregroundStyle(RexColor.mutedForeground)
+            }
+        }
+        .padding(RexSpacing.cardPadding)
+        .rexCard()
+    }
+
+    /// A random non-blast, non-want Rex from the given category. Drawn from
+    /// what's already loaded in the feed rather than a fresh query — this is
+    /// meant to feel instant, and everything it could surface is already in
+    /// memory.
+    private func surpriseMe(in category: RexCategory) {
+        let candidates = recommendations.filter {
+            !$0.isBlast && !$0.isWant && RexCategory(rawType: $0.items?.type) == category
+        }
+        guard let pick = candidates.randomElement() else {
+            noInspirationFor = category
+            return
+        }
+        noInspirationFor = nil
+        searchFocused = false
+        open(pick)
+    }
+
     private var searchField: some View {
         HStack(spacing: RexSpacing.sm) {
             Image(systemName: "magnifyingglass")
@@ -457,6 +516,7 @@ struct FeedView: View {
                 .font(RexFont.text(15))
                 .foregroundStyle(RexColor.foreground)
                 .autocorrectionDisabled()
+                .focused($searchFocused)
             if !query.isEmpty {
                 Button {
                     query = ""
