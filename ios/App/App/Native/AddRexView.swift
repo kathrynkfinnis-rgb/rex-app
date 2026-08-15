@@ -30,6 +30,13 @@ struct AddRexView: View {
     @State private var errorMessage: String?
     @State private var didPost = false
     @State private var didWant = false
+    /// The item just saved as "want to try" — kept around so the success
+    /// screen can offer an immediate undo. RexAPI already had removeWant for
+    /// this; there was just nowhere in Add-a-Rex that called it, so tapping
+    /// "Want to try" was a one-way door until you went and found it again in
+    /// Collections to swipe it away.
+    @State private var lastWantItemId: String?
+    @State private var isUndoingWant = false
 
     // Search-as-you-type against the external catalogues.
     @State private var hits: [RexSearchHit] = []
@@ -540,6 +547,7 @@ struct AddRexView: View {
                     note: note.trimmingCharacters(in: .whitespaces).isEmpty ? nil : note
                 )
                 didWant = true
+                lastWantItemId = itemId
             }
             withAnimation { didPost = true }
         } catch {
@@ -550,10 +558,23 @@ struct AddRexView: View {
 
     /// Clear the form but keep the category — you're usually adding another of
     /// the same kind. Tags deliberately don't carry over; that was a bug once.
+    private func undoWant() async {
+        guard let itemId = lastWantItemId else { return }
+        isUndoingWant = true
+        do {
+            try await RexAPI.shared.removeWant(itemId: itemId)
+            onDone()
+        } catch {
+            errorMessage = error.localizedDescription
+        }
+        isUndoingWant = false
+    }
+
     private func startAnother() {
         withAnimation {
             didPost = false
             didWant = false
+            lastWantItemId = nil
             title = ""
             note = ""
             productLink = ""
@@ -593,6 +614,29 @@ struct AddRexView: View {
             Button("Back to feed") { onDone() }
                 .font(RexFont.text(15, weight: .semibold))
                 .foregroundStyle(RexColor.primary)
+
+            // Tapping "Want to try" used to be a one-way door — the only
+            // way back was finding it in Collections and swiping it away.
+            if didWant, lastWantItemId != nil {
+                Button {
+                    Task { await undoWant() }
+                } label: {
+                    if isUndoingWant {
+                        ProgressView().tint(RexColor.destructive)
+                    } else {
+                        Text("Undo").font(RexFont.text(14, weight: .semibold))
+                    }
+                }
+                .foregroundStyle(RexColor.destructive)
+                .disabled(isUndoingWant)
+
+                if let errorMessage {
+                    Text(errorMessage)
+                        .font(.footnote)
+                        .foregroundStyle(RexColor.destructive)
+                        .multilineTextAlignment(.center)
+                }
+            }
         }
         .padding(32)
         .frame(maxWidth: .infinity)
