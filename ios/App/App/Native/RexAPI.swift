@@ -1111,6 +1111,28 @@ final class RexAPI {
         }
     }
 
+    /// Items are shared across everyone who's Rex'd them (not per-user like
+    /// the fields above), so this fixes the title for the catalogue entry
+    /// itself, not just your own take on it — same model already used for
+    /// repairPlacePhotoIfNeeded, and RLS already permits any authenticated
+    /// user to update an item, not just whoever first created it.
+    func updateItemTitle(itemId: String, title: String) async throws {
+        let token = try await validToken()
+        var components = URLComponents(url: baseURL.appendingPathComponent("/rest/v1/items"), resolvingAgainstBaseURL: false)!
+        components.queryItems = [URLQueryItem(name: "id", value: "eq.\(itemId)")]
+        var request = URLRequest(url: components.url!)
+        request.httpMethod = "PATCH"
+        request.setValue(anonKey, forHTTPHeaderField: "apikey")
+        request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        request.httpBody = try JSONSerialization.data(withJSONObject: ["title": title])
+
+        let (data, response) = try await URLSession.shared.data(for: request)
+        guard let http = response as? HTTPURLResponse, http.statusCode < 400 else {
+            throw RexAPIError.server(friendlyError(data, fallback: "Couldn't update the title."))
+        }
+    }
+
     func deleteRecommendation(id: String) async throws {
         let token = try await validToken()
         var components = URLComponents(url: baseURL.appendingPathComponent("/rest/v1/recommendations"), resolvingAgainstBaseURL: false)!

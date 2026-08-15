@@ -110,9 +110,13 @@ struct CollectionDetailView: View {
         .navigationBarTitleDisplayMode(.inline)
         .navigationDestination(item: $pushedItemId) { ItemDetailView(itemId: $0) }
         .toolbar {
-            if route.isMine {
-                ToolbarItem(placement: .topBarTrailing) {
-                    Menu {
+            // Shown for any collection, not just your own — there's no
+            // public web page for a collection yet (task #108), so this is
+            // a text summary rather than a link, but sharing a friend's
+            // list is just as reasonable as sharing your own.
+            ToolbarItem(placement: .topBarTrailing) {
+                Menu {
+                    if route.isMine {
                         Button { startRename() } label: { Label("Rename", systemImage: "pencil") }
 
                         Menu("Who can see it") {
@@ -120,13 +124,19 @@ struct CollectionDetailView: View {
                             visibilityButton("friends", "Friends", "person.2")
                             visibilityButton("public", "Anyone on REX", "globe")
                         }
+                    }
 
+                    ShareLink(item: shareText) {
+                        Label("Share", systemImage: "square.and.arrow.up")
+                    }
+
+                    if route.isMine {
                         Button(role: .destructive) { confirmingDelete = true } label: {
                             Label("Delete collection", systemImage: "trash")
                         }
-                    } label: {
-                        Image(systemName: "ellipsis.circle")
                     }
+                } label: {
+                    Image(systemName: "ellipsis.circle")
                 }
             }
         }
@@ -166,6 +176,21 @@ struct CollectionDetailView: View {
             Spacer()
         }
         .padding(.top, RexSpacing.sm)
+    }
+
+    /// A text summary rather than a link — there's no public web page for a
+    /// collection to point at (see the toolbar comment). Good enough for
+    /// "hey, check out this list of restaurants" over WhatsApp/iMessage/etc,
+    /// which was the actual ask; a real shareable link is separate follow-up
+    /// work if it turns out people want to open it back up in-app.
+    private var shareText: String {
+        var lines = ["\(emoji) \(name) on REX"]
+        let titles = rows.compactMap { $0.recommendations?.items?.title }
+        lines.append(contentsOf: titles.prefix(12).map { "\u{2022} \($0)" })
+        if titles.count > 12 {
+            lines.append("...and \(titles.count - 12) more")
+        }
+        return lines.joined(separator: "\n")
     }
 
     private var visibilityLabel: String {

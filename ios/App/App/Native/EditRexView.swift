@@ -9,6 +9,7 @@ struct EditRexView: View {
 
     @Environment(\.dismiss) private var dismiss
 
+    @State private var title: String
     @State private var rating: Double
     @State private var note: String
     @State private var photoURLs: [String]
@@ -22,6 +23,7 @@ struct EditRexView: View {
         self.rec = rec
         self.onSaved = onSaved
         self.onDeleted = onDeleted
+        _title = State(initialValue: rec.items?.title ?? "")
         _rating = State(initialValue: rec.rating)
         _note = State(initialValue: rec.note ?? "")
         _photoURLs = State(initialValue: rec.photo_urls ?? (rec.photo_url.map { [$0] } ?? []))
@@ -32,10 +34,19 @@ struct EditRexView: View {
         NavigationStack {
             ScrollView {
                 VStack(alignment: .leading, spacing: RexSpacing.xl) {
-                    if let item = rec.items {
-                        Text(item.title)
-                            .font(RexFont.display(22, weight: .semibold))
-                            .foregroundStyle(RexColor.foreground)
+                    if rec.items != nil {
+                        VStack(alignment: .leading, spacing: RexSpacing.sm) {
+                            Text("Title").font(RexFont.text(14, weight: .semibold))
+                            // This is the shared catalogue entry's title, not
+                            // just your own take on it — anyone who's Rex'd
+                            // the same thing sees the fix too, same as
+                            // correcting a place's address does. Worth it:
+                            // there was previously no way to fix a typo'd
+                            // title at all, short of deleting and re-adding.
+                            TextField("Title", text: $title)
+                                .font(RexFont.display(22, weight: .semibold))
+                                .foregroundStyle(RexColor.foreground)
+                        }
                     }
 
                     VStack(alignment: .leading, spacing: RexSpacing.sm) {
@@ -154,11 +165,21 @@ struct EditRexView: View {
     }
 
     private func save() async {
+        let trimmedTitle = title.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmedTitle.isEmpty else {
+            errorMessage = "Title can't be empty."
+            return
+        }
         isSaving = true
         errorMessage = nil
         // Commit a tag the user typed but didn't submit, so it isn't silently lost.
         addTag()
         do {
+            // Only actually hits the network if it changed — every other
+            // card sharing this item doesn't need a write on every save.
+            if let item = rec.items, trimmedTitle != item.title {
+                try await RexAPI.shared.updateItemTitle(itemId: rec.item_id, title: trimmedTitle)
+            }
             try await RexAPI.shared.updateRecommendation(
                 id: rec.id, rating: rating,
                 note: note.isEmpty ? nil : note,
