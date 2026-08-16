@@ -26,8 +26,11 @@ struct RexCardActions: View {
         // before a Button's intrinsic icon size does.
         HStack(spacing: RexSpacing.md) {
             action(
+                // .destructive (the spec's Error red), not .accent — accent
+                // is gold now, reserved for premium/award/featured contexts,
+                // and a liked heart isn't one of those.
                 icon: liked ? "heart.fill" : "heart",
-                tint: liked ? RexColor.accent : RexColor.mutedForeground,
+                tint: liked ? RexColor.destructive : RexColor.mutedForeground,
                 count: likeCount,
                 label: liked ? "Unlike" : "Like"
             ) {

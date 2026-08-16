@@ -17,44 +17,49 @@ extension Color {
 /// Premium editorial palette — FT / Linear / Notion in feel: calm, spacious,
 /// mostly neutral. Roughly 85% white and warm neutrals, 10% forest green,
 /// 5% accent. Colour is used sparingly and deliberately.
+///
+/// Supersedes the earlier "REX Brand Guidelines" khaki/oxblood palette below
+/// this comment used to describe — full swap, not a tweak, per the spec
+/// (Forest Green primary, warm white surfaces, gold reserved strictly for
+/// premium/award/featured contexts, never as a general accent).
 enum RexColor {
-    // Brand — four tones, clear roles (REX Brand Guidelines).
-    // Oxford Stone carries the surface, Chocolate carries text, Khaki Green
-    // carries brand recognition and primary action, Oxblood is selective
-    // emphasis only. Aim for large fields of stone with small, purposeful
-    // areas of the rest.
-    static let primary = Color(hex: "4B5320")          // Khaki Green
-    static let primaryPressed = Color(hex: "3C421A")
-    static let primaryForeground = Color(hex: "F5EFE6")
-    static let moss = Color(hex: "6B7340")
+    // Brand
+    static let primary = Color(hex: "173626")          // Forest Green
+    static let primaryPressed = Color(hex: "10271C")   // Hover / Pressed
+    static let primaryForeground = Color(hex: "FFFFFF")
+    static let moss = Color(hex: "4D6B56")             // Secondary Green
 
     // Surfaces
-    static let background = Color(hex: "F5EFE6")       // Oxford Stone
-    static let card = Color(hex: "FFFFFF")
-    static let border = Color(hex: "E3DACE")
-    static let divider = Color(hex: "EDE5D9")
+    static let background = Color(hex: "F8F8F5")       // Warm White
+    static let card = Color(hex: "FFFFFF")             // Pure White
+    static let border = Color(hex: "E2E5DE")
+    static let divider = Color(hex: "ECEEE8")
 
     // Text
-    static let foreground = Color(hex: "3A2E22")       // Chocolate
-    static let mutedForeground = Color(hex: "7A6A58")
-    static let placeholder = Color(hex: "A89785")
-    static let disabled = Color(hex: "C4B7A6")
+    static let foreground = Color(hex: "1D1D1D")       // Charcoal
+    static let mutedForeground = Color(hex: "666A66")  // Soft Grey
+    static let placeholder = Color(hex: "9A9C98")
+    static let disabled = Color(hex: "BCBEB8")
 
     // Status
-    static let success = Color(hex: "4B5320")
-    /// Oxblood — accent and emphasis only, never the default action colour.
-    static let accent = Color(hex: "6B2A2A")
-    static let destructive = Color(hex: "6B2A2A")
-    static let gold = Color(hex: "6B2A2A")
+    static let success = Color(hex: "2E7D32")
+    static let warning = Color(hex: "C79A3B")
+    static let destructive = Color(hex: "B44A3A")      // Error
+    /// Gold — reserved for premium indicators, awards, membership and
+    /// featured status (leaderboard crown, star ratings, "Hot"/"Asking"
+    /// highlight badges). Per spec: never a general-purpose accent colour,
+    /// so don't reach for this for anything that isn't one of those.
+    static let accent = Color(hex: "C79A3B")
+    static let gold = Color(hex: "C79A3B")
 
     // Badges
-    static let badgeBackground = Color(hex: "EAE4D8")
-    static let badgeForeground = Color(hex: "4B5320")
+    static let badgeBackground = Color(hex: "EEF1EC")
+    static let badgeForeground = Color(hex: "4D6B56")  // Moss
 
-    // Kept for existing call sites.
-    static let muted = Color(hex: "EDE5D9")
-    static let secondary = Color(hex: "EAE4D8")
-    static let secondaryForeground = Color(hex: "4B5320")
+    // Kept for existing call sites; aligned to the nearest spec token.
+    static let muted = Color(hex: "E2E5DE")
+    static let secondary = Color(hex: "EEF1EC")
+    static let secondaryForeground = Color(hex: "4D6B56")
 }
 
 /// Corner radii from the spec.
@@ -125,6 +130,20 @@ struct RexSecondaryButtonStyle: ButtonStyle {
                 RoundedRectangle(cornerRadius: RexRadius.button, style: .continuous)
                     .stroke(RexColor.primary, lineWidth: 1)
             )
+    }
+}
+
+/// Ghost action: transparent background, forest-green label only — the
+/// spec's third button tier, for the lowest-emphasis actions (inline
+/// dismissals, "skip" links) that shouldn't compete with a real button.
+struct RexGhostButtonStyle: ButtonStyle {
+    func makeBody(configuration: Configuration) -> some View {
+        configuration.label
+            .font(.system(size: 16, weight: .semibold))
+            .foregroundStyle(RexColor.primary)
+            .opacity(configuration.isPressed ? 0.6 : 1)
+            .frame(maxWidth: .infinity)
+            .frame(height: 50)
     }
 }
 
