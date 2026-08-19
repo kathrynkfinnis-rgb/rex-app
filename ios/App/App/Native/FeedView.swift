@@ -16,6 +16,7 @@ struct FeedView: View {
     /// A sheet, not a NavigationLink push — see the comment on the avatar
     /// button for why.
     @State private var showingProfile = false
+    @State private var showingExplainer = false
     @State private var filter: RexCategory?
     @State private var subFilter: String?
     @State private var blastsOnly = false
@@ -293,13 +294,20 @@ struct FeedView: View {
             }
             .toolbar {
                 ToolbarItem(placement: .topBarLeading) {
-                    // The supplied wordmark artwork, used without distortion
+                    // #102 (Gemma) — tapping the logo explains what the app
+                    // is, for while awareness is still low. The wordmark
+                    // artwork itself is unchanged, used without distortion
                     // per the brand guidelines.
-                    Image("RexWordmark")
-                        .resizable()
-                        .scaledToFit()
-                        .frame(height: 20)
-                        .accessibilityLabel("REX")
+                    Button {
+                        showingExplainer = true
+                    } label: {
+                        Image("RexWordmark")
+                            .resizable()
+                            .scaledToFit()
+                            .frame(height: 20)
+                            .accessibilityLabel("REX — what is this app?")
+                    }
+                    .buttonStyle(.plain)
                 }
                 ToolbarItem(placement: .topBarTrailing) {
                     HStack(spacing: RexSpacing.lg) {
@@ -369,6 +377,10 @@ struct FeedView: View {
         }
         .sheet(isPresented: $showingProfile, onDismiss: { Task { await loadFeed() } }) {
             ProfileView(onSignedOut: onSignedOut)
+        }
+        .sheet(isPresented: $showingExplainer) {
+            RexExplainerView()
+                .presentationDetents([.height(360)])
         }
     }
 

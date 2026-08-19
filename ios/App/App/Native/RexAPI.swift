@@ -1026,6 +1026,30 @@ final class RexAPI {
         }
     }
 
+    /// #102 onboarding's "what are you interested in" step. Best-effort by
+    /// design — called with `try?` from OnboardingView, since a failed save
+    /// here shouldn't block someone from reaching their feed. Needs
+    /// migration 20260816070000 run first; until then this just 400s
+    /// quietly and the answer is lost, same tradeoff fetchRexCounts and
+    /// friends make elsewhere in this file for not-yet-migrated columns.
+    func updateInterests(_ categories: [RexCategory]) async throws {
+        let token = try await validToken()
+        guard let userId = currentUserId else { throw RexAPIError.notSignedIn }
+        var components = URLComponents(url: baseURL.appendingPathComponent("/rest/v1/profiles"), resolvingAgainstBaseURL: false)!
+        components.queryItems = [URLQueryItem(name: "id", value: "eq.\(userId)")]
+        var request = URLRequest(url: components.url!)
+        request.httpMethod = "PATCH"
+        request.setValue(anonKey, forHTTPHeaderField: "apikey")
+        request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        request.httpBody = try JSONSerialization.data(withJSONObject: ["interests": categories.map(\.rawValue)])
+
+        let (data, response) = try await URLSession.shared.data(for: request)
+        guard let http = response as? HTTPURLResponse, http.statusCode < 400 else {
+            throw RexAPIError.server(friendlyError(data, fallback: "Couldn't save that."))
+        }
+    }
+
     // MARK: - Photos
 
     /// Uploads image data to the rec-photos bucket and returns a long-lived

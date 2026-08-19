@@ -45,6 +45,8 @@
 		FEED048B0000000000000000 /* AddToTripView.swift in Sources */ = {isa = PBXBuildFile; fileRef = FEED048A0000000000000000 /* AddToTripView.swift */; };
 		FEED049B0000000000000000 /* ListsImportView.swift in Sources */ = {isa = PBXBuildFile; fileRef = FEED049A0000000000000000 /* ListsImportView.swift */; };
 		FEED050B0000000000000000 /* ImportReviewView.swift in Sources */ = {isa = PBXBuildFile; fileRef = FEED050A0000000000000000 /* ImportReviewView.swift */; };
+		FEED051B0000000000000000 /* RexExplainerView.swift in Sources */ = {isa = PBXBuildFile; fileRef = FEED051A0000000000000000 /* RexExplainerView.swift */; };
+		FEED052B0000000000000000 /* OnboardingView.swift in Sources */ = {isa = PBXBuildFile; fileRef = FEED052A0000000000000000 /* OnboardingView.swift */; };
 		FEED035B0000000000000000 /* NewCollectionView.swift in Sources */ = {isa = PBXBuildFile; fileRef = FEED035A0000000000000000 /* NewCollectionView.swift */; };
 		FEED037B0000000000000000 /* AppleSignInButton.swift in Sources */ = {isa = PBXBuildFile; fileRef = FEED037A0000000000000000 /* AppleSignInButton.swift */; };
 		FEED031B0000000000000000 /* AskForRexView.swift in Sources */ = {isa = PBXBuildFile; fileRef = FEED031A0000000000000000 /* AskForRexView.swift */; };
@@ -106,6 +108,8 @@
 		FEED048A0000000000000000 /* AddToTripView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AddToTripView.swift; sourceTree = "<group>"; };
 		FEED049A0000000000000000 /* ListsImportView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ListsImportView.swift; sourceTree = "<group>"; };
 		FEED050A0000000000000000 /* ImportReviewView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ImportReviewView.swift; sourceTree = "<group>"; };
+		FEED051A0000000000000000 /* RexExplainerView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RexExplainerView.swift; sourceTree = "<group>"; };
+		FEED052A0000000000000000 /* OnboardingView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OnboardingView.swift; sourceTree = "<group>"; };
 		FEED035A0000000000000000 /* NewCollectionView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NewCollectionView.swift; sourceTree = "<group>"; };
 		FEED037A0000000000000000 /* AppleSignInButton.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppleSignInButton.swift; sourceTree = "<group>"; };
 		FEED036A0000000000000000 /* App.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = App.entitlements; sourceTree = "<group>"; };
@@ -205,6 +209,8 @@
 				FEED048A0000000000000000 /* AddToTripView.swift */,
 				FEED049A0000000000000000 /* ListsImportView.swift */,
 				FEED050A0000000000000000 /* ImportReviewView.swift */,
+				FEED051A0000000000000000 /* RexExplainerView.swift */,
+				FEED052A0000000000000000 /* OnboardingView.swift */,
 				FEED035A0000000000000000 /* NewCollectionView.swift */,
 				FEED037A0000000000000000 /* AppleSignInButton.swift */,
 				FEED031A0000000000000000 /* AskForRexView.swift */,
@@ -341,6 +347,8 @@
 				FEED048B0000000000000000 /* AddToTripView.swift in Sources */,
 				FEED049B0000000000000000 /* ListsImportView.swift in Sources */,
 				FEED050B0000000000000000 /* ImportReviewView.swift in Sources */,
+				FEED051B0000000000000000 /* RexExplainerView.swift in Sources */,
+				FEED052B0000000000000000 /* OnboardingView.swift in Sources */,
 				FEED035B0000000000000000 /* NewCollectionView.swift in Sources */,
 				FEED037B0000000000000000 /* AppleSignInButton.swift in Sources */,
 				FEED031B0000000000000000 /* AskForRexView.swift in Sources */,
