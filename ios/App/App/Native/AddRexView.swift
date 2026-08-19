@@ -196,7 +196,7 @@ struct AddRexView: View {
             }
 
             if category == .recipe {
-                RecipeEditorView(recipeText: $recipeText)
+                RecipeEditorView(recipeText: $recipeText, title: $title)
             }
 
             if let options = rexSubcategories[category], !options.isEmpty {
@@ -529,6 +529,14 @@ struct AddRexView: View {
                 hit: picked,
                 genre: subcategories.isEmpty ? nil : subcategories.sorted().joined(separator: ", "),
                 linkURL: productLink.trimmingCharacters(in: .whitespaces).isEmpty ? nil : productLink.trimmingCharacters(in: .whitespaces),
+                // #21 "guaranteed image": recipes have no catalogue to
+                // auto-import a cover photo from the way books/movies do,
+                // so every recipe card fell back to the same generic
+                // fork-and-knife placeholder. If a photo was attached to
+                // the post, promote it to the item's own cover too - fine
+                // if there isn't one (no forced upload step), but a real
+                // photo when there is one.
+                imageURL: category == .recipe ? photoURLs.first : nil,
                 recipeText: category == .recipe && !recipeText.isEmpty ? recipeText : nil
             )
             // Trip stops become their own Rex, linked to the trip.

@@ -2103,6 +2103,32 @@ final class RexAPI {
         return try JSONDecoder().decode(Response.self, from: data).items
     }
 
+    /// #21 — a photo of a recipe (cookbook page, handwritten card,
+    /// screenshot) transcribed to plain text. The caller feeds the result
+    /// through RexRecipe.parse(), same as "paste whole recipe" — this only
+    /// does the OCR/transcription step, not structured extraction, so
+    /// photo-import and paste-import end up behaving identically.
+    func extractRecipeFromPhoto(_ jpegData: Data) async throws -> (title: String?, text: String) {
+        let token = try await validToken()
+        var request = URLRequest(url: baseURL.appendingPathComponent("/functions/v1/extract-recipe-photo"))
+        request.httpMethod = "POST"
+        request.setValue(anonKey, forHTTPHeaderField: "apikey")
+        request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        request.httpBody = try JSONSerialization.data(withJSONObject: [
+            "imageBase64": jpegData.base64EncodedString(),
+            "mediaType": "image/jpeg",
+        ])
+
+        let (data, response) = try await URLSession.shared.data(for: request)
+        guard let http = response as? HTTPURLResponse, http.statusCode < 400 else {
+            throw RexAPIError.server(friendlyError(data, fallback: "Couldn't read that recipe photo."))
+        }
+        struct Response: Codable { let title: String?; let text: String }
+        let decoded = try JSONDecoder().decode(Response.self, from: data)
+        return (decoded.title, decoded.text)
+    }
+
     /// Stages extracted items for review — nothing becomes a real Rex until
     /// the user approves it (individually, or in bulk as a trip/collection).
     @discardableResult

@@ -1,4 +1,5 @@
 import SwiftUI
+import PhotosUI
 
 /// Recipe text parsing, mirroring src/lib/recipe.ts so a recipe written on
 /// the phone and one written on the web round-trip identically.
@@ -95,12 +96,20 @@ enum RexRecipe {
 /// build it line by line. Restores the web behaviour testers missed.
 struct RecipeEditorView: View {
     @Binding var recipeText: String
+    /// #21 — filled in from a transcribed photo's title, if the source
+    /// field is still empty when one comes back. Optional so existing call
+    /// sites that don't care about this keep compiling unchanged.
+    var title: Binding<String>? = nil
 
     @State private var ingredients: [String] = [""]
     @State private var method: [String] = [""]
     @State private var showPaste = false
     @State private var pasteBuffer = ""
     @State private var loaded = false
+
+    @State private var photoSelection: PhotosPickerItem?
+    @State private var isImportingPhoto = false
+    @State private var importError: String?
 
     var body: some View {
         VStack(alignment: .leading, spacing: RexSpacing.lg) {
@@ -109,6 +118,28 @@ struct RecipeEditorView: View {
                     .font(RexFont.text(14, weight: .semibold))
                     .foregroundStyle(RexColor.foreground)
                 Spacer()
+                // #21 — a photo of a cookbook page, handwritten card, or
+                // screenshot, transcribed and split the same way pasted
+                // text is. PhotosPickerItem rather than a plain Button so
+                // this is one tap straight into the library, no
+                // intermediate sheet.
+                PhotosPicker(selection: $photoSelection, matching: .images) {
+                    HStack(spacing: 4) {
+                        if isImportingPhoto {
+                            ProgressView().controlSize(.mini)
+                        } else {
+                            Image(systemName: "camera").font(.system(size: 11))
+                        }
+                        Text("Import from photo").font(RexFont.text(12, weight: .medium))
+                    }
+                    .foregroundStyle(RexColor.primary)
+                    .padding(.horizontal, RexSpacing.md)
+                    .padding(.vertical, 6)
+                    .background(RexColor.badgeBackground)
+                    .clipShape(Capsule())
+                }
+                .disabled(isImportingPhoto)
+
                 Button {
                     showPaste.toggle()
                 } label: {
@@ -123,6 +154,12 @@ struct RecipeEditorView: View {
                     .clipShape(Capsule())
                 }
                 .buttonStyle(.plain)
+            }
+
+            if let importError {
+                Text(importError)
+                    .font(RexFont.text(12))
+                    .foregroundStyle(RexColor.destructive)
             }
 
             if showPaste {
@@ -167,6 +204,10 @@ struct RecipeEditorView: View {
         }
         .onChange(of: ingredients) { _, _ in push() }
         .onChange(of: method) { _, _ in push() }
+        .onChange(of: photoSelection) { _, item in
+            guard let item else { return }
+            Task { await importFromPhoto(item) }
+        }
     }
 
     private func section(title: String, items: Binding<[String]>, placeholder: String) -> some View {
@@ -242,5 +283,36 @@ struct RecipeEditorView: View {
 
     private func push() {
         recipeText = RexRecipe.serialize(ingredients: ingredients, method: method)
+    }
+
+    private func importFromPhoto(_ item: PhotosPickerItem) async {
+        isImportingPhoto = true
+        importError = nil
+        defer { photoSelection = nil; isImportingPhoto = false }
+        do {
+            guard let data = try await item.loadTransferable(type: Data.self) else { return }
+            let jpeg = downscaledJPEG(data)
+            let (extractedTitle, text) = try await RexAPI.shared.extractRecipeFromPhoto(jpeg)
+            guard !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
+                importError = "Couldn't find a recipe in that photo — try a clearer shot, or paste it as text instead."
+                return
+            }
+            let parsed = RexRecipe.parse(text)
+            if parsed.ingredients.isEmpty && parsed.method.isEmpty {
+                // Same fallback as applyPaste(): unrecognisable shape, but
+                // don't lose what was transcribed.
+                method = [text.trimmingCharacters(in: .whitespaces)]
+            } else {
+                if !parsed.ingredients.isEmpty { ingredients = parsed.ingredients }
+                if !parsed.method.isEmpty { method = parsed.method }
+            }
+            if let extractedTitle, !extractedTitle.isEmpty,
+               let title, title.wrappedValue.trimmingCharacters(in: .whitespaces).isEmpty {
+                title.wrappedValue = extractedTitle
+            }
+            push()
+        } catch {
+            importError = error.localizedDescription
+        }
     }
 }
