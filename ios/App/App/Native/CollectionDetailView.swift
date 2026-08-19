@@ -1,10 +1,12 @@
 import SwiftUI
 import UniformTypeIdentifiers
 
-struct CollectionRoute: Hashable {
+struct CollectionRoute: Hashable, Identifiable {
     let listId: String
     let name: String
     let isMine: Bool
+
+    var id: String { listId }
 }
 
 /// One collection, opened up. Yours can be renamed, shared wider, or emptied;

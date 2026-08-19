@@ -284,6 +284,39 @@ struct TopRexxer: Codable, Identifiable {
     var id: String { user_id }
 }
 
+/// Explore tab. Most-Rex'd items this week, from trending_items_weekly.
+struct TrendingItem: Codable, Identifiable {
+    let item_id: String
+    let title: String
+    let subtitle: String?
+    let image_url: String?
+    let type: String
+    let rex_count: Int
+
+    var id: String { item_id }
+}
+
+/// Explore tab. A shelf curated by the named REX team members — either
+/// their own pick or something credited elsewhere via source_label.
+struct EditorialCollection: Codable, Identifiable {
+    let id: String
+    let title: String
+    let source_label: String
+    let category: String?
+    let editorial_collection_items: [EditorialCollectionItem]?
+
+    var items: [EditorialCollectionItem] { editorial_collection_items ?? [] }
+}
+
+struct EditorialCollectionItem: Codable, Identifiable {
+    let id: String
+    let title: String
+    let subtitle: String?
+    let image_url: String?
+    let item_id: String?
+    let link_url: String?
+}
+
 // MARK: - Import (#109 "Lists" category, #15/#38 native trip import)
 
 /// One recommendation as the extraction edge function returned it, before

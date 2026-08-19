@@ -1759,6 +1759,76 @@ final class RexAPI {
         return ((try? JSONDecoder().decode([Row].self, from: data)) ?? []).compactMap { $0.hitlist_lists }
     }
 
+    /// Explore tab's "missed from your friends" shelf: every accepted
+    /// friend's visible collections, minus ones already followed or
+    /// collaborated on (those already have a home on the Collections tab,
+    /// so surfacing them again here would just be noise). One request per
+    /// friend, run concurrently — fine at friend-list sizes this app deals
+    /// with, same tradeoff CollectionsView's loadContents already makes.
+    func fetchFriendsCollectionsToExplore(limit: Int = 12) async throws -> [RexList] {
+        guard let userId = currentUserId else { throw RexAPIError.notSignedIn }
+        async let friendshipsTask = fetchFriendships()
+        async let followedTask = fetchFollowedLists()
+        async let collaboratingTask = fetchCollaboratingLists()
+        let (friendships, followed, collaborating) = try await (friendshipsTask, followedTask, collaboratingTask)
+
+        let friendIds = friendships
+            .filter { $0.status == "accepted" }
+            .map { $0.requester_id == userId ? $0.addressee_id : $0.requester_id }
+        guard !friendIds.isEmpty else { return [] }
+
+        let alreadyHave = Set((followed + collaborating).map(\.id))
+        let lists = await withTaskGroup(of: [RexList].self) { group in
+            for friendId in friendIds {
+                group.addTask { (try? await self.fetchLists(forUser: friendId)) ?? [] }
+            }
+            var all: [RexList] = []
+            for await lists in group { all.append(contentsOf: lists) }
+            return all
+        }
+
+        return lists
+            .filter { !alreadyHave.contains($0.id) }
+            .sorted { ($0.created_at ?? "") > ($1.created_at ?? "") }
+            .prefix(limit)
+            .map { $0 }
+    }
+
+    /// Explore tab's "trending this week" shelf.
+    func fetchTrendingItems(limit: Int = 12) async throws -> [TrendingItem] {
+        let token = try await validToken()
+        var request = URLRequest(url: baseURL.appendingPathComponent("/rest/v1/rpc/trending_items_weekly"))
+        request.httpMethod = "POST"
+        request.setValue(anonKey, forHTTPHeaderField: "apikey")
+        request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        request.httpBody = try JSONSerialization.data(withJSONObject: ["_limit": limit])
+
+        let (data, response) = try await URLSession.shared.data(for: request)
+        // Best-effort: needs migration 20260816094500 run first.
+        guard let http = response as? HTTPURLResponse, http.statusCode < 400 else { return [] }
+        return (try? JSONDecoder().decode([TrendingItem].self, from: data)) ?? []
+    }
+
+    /// Explore tab's REX-curated shelves ("REX Team" picks and anything
+    /// credited to an outside source, both written by the three named
+    /// curators — see is_rex_curator() in the migration).
+    func fetchEditorialCollections() async throws -> [EditorialCollection] {
+        let token = try await validToken()
+        var components = URLComponents(url: baseURL.appendingPathComponent("/rest/v1/editorial_collections"), resolvingAgainstBaseURL: false)!
+        components.queryItems = [
+            URLQueryItem(name: "select", value: "id,title,source_label,category,editorial_collection_items(id,title,subtitle,image_url,item_id,link_url,sort_order)"),
+            URLQueryItem(name: "order", value: "sort_order.asc"),
+        ]
+        var request = URLRequest(url: components.url!)
+        request.setValue(anonKey, forHTTPHeaderField: "apikey")
+        request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+        let (data, response) = try await URLSession.shared.data(for: request)
+        // Best-effort: needs migration 20260816094500 run first.
+        guard let http = response as? HTTPURLResponse, http.statusCode < 400 else { return [] }
+        return (try? JSONDecoder().decode([EditorialCollection].self, from: data)) ?? []
+    }
+
     /// Posts saved from other people — the Pinterest-style half of Collections.
     func fetchSavedPosts() async throws -> [SavedPost] {
         let token = try await validToken()

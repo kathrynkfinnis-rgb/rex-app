@@ -16,7 +16,6 @@ struct FeedView: View {
     /// A sheet, not a NavigationLink push — see the comment on the avatar
     /// button for why.
     @State private var showingProfile = false
-    @State private var showingExplainer = false
     @State private var filter: RexCategory?
     @State private var subFilter: String?
     @State private var blastsOnly = false
@@ -294,23 +293,31 @@ struct FeedView: View {
             }
             .toolbar {
                 ToolbarItem(placement: .topBarLeading) {
-                    // #102 (Gemma) — tapping the logo explains what the app
-                    // is, for while awareness is still low. The wordmark
-                    // artwork itself is unchanged, used without distortion
+                    // Non-interactive — Explore has its own tab now (see
+                    // MainTabView), so the logo doesn't need to do anything.
+                    // The supplied wordmark artwork, used without distortion
                     // per the brand guidelines.
-                    Button {
-                        showingExplainer = true
-                    } label: {
-                        Image("RexWordmark")
-                            .resizable()
-                            .scaledToFit()
-                            .frame(height: 20)
-                            .accessibilityLabel("REX — what is this app?")
-                    }
-                    .buttonStyle(.plain)
+                    Image("RexWordmark")
+                        .resizable()
+                        .scaledToFit()
+                        .frame(height: 20)
+                        .accessibilityLabel("REX")
                 }
                 ToolbarItem(placement: .topBarTrailing) {
                     HStack(spacing: RexSpacing.lg) {
+                        // Moved up from the bottom tab bar's raised centre
+                        // button — trialing it living next to the profile
+                        // avatar instead, freeing that bottom-centre slot
+                        // for the new Explore tab.
+                        Button {
+                            showingAddRex = true
+                        } label: {
+                            Image(systemName: "plus.circle.fill")
+                                .font(.system(size: 20))
+                                .foregroundStyle(RexColor.primary)
+                        }
+                        .accessibilityLabel("Add a Rex")
+
                         NavigationLink(value: FeedbackRoute()) {
                             Image(systemName: "exclamationmark.bubble")
                                 .font(.system(size: 18))
@@ -377,10 +384,6 @@ struct FeedView: View {
         }
         .sheet(isPresented: $showingProfile, onDismiss: { Task { await loadFeed() } }) {
             ProfileView(onSignedOut: onSignedOut)
-        }
-        .sheet(isPresented: $showingExplainer) {
-            RexExplainerView()
-                .presentationDetents([.height(360)])
         }
     }
 
