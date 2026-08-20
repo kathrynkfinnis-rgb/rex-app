@@ -25,6 +25,7 @@ struct ItemDetailView: View {
             } else if let item {
                 VStack(alignment: .leading, spacing: 0) {
                     header(item: item)
+                    recipeSection(item: item)
                     yourTakeSection
                     friendsSection
                     googleSection
@@ -133,6 +134,54 @@ struct ItemDetailView: View {
             }
         }
         .padding(16)
+    }
+
+    // #126 — recipe_text saved correctly on post; this is the other half
+    // of the fix, actually showing it. Reuses RecipeEditorView's own
+    // Ingredients/Method splitter so a pasted or photo-auto-populated
+    // recipe reads back the same shape it was reviewed in before posting.
+    @ViewBuilder
+    private func recipeSection(item: RexItem) -> some View {
+        if let text = item.recipe_text, !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+            let parsed = RexRecipe.parse(text)
+            VStack(alignment: .leading, spacing: 12) {
+                if !parsed.ingredients.isEmpty {
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text("Ingredients")
+                            .font(.system(size: 15, weight: .semibold, design: .rounded))
+                            .foregroundStyle(RexColor.foreground)
+                        ForEach(parsed.ingredients, id: \.self) { line in
+                            Text("\u{2022} \(line)")
+                                .font(.system(size: 13))
+                                .foregroundStyle(RexColor.foreground)
+                        }
+                    }
+                }
+                if !parsed.method.isEmpty {
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text("Method")
+                            .font(.system(size: 15, weight: .semibold, design: .rounded))
+                            .foregroundStyle(RexColor.foreground)
+                        ForEach(Array(parsed.method.enumerated()), id: \.offset) { index, line in
+                            Text("\(index + 1). \(line)")
+                                .font(.system(size: 13))
+                                .foregroundStyle(RexColor.foreground)
+                        }
+                    }
+                }
+                // A recipe that didn't parse into recognizable sections —
+                // pasted as one freeform block — still deserves to show up
+                // rather than silently vanishing.
+                if parsed.ingredients.isEmpty && parsed.method.isEmpty {
+                    Text(text)
+                        .font(.system(size: 13))
+                        .foregroundStyle(RexColor.foreground)
+                }
+            }
+            .padding(16)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .background(RexColor.card)
+        }
     }
 
     private var yourTakeSection: some View {

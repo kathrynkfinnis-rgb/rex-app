@@ -370,7 +370,12 @@ final class RexAPI {
         // Ask for them, but fall back to the base columns rather than failing the
         // whole page — an item detail that can't open is far worse than a missing
         // star rating. Drop the fallback once the migration is everywhere.
-        let base = "id,type,title,subtitle,image_url,genre,address"
+        // #126 — recipe_text was written on create (createItem already sent
+        // it) but never read back: fetchItem's select stopped at "address",
+        // so a pasted/auto-populated recipe saved fine and then simply had
+        // nowhere to display, matching "doesn't seem to have pulled
+        // through... even though I checked it and posted it."
+        let base = "id,type,title,subtitle,image_url,genre,address,recipe_text"
         if let item = try? await fetchItem(id: id, select: base + ",google_rating,google_rating_count") {
             return item
         }
@@ -930,21 +935,27 @@ final class RexAPI {
         return try JSONDecoder().decode([RexProfileDetail].self, from: data)
     }
 
+    /// #128 — this used to SELECT /rest/v1/profiles directly with an
+    /// ilike filter, which reads correctly but was silently defeated by
+    /// the RLS policy migration 20260727142816 tightened profiles SELECT
+    /// down to "self, friends, or a pending friendship row" — so searching
+    /// for anyone you're not already connected to (the whole point of
+    /// searching) came back empty, 200 OK, no error. That same migration
+    /// added a search_profiles() SECURITY DEFINER RPC specifically to
+    /// bypass this for search, but the native app never called it. Now it
+    /// does.
     func searchProfilesByUsername(_ query: String) async throws -> [RexProfileDetail] {
         let token = try await validToken()
-        var components = URLComponents(url: baseURL.appendingPathComponent("/rest/v1/profiles"), resolvingAgainstBaseURL: false)!
-        components.queryItems = [
-            URLQueryItem(name: "select", value: "id,username,display_name,avatar_url"),
-            URLQueryItem(name: "or", value: "(username.ilike.*\(query)*,display_name.ilike.*\(query)*)"),
-            URLQueryItem(name: "limit", value: "15"),
-        ]
-        var request = URLRequest(url: components.url!)
+        var request = URLRequest(url: baseURL.appendingPathComponent("/rest/v1/rpc/search_profiles"))
+        request.httpMethod = "POST"
         request.setValue(anonKey, forHTTPHeaderField: "apikey")
         request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        request.httpBody = try JSONSerialization.data(withJSONObject: ["_query": query, "_limit": 15])
 
         let (data, response) = try await URLSession.shared.data(for: request)
         guard let http = response as? HTTPURLResponse, http.statusCode < 400 else {
-            throw RexAPIError.server("Search failed.")
+            throw RexAPIError.server(friendlyError(data, fallback: "Search failed."))
         }
         return try JSONDecoder().decode([RexProfileDetail].self, from: data)
     }

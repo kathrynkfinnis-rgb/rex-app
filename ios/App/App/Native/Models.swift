@@ -10,8 +10,10 @@ struct RexItem: Codable {
     let address: String?
     let google_rating: Double?
     let google_rating_count: Int?
+    /// #126 — saved fine on create, just never selected back until now.
+    let recipe_text: String?
 
-    init(id: String, type: String, title: String, subtitle: String?, image_url: String?, genre: String?, address: String? = nil, google_rating: Double? = nil, google_rating_count: Int? = nil) {
+    init(id: String, type: String, title: String, subtitle: String?, image_url: String?, genre: String?, address: String? = nil, google_rating: Double? = nil, google_rating_count: Int? = nil, recipe_text: String? = nil) {
         self.id = id
         self.type = type
         self.title = title
@@ -21,6 +23,7 @@ struct RexItem: Codable {
         self.address = address
         self.google_rating = google_rating
         self.google_rating_count = google_rating_count
+        self.recipe_text = recipe_text
     }
 }
 
