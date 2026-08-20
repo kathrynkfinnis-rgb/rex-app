@@ -370,13 +370,12 @@ private struct EditStagingRowSheet: View {
                             .font(RexFont.text(14))
                             .tint(RexColor.primary)
                         if hasRating {
-                            HStack {
-                                Slider(value: $rating, in: 1...10, step: 1)
-                                Text("\(Int(rating))/10")
-                                    .font(RexFont.text(13, weight: .semibold))
-                                    .foregroundStyle(RexColor.mutedForeground)
-                                    .frame(width: 40, alignment: .trailing)
-                            }
+                            // Same five-tier emoji scale as everywhere else
+                            // a rating is set (Add a Rex, Edit a Rex, trip
+                            // stops) — this sheet was still on the old
+                            // ten-crown slider, the one place in the app
+                            // that had fallen out of step.
+                            RexRatingPicker(value: $rating)
                         }
                     }
 
