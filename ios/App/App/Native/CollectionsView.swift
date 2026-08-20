@@ -310,7 +310,7 @@ struct CollectionsView: View {
                             }
                         )
                 } else {
-                    thumbnailGrid(thumbnails)
+                    ThumbnailGridView(urls: thumbnails)
                 }
                 if locked {
                     Image(systemName: "lock.fill")
@@ -335,10 +335,16 @@ struct CollectionsView: View {
             .frame(width: 128, height: 128)
             .clipShape(RoundedRectangle(cornerRadius: RexRadius.card, style: .continuous))
 
+            // #127: was lineLimit(1) — a long collection name just cut off
+            // mid-word with an ellipsis. Two lines, with a reserved height
+            // so 1-line and 2-line titles still line up across the same
+            // horizontal shelf.
             Text(title)
                 .font(RexFont.text(13, weight: .semibold))
                 .foregroundStyle(RexColor.foreground)
-                .lineLimit(1)
+                .lineLimit(2)
+                .multilineTextAlignment(.leading)
+                .frame(height: 34, alignment: .top)
             Text(count == 1 ? "1 item" : "\(count) items")
                 .font(RexFont.text(11))
                 .foregroundStyle(RexColor.mutedForeground)
@@ -346,38 +352,9 @@ struct CollectionsView: View {
         .frame(width: 128, alignment: .leading)
     }
 
-    @ViewBuilder
-    private func thumbnailGrid(_ urls: [String]) -> some View {
-        let cells = Array(urls.prefix(4))
-        Grid(horizontalSpacing: 2, verticalSpacing: 2) {
-            GridRow {
-                gridCell(cells.count > 0 ? cells[0] : nil)
-                gridCell(cells.count > 1 ? cells[1] : nil)
-            }
-            GridRow {
-                gridCell(cells.count > 2 ? cells[2] : nil)
-                gridCell(cells.count > 3 ? cells[3] : nil)
-            }
-        }
-        .background(RexColor.muted)
-    }
-
-    @ViewBuilder
-    private func gridCell(_ url: String?) -> some View {
-        Group {
-            if let url, let parsed = URL(string: url) {
-                AsyncImage(url: parsed) { phase in
-                    if let image = phase.image {
-                        image.resizable().aspectRatio(contentMode: .fill)
-                    } else { RexColor.muted }
-                }
-            } else {
-                RexColor.muted
-            }
-        }
-        .frame(width: 62, height: 62)
-        .clipped()
-    }
+    // thumbnailGrid/gridCell moved to ThumbnailGridView.swift (#131) — now
+    // shared with Explore's friend-collection cards instead of living only
+    // here.
 
     private func seeAllTile(destination: CollectionsSectionRoute.Section) -> some View {
         NavigationLink(value: CollectionsSectionRoute(section: destination)) {

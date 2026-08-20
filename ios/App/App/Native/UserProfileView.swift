@@ -181,10 +181,13 @@ struct UserProfileView: View {
             }
             .buttonStyle(.plain)
 
+            // Same #127 fix applied here too — one more spot with the same
+            // truncated-title complaint.
             Text(list.name)
                 .font(RexFont.text(13, weight: .semibold))
                 .foregroundStyle(RexColor.foreground)
-                .lineLimit(1)
+                .lineLimit(2)
+                .multilineTextAlignment(.leading)
                 .frame(width: 112, alignment: .leading)
 
             // Press-and-hold to save, not a tap — this tile sits inside a

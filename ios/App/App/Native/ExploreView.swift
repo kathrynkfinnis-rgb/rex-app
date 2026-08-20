@@ -11,6 +11,7 @@ struct ExploreView: View {
     @State private var filter: RexCategory?
     @State private var friendsCollections: [RexList] = []
     @State private var collectionOwners: [String: RexProfileDetail] = [:]
+    @State private var friendCollectionThumbnails: [String: [String]] = [:]
     @State private var trending: [TrendingItem] = []
     @State private var editorial: [EditorialCollection] = []
     @State private var isLoading = true
@@ -187,9 +188,15 @@ struct ExploreView: View {
             pushedCollection = CollectionRoute(listId: list.id, name: list.name, isMine: false)
         } label: {
             VStack(alignment: .leading, spacing: RexSpacing.xs) {
-                ZStack {
-                    RexColor.badgeBackground
-                    Text(list.emoji ?? "\u{1F4D2}").font(.system(size: 30))
+                Group {
+                    if let thumbs = friendCollectionThumbnails[list.id], !thumbs.isEmpty {
+                        ThumbnailGridView(urls: thumbs)
+                    } else {
+                        ZStack {
+                            RexColor.badgeBackground
+                            Text(list.emoji ?? "\u{1F4D2}").font(.system(size: 30))
+                        }
+                    }
                 }
                 .frame(width: 132, height: 96)
                 .clipShape(RoundedRectangle(cornerRadius: RexRadius.input, style: .continuous))
@@ -311,6 +318,22 @@ struct ExploreView: View {
             let profiles = (try? await RexAPI.shared.fetchProfiles(ids: ownerIds)) ?? []
             collectionOwners = Dictionary(uniqueKeysWithValues: profiles.map { ($0.id, $0) })
         }
+
+        // #131 — a friend-collection card was just an emoji placeholder,
+        // giving the shelf no colour of its own. Same fetch-per-list
+        // pattern CollectionsView already uses for its own shelf tiles.
+        friendCollectionThumbnails = await withTaskGroup(of: (String, [String]).self) { group in
+            for list in friendsCollections {
+                group.addTask {
+                    let items = (try? await RexAPI.shared.fetchCollectionItems(listId: list.id)) ?? []
+                    return (list.id, items.compactMap { $0.recommendations?.items?.image_url })
+                }
+            }
+            var result: [String: [String]] = [:]
+            for await (id, urls) in group { result[id] = urls }
+            return result
+        }
+
         isLoading = false
     }
 }

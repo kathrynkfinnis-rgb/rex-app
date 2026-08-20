@@ -40,9 +40,14 @@ struct RecommendationCardView: View {
                     VStack(alignment: .leading, spacing: RexSpacing.xs) {
                         HStack(spacing: RexSpacing.sm) {
                             categoryBadge
-                            // Second tag: what kind of place/book/etc it is,
-                            // e.g. PLACE · Restaurant.
-                            if let genre = splitGenres(item.genre).first {
+                            // Genre tags: what kind of place/book/etc it is,
+                            // e.g. PLACE · Restaurant · Bar. #136 — was
+                            // .first only, so a place tagged with several
+                            // subcategories showed just one of them. Capped
+                            // at 3, same as the note's #hashtags below, so a
+                            // heavily-tagged place doesn't crowd out the
+                            // rating badge at the far end of this row.
+                            ForEach(splitGenres(item.genre).prefix(3), id: \.self) { genre in
                                 Text(genre)
                                     .font(.system(size: 10, weight: .medium))
                                     .foregroundStyle(RexColor.mutedForeground)

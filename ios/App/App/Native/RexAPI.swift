@@ -305,6 +305,37 @@ final class RexAPI {
         return try JSONDecoder().decode([FeedRecommendation].self, from: data)
     }
 
+    /// One recommendation by id, same shape as fetchFeed's rows. #138 —
+    /// editing a Rex used to call the full loadFeed() to pick up the
+    /// change, which replaces the entire feed array and reset scroll to
+    /// the top even though the edited row's id and sort position hadn't
+    /// moved. Fetching just the one changed row lets the caller splice it
+    /// back into the existing array in place instead, so nothing else in
+    /// the list re-renders and scroll position holds.
+    func fetchRecommendation(id: String) async throws -> FeedRecommendation {
+        let token = try await validToken()
+        let select = "id,rating,note,created_at,photo_url,photo_urls,tags\(await anonymousField()),user_id,item_id,trip_id," +
+            "items!inner(id,type,title,subtitle,image_url,genre,address)," +
+            "profiles!recommendations_user_id_fkey(username,display_name,avatar_url)," +
+            "creators(slug,name,color,emoji)"
+        var components = URLComponents(url: baseURL.appendingPathComponent("/rest/v1/recommendations"), resolvingAgainstBaseURL: false)!
+        components.queryItems = [
+            URLQueryItem(name: "select", value: select),
+            URLQueryItem(name: "id", value: "eq.\(id)"),
+        ]
+        var request = URLRequest(url: components.url!)
+        request.setValue(anonKey, forHTTPHeaderField: "apikey")
+        request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+        let (data, response) = try await URLSession.shared.data(for: request)
+        guard let http = response as? HTTPURLResponse else { throw RexAPIError.invalidResponse }
+        if http.statusCode >= 400 {
+            throw RexAPIError.server(friendlyError(data, fallback: "Couldn't refresh this Rex (\(http.statusCode))."))
+        }
+        let rows = try JSONDecoder().decode([FeedRecommendation].self, from: data)
+        guard let row = rows.first else { throw RexAPIError.server("That Rex no longer exists.") }
+        return row
+    }
+
     /// Every trip (not stops — trip_id is.null the same way fetchFeed's main
     /// pass is) visible under RLS, for the dedicated trip search screen.
     /// fetchFeed caps at 50 most-recent-of-everything, which is exactly what

@@ -381,7 +381,7 @@ struct FeedView: View {
         .sheet(item: $editing) { rec in
             EditRexView(
                 rec: rec,
-                onSaved: { Task { await loadFeed() } },
+                onSaved: { Task { await refreshOneRex(id: rec.id) } },
                 onDeleted: { Task { await loadFeed() } }
             )
         }
@@ -666,6 +666,25 @@ struct FeedView: View {
             errorMessage = error.localizedDescription
         }
         isLoading = false
+    }
+
+    /// #138 — splice one refreshed row back into the existing array instead
+    /// of calling loadFeed(), which replaces the whole thing and reset
+    /// scroll to the top even though the edited row's id and sort position
+    /// hadn't moved. Falls back to a full reload if the targeted fetch
+    /// fails for any reason (e.g. the edit also changed something that
+    /// affects what should be visible) rather than leaving the feed stale.
+    private func refreshOneRex(id: String) async {
+        do {
+            let updated = try await RexAPI.shared.fetchRecommendation(id: id)
+            if let index = recommendations.firstIndex(where: { $0.id == id }) {
+                recommendations[index] = updated
+            } else {
+                await loadFeed()
+            }
+        } catch {
+            await loadFeed()
+        }
     }
 
     private var emptyState: some View {
