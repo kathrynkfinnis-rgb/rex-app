@@ -1,5 +1,35 @@
 import SwiftUI
 
+/// A rect, in SwipeToRemove's own coordinate space, that its delete-swipe
+/// gesture should not claim — reported by any subview that has its own
+/// horizontal swipe (currently just PhotoCarouselView's paging).
+/// `nil` means "nothing has reported a zone"; a `.zero` rect is a real,
+/// reported empty zone, so this can't just default to CGRect.zero.
+private struct SwipeExclusionZoneKey: PreferenceKey {
+    static let defaultValue: CGRect? = nil
+    static func reduce(value: inout CGRect?, nextValue: () -> CGRect?) {
+        // Last write wins — a card has at most one such subview (the photo
+        // carousel), so there's never really a second writer in practice.
+        value = nextValue() ?? value
+    }
+}
+
+extension View {
+    /// Mark this view as its own swipe target: SwipeToRemove.swiftCardSpace
+    /// must be the enclosing SwipeToRemove for this to have any effect —
+    /// elsewhere it's a harmless, unread preference write.
+    func swipeToRemoveExclusionZone() -> some View {
+        background(
+            GeometryReader { geo in
+                Color.clear.preference(
+                    key: SwipeExclusionZoneKey.self,
+                    value: geo.frame(in: .named(SwipeToRemove<AnyView>.coordinateSpaceName))
+                )
+            }
+        )
+    }
+}
+
 /// Right-to-left swipe to reveal a destructive action.
 ///
 /// `List`'s own `.swipeActions` isn't available to us — the feed, collections
@@ -29,6 +59,16 @@ struct SwipeToRemove<Content: View>: View {
     @State private var dragStart: CGFloat?
     @State private var isConfirming = false
     @State private var isWorking = false
+
+    /// Reported by a subview (PhotoCarouselView, via
+    /// .swipeToRemoveExclusionZone()) that has its own horizontal swipe —
+    /// a drag starting inside this rect belongs to that subview instead.
+    @State private var exclusionZone: CGRect?
+    /// Decided once, when a drag starts, from exclusionZone — a drag can't
+    /// change which view owns it partway through.
+    @State private var isDragExcluded = false
+
+    static var coordinateSpaceName: String { "swipeToRemoveCard" }
 
     var body: some View {
         ZStack(alignment: .trailing) {
@@ -70,17 +110,36 @@ struct SwipeToRemove<Content: View>: View {
                 // highPriorityGesture is the documented way to make a child's
                 // gesture take precedence over an ancestor's, which plain
                 // .gesture does not do.
+                //
+                // That same priority-over-descendants behavior is exactly
+                // what broke the photo carousel's own swipe (#120/#111
+                // regression): once this card started fielding a photo
+                // carousel, ITS internal paging drag is a descendant of
+                // this highPriorityGesture too, so it lost every time a
+                // swipe started on the photo. coordinateSpaceName +
+                // exclusionZone below carve that region back out — a drag
+                // whose start point lands inside the reported carousel
+                // frame is marked excluded up front and this gesture does
+                // nothing for its whole lifetime, leaving the touch free
+                // for the carousel's own TabView to handle.
+                .coordinateSpace(name: Self.coordinateSpaceName)
+                .onPreferenceChange(SwipeExclusionZoneKey.self) { exclusionZone = $0 }
                 .highPriorityGesture(
-                    DragGesture(minimumDistance: 14)
+                    DragGesture(minimumDistance: 14, coordinateSpace: .named(Self.coordinateSpaceName))
                         .onChanged { value in
+                            if dragStart == nil {
+                                isDragExcluded = exclusionZone?.contains(value.startLocation) ?? false
+                                dragStart = offset
+                            }
+                            guard !isDragExcluded else { return }
                             // Ignore anything that's really a scroll.
                             guard abs(value.translation.width) > abs(value.translation.height) else { return }
                             let base = dragStart ?? offset
-                            if dragStart == nil { dragStart = offset }
                             offset = min(0, max(base + value.translation.width, -commitWidth - 40))
                         }
                         .onEnded { value in
-                            defer { dragStart = nil }
+                            defer { dragStart = nil; isDragExcluded = false }
+                            guard !isDragExcluded else { return }
                             guard abs(value.translation.width) > abs(value.translation.height) || offset < 0 else { return }
                             // No commit-on-full-swipe: a long flick is too easy
                             // to do by accident, and this deletes things.

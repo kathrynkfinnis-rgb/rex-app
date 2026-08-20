@@ -33,14 +33,20 @@ struct FeedView: View {
     @State private var addingToCollection: FeedRecommendation?
     @State private var addingToTrip: FeedRecommendation?
 
-    /// Categories that actually appear in the feed, so we don't show filters
-    /// that would return nothing.
-    private var availableCategories: [RexCategory] {
-        // A blast's type ("place", "book"...) describes what's being asked
-        // for, not a Rex — it belongs under Blasts, not mixed into Place.
-        let present = Set(recommendations.filter { !$0.isBlast }.compactMap { RexCategory(rawType: $0.items?.type) })
-        return rexAllCategories.filter { present.contains($0) }
-    }
+    /// Every category, always offered — not just the ones present in the
+    /// currently-loaded page.
+    ///
+    /// This used to filter down to Set(recommendations...) so we wouldn't
+    /// show a filter that would return nothing. That reasoning held when
+    /// the feed loaded in full, but fetchFeed() caps at 50 rows (see
+    /// RexAPI.fetchFeed) — so a category with real posts just outside that
+    /// window would silently lose its chip. TestFlight caught this
+    /// directly: "The filter has lost some of the filters including movie
+    /// tv show podcast recipe stuff etc." A tapped category with nothing
+    /// in the current page now lands on the existing noMatchesState
+    /// ("Nothing matches") instead of the chip vanishing, which is the
+    /// same honest outcome without the disappearing-button confusion.
+    private var availableCategories: [RexCategory] { rexAllCategories }
 
     /// Only the tiers actually represented, same reasoning as
     /// availableCategories — no point offering a filter that would empty

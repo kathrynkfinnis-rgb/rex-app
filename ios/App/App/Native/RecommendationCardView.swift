@@ -174,6 +174,11 @@ struct RecommendationCardView: View {
                 if let photos = rec.photo_urls, !photos.isEmpty {
                     PhotoCarouselView(urls: photos, height: 200, cornerRadius: 0)
                         .padding(.bottom, RexSpacing.sm)
+                        // #120: without this, a swipe started on the photo
+                        // itself was captured by the enclosing
+                        // SwipeToRemove (when this card is your own, in the
+                        // feed) as a delete-swipe instead of paging photos.
+                        .swipeToRemoveExclusionZone()
                 }
 
                 Rectangle()
