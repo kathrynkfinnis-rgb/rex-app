@@ -54,7 +54,7 @@ struct ListsImportView: View {
                 .padding(RexSpacing.page)
             }
             .background(RexColor.background.ignoresSafeArea())
-            .navigationTitle("Import a list")
+            .navigationTitle("Import from doc")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .topBarLeading) {

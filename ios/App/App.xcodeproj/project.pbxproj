@@ -47,6 +47,7 @@
 		FEED050B0000000000000000 /* ImportReviewView.swift in Sources */ = {isa = PBXBuildFile; fileRef = FEED050A0000000000000000 /* ImportReviewView.swift */; };
 		FEED052B0000000000000000 /* OnboardingView.swift in Sources */ = {isa = PBXBuildFile; fileRef = FEED052A0000000000000000 /* OnboardingView.swift */; };
 		FEED053B0000000000000000 /* ExploreView.swift in Sources */ = {isa = PBXBuildFile; fileRef = FEED053A0000000000000000 /* ExploreView.swift */; };
+		FEED054B0000000000000000 /* ListDetailView.swift in Sources */ = {isa = PBXBuildFile; fileRef = FEED054A0000000000000000 /* ListDetailView.swift */; };
 		FEED035B0000000000000000 /* NewCollectionView.swift in Sources */ = {isa = PBXBuildFile; fileRef = FEED035A0000000000000000 /* NewCollectionView.swift */; };
 		FEED037B0000000000000000 /* AppleSignInButton.swift in Sources */ = {isa = PBXBuildFile; fileRef = FEED037A0000000000000000 /* AppleSignInButton.swift */; };
 		FEED031B0000000000000000 /* AskForRexView.swift in Sources */ = {isa = PBXBuildFile; fileRef = FEED031A0000000000000000 /* AskForRexView.swift */; };
@@ -110,6 +111,7 @@
 		FEED050A0000000000000000 /* ImportReviewView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ImportReviewView.swift; sourceTree = "<group>"; };
 		FEED052A0000000000000000 /* OnboardingView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OnboardingView.swift; sourceTree = "<group>"; };
 		FEED053A0000000000000000 /* ExploreView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ExploreView.swift; sourceTree = "<group>"; };
+		FEED054A0000000000000000 /* ListDetailView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ListDetailView.swift; sourceTree = "<group>"; };
 		FEED035A0000000000000000 /* NewCollectionView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NewCollectionView.swift; sourceTree = "<group>"; };
 		FEED037A0000000000000000 /* AppleSignInButton.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppleSignInButton.swift; sourceTree = "<group>"; };
 		FEED036A0000000000000000 /* App.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = App.entitlements; sourceTree = "<group>"; };
@@ -211,6 +213,7 @@
 				FEED050A0000000000000000 /* ImportReviewView.swift */,
 				FEED052A0000000000000000 /* OnboardingView.swift */,
 				FEED053A0000000000000000 /* ExploreView.swift */,
+				FEED054A0000000000000000 /* ListDetailView.swift */,
 				FEED035A0000000000000000 /* NewCollectionView.swift */,
 				FEED037A0000000000000000 /* AppleSignInButton.swift */,
 				FEED031A0000000000000000 /* AskForRexView.swift */,
@@ -349,6 +352,7 @@
 				FEED050B0000000000000000 /* ImportReviewView.swift in Sources */,
 				FEED052B0000000000000000 /* OnboardingView.swift in Sources */,
 				FEED053B0000000000000000 /* ExploreView.swift in Sources */,
+				FEED054B0000000000000000 /* ListDetailView.swift in Sources */,
 				FEED035B0000000000000000 /* NewCollectionView.swift in Sources */,
 				FEED037B0000000000000000 /* AppleSignInButton.swift in Sources */,
 				FEED031B0000000000000000 /* AskForRexView.swift in Sources */,
@@ -508,7 +512,7 @@
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CODE_SIGN_ENTITLEMENTS = App/App.entitlements;
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 14;
+				CURRENT_PROJECT_VERSION = 15;
 				DEVELOPMENT_TEAM = X54V2C674U;
 				INFOPLIST_FILE = App/Info.plist;
 				IPHONEOS_DEPLOYMENT_TARGET = 18.0;
@@ -532,7 +536,7 @@
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CODE_SIGN_ENTITLEMENTS = App/App.entitlements;
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 14;
+				CURRENT_PROJECT_VERSION = 15;
 				DEVELOPMENT_TEAM = X54V2C674U;
 				INFOPLIST_FILE = App/Info.plist;
 				IPHONEOS_DEPLOYMENT_TARGET = 18.0;

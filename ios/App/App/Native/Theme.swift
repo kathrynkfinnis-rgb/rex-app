@@ -168,7 +168,7 @@ enum RexFont {
 }
 
 enum RexCategory: String {
-    case place, trip, book, movie, tv, podcast, recipe, event, other
+    case place, trip, book, movie, tv, podcast, recipe, event, other, list
 
     var label: String {
         switch self {
@@ -181,6 +181,7 @@ enum RexCategory: String {
         case .recipe: return "Recipe"
         case .event: return "Event"
         case .other: return "Other"
+        case .list: return "List"
         }
     }
 
@@ -195,6 +196,7 @@ enum RexCategory: String {
         case .recipe: return "fork.knife"
         case .event: return "ticket"
         case .other: return "sparkles"
+        case .list: return "list.bullet.rectangle"
         }
     }
 
@@ -202,6 +204,12 @@ enum RexCategory: String {
         self = RexCategory(rawValue: rawType ?? "other") ?? .other
     }
 }
+
+/// What kind of list it is — the genre picked on the "Import from doc"
+/// screen, stored the same way every other category's subcategory already
+/// is (items.genre). "Other" last, same convention as every other array
+/// below.
+let rexListKinds: [String] = ["Book", "Place", "Trip", "Film & TV", "Recipe", "Mixed", "Other"]
 
 /// Subcategories per category, mirroring src/lib/categories.ts. Stored
 /// comma-separated in items.genre.
@@ -229,9 +237,11 @@ let rexSubcategories: [RexCategory: [String]] = [
              "Health & fitness", "Other service", "Hidden gem", "For kids", "Other"],
 ]
 
-/// All categories in the order the web app shows them.
+/// All categories in the order the web app shows them. .list is native
+/// -only (no web equivalent yet) — placed next to .trip since it's built
+/// the same way structurally (one parent Rex, items linked underneath).
 let rexAllCategories: [RexCategory] = [
-    .place, .trip, .book, .movie, .tv, .podcast, .recipe, .event, .other,
+    .place, .trip, .list, .book, .movie, .tv, .podcast, .recipe, .event, .other,
 ]
 
 /// Wrapping row of multi-select chips, used for subcategories.

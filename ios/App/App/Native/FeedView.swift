@@ -273,6 +273,9 @@ struct FeedView: View {
             .navigationDestination(for: TripRoute.self) { route in
                 TripDetailView(route: route)
             }
+            .navigationDestination(for: ListRoute.self) { route in
+                ListDetailView(route: route)
+            }
             .navigationDestination(for: UserProfileRoute.self) { r in
                 UserProfileView(route: r)
             }
@@ -614,9 +617,12 @@ struct FeedView: View {
         // Blasts and wants aren't backed by a real item — there's nowhere to
         // push to. Comments are the whole point of a blast, so that's next up.
         guard !rec.isBlast, !rec.isWant else { return }
-        if RexCategory(rawType: rec.items?.type) == .trip {
+        switch RexCategory(rawType: rec.items?.type) {
+        case .trip:
             path.append(TripRoute(recommendationId: rec.id, title: rec.items?.title ?? "Trip"))
-        } else {
+        case .list:
+            path.append(ListRoute(recommendationId: rec.id, title: rec.items?.title ?? "List"))
+        default:
             path.append(rec.item_id)
         }
     }

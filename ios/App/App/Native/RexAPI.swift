@@ -263,20 +263,42 @@ final class RexAPI {
             "profiles!recommendations_user_id_fkey(username,display_name,avatar_url)," +
             "creators(slug,name,color,emoji)"
 
-        var components = URLComponents(url: baseURL.appendingPathComponent("/rest/v1/recommendations"), resolvingAgainstBaseURL: false)!
-        components.queryItems = [
-            URLQueryItem(name: "select", value: select),
-            URLQueryItem(name: "trip_id", value: "is.null"),
-            URLQueryItem(name: "order", value: "created_at.desc"),
-            URLQueryItem(name: "limit", value: "50"),
-        ]
+        // Trip stops are unconditionally hidden (trip_id.is.null). List
+        // items default visible but can be toggled off individually — so
+        // unlike trips, this needs an actual per-row check rather than a
+        // blanket exclusion: show it if it isn't a list item at all, or if
+        // it is one that's been left on. Filters on list_id/show_in_feed,
+        // which don't exist until migration 20260816230000 is run — this
+        // is the core feed, not a best-effort feature, so it can't just
+        // break for everyone in the meantime the way a missing column
+        // elsewhere in the app gets a quiet ?? [] fallback. Try the real
+        // query first; a 400 specifically (not any other failure) falls
+        // back to the pre-migration shape once, rather than the feed going
+        // blank for every user until the migration happens to be run.
+        func fetch(includeListFilter: Bool) async throws -> (Data, HTTPURLResponse) {
+            var components = URLComponents(url: baseURL.appendingPathComponent("/rest/v1/recommendations"), resolvingAgainstBaseURL: false)!
+            var queryItems = [
+                URLQueryItem(name: "select", value: select),
+                URLQueryItem(name: "trip_id", value: "is.null"),
+                URLQueryItem(name: "order", value: "created_at.desc"),
+                URLQueryItem(name: "limit", value: "50"),
+            ]
+            if includeListFilter {
+                queryItems.append(URLQueryItem(name: "or", value: "(list_id.is.null,show_in_feed.eq.true)"))
+            }
+            components.queryItems = queryItems
+            var request = URLRequest(url: components.url!)
+            request.setValue(anonKey, forHTTPHeaderField: "apikey")
+            request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+            let (data, response) = try await URLSession.shared.data(for: request)
+            guard let http = response as? HTTPURLResponse else { throw RexAPIError.invalidResponse }
+            return (data, http)
+        }
 
-        var request = URLRequest(url: components.url!)
-        request.setValue(anonKey, forHTTPHeaderField: "apikey")
-        request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
-
-        let (data, response) = try await URLSession.shared.data(for: request)
-        guard let http = response as? HTTPURLResponse else { throw RexAPIError.invalidResponse }
+        var (data, http) = try await fetch(includeListFilter: true)
+        if http.statusCode == 400 {
+            (data, http) = try await fetch(includeListFilter: false)
+        }
         if http.statusCode >= 400 {
             throw RexAPIError.server(friendlyError(data, fallback: "Couldn't load your feed (\(http.statusCode))."))
         }
@@ -473,6 +495,50 @@ final class RexAPI {
             throw RexAPIError.server(friendlyError(data, fallback: "Couldn't load this trip."))
         }
         return try JSONDecoder().decode([FeedRecommendation].self, from: data)
+    }
+
+    /// Items on a List — list_id/list_section mirror trip_id/trip_section
+    /// exactly, see fetchTripStops.
+    func fetchListItems(listRecommendationId: String) async throws -> [FeedRecommendation] {
+        let token = try await validToken()
+        let select = "id,rating,note,created_at,photo_url,photo_urls,tags\(await anonymousField()),user_id,item_id,list_id,list_section,show_in_feed," +
+            "items!inner(id,type,title,subtitle,image_url,genre,address)," +
+            "profiles!recommendations_user_id_fkey(username,display_name,avatar_url)"
+        var components = URLComponents(url: baseURL.appendingPathComponent("/rest/v1/recommendations"), resolvingAgainstBaseURL: false)!
+        components.queryItems = [
+            URLQueryItem(name: "select", value: select),
+            URLQueryItem(name: "list_id", value: "eq.\(listRecommendationId)"),
+            URLQueryItem(name: "order", value: "created_at.asc"),
+        ]
+        var request = URLRequest(url: components.url!)
+        request.setValue(anonKey, forHTTPHeaderField: "apikey")
+        request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+
+        let (data, response) = try await URLSession.shared.data(for: request)
+        guard let http = response as? HTTPURLResponse, http.statusCode < 400 else {
+            throw RexAPIError.server(friendlyError(data, fallback: "Couldn't load this list."))
+        }
+        return try JSONDecoder().decode([FeedRecommendation].self, from: data)
+    }
+
+    /// Post-hoc "show on feed" toggle from ListDetailView — the same
+    /// visibility choice made during import, editable indefinitely
+    /// afterward, not just at import time.
+    func updateShowInFeed(recommendationId: String, showInFeed: Bool) async throws {
+        let token = try await validToken()
+        var components = URLComponents(url: baseURL.appendingPathComponent("/rest/v1/recommendations"), resolvingAgainstBaseURL: false)!
+        components.queryItems = [URLQueryItem(name: "id", value: "eq.\(recommendationId)")]
+        var request = URLRequest(url: components.url!)
+        request.httpMethod = "PATCH"
+        request.setValue(anonKey, forHTTPHeaderField: "apikey")
+        request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        request.httpBody = try JSONSerialization.data(withJSONObject: ["show_in_feed": showInFeed])
+
+        let (data, response) = try await URLSession.shared.data(for: request)
+        guard let http = response as? HTTPURLResponse, http.statusCode < 400 else {
+            throw RexAPIError.server(friendlyError(data, fallback: "Couldn't update that."))
+        }
     }
 
     func fetchRecommendations(forItem itemId: String) async throws -> [FeedRecommendation] {
@@ -677,6 +743,9 @@ final class RexAPI {
         tags: [String] = [],
         tripId: String? = nil,
         tripSection: String? = nil,
+        listId: String? = nil,
+        listSection: String? = nil,
+        showInFeed: Bool? = nil,
         anonymous: Bool = false,
         returningId: Bool = false,
         asDraft: Bool = false
@@ -696,6 +765,9 @@ final class RexAPI {
         body["tags"] = tags
         if let tripId { body["trip_id"] = tripId }
         if let tripSection, !tripSection.isEmpty { body["trip_section"] = tripSection }
+        if let listId { body["list_id"] = listId }
+        if let listSection, !listSection.isEmpty { body["list_section"] = listSection }
+        if let showInFeed { body["show_in_feed"] = showInFeed }
         if anonymous { body["is_anonymous"] = true }
         // NULL published_at is what makes a row a draft — see migration
         // 20260815162631. Everything else (feed, item pages, map,
@@ -1566,7 +1638,9 @@ final class RexAPI {
                 profiles: row.profiles,
                 creators: nil,
                 trip_section: nil,
-                is_anonymous: false
+                is_anonymous: false,
+                list_section: nil,
+                show_in_feed: nil
             )
         }
     }
@@ -1993,7 +2067,9 @@ final class RexAPI {
                 profiles: row.profiles,
                 creators: nil,
                 trip_section: nil,
-                is_anonymous: false
+                is_anonymous: false,
+                list_section: nil,
+                show_in_feed: nil
             )
         }
     }
@@ -2279,6 +2355,42 @@ final class RexAPI {
         }
     }
 
+    /// Fixes up a row before it's approved — the AI's guess at title,
+    /// creator, note, rating, or type isn't always right, and there was no
+    /// way to correct that short of discarding the row and posting as-is.
+    /// A cleared resolved_item_id/resolved_external_id forces
+    /// approveOneStagingRow to create a fresh item on next approval rather
+    /// than reusing whatever resolveStagingRow matched against the old
+    /// (now-edited) title.
+    func updateStagingRow(
+        id: String, title: String, creator: String?, note: String?, rating: Double?, type: String
+    ) async throws {
+        let token = try await validToken()
+        var components = URLComponents(url: baseURL.appendingPathComponent("/rest/v1/import_staging"), resolvingAgainstBaseURL: false)!
+        components.queryItems = [URLQueryItem(name: "id", value: "eq.\(id)")]
+        var request = URLRequest(url: components.url!)
+        request.httpMethod = "PATCH"
+        request.setValue(anonKey, forHTTPHeaderField: "apikey")
+        request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        var body: [String: Any] = [
+            "raw_title": title,
+            "suggested_type": type,
+            "resolved_item_id": NSNull(),
+            "resolved_external_id": NSNull(),
+            "resolved_external_source": NSNull(),
+        ]
+        body["raw_creator"] = creator?.isEmpty == false ? creator : NSNull()
+        body["raw_note"] = note?.isEmpty == false ? note : NSNull()
+        body["raw_rating"] = rating ?? NSNull()
+        request.httpBody = try JSONSerialization.data(withJSONObject: body)
+
+        let (data, response) = try await URLSession.shared.data(for: request)
+        guard let http = response as? HTTPURLResponse, http.statusCode < 400 else {
+            throw RexAPIError.server(friendlyError(data, fallback: "Couldn't save that change."))
+        }
+    }
+
     /// Best-effort match against the app's own search — same catalogues
     /// (OpenLibrary, TMDB, Google Places) Add-a-Rex already searches, run
     /// client-side rather than through a server round trip since the native
@@ -2338,7 +2450,14 @@ final class RexAPI {
         note: String?,
         tripId: String?,
         tripSection: String?,
-        listId: String?
+        listId: String?,
+        // Named docListId/docListSection to keep clear of the parameter
+        // above — that `listId` means "add to this Collection"
+        // (saved_posts), an entirely different thing from a List-type Rex's
+        // own list_id linkage. showInFeed only applies alongside docListId.
+        docListId: String? = nil,
+        docListSection: String? = nil,
+        showInFeed: Bool? = nil
     ) async throws -> String {
         guard let type = row.suggested_type, !type.isEmpty else {
             throw RexAPIError.server("Set a type before approving.")
@@ -2367,6 +2486,9 @@ final class RexAPI {
             note: note ?? row.raw_note,
             tripId: tripId,
             tripSection: tripId != nil ? tripSection : nil,
+            listId: docListId,
+            listSection: docListId != nil ? docListSection : nil,
+            showInFeed: docListId != nil ? showInFeed : nil,
             returningId: true
         )
 
@@ -2389,7 +2511,7 @@ final class RexAPI {
     }
 
     /// Approves one staged row on its own — the individual-review path,
-    /// as opposed to the batch trip/collection paths below.
+    /// as opposed to the batch trip/collection/list paths below.
     @discardableResult
     func approveStagingRow(_ row: ImportStagingRow, rating: Double? = nil, note: String? = nil) async throws -> String {
         try await approveOneStagingRow(row, rating: rating, note: note, tripId: nil, tripSection: nil, listId: nil)
@@ -2417,6 +2539,39 @@ final class RexAPI {
             }
         }
         return (tripRecId, added, failed)
+    }
+
+    /// Turns a batch of staged rows into one new List — structurally
+    /// identical to approveStagingAsTrip (one parent Rex, items linked
+    /// underneath via list_id/list_section instead of trip_id/trip_section)
+    /// with one difference: showInFeedIds carries which rows should default
+    /// visible on the main feed on their own, since unlike trip stops
+    /// (always hidden) a list item's visibility is a per-row choice made on
+    /// the review screen.
+    func approveStagingAsList(
+        rows: [ImportStagingRow], listName: String, kind: String, note: String?, showInFeedIds: Set<String>
+    ) async throws -> (listId: String, added: Int, failed: [ImportFailure]) {
+        guard !rows.isEmpty else { throw RexAPIError.server("Nothing to import.") }
+        let listItemId = try await createItem(
+            type: "list", title: listName.trimmingCharacters(in: .whitespaces), subtitle: nil, address: nil,
+            genre: kind.isEmpty ? nil : kind
+        )
+        let listRecId = try await createRecommendation(itemId: listItemId, rating: 8, note: note, returningId: true)
+
+        var added = 0
+        var failed: [ImportFailure] = []
+        for row in rows {
+            do {
+                try await approveOneStagingRow(
+                    row, rating: nil, note: nil, tripId: nil, tripSection: nil, listId: nil,
+                    docListId: listRecId, docListSection: row.raw_section, showInFeed: showInFeedIds.contains(row.id)
+                )
+                added += 1
+            } catch {
+                failed.append(ImportFailure(title: row.raw_title, reason: error.localizedDescription))
+            }
+        }
+        return (listRecId, added, failed)
     }
 
     /// Turns a batch of staged rows into one or more Collections. With

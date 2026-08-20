@@ -224,6 +224,14 @@ struct FeedRecommendation: Codable, Identifiable {
     /// Posted without a name on it. Optional so the app keeps working against a
     /// database where the migration hasn't been run.
     let is_anonymous: Bool?
+    /// Optional heading a list item sits under — list_id/list_section mirror
+    /// trip_id/trip_section exactly, just for the "List" category.
+    let list_section: String?
+    /// Whether a list item shows on the main feed on its own, independent of
+    /// the list itself showing there. Optional/defaulted true client-side so
+    /// this keeps working against a database where the migration hasn't run
+    /// yet, and for every query that doesn't select it at all.
+    let show_in_feed: Bool?
 
     /// A want rather than a Rex — someone saying they'd like to try this. The
     /// feed carries both, and an unrated row is what marks the difference.

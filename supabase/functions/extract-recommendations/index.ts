@@ -36,7 +36,7 @@ const EXTRACTION_TOOL = {
             rating: { type: ["number", "null"] },
             type: {
               type: ["string", "null"],
-              enum: ["book", "movie", "tv", "place", null],
+              enum: ["book", "movie", "tv", "place", "recipe", "event", "podcast", null],
             },
             section: {
               type: ["string", "null"],
@@ -63,14 +63,19 @@ For each distinct recommendation, output:
 - creator: author for books, director/showrunner for film/TV, cuisine or city for places (null if unknown)
 - note: the person's comment about it, cleaned up (null if none)
 - rating: if a numeric rating is present, normalize to a 1-10 scale (e.g. 4/5 -> 8, 9/10 -> 9). null if none.
-- type: one of "book", "movie", "tv", "place" — your best guess
+- type: one of "book", "movie", "tv", "place", "recipe", "event", "podcast" — your best guess
 - section: the heading this item appeared under, copied verbatim (e.g. "Brunch", "Museums", "Day 2"). Use the nearest heading above the item. null if the document has no headings.
 - url: a link written next to or attached to the item. null if none.
 
 Preserve the document's own structure: if it is organised under headings, every
 item must carry the heading it belongs to, so an itinerary keeps its shape.
 
-Skip lines that aren't specific works or places. Skip duplicates. Never invent items.`;
+Skip lines that aren't specific works or places. Skip duplicates. Never invent items.
+
+Extract EVERY item in the document, however many there are — 5 or 50. Do not
+stop early, do not summarize, do not sample a subset and call it done. Work
+through the whole document from top to bottom before answering. A long
+document with many items is normal, not a signal to abbreviate.`;
 
 Deno.serve(async (req: Request) => {
   if (req.method !== "POST") {
@@ -108,10 +113,22 @@ Deno.serve(async (req: Request) => {
       "anthropic-version": "2023-06-01",
     },
     body: JSON.stringify({
-      model: "claude-haiku-4-5-20251001",
-      max_tokens: 4096,
+      // Sonnet, not Haiku — this is a one-shot paste action, not a chat
+      // turn, so the cost/latency tradeoff favors accuracy. Haiku was the
+      // likely cause of "only picks up a few items": weaker models are
+      // more prone to truncating an enumeration task early on long or
+      // messy input regardless of the token budget available to them.
+      model: "claude-sonnet-5",
+      // Was 4096 - a document with 50+ items, each ~60-100 tokens of JSON
+      // output (title/creator/note/rating/type/section/url), could hit
+      // that ceiling and silently cut off mid-list.
+      max_tokens: 8192,
       system: PROMPT,
-      messages: [{ role: "user", content: text.slice(0, 60000) }],
+      // Was text.slice(0, 60000) despite the 200000-char cap two lines up
+      // being the actual intended limit - trimming the input itself to a
+      // third of what's allowed was its own source of dropped items on
+      // longer documents.
+      messages: [{ role: "user", content: text }],
       tools: [EXTRACTION_TOOL],
       tool_choice: { type: "tool", name: "extract_recommendations" },
     }),

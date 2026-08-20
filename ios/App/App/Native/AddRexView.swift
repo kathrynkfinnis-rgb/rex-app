@@ -131,7 +131,7 @@ struct AddRexView: View {
                     .frame(width: 48, height: 48)
 
                     VStack(alignment: .leading, spacing: 2) {
-                        Text("Import a list")
+                        Text("Import from doc")
                             .font(RexFont.display(17, weight: .semibold))
                             .foregroundStyle(RexColor.foreground)
                         Text("Paste from Notes, a Word doc, or an itinerary.")

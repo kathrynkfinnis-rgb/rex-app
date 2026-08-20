@@ -408,6 +408,7 @@ struct CollectionsView: View {
         case .recipe: return "Recipes to cook"
         case .event: return "Events to attend"
         case .other: return "Other"
+        case .list: return "Lists"
         }
     }
 

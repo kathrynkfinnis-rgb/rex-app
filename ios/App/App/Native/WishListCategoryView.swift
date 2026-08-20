@@ -25,6 +25,10 @@ struct WishListCategoryView: View {
         case .recipe: return "Recipes to cook"
         case .event: return "Events to attend"
         case .other: return "Other"
+        // A "want to try" for a List doesn't really make sense (you don't
+        // want-to-try a list of things, you'd want the things on it) — kept
+        // for exhaustiveness rather than because this is reachable today.
+        case .list: return "Lists"
         }
     }
 
