@@ -9,8 +9,18 @@ struct AddRexView: View {
     var onDone: () -> Void
 
     // Trip sits second, as on the web. A trip is created as a normal Rex here
-    // and stops get added to it afterwards from the trip screen.
-    private let creatableCategories: [RexCategory] = [.place, .trip, .book, .movie, .tv, .podcast, .recipe, .event, .other]
+    // and stops get added to it afterwards from the trip screen. List sits
+    // right after — same "container + its own items" shape as Trip — for
+    // building one by hand, right here, rather than only ever arriving via
+    // "Import from doc" (#118). That importer is still the fast path for a
+    // list that already exists somewhere as text; this tile is for a list
+    // that doesn't fit any other category and is being made up as you go.
+    private let creatableCategories: [RexCategory] = [.place, .trip, .list, .book, .movie, .tv, .podcast, .recipe, .event, .other]
+
+    /// A list can hold any kind of Rex — that's the whole point of it being
+    /// the catch-all container — unlike a trip's stops, which are almost
+    /// always a place.
+    private let listItemTypes: [RexCategory] = [.book, .movie, .tv, .place, .recipe, .event, .podcast, .other]
 
     private enum Mode { case rated, want }
 
@@ -49,6 +59,8 @@ struct AddRexView: View {
     @State private var subcategories: Set<String> = []
     @State private var productLink = ""
     @State private var tripStops: [DraftStop] = []
+    @State private var listItems: [DraftStop] = []
+    @State private var listKind = rexListKinds.first ?? "Other"
     @State private var recipeText = ""
     /// Searchable categories open on a search field; the full form only
     /// appears once something's picked or you choose to type it in manually.
@@ -185,14 +197,38 @@ struct AddRexView: View {
             }
 
             if !searchFirst {
-            field(subtitleLabel(for: category), text: $subtitle, placeholder: "Optional")
+            // A list's "kind" chip already says what it's about — a second,
+            // generic "Subtitle" box under the name would just be a blank
+            // field nobody knows what to put in.
+            if category != .list {
+                field(subtitleLabel(for: category), text: $subtitle, placeholder: "Optional")
+            }
 
             if category == .place || category == .event {
                 field("Address", text: $address, placeholder: "Optional")
             }
 
+            if category == .list {
+                listKindChips
+            }
+
             if category == .trip {
                 TripStopsBuilderView(stops: $tripStops)
+            }
+
+            if category == .list {
+                // Same builder Trip uses for its stops — a list's items are
+                // the same shape (grouped under optional headings, own
+                // rating, own note), just drawn from any category instead
+                // of almost-always-a-place. See #118's list_id/list_section
+                // /show_in_feed columns this posts against.
+                TripStopsBuilderView(
+                    stops: $listItems,
+                    singularNoun: "item",
+                    containerNoun: "list",
+                    itemTypes: listItemTypes,
+                    showImportLink: false
+                )
             }
 
             if category == .recipe {
@@ -209,11 +245,26 @@ struct AddRexView: View {
             // A link to the thing itself: the point of Other (products,
             // services) and useful for places and events. Books, films, TV and
             // podcasts come from a catalogue with their own page, so a link
-            // field there is just another box to ignore.
-            if ![.book, .movie, .tv, .podcast].contains(category) {
+            // field there is just another box to ignore. A list isn't a single
+            // thing to link to either.
+            if ![.book, .movie, .tv, .podcast, .list].contains(category) {
                 field("Link (optional)", text: $productLink, placeholder: "https://…")
                     .textInputAutocapitalization(.never)
             }
+
+            // A list is always just "posted" — there's no done-vs-want-to-try
+            // state for a container, and ListDetailView never shows the
+            // container's own rating, only its items'. So it gets its own
+            // simple note field instead of the full rated/want picker below.
+            if category == .list {
+                Text("Note (optional)").font(.system(size: 14, weight: .semibold)).foregroundStyle(RexColor.foreground)
+                TextField("What's this list for?", text: $note, axis: .vertical)
+                    .lineLimit(2...4)
+                    .padding(12)
+                    .background(RexColor.card)
+                    .clipShape(RoundedRectangle(cornerRadius: 14))
+                    .overlay(RoundedRectangle(cornerRadius: 14).stroke(RexColor.border, lineWidth: 1))
+            } else {
 
             modePicker(for: category)
 
@@ -256,6 +307,7 @@ struct AddRexView: View {
                     }
                 }
                 .tint(RexColor.primary)
+            }
             }
 
             if let errorMessage {
@@ -473,6 +525,33 @@ struct AddRexView: View {
         .buttonStyle(.plain)
     }
 
+    // Same single-select chip row as ImportReviewView's "What kind of list
+    // is this?" — kept visually and behaviorally identical so a list looks
+    // the same whether it was typed by hand here or came in from a pasted
+    // document.
+    private var listKindChips: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Text("What kind of list is this?")
+                .font(.system(size: 14, weight: .semibold))
+                .foregroundStyle(RexColor.foreground)
+            ScrollView(.horizontal, showsIndicators: false) {
+                HStack(spacing: RexSpacing.sm) {
+                    ForEach(rexListKinds, id: \.self) { kind in
+                        let isOn = listKind == kind
+                        Button(kind) { listKind = kind }
+                            .font(RexFont.text(13, weight: isOn ? .semibold : .regular))
+                            .foregroundStyle(isOn ? RexColor.primaryForeground : RexColor.foreground)
+                            .padding(.horizontal, RexSpacing.md)
+                            .padding(.vertical, 7)
+                            .background(isOn ? RexColor.primary : RexColor.card)
+                            .clipShape(Capsule())
+                            .overlay(Capsule().stroke(isOn ? RexColor.primary : RexColor.border, lineWidth: 1))
+                    }
+                }
+            }
+        }
+    }
+
     private func field(_ label: String, text: Binding<String>, placeholder: String) -> some View {
         VStack(alignment: .leading, spacing: 6) {
             Text(label).font(.system(size: 14, weight: .semibold)).foregroundStyle(RexColor.foreground)
@@ -527,7 +606,10 @@ struct AddRexView: View {
                 subtitle: subtitle.isEmpty ? nil : subtitle,
                 address: (category == .place || category == .event) && !address.isEmpty ? address : nil,
                 hit: picked,
-                genre: subcategories.isEmpty ? nil : subcategories.sorted().joined(separator: ", "),
+                // The "genre" column is where approveStagingAsList already
+                // stores a list's kind (Book/Place/Trip/...) — same column,
+                // same meaning, whichever route created the list.
+                genre: category == .list ? listKind : (subcategories.isEmpty ? nil : subcategories.sorted().joined(separator: ", ")),
                 linkURL: productLink.trimmingCharacters(in: .whitespaces).isEmpty ? nil : productLink.trimmingCharacters(in: .whitespaces),
                 // #21 "guaranteed image": recipes have no catalogue to
                 // auto-import a cover photo from the way books/movies do,
@@ -593,6 +675,60 @@ struct AddRexView: View {
                 }
                 postingProgress = nil
                 didSaveDraft = asDraft
+                withAnimation { didPost = true }
+                isSaving = false
+                return
+            }
+
+            // List items become their own Rex, linked to the list — the
+            // same shape as trip stops above, just addressed by
+            // list_id/list_section/show_in_feed instead of trip_id
+            // /trip_section (#118). Every item defaults to visible on the
+            // feed, same as a fresh import; the toggle to hide one lives in
+            // ListDetailView after the fact.
+            if category == .list, !listItems.isEmpty {
+                let listRecId = try await RexAPI.shared.createRecommendation(
+                    itemId: itemId,
+                    rating: rating,
+                    note: note.isEmpty ? nil : note,
+                    returningId: true
+                )
+                var createdItemRecIds: [String] = []
+                do {
+                    for (index, draftItem) in listItems.enumerated() {
+                        postingProgress = listItems.count > 1
+                            ? "Adding item \(index + 1) of \(listItems.count)…" : "Adding item…"
+                        let childItemId = try await RexAPI.shared.createItem(
+                            type: draftItem.type.rawValue,
+                            title: draftItem.title,
+                            subtitle: draftItem.subtitle,
+                            address: draftItem.address,
+                            genre: draftItem.genre,
+                            externalId: draftItem.externalId,
+                            externalSource: draftItem.externalSource,
+                            imageURL: draftItem.imageURL,
+                            lat: draftItem.lat,
+                            lng: draftItem.lng
+                        )
+                        let childRecId = try await RexAPI.shared.createRecommendation(
+                            itemId: childItemId,
+                            rating: draftItem.rating,
+                            note: draftItem.note.isEmpty ? nil : draftItem.note,
+                            listId: listRecId,
+                            listSection: draftItem.section,
+                            showInFeed: true,
+                            returningId: true
+                        )
+                        createdItemRecIds.append(childRecId)
+                    }
+                } catch {
+                    postingProgress = "Undoing partial list…"
+                    for id in createdItemRecIds { try? await RexAPI.shared.deleteRecommendation(id: id) }
+                    try? await RexAPI.shared.deleteRecommendation(id: listRecId)
+                    postingProgress = nil
+                    throw error
+                }
+                postingProgress = nil
                 withAnimation { didPost = true }
                 isSaving = false
                 return

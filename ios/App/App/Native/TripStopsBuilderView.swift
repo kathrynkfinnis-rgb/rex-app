@@ -30,8 +30,29 @@ let rexSectionSuggestions = [
 /// Build a trip's itinerary inline, mirroring the web TripStopsBuilder:
 /// stops grouped under optional headings, Google search per stop, optional
 /// ratings.
+///
+/// Reused as-is for a manually-built List (#118 follow-up) via the wording
+/// and `itemTypes` parameters below — a List's items are exactly the same
+/// shape as a Trip's stops (grouped under optional headings, own rating,
+/// own note), so this stayed one view with the trip-specific strings
+/// swappable rather than forking a near-identical copy.
 struct TripStopsBuilderView: View {
     @Binding var stops: [DraftStop]
+
+    /// Singular word for one entry — "stop" for a trip, "item" for a list.
+    /// Drives the header count, the "Add a ___" button, and the "New ___"
+    /// form title; all pluralize by appending "s".
+    var singularNoun: String = "stop"
+    /// What the entries belong to, for the header and footnote — "trip" or
+    /// "list".
+    var containerNoun: String = "trip"
+    /// Only the categories offered for this container's entries. A trip's
+    /// stops are almost always a place; a list can hold anything.
+    var itemTypes: [RexCategory] = [.place, .event, .recipe, .other]
+    /// The document-import hand-off only exists for trips today (#38) — a
+    /// List already has its own "Import from doc" entry point one screen up
+    /// in AddRexView, so this would just be a confusing second link there.
+    var showImportLink: Bool = true
 
     @State private var adding = false
     @State private var type: RexCategory = .place
@@ -45,8 +66,15 @@ struct TripStopsBuilderView: View {
     @State private var hits: [RexSearchHit] = []
     @State private var searchTask: Task<Void, Never>?
 
-    /// Only the categories that actually turn up on a trip.
-    private let stopTypes: [RexCategory] = [.place, .event, .recipe, .other]
+    private var stopTypes: [RexCategory] { itemTypes }
+
+    /// "a stop" vs "an item" — the only two nouns this view is ever asked
+    /// to pluralize, but a hard-coded "a" broke the moment "item" showed up.
+    private var singularNounWithArticle: String {
+        let vowels: Set<Character> = ["a", "e", "i", "o", "u"]
+        let article = vowels.contains(singularNoun.lowercased().first ?? " ") ? "an" : "a"
+        return "\(article) \(singularNoun)"
+    }
 
     /// Group stops under their heading, keeping first-appearance order.
     private var groups: [(heading: String, stops: [DraftStop])] {
@@ -65,11 +93,11 @@ struct TripStopsBuilderView: View {
     var body: some View {
         VStack(alignment: .leading, spacing: RexSpacing.md) {
             HStack {
-                Text("Stops on this trip")
+                Text("\(singularNoun.capitalized)s on this \(containerNoun)")
                     .font(RexFont.text(14, weight: .semibold))
                     .foregroundStyle(RexColor.foreground)
                 Spacer()
-                Text("\(stops.count) \(stops.count == 1 ? "stop" : "stops")")
+                Text("\(stops.count) \(stops.count == 1 ? singularNoun : "\(singularNoun)s")")
                     .font(RexFont.text(12))
                     .foregroundStyle(RexColor.mutedForeground)
             }
@@ -133,34 +161,37 @@ struct TripStopsBuilderView: View {
                 } label: {
                     HStack {
                         Image(systemName: "plus")
-                        Text("Add a stop")
+                        Text("Add \(singularNounWithArticle)")
                     }
                 }
                 .buttonStyle(RexSecondaryButtonStyle())
             }
 
-            Text("Each stop becomes its own Rex as well as part of the trip.")
+            Text("Each \(singularNoun) becomes its own Rex as well as part of the \(containerNoun).")
                 .font(RexFont.text(11))
                 .foregroundStyle(RexColor.mutedForeground)
 
             // Importing a curated itinerary means picking a Word/Excel file and
             // parsing it — something you'd realistically do at a desk. Rather
             // than rebuild that on the phone, hand off to the web importer,
-            // which already handles headings and links.
-            Link(destination: URL(string: "https://kathrynkfinnis-rgb-rex-app.kathryn-k-finnis.workers.dev/import")!) {
-                HStack(spacing: RexSpacing.sm) {
-                    Image(systemName: "square.and.arrow.down")
-                        .font(.system(size: 13))
-                    Text("Import a trip from a document")
-                        .font(RexFont.text(13, weight: .medium))
-                    Spacer()
-                    Image(systemName: "arrow.up.right")
-                        .font(.system(size: 11))
+            // which already handles headings and links. Lists have no
+            // equivalent web hand-off yet, hence showImportLink.
+            if showImportLink {
+                Link(destination: URL(string: "https://kathrynkfinnis-rgb-rex-app.kathryn-k-finnis.workers.dev/import")!) {
+                    HStack(spacing: RexSpacing.sm) {
+                        Image(systemName: "square.and.arrow.down")
+                            .font(.system(size: 13))
+                        Text("Import a \(containerNoun) from a document")
+                            .font(RexFont.text(13, weight: .medium))
+                        Spacer()
+                        Image(systemName: "arrow.up.right")
+                            .font(.system(size: 11))
+                    }
+                    .foregroundStyle(RexColor.primary)
+                    .padding(RexSpacing.md)
+                    .background(RexColor.badgeBackground)
+                    .clipShape(RoundedRectangle(cornerRadius: RexRadius.input, style: .continuous))
                 }
-                .foregroundStyle(RexColor.primary)
-                .padding(RexSpacing.md)
-                .background(RexColor.badgeBackground)
-                .clipShape(RoundedRectangle(cornerRadius: RexRadius.input, style: .continuous))
             }
         }
     }
@@ -168,7 +199,7 @@ struct TripStopsBuilderView: View {
     private var addForm: some View {
         VStack(alignment: .leading, spacing: RexSpacing.md) {
             HStack {
-                Text("New stop").font(RexFont.text(14, weight: .semibold))
+                Text("New \(singularNoun)").font(RexFont.text(14, weight: .semibold))
                 Spacer()
                 Button("Cancel") { resetForm(); adding = false }
                     .font(RexFont.text(12))
@@ -270,7 +301,7 @@ struct TripStopsBuilderView: View {
 
             input("Why are you Rexing it?", text: $note)
 
-            Button("Add stop") { addStop() }
+            Button("Add \(singularNoun)") { addStop() }
                 .buttonStyle(RexPrimaryButtonStyle())
                 .opacity(title.trimmingCharacters(in: .whitespaces).isEmpty ? 0.5 : 1)
                 .disabled(title.trimmingCharacters(in: .whitespaces).isEmpty)
