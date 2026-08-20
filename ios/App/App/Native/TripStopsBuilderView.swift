@@ -65,6 +65,9 @@ struct TripStopsBuilderView: View {
     @State private var picked: RexSearchHit?
     @State private var hits: [RexSearchHit] = []
     @State private var searchTask: Task<Void, Never>?
+    /// #135 — true while a manually-typed place/event is being geocoded
+    /// before it's actually added.
+    @State private var isGeocoding = false
 
     private var stopTypes: [RexCategory] { itemTypes }
 
@@ -301,10 +304,22 @@ struct TripStopsBuilderView: View {
 
             input("Why are you Rexing it?", text: $note)
 
-            Button("Add \(singularNoun)") { addStop() }
-                .buttonStyle(RexPrimaryButtonStyle())
-                .opacity(title.trimmingCharacters(in: .whitespaces).isEmpty ? 0.5 : 1)
-                .disabled(title.trimmingCharacters(in: .whitespaces).isEmpty)
+            Button {
+                addStop()
+            } label: {
+                if isGeocoding {
+                    HStack(spacing: RexSpacing.sm) {
+                        ProgressView().controlSize(.small)
+                        Text("Locating…")
+                    }
+                    .frame(maxWidth: .infinity)
+                } else {
+                    Text("Add \(singularNoun)").frame(maxWidth: .infinity)
+                }
+            }
+            .buttonStyle(RexPrimaryButtonStyle())
+            .opacity(title.trimmingCharacters(in: .whitespaces).isEmpty ? 0.5 : 1)
+            .disabled(isGeocoding || title.trimmingCharacters(in: .whitespaces).isEmpty)
         }
         .padding(RexSpacing.cardPadding)
         .rexCard()
@@ -339,24 +354,49 @@ struct TripStopsBuilderView: View {
     private func addStop() {
         let trimmed = title.trimmingCharacters(in: .whitespaces)
         guard !trimmed.isEmpty else { return }
-        stops.append(DraftStop(
-            type: type,
-            title: trimmed,
-            subtitle: subtitle.isEmpty ? nil : subtitle,
-            address: address.isEmpty ? nil : address,
-            lat: picked?.lat,
-            lng: picked?.lng,
-            genre: picked?.genre,
-            imageURL: picked?.imageURL,
-            externalId: picked?.externalId,
-            externalSource: picked?.externalSource,
-            rating: rating,
-            note: note.trimmingCharacters(in: .whitespaces),
-            // Heading persists so several stops can be added under one.
-            section: section.trimmingCharacters(in: .whitespaces).isEmpty ? nil : section.trimmingCharacters(in: .whitespaces)
-        ))
-        resetForm(keepSection: true)
-        adding = false
+        let trimmedAddress = address.trimmingCharacters(in: .whitespaces)
+        var lat = picked?.lat
+        var lng = picked?.lng
+
+        func finish() {
+            stops.append(DraftStop(
+                type: type,
+                title: trimmed,
+                subtitle: subtitle.isEmpty ? nil : subtitle,
+                address: trimmedAddress.isEmpty ? nil : trimmedAddress,
+                lat: lat,
+                lng: lng,
+                genre: picked?.genre,
+                imageURL: picked?.imageURL,
+                externalId: picked?.externalId,
+                externalSource: picked?.externalSource,
+                rating: rating,
+                note: note.trimmingCharacters(in: .whitespaces),
+                // Heading persists so several stops can be added under one.
+                section: section.trimmingCharacters(in: .whitespaces).isEmpty ? nil : section.trimmingCharacters(in: .whitespaces)
+            ))
+            resetForm(keepSection: true)
+            adding = false
+        }
+
+        // #135 — a stop typed by hand (no search suggestion tapped) had no
+        // coordinates at all and so never got a map pin. Geocode it from
+        // whatever's most specific — the address if one was given, else
+        // the name — before adding it. Only for place/event: a recipe or
+        // "other" stop was never going to have a pin anyway.
+        guard picked == nil, lat == nil, (type == .place || type == .event),
+              !(trimmedAddress.isEmpty && trimmed.isEmpty) else {
+            finish()
+            return
+        }
+        isGeocoding = true
+        Task {
+            let located = await RexSearch.geocode(trimmedAddress.isEmpty ? trimmed : trimmedAddress)
+            lat = located?.lat
+            lng = located?.lng
+            isGeocoding = false
+            finish()
+        }
     }
 
     private func resetForm(keepSection: Bool = false) {

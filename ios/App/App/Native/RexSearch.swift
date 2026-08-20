@@ -249,6 +249,35 @@ enum RexSearch {
         }
     }
 
+    /// #135 — a stop only ever got a map pin if it was picked from a live
+    /// places() search result above; anything typed by hand, or brought in
+    /// by the document importer (which never geocodes at all), had no
+    /// lat/lng and so never rendered a pin. This is the fallback for both
+    /// of those paths: turn a plain address or name into coordinates via
+    /// the legacy Geocoding API, which — like places() above — accepts the
+    /// same iOS-bundle-restricted key over REST rather than needing a
+    /// separate unrestricted server key. Best-effort: a place that doesn't
+    /// resolve (typo, too vague, key missing the Geocoding API product)
+    /// just stays pinless the way it already did, rather than blocking
+    /// whatever's creating the stop.
+    static func geocode(_ query: String) async -> (lat: Double, lng: Double)? {
+        let q = query.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !q.isEmpty, !googleKey.isEmpty else { return nil }
+        guard let url = URL(string: "https://maps.googleapis.com/maps/api/geocode/json?address=\(esc(q))&key=\(googleKey)") else { return nil }
+        var request = URLRequest(url: url)
+        request.setValue(bundleId, forHTTPHeaderField: "X-Ios-Bundle-Identifier")
+        guard let (data, response) = try? await URLSession.shared.data(for: request),
+              let http = response as? HTTPURLResponse, http.statusCode < 400,
+              let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+              json["status"] as? String == "OK",
+              let results = json["results"] as? [[String: Any]], let first = results.first,
+              let geometry = first["geometry"] as? [String: Any],
+              let location = geometry["location"] as? [String: Any],
+              let lat = location["lat"] as? Double, let lng = location["lng"] as? Double
+        else { return nil }
+        return (lat, lng)
+    }
+
     // MARK: - Helpers
 
     private static func esc(_ s: String) -> String {

@@ -2508,6 +2508,24 @@ final class RexAPI {
         if let existing = row.resolved_item_id {
             itemId = existing
         } else {
+            // #135 — the document importer never geocoded anything, so a
+            // trip/list brought in this way had stops with no coordinates
+            // at all and no pins on the map. raw_creator often carries a
+            // city or cuisine for a place row ("cuisine or city for
+            // places", same convention the extraction prompt uses), which
+            // helps disambiguate a name like "The Ivy" that exists in
+            // several cities. Best-effort — a row that doesn't geocode
+            // just stays pinless the way it already did.
+            var geocodedLat: Double?
+            var geocodedLng: Double?
+            if type == "place" || type == "event" {
+                let query = [row.raw_title, row.raw_creator]
+                    .compactMap { $0 }.filter { !$0.isEmpty }.joined(separator: ", ")
+                if let located = await RexSearch.geocode(query) {
+                    geocodedLat = located.lat
+                    geocodedLng = located.lng
+                }
+            }
             itemId = try await createItem(
                 type: type,
                 title: row.raw_title,
@@ -2517,7 +2535,9 @@ final class RexAPI {
                 linkURL: row.raw_url,
                 externalId: row.resolved_external_id,
                 externalSource: row.resolved_external_source,
-                imageURL: row.resolved_image_url
+                imageURL: row.resolved_image_url,
+                lat: geocodedLat,
+                lng: geocodedLng
             )
         }
 
