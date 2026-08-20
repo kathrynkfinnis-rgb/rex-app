@@ -5,6 +5,11 @@ import SwiftUI
 /// compete with the content above it.
 struct RexCardActions: View {
     let rec: FeedRecommendation
+    /// #130 — where tapping the comment icon should go. The card is one
+    /// tap target (so swipe-to-delete works), so this can't be its own
+    /// NavigationLink; the parent hands the same push it uses for the
+    /// card itself back in through here, same pattern as onAuthorTap.
+    var onCommentTap: (() -> Void)? = nil
 
     @State private var liked = false
     @State private var likeCount = 0
@@ -37,11 +42,20 @@ struct RexCardActions: View {
                 Task { await toggleLike() }
             }
 
-            // Comments live on the detail screen; this is a visual affordance
-            // that the card is tappable through to them.
+            // Comments live on the detail screen. #130 — this used to rely
+            // on allowsHitTesting(false) letting the tap fall through to
+            // the card's own onTap; that didn't reliably happen on a card
+            // this gesture-laden (feed/profile, wrapped in SwipeToRemove),
+            // so callers that pass onCommentTap now get an explicit push
+            // instead, same as the like/save buttons next to it. Screens
+            // that haven't wired it (a friend's profile, a collection —
+            // both wrap the whole card in their own NavigationLink already)
+            // keep the old pass-through so they're untouched by this fix.
             action(icon: "bubble.left", tint: RexColor.mutedForeground,
-                   count: commentCount, label: "Comments") {}
-                .allowsHitTesting(false)
+                   count: commentCount, label: "Comments") {
+                onCommentTap?()
+            }
+            .allowsHitTesting(onCommentTap != nil)
 
             // A single save action. There used to be two (bookmark and +)
             // writing to different tables, which testers found confusing —

@@ -14,6 +14,12 @@ struct RecommendationCardView: View {
     /// books by them. Same nested-tap-gesture trick as onAuthorTap, and the
     /// same reason it has to be handed back up rather than pushed here.
     var onBookAuthorTap: ((String) -> Void)? = nil
+    /// #130 — the comment icon used to rely on allowsHitTesting(false) to
+    /// let its tap fall through to the card's own onTap, which turned out
+    /// not to reliably happen on a card this gesture-laden (same class of
+    /// issue as #120's swipe conflict). Same explicit hand-back-up pattern
+    /// as onAuthorTap/onBookAuthorTap instead of relying on pass-through.
+    var onCommentTap: (() -> Void)? = nil
 
     @State private var noteExpanded = false
 
@@ -197,7 +203,7 @@ struct RecommendationCardView: View {
                     // want doesn't have — so those actions stay off until wants
                     // and Rex share a table.
                     if !rec.isWant && !rec.isBlast {
-                        RexCardActions(rec: rec)
+                        RexCardActions(rec: rec, onCommentTap: onCommentTap)
                     }
                 }
                 .padding(.horizontal, RexSpacing.cardPadding)

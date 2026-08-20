@@ -285,7 +285,8 @@ struct ProfileView: View {
                                     rexCount: rexCounts[rec.item_id] ?? 0,
                                     onBookAuthorTap: { author in
                                         path.append(AuthorRoute(author: author))
-                                    }
+                                    },
+                                    onCommentTap: { path.append(rec.item_id) }
                                 )
                             }
                         }

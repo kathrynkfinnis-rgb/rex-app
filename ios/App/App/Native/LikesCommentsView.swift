@@ -32,16 +32,27 @@ struct LikesCommentsView: View {
                 }
                 .buttonStyle(.plain)
 
-                HStack(spacing: RexSpacing.sm) {
-                    Image(systemName: "bubble.left")
-                        .font(.system(size: 16))
-                        .foregroundStyle(RexColor.mutedForeground)
-                    if !comments.isEmpty {
-                        Text("\(comments.count)")
-                            .font(RexFont.text(14, weight: .medium))
+                // #130 — this had no action at all, unlike the like button
+                // right next to it: "Clicking on 'comment' isn't
+                // registering so I can't comment on the Rex." Comments
+                // already show inline below, so tapping this just focuses
+                // the comment field and brings up the keyboard, same as
+                // tapping the field itself.
+                Button {
+                    draftFocused = true
+                } label: {
+                    HStack(spacing: RexSpacing.sm) {
+                        Image(systemName: "bubble.left")
+                            .font(.system(size: 16))
                             .foregroundStyle(RexColor.mutedForeground)
+                        if !comments.isEmpty {
+                            Text("\(comments.count)")
+                                .font(RexFont.text(14, weight: .medium))
+                                .foregroundStyle(RexColor.mutedForeground)
+                        }
                     }
                 }
+                .buttonStyle(.plain)
 
                 Spacer()
             }

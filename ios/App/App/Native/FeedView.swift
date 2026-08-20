@@ -218,7 +218,8 @@ struct FeedView: View {
                                         },
                                         onBookAuthorTap: { author in
                                             path.append(AuthorRoute(author: author))
-                                        }
+                                        },
+                                        onCommentTap: { open(rec) }
                                     )
                                 }
                                 .modifier(EditableIfMine(rec: rec, editing: $editing))
