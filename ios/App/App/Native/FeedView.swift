@@ -473,14 +473,24 @@ struct FeedView: View {
     private var wordmarkToolbarItem: some View {
         Button {} label: {
             HStack(spacing: 6) {
+                // Explicit width, not just height — once the text next to
+                // it went .fixedSize(), the toolbar's tight width proposal
+                // started giving this image whatever was left over, which
+                // was nothing (it disappeared entirely). Both siblings now
+                // demand their own space instead of one starving the other.
                 Image("RexDinoLogo")
                     .resizable()
                     .scaledToFit()
-                    .frame(height: 36)
-                Image("RexWordmark")
-                    .resizable()
-                    .scaledToFit()
-                    .frame(height: 48)
+                    .frame(width: 34, height: 36)
+                // Real Text rather than the wordmark image — the image's
+                // .frame(height:) was getting clamped to the toolbar's own
+                // fixed ~44pt height no matter what value we gave it; text
+                // isn't bound by that the same way, so this actually reads
+                // bigger.
+                Text("REX")
+                    .font(RexFont.display(24, weight: .bold))
+                    .foregroundStyle(RexColor.primary)
+                    .fixedSize()
             }
         }
         .buttonStyle(.plain)
