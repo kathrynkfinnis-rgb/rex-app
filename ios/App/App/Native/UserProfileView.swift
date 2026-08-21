@@ -22,6 +22,13 @@ struct UserProfileView: View {
     @State private var followBusyIds: Set<String> = []
     @State private var addingToCollection: FeedRecommendation?
     @State private var rexCounts: [String: Int] = [:]
+    /// #148 — this shelf showed a plain emoji square per collection; the
+    /// same shelf on your own Collections page (and Explore's friend-
+    /// collections cards) shows a 2x2 grid of the collection's own content
+    /// thumbnails instead (ThumbnailGridView, #131). Same fetch pattern as
+    /// ExploreView: one fetchCollectionItems call per list, in parallel.
+    @State private var listThumbnails: [String: [String]] = [:]
+    @State private var listItemCounts: [String: Int] = [:]
 
     private var availableCategories: [RexCategory] {
         let present = Set(recommendations.compactMap { RexCategory(rawType: $0.items?.type) })
@@ -170,14 +177,24 @@ struct UserProfileView: View {
     private func collectionTile(_ list: RexList) -> some View {
         let saved = myFollowedListIds.contains(list.id)
         let busy = followBusyIds.contains(list.id)
+        let thumbnails = listThumbnails[list.id] ?? []
         return VStack(alignment: .leading, spacing: 6) {
             NavigationLink(value: CollectionRoute(listId: list.id, name: list.name, isMine: false)) {
                 ZStack {
-                    RoundedRectangle(cornerRadius: RexRadius.card, style: .continuous)
-                        .fill(RexColor.badgeBackground)
-                    Text(list.emoji ?? "\u{1F4D2}").font(.system(size: 28))
+                    if thumbnails.isEmpty {
+                        RoundedRectangle(cornerRadius: RexRadius.card, style: .continuous)
+                            .fill(RexColor.badgeBackground)
+                        Text(list.emoji ?? "\u{1F4D2}").font(.system(size: 28))
+                    } else {
+                        // #148 — matches the 2x2 content-thumbnail grid your
+                        // own Collections page and Explore's friend-
+                        // collection cards already use (ThumbnailGridView,
+                        // #131), instead of a plain emoji placeholder.
+                        ThumbnailGridView(urls: thumbnails)
+                    }
                 }
                 .frame(width: 112, height: 112)
+                .clipShape(RoundedRectangle(cornerRadius: RexRadius.card, style: .continuous))
             }
             .buttonStyle(.plain)
 
@@ -189,6 +206,12 @@ struct UserProfileView: View {
                 .lineLimit(2)
                 .multilineTextAlignment(.leading)
                 .frame(width: 112, alignment: .leading)
+
+            if let count = listItemCounts[list.id] {
+                Text(count == 1 ? "1 item" : "\(count) items")
+                    .font(RexFont.text(11))
+                    .foregroundStyle(RexColor.mutedForeground)
+            }
 
             // Press-and-hold to save, not a tap — this tile sits inside a
             // horizontal scroll row, where a quick tap is often really a
@@ -264,6 +287,22 @@ struct UserProfileView: View {
             myFollowedListIds = Set(followedLists.map { $0.id })
             let itemIds = Array(Set(recs.map { $0.item_id }))
             rexCounts = (try? await RexAPI.shared.fetchRexCounts(itemIds: itemIds)) ?? [:]
+
+            // #148 — same per-list thumbnail fetch as ExploreView's friend-
+            // collection cards, so this shelf matches the one on your own
+            // Collections page instead of a plain emoji square.
+            await withTaskGroup(of: (String, [SavedPost]).self) { group in
+                for list in lists {
+                    group.addTask {
+                        let items = (try? await RexAPI.shared.fetchCollectionItems(listId: list.id)) ?? []
+                        return (list.id, items)
+                    }
+                }
+                for await (listId, items) in group {
+                    listThumbnails[listId] = items.prefix(4).compactMap { $0.recommendations?.items?.image_url }
+                    listItemCounts[listId] = items.count
+                }
+            }
         } catch {
             errorMessage = error.localizedDescription
         }
