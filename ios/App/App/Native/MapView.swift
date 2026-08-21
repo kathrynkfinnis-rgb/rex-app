@@ -375,7 +375,30 @@ struct RexMapView: View {
         isLoading = places.isEmpty
         errorMessage = nil
         do {
-            places = try await RexAPI.shared.fetchMapPlaces()
+            let recPlaces = try await RexAPI.shared.fetchMapPlaces()
+            // #153 — wants live in a separate table with no recommendations
+            // row at all, so they need their own fetch; merged here rather
+            // than fought into fetchMapPlaces' own query (same reasoning as
+            // fetchFeed's wants/blasts merge). Best-effort: a failure here
+            // shouldn't blank the map that already loaded fine.
+            let wantPlaces = (try? await RexAPI.shared.fetchMapWants()) ?? []
+            var merged: [String: MapPlace] = [:]
+            for place in recPlaces { merged[place.id] = place }
+            for want in wantPlaces {
+                if let existing = merged[want.id] {
+                    // Already a real pin (someone's rated it) — fold the
+                    // want in as another "recommendation" on it instead of a
+                    // second pin, so the count/summary reflects both.
+                    merged[want.id] = MapPlace(
+                        id: existing.id, title: existing.title, subtitle: existing.subtitle, type: existing.type,
+                        genre: existing.genre, address: existing.address, lat: existing.lat, lng: existing.lng,
+                        image_url: existing.image_url, recommendations: existing.recommendations + want.recommendations
+                    )
+                } else {
+                    merged[want.id] = want
+                }
+            }
+            places = Array(merged.values)
             let tripIds = Array(Set(places.flatMap { $0.tripIds }))
             tripTitles = (try? await RexAPI.shared.fetchTripTitles(recommendationIds: tripIds)) ?? [:]
         } catch {

@@ -2550,6 +2550,64 @@ final class RexAPI {
         return place
     }
 
+    /// #153 — a want has no recommendations row at all (it lives in the
+    /// separate `wants` table entirely), so fetchMapPlaces' inner join on
+    /// recommendations excluded it completely: marking a place "want to
+    /// try" never made it a pin. Same shape as fetchFeed's wants/blasts
+    /// merge — a separate fetch, combined client-side in RexMapView.load(),
+    /// rather than fighting PostgREST to OR across two unrelated child
+    /// tables in one query.
+    func fetchMapWants() async throws -> [MapPlace] {
+        let token = try await validToken()
+        let select = "id,user_id,item_id," +
+            "items!inner(id,title,subtitle,type,genre,address,lat,lng,image_url)," +
+            "profiles!wants_user_id_fkey(username,display_name,avatar_url)"
+        var components = URLComponents(url: baseURL.appendingPathComponent("/rest/v1/wants"), resolvingAgainstBaseURL: false)!
+        components.queryItems = [
+            URLQueryItem(name: "select", value: select),
+            URLQueryItem(name: "items.type", value: "in.(place,event)"),
+            URLQueryItem(name: "limit", value: "200"),
+        ]
+        var request = URLRequest(url: components.url!)
+        request.setValue(anonKey, forHTTPHeaderField: "apikey")
+        request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+
+        let (data, response) = try await URLSession.shared.data(for: request)
+        guard let http = response as? HTTPURLResponse, http.statusCode < 400 else { return [] }
+        struct Row: Codable {
+            let id: String
+            let user_id: String
+            let item_id: String
+            let items: Item
+            let profiles: RexProfile?
+            struct Item: Codable {
+                let id: String, title: String, subtitle: String?, type: String
+                let genre: String?, address: String?, lat: Double?, lng: Double?, image_url: String?
+            }
+        }
+        let rows = (try? JSONDecoder().decode([Row].self, from: data)) ?? []
+        var places: [MapPlace] = []
+        for row in rows {
+            var lat = row.items.lat, lng = row.items.lng
+            if (lat == nil || lng == nil), let address = row.items.address, !address.isEmpty,
+               let located = await repairPlaceCoordsIfNeeded(itemId: row.items.id, address: address) {
+                lat = located.lat
+                lng = located.lng
+            }
+            guard let lat, let lng else { continue }
+            places.append(MapPlace(
+                id: row.items.id, title: row.items.title, subtitle: row.items.subtitle, type: row.items.type,
+                genre: row.items.genre, address: row.items.address, lat: lat, lng: lng,
+                image_url: row.items.image_url,
+                // rating 0 / trip_id nil — a want has neither; the synthetic
+                // "want-" id prefix keeps it distinct if this same item also
+                // has a real recommendation (see the merge in load()).
+                recommendations: [MapRecStub(id: "want-\(row.id)", rating: 0, user_id: row.user_id, trip_id: nil, profiles: row.profiles)]
+            ))
+        }
+        return places
+    }
+
     // MARK: - Import (#109 "Lists" category, #15/#38 native trip import)
 
     /// Sends pasted text to the extract-recommendations edge function and
