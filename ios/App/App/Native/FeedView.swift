@@ -99,8 +99,21 @@ struct FeedView: View {
     /// A mass import — someone's whole Goodreads or IMDb history in one go —
     /// otherwise buries everyone else. More than five in a row from the same
     /// person in the same minute collapses to five plus a "show the rest".
+    ///
+    /// #152 — this used to run unconditionally, even over an active search
+    /// or filter. A search for a specific title that happened to land
+    /// inside someone's >5-item import burst (e.g. their note field is the
+    /// same "Imported from Goodreads" boilerplate on every book, which the
+    /// search also matches on) got folded into "+N more" instead of shown
+    /// directly — indistinguishable from not matching at all unless you
+    /// happened to tap through. A search/filter already narrows results
+    /// down to what you're looking for on purpose; collapsing them again
+    /// on top of that just hides the thing you searched for.
     private var visible: [FeedRow] {
         let rows = sorted
+        guard filter == nil, subFilter == nil, !blastsOnly, ratingFilter == nil,
+              query.trimmingCharacters(in: .whitespaces).isEmpty
+        else { return rows.map { FeedRow.rex($0) } }
         var out: [FeedRow] = []
         var index = 0
         while index < rows.count {
