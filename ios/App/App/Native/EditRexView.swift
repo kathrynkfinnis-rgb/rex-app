@@ -28,9 +28,19 @@ struct EditRexView: View {
     /// Rex can hide from the main feed now while still showing wherever it
     /// was deliberately looked up (your own profile, this item's page).
     @State private var showInFeed: Bool
+    /// #45 — same shared-catalogue model as title/thumbnail. Only offered
+    /// for the same categories AddRexView itself offers it to at creation
+    /// (everything except book/movie/tv/podcast/list — those come from a
+    /// catalogue with their own page, or aren't a single thing to link to).
+    @State private var linkURL: String
     @State private var isSaving = false
     @State private var confirmDelete = false
     @State private var errorMessage: String?
+
+    private var category: RexCategory { RexCategory(rawType: rec.items?.type) }
+    private var offersLink: Bool {
+        !([.book, .movie, .tv, .podcast, .list] as [RexCategory]).contains(category)
+    }
 
     /// wants and recommendations are two separate tables (see fetchWantsFeed) —
     /// a want has no rating, no photos, no tags of its own, so there's a real
@@ -55,6 +65,7 @@ struct EditRexView: View {
         _tags = State(initialValue: rec.tags ?? [])
         _thumbnailURLs = State(initialValue: rec.items?.image_url.map { [$0] } ?? [])
         _showInFeed = State(initialValue: rec.show_in_feed ?? true)
+        _linkURL = State(initialValue: rec.items?.link_url ?? "")
     }
 
     var body: some View {
@@ -81,6 +92,26 @@ struct EditRexView: View {
                         VStack(alignment: .leading, spacing: RexSpacing.sm) {
                             Text("Thumbnail").font(RexFont.text(14, weight: .semibold))
                             PhotoPickerView(photoURLs: $thumbnailURLs, maxPhotos: 1)
+                        }
+
+                        // #45 — was write-once at creation (AddRexView's own
+                        // "Link" field); this is the same shared-catalogue
+                        // field, just now fixable after the fact too.
+                        if offersLink {
+                            VStack(alignment: .leading, spacing: RexSpacing.sm) {
+                                Text("Link").font(RexFont.text(14, weight: .semibold))
+                                TextField("https://…", text: $linkURL)
+                                    .textInputAutocapitalization(.never)
+                                    .autocorrectionDisabled()
+                                    .font(RexFont.text(15))
+                                    .padding(RexSpacing.md)
+                                    .background(RexColor.card)
+                                    .clipShape(RoundedRectangle(cornerRadius: RexRadius.input, style: .continuous))
+                                    .overlay(
+                                        RoundedRectangle(cornerRadius: RexRadius.input, style: .continuous)
+                                            .stroke(RexColor.border, lineWidth: 1)
+                                    )
+                            }
                         }
                     }
 
@@ -263,6 +294,13 @@ struct EditRexView: View {
             let newThumbnail = thumbnailURLs.first
             if newThumbnail != rec.items?.image_url {
                 try await RexAPI.shared.updateItemImageURL(itemId: rec.item_id, imageURL: newThumbnail)
+            }
+            if offersLink {
+                let trimmedLink = linkURL.trimmingCharacters(in: .whitespaces)
+                let newLink = trimmedLink.isEmpty ? nil : trimmedLink
+                if newLink != rec.items?.link_url {
+                    try await RexAPI.shared.updateItemLinkURL(itemId: rec.item_id, linkURL: newLink)
+                }
             }
 
             switch (wantRowId, wantToTry) {

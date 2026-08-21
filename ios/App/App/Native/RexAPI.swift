@@ -269,7 +269,7 @@ final class RexAPI {
         let token = try await validToken()
 
         let select = "id,rating,note,created_at,photo_url,photo_urls,tags\(await anonymousField()),user_id,item_id,trip_id," +
-            "items!inner(id,type,title,subtitle,image_url,genre,address)," +
+            "items!inner(id,type,title,subtitle,image_url,genre,address,link_url)," +
             "profiles!recommendations_user_id_fkey(username,display_name,avatar_url)," +
             "creators(slug,name,color,emoji)"
 
@@ -371,7 +371,7 @@ final class RexAPI {
     func fetchRecommendation(id: String) async throws -> FeedRecommendation {
         let token = try await validToken()
         let select = "id,rating,note,created_at,photo_url,photo_urls,tags\(await anonymousField()),user_id,item_id,trip_id," +
-            "items!inner(id,type,title,subtitle,image_url,genre,address)," +
+            "items!inner(id,type,title,subtitle,image_url,genre,address,link_url)," +
             "profiles!recommendations_user_id_fkey(username,display_name,avatar_url)," +
             "creators(slug,name,color,emoji)"
         var components = URLComponents(url: baseURL.appendingPathComponent("/rest/v1/recommendations"), resolvingAgainstBaseURL: false)!
@@ -400,7 +400,7 @@ final class RexAPI {
     func fetchTrips() async throws -> [FeedRecommendation] {
         let token = try await validToken()
         let select = "id,rating,note,created_at,photo_url,photo_urls,tags\(await anonymousField()),user_id,item_id,trip_id," +
-            "items!inner(id,type,title,subtitle,image_url,genre,address)," +
+            "items!inner(id,type,title,subtitle,image_url,genre,address,link_url)," +
             "profiles!recommendations_user_id_fkey(username,display_name,avatar_url)"
         var components = URLComponents(url: baseURL.appendingPathComponent("/rest/v1/recommendations"), resolvingAgainstBaseURL: false)!
         components.queryItems = [
@@ -513,7 +513,7 @@ final class RexAPI {
         let token = try await validToken()
         guard let userId = currentUserId else { throw RexAPIError.notSignedIn }
         let select = "id,rating,note,created_at,photo_url,photo_urls,tags,user_id,item_id,trip_id," +
-            "items!inner(id,type,title,subtitle,image_url,genre,address)," +
+            "items!inner(id,type,title,subtitle,image_url,genre,address,link_url)," +
             "profiles!recommendations_user_id_fkey(username,display_name,avatar_url)"
         var components = URLComponents(url: baseURL.appendingPathComponent("/rest/v1/recommendations"), resolvingAgainstBaseURL: false)!
         components.queryItems = [
@@ -542,7 +542,7 @@ final class RexAPI {
         let token = try await validToken()
         guard let userId = currentUserId else { throw RexAPIError.notSignedIn }
         let select = "id,rating,note,created_at,photo_url,photo_urls,tags,user_id,item_id,trip_id," +
-            "items!inner(id,type,title,subtitle,image_url,genre,address)," +
+            "items!inner(id,type,title,subtitle,image_url,genre,address,link_url)," +
             "profiles!recommendations_user_id_fkey(username,display_name,avatar_url)"
         var components = URLComponents(url: baseURL.appendingPathComponent("/rest/v1/recommendations"), resolvingAgainstBaseURL: false)!
         components.queryItems = [
@@ -570,7 +570,7 @@ final class RexAPI {
     func fetchTripStops(tripRecommendationId: String) async throws -> [FeedRecommendation] {
         let token = try await validToken()
         let select = "id,rating,note,created_at,photo_url,photo_urls,tags\(await anonymousField()),user_id,item_id,trip_id,trip_section," +
-            "items!inner(id,type,title,subtitle,image_url,genre,address)," +
+            "items!inner(id,type,title,subtitle,image_url,genre,address,link_url)," +
             "profiles!recommendations_user_id_fkey(username,display_name,avatar_url)"
         var components = URLComponents(url: baseURL.appendingPathComponent("/rest/v1/recommendations"), resolvingAgainstBaseURL: false)!
         components.queryItems = [
@@ -594,7 +594,7 @@ final class RexAPI {
     func fetchListItems(listRecommendationId: String) async throws -> [FeedRecommendation] {
         let token = try await validToken()
         let select = "id,rating,note,created_at,photo_url,photo_urls,tags\(await anonymousField()),user_id,item_id,list_id,list_section,show_in_feed," +
-            "items!inner(id,type,title,subtitle,image_url,genre,address)," +
+            "items!inner(id,type,title,subtitle,image_url,genre,address,link_url)," +
             "profiles!recommendations_user_id_fkey(username,display_name,avatar_url)"
         var components = URLComponents(url: baseURL.appendingPathComponent("/rest/v1/recommendations"), resolvingAgainstBaseURL: false)!
         components.queryItems = [
@@ -932,7 +932,7 @@ final class RexAPI {
     func fetchRecommendations(forUser userId: String) async throws -> [FeedRecommendation] {
         let token = try await validToken()
         let select = "id,rating,note,created_at,photo_url,photo_urls,tags\(await anonymousField()),user_id,item_id," +
-            "items!inner(id,type,title,subtitle,image_url,genre,address)," +
+            "items!inner(id,type,title,subtitle,image_url,genre,address,link_url)," +
             "profiles!recommendations_user_id_fkey(username,display_name,avatar_url)," +
             "creators(slug,name,color,emoji)"
         var components = URLComponents(url: baseURL.appendingPathComponent("/rest/v1/recommendations"), resolvingAgainstBaseURL: false)!
@@ -1401,6 +1401,29 @@ final class RexAPI {
         let (data, response) = try await URLSession.shared.data(for: request)
         guard let http = response as? HTTPURLResponse, http.statusCode < 400 else {
             throw RexAPIError.server(friendlyError(data, fallback: "Couldn't update the thumbnail."))
+        }
+    }
+
+    /// #45 — same shared-catalogue model again, for the "Link" field
+    /// AddRexView already collects at creation for place/event/recipe/other
+    /// (everything except book/movie/tv/podcast/list, which come from a
+    /// catalogue with their own page). This was write-once; there was no way
+    /// to add one after the fact, or fix a dead one, without redoing the Rex.
+    func updateItemLinkURL(itemId: String, linkURL: String?) async throws {
+        let token = try await validToken()
+        var components = URLComponents(url: baseURL.appendingPathComponent("/rest/v1/items"), resolvingAgainstBaseURL: false)!
+        components.queryItems = [URLQueryItem(name: "id", value: "eq.\(itemId)")]
+        var request = URLRequest(url: components.url!)
+        request.httpMethod = "PATCH"
+        request.setValue(anonKey, forHTTPHeaderField: "apikey")
+        request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        let body: [String: Any] = ["link_url": linkURL ?? (NSNull() as Any)]
+        request.httpBody = try JSONSerialization.data(withJSONObject: body)
+
+        let (data, response) = try await URLSession.shared.data(for: request)
+        guard let http = response as? HTTPURLResponse, http.statusCode < 400 else {
+            throw RexAPIError.server(friendlyError(data, fallback: "Couldn't update the link."))
         }
     }
 
@@ -2265,7 +2288,7 @@ final class RexAPI {
         guard let userId = currentUserId else { return [] }
         let noteField = await wantNoteField()
         let select = "id,created_at,item_id,user_id\(noteField)," +
-            "items!inner(id,type,title,subtitle,image_url,genre,address)," +
+            "items!inner(id,type,title,subtitle,image_url,genre,address,link_url)," +
             "profiles!wants_user_id_fkey(username,display_name,avatar_url)"
         var components = URLComponents(url: baseURL.appendingPathComponent("/rest/v1/wants"), resolvingAgainstBaseURL: false)!
         components.queryItems = [

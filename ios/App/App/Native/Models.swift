@@ -12,8 +12,12 @@ struct RexItem: Codable {
     let google_rating_count: Int?
     /// #126 — saved fine on create, just never selected back until now.
     let recipe_text: String?
+    /// #45 — same story as recipe_text: createItem writes this fine
+    /// (AddRexView's "Link" field), it just was never in this struct at
+    /// all, so nothing that read an item back ever saw it.
+    let link_url: String?
 
-    init(id: String, type: String, title: String, subtitle: String?, image_url: String?, genre: String?, address: String? = nil, google_rating: Double? = nil, google_rating_count: Int? = nil, recipe_text: String? = nil) {
+    init(id: String, type: String, title: String, subtitle: String?, image_url: String?, genre: String?, address: String? = nil, google_rating: Double? = nil, google_rating_count: Int? = nil, recipe_text: String? = nil, link_url: String? = nil) {
         self.id = id
         self.type = type
         self.title = title
@@ -24,6 +28,7 @@ struct RexItem: Codable {
         self.google_rating = google_rating
         self.google_rating_count = google_rating_count
         self.recipe_text = recipe_text
+        self.link_url = link_url
     }
 }
 
