@@ -428,62 +428,7 @@ struct FeedView: View {
             .navigationDestination(for: AskRoute.self) { _ in
                 AskForRexView()
             }
-            .toolbar {
-                ToolbarItem(placement: .topBarLeading) {
-                    wordmarkToolbarItem
-                }
-                ToolbarItem(placement: .topBarTrailing) {
-                    HStack(spacing: RexSpacing.lg) {
-                        // + is back on the bottom tab bar's raised centre
-                        // button, per Kathryn's ask — see MainTabView.
-                        // Friends moved up here in its place.
-                        Button {
-                            onFriendsTap()
-                        } label: {
-                            Image(systemName: "person.2")
-                                .font(.system(size: 18))
-                                .foregroundStyle(RexColor.mutedForeground)
-                        }
-                        .accessibilityLabel("Friends")
-
-                        NavigationLink(value: FeedbackRoute()) {
-                            Image(systemName: "exclamationmark.bubble")
-                                .font(.system(size: 18))
-                                .foregroundStyle(RexColor.mutedForeground)
-                        }
-                        .accessibilityLabel("Send feedback")
-
-                        NavigationLink(value: NotificationsRoute()) {
-                            Image(systemName: "bell")
-                                .font(.system(size: 18))
-                                .foregroundStyle(RexColor.mutedForeground)
-                        }
-                        .accessibilityLabel("Notifications")
-
-                        // Your own picture, not a generic glyph. A sheet
-                        // rather than a NavigationLink push deliberately —
-                        // ProfileView owns its own NavigationStack (needed
-                        // so a swiped row can push onto a real bound path
-                        // when Profile is the tab root), and pushing it
-                        // inside Feed's NavigationStack nested one
-                        // NavigationStack inside another. That's explicitly
-                        // unsupported in SwiftUI and rendered as a blank
-                        // screen with a dead back button — a real bug this
-                        // session caught, not a hypothetical. A sheet is its
-                        // own presentation context, so there's no nesting.
-                        Button {
-                            showingProfile = true
-                        } label: {
-                            UserAvatarView(
-                                url: myProfile?.avatar_url,
-                                name: myProfile?.display_name ?? myProfile?.username ?? "?",
-                                size: 28
-                            )
-                        }
-                        .accessibilityLabel("Your profile")
-                    }
-                }
-            }
+            .toolbar { feedToolbarContent }
         }
         .tint(RexColor.primary)
         .onChange(of: popToRootSignal) { _, _ in
@@ -527,14 +472,91 @@ struct FeedView: View {
     /// to type-check it as part of this view's already-large body.
     private var wordmarkToolbarItem: some View {
         Button {} label: {
-            Image("RexDinoLogo")
-                .resizable()
-                .scaledToFit()
-                .frame(height: 28)
+            HStack(spacing: 6) {
+                Image("RexDinoLogo")
+                    .resizable()
+                    .scaledToFit()
+                    .frame(height: 36)
+                Image("RexWordmark")
+                    .resizable()
+                    .scaledToFit()
+                    .frame(height: 48)
+            }
         }
         .buttonStyle(.plain)
         .disabled(true)
         .accessibilityLabel("REX")
+    }
+
+    /// Pulled out of body for the same reason as wordmarkToolbarItem above —
+    /// the compiler choked type-checking this inline. .sharedBackgroundVisibility
+    /// on the leading item is what actually suppresses iOS 26's automatic
+    /// circular "Liquid Glass" badge around it; the plain button style alone
+    /// wasn't enough once the leading item held two images instead of one.
+    @ToolbarContentBuilder
+    private var feedToolbarContent: some ToolbarContent {
+        if #available(iOS 26.0, *) {
+            ToolbarItem(placement: .topBarLeading) {
+                wordmarkToolbarItem
+            }
+            .sharedBackgroundVisibility(.hidden)
+        } else {
+            ToolbarItem(placement: .topBarLeading) {
+                wordmarkToolbarItem
+            }
+        }
+
+        ToolbarItem(placement: .topBarTrailing) {
+            HStack(spacing: RexSpacing.lg) {
+                // + is back on the bottom tab bar's raised centre
+                // button, per Kathryn's ask — see MainTabView.
+                // Friends moved up here in its place.
+                Button {
+                    onFriendsTap()
+                } label: {
+                    Image(systemName: "person.2")
+                        .font(.system(size: 18))
+                        .foregroundStyle(RexColor.mutedForeground)
+                }
+                .accessibilityLabel("Friends")
+
+                NavigationLink(value: FeedbackRoute()) {
+                    Image(systemName: "exclamationmark.bubble")
+                        .font(.system(size: 18))
+                        .foregroundStyle(RexColor.mutedForeground)
+                }
+                .accessibilityLabel("Send feedback")
+
+                NavigationLink(value: NotificationsRoute()) {
+                    Image(systemName: "bell")
+                        .font(.system(size: 18))
+                        .foregroundStyle(RexColor.mutedForeground)
+                }
+                .accessibilityLabel("Notifications")
+
+                // Your own picture, not a generic glyph. A sheet
+                // rather than a NavigationLink push deliberately —
+                // ProfileView owns its own NavigationStack (needed
+                // so a swiped row can push onto a real bound path
+                // when Profile is the tab root), and pushing it
+                // inside Feed's NavigationStack nested one
+                // NavigationStack inside another. That's explicitly
+                // unsupported in SwiftUI and rendered as a blank
+                // screen with a dead back button — a real bug this
+                // session caught, not a hypothetical. A sheet is its
+                // own presentation context, so there's no nesting.
+                Button {
+                    showingProfile = true
+                } label: {
+                    UserAvatarView(
+                        url: myProfile?.avatar_url,
+                        name: myProfile?.display_name ?? myProfile?.username ?? "?",
+                        size: 28
+                    )
+                }
+                .accessibilityLabel("Your profile")
+            }
+        }
     }
 
     private var header: some View {
