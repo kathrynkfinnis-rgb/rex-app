@@ -246,7 +246,13 @@ struct ProfileView: View {
                 .frame(maxWidth: .infinity)
                 .padding(.top, 40)
         } else {
-            VStack(spacing: RexSpacing.betweenCards) {
+            // Live report: "profile loading really really slowly and often
+            // crashing when you try and scroll." This was a plain VStack —
+            // every Rex you've ever posted, photos and all, got fully
+            // instantiated up front instead of lazily as you scroll to it.
+            // FeedView and UserProfileView already use LazyVStack for the
+            // same row shape; this was the one screen that didn't.
+            LazyVStack(spacing: RexSpacing.betweenCards) {
                 ForEach(filteredRecommendations) { rec in
                     Group {
                         if selecting {
