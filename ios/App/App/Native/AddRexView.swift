@@ -166,7 +166,7 @@ struct AddRexView: View {
     @ViewBuilder
     private func form(for category: RexCategory) -> some View {
         VStack(alignment: .leading, spacing: 14) {
-            let searchable: Set<RexCategory> = [.place, .event, .book, .movie, .tv, .podcast]
+            let searchable: Set<RexCategory> = [.place, .event, .book, .movie, .tv, .podcast, .other]
             let searchFirst = searchable.contains(category) && picked == nil && !manualEntry
 
             field(searchFirst ? "Search" : "Title", text: $title,
@@ -357,7 +357,7 @@ struct AddRexView: View {
     /// something, so the form stops nagging.
     @ViewBuilder
     private func suggestions(for category: RexCategory) -> some View {
-        let searchable: Set<RexCategory> = [.place, .event, .book, .movie, .tv, .podcast]
+        let searchable: Set<RexCategory> = [.place, .event, .book, .movie, .tv, .podcast, .other]
 
         if searchable.contains(category) {
             if let picked {
@@ -469,6 +469,11 @@ struct AddRexView: View {
             address = hit.address ?? ""
         } else {
             subtitle = hit.subtitle ?? ""
+        }
+        // #73 — a picked web result for "Other"/Stuff carries its own page
+        // link; everything else leaves productLink alone (nil for them).
+        if let productURL = hit.productURL {
+            productLink = productURL
         }
         hits = []
     }

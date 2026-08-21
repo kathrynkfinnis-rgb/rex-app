@@ -32,6 +32,10 @@
 	<string>f72338e298712db7cbb764225473f7f0</string>
 	<key>GMSApiKey</key>
 	<string>AIzaSyDl2PCHjjKbAje0C-NjJNkb-AKn5LwAtGU</string>
+	<key>GoogleCSEEngineId</key>
+	<string>e7ee7b5e87ca1417e</string>
+	<key>GoogleCSEApiKey</key>
+	<string>AIzaSyD7CA_SOpUqX3lU3YonDvHEHA2rfMBrA2o</string>
 	<key>UIApplicationSceneManifest</key>
 	<dict>
 		<key>UIApplicationSupportsMultipleScenes</key>

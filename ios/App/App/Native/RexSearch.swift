@@ -15,6 +15,9 @@ struct RexSearchHit: Identifiable, Hashable {
     /// Google's public star rating, shown beneath friends' ratings.
     let googleRating: Double?
     let googleRatingCount: Int?
+    /// #73/#103 — the web page a "Other"/Stuff search result came from.
+    /// Nil for every other category; only productLookup() sets this.
+    let productURL: String?
 
     var id: String { "\(externalSource):\(externalId)" }
 
@@ -22,7 +25,8 @@ struct RexSearchHit: Identifiable, Hashable {
         externalId: String, externalSource: String, title: String,
         subtitle: String? = nil, imageURL: String? = nil, genre: String? = nil,
         address: String? = nil, lat: Double? = nil, lng: Double? = nil,
-        googleRating: Double? = nil, googleRatingCount: Int? = nil
+        googleRating: Double? = nil, googleRatingCount: Int? = nil,
+        productURL: String? = nil
     ) {
         self.externalId = externalId
         self.externalSource = externalSource
@@ -35,6 +39,7 @@ struct RexSearchHit: Identifiable, Hashable {
         self.lng = lng
         self.googleRating = googleRating
         self.googleRatingCount = googleRatingCount
+        self.productURL = productURL
     }
 }
 
@@ -52,6 +57,12 @@ enum RexSearch {
     private static var bundleId: String {
         Bundle.main.bundleIdentifier ?? ""
     }
+    private static var cseApiKey: String {
+        Bundle.main.object(forInfoDictionaryKey: "GoogleCSEApiKey") as? String ?? ""
+    }
+    private static var cseEngineId: String {
+        Bundle.main.object(forInfoDictionaryKey: "GoogleCSEEngineId") as? String ?? ""
+    }
 
     static func search(category: RexCategory, query: String) async -> [RexSearchHit] {
         let q = query.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -63,10 +74,49 @@ enum RexSearch {
             case .tv:              return try await tmdb(q, kind: "tv")
             case .podcast:         return try await podcasts(q)
             case .place, .event:   return try await places(q)
+            case .other:           return try await productLookup(q)
             default:               return []
             }
         } catch {
             return []
+        }
+    }
+
+    /// #73/#103 — books/movies/TV/podcasts/places each have their own real
+    /// catalogue; "Other"/Stuff never had one, so it never got a photo or a
+    /// product link beyond whatever the user typed in by hand. Google
+    /// Programmable Search stands in as a generic "look this up on the web"
+    /// catalogue for everything else — same search-then-pick flow as any
+    /// other category, just backed by web results instead of a dedicated API.
+    private static func productLookup(_ q: String) async throws -> [RexSearchHit] {
+        guard !cseApiKey.isEmpty, !cseEngineId.isEmpty else { return [] }
+        var components = URLComponents(string: "https://www.googleapis.com/customsearch/v1")!
+        components.queryItems = [
+            URLQueryItem(name: "key", value: cseApiKey),
+            URLQueryItem(name: "cx", value: cseEngineId),
+            URLQueryItem(name: "q", value: q),
+            URLQueryItem(name: "num", value: "5"),
+        ]
+        let (data, response) = try await URLSession.shared.data(from: components.url!)
+        guard let http = response as? HTTPURLResponse, http.statusCode < 400 else { return [] }
+        guard let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+              let items = json["items"] as? [[String: Any]]
+        else { return [] }
+        return items.compactMap { item -> RexSearchHit? in
+            guard let title = item["title"] as? String, let link = item["link"] as? String else { return nil }
+            let snippet = item["snippet"] as? String
+            var thumbnail: String?
+            if let pagemap = item["pagemap"] as? [String: Any] {
+                if let images = pagemap["cse_image"] as? [[String: Any]], let src = images.first?["src"] as? String {
+                    thumbnail = src
+                } else if let thumbs = pagemap["cse_thumbnail"] as? [[String: Any]], let src = thumbs.first?["src"] as? String {
+                    thumbnail = src
+                }
+            }
+            return RexSearchHit(
+                externalId: link, externalSource: "google_cse", title: title,
+                subtitle: snippet, imageURL: thumbnail, productURL: link
+            )
         }
     }
 
