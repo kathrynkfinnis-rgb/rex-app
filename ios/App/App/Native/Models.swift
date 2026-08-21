@@ -255,6 +255,19 @@ struct FeedRecommendation: Codable, Identifiable {
     }
 }
 
+/// #132 — a reply to a blast (public.request_comments). suggested_item_id
+/// exists in the schema for "reply with an actual place/book/etc", but the
+/// native compose UI only sends plain text for now — the column just comes
+/// back nil for every response until that's built.
+struct RequestComment: Codable, Identifiable {
+    let id: String
+    let request_id: String
+    let user_id: String
+    let body: String
+    let created_at: String
+    let profiles: RexProfile?
+}
+
 /// One of the user's own curated lists (hitlist_lists) — e.g. "Baby Recs".
 struct RexList: Codable, Identifiable {
     let id: String

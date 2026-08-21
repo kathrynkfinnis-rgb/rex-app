@@ -319,6 +319,9 @@ struct FeedView: View {
             .navigationDestination(for: ListRoute.self) { route in
                 ListDetailView(route: route)
             }
+            .navigationDestination(for: BlastRoute.self) { route in
+                BlastDetailView(route: route)
+            }
             .navigationDestination(for: UserProfileRoute.self) { r in
                 UserProfileView(route: r)
             }
@@ -656,9 +659,16 @@ struct FeedView: View {
 
     /// Trips open their itinerary; everything else opens the item screen.
     private func open(_ rec: FeedRecommendation) {
-        // Blasts and wants aren't backed by a real item — there's nowhere to
-        // push to. Comments are the whole point of a blast, so that's next up.
-        guard !rec.isBlast, !rec.isWant else { return }
+        // #132 — a blast has no item, but it does now have somewhere to go:
+        // its own screen, to read and add responses.
+        if rec.isBlast {
+            let requestId = String(rec.id.dropFirst("blast-".count))
+            path.append(BlastRoute(requestId: requestId, title: rec.items?.title ?? "Blast"))
+            return
+        }
+        // A want isn't backed by a real item either, and has no responses
+        // mechanism of its own — nowhere to push to.
+        guard !rec.isWant else { return }
         switch RexCategory(rawType: rec.items?.type) {
         case .trip:
             path.append(TripRoute(recommendationId: rec.id, title: rec.items?.title ?? "Trip"))

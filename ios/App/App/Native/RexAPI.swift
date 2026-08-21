@@ -1861,6 +1861,47 @@ final class RexAPI {
         }
     }
 
+    /// #132 — every response to one blast, oldest first (a conversation
+    /// reads top-to-bottom, unlike the feed itself).
+    func fetchRequestComments(requestId: String) async throws -> [RequestComment] {
+        let token = try await validToken()
+        let select = "id,request_id,user_id,body,created_at,profiles!request_comments_user_id_fkey(username,display_name,avatar_url)"
+        var components = URLComponents(url: baseURL.appendingPathComponent("/rest/v1/request_comments"), resolvingAgainstBaseURL: false)!
+        components.queryItems = [
+            URLQueryItem(name: "select", value: select),
+            URLQueryItem(name: "request_id", value: "eq.\(requestId)"),
+            URLQueryItem(name: "order", value: "created_at.asc"),
+        ]
+        var request = URLRequest(url: components.url!)
+        request.setValue(anonKey, forHTTPHeaderField: "apikey")
+        request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+
+        let (data, response) = try await URLSession.shared.data(for: request)
+        guard let http = response as? HTTPURLResponse, http.statusCode < 400 else {
+            throw RexAPIError.server(friendlyError(data, fallback: "Couldn't load responses."))
+        }
+        return try JSONDecoder().decode([RequestComment].self, from: data)
+    }
+
+    /// #132 — reply to a blast. suggested_item_id is left null; the compose
+    /// UI is plain text only for now (see RequestComment's doc comment).
+    func createRequestComment(requestId: String, body text: String) async throws {
+        let token = try await validToken()
+        guard let userId = currentUserId else { throw RexAPIError.notSignedIn }
+        var request = URLRequest(url: baseURL.appendingPathComponent("/rest/v1/request_comments"))
+        request.httpMethod = "POST"
+        request.setValue(anonKey, forHTTPHeaderField: "apikey")
+        request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        let body: [String: Any] = ["request_id": requestId, "user_id": userId, "body": text]
+        request.httpBody = try JSONSerialization.data(withJSONObject: body)
+
+        let (data, response) = try await URLSession.shared.data(for: request)
+        guard let http = response as? HTTPURLResponse, http.statusCode < 400 else {
+            throw RexAPIError.server(friendlyError(data, fallback: "Couldn't post your reply."))
+        }
+    }
+
     /// Anonymous feedback goes in with user_id null so it can't be traced back.
     func sendFeedback(message: String, anonymous: Bool, page: String?) async throws {
         let token = try await validToken()
