@@ -9,6 +9,10 @@ struct RexMapView: View {
     /// keeps tabs alive rather than recreating them, so without this a
     /// deleted item's pin would sit on the map until the app relaunched.
     var refreshSignal: Int = 0
+    /// #133 "view on map" — set by MainTabView when a card's map icon is
+    /// tapped elsewhere in the app. Carries its own nonce so tapping the
+    /// same card's icon twice in a row still re-centres.
+    var focusRequest: MapFocusRequest? = nil
 
     @State private var places: [MapPlace] = []
     @State private var isLoading = true
@@ -100,6 +104,7 @@ struct RexMapView: View {
                     places: visiblePlaces,
                     center: center,
                     radiusMeters: radiusMeters,
+                    focusRequest: focusRequest,
                     onSelect: { selectedPlace = $0 }
                 )
                 .ignoresSafeArea(edges: .bottom)
@@ -122,6 +127,11 @@ struct RexMapView: View {
             // if nothing actually changed server-side.
             Task { await load() }
         }
+        // .task(id:) rather than .onChange — this needs to fire for
+        // whatever focusRequest MainTabView already set *before* this view
+        // first appeared (tapping a card's map icon switches tabs and sets
+        // the request in the same action), not only for later changes.
+        .task(id: focusRequest) { await focusOn(focusRequest) }
         .sheet(item: $selectedPlace) { place in
             placeSheet(place)
                 // Compact by default; drag up when a place is on several trips.
@@ -148,6 +158,24 @@ struct RexMapView: View {
         tripFilter = nil
         followingTripTitle = nil
         focusedTripPlaces = nil
+    }
+
+    /// #133 "view on map" — jumps straight to one place regardless of
+    /// whatever filter or followed trip the map was already showing, and
+    /// pops its info sheet the same as tapping the pin directly would.
+    private func focusOn(_ request: MapFocusRequest?) async {
+        guard let request else { return }
+        guard let place = try? await RexAPI.shared.fetchMapPlace(itemId: request.itemId) else { return }
+        // A category filter or a followed trip could hide the very place
+        // being jumped to — clear both so it's guaranteed visible.
+        filter = nil
+        if tripFilter != nil { unfollowTrip() }
+        if let idx = places.firstIndex(where: { $0.id == place.id }) {
+            places[idx] = place
+        } else {
+            places.append(place)
+        }
+        selectedPlace = place
     }
 
     /// Location indicator + category filters, floating over the map.

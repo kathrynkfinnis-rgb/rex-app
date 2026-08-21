@@ -15,6 +15,9 @@ struct FeedView: View {
     /// there, per Kathryn's ask) whenever that sheet dismisses, so the feed
     /// picks up whatever was just posted the same way it always has.
     var addRexRefreshSignal: Int = 0
+    /// #133 "view on map" — MainTabView switches to the Map tab and jumps
+    /// to this item's pin.
+    var onViewOnMap: ((String) -> Void)? = nil
 
     @State private var path = NavigationPath()
 
@@ -251,7 +254,8 @@ struct FeedView: View {
                                         onBookAuthorTap: { author in
                                             path.append(AuthorRoute(author: author))
                                         },
-                                        onCommentTap: { open(rec) }
+                                        onCommentTap: { open(rec) },
+                                        onViewOnMap: onViewOnMap
                                     )
                                 }
                                 .modifier(EditableIfMine(rec: rec, editing: $editing))

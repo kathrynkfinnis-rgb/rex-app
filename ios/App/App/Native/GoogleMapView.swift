@@ -4,11 +4,23 @@ import CoreLocation
 
 /// Google Maps, so the native map matches the web app rather than showing
 /// Apple's basemap. Wraps GMSMapView for SwiftUI.
+/// #133 "view on map" — a request to jump to one specific pin, distinct from
+/// the general `center` (which only ever fires once, on first load — see
+/// Coordinator.didCenter). Carries a nonce so tapping "view on map" again on
+/// the same place still re-centres, rather than a same-value SwiftUI update
+/// being silently ignored.
+struct MapFocusRequest: Equatable {
+    let itemId: String
+    let nonce: Int
+}
+
 struct GoogleMapView: UIViewRepresentable {
     let places: [MapPlace]
     /// Centre point and radius (metres) to show on first load.
     var center: CLLocationCoordinate2D?
     var radiusMeters: Double
+    /// Jump straight to one place, overriding wherever the map currently sits.
+    var focusRequest: MapFocusRequest?
     var onSelect: (MapPlace) -> Void
 
     func makeCoordinator() -> Coordinator { Coordinator(self) }
@@ -56,6 +68,18 @@ struct GoogleMapView: UIViewRepresentable {
             ))
             context.coordinator.didCenter = true
         }
+
+        if let focusRequest, focusRequest != context.coordinator.lastFocusRequest,
+           let place = places.first(where: { $0.id == focusRequest.itemId }),
+           let lat = place.lat, let lng = place.lng {
+            // Tighter than the general area radius — this is "show me this
+            // one place", not "show me the neighbourhood".
+            mapView.animate(to: GMSCameraPosition(
+                target: CLLocationCoordinate2D(latitude: lat, longitude: lng),
+                zoom: zoomFor(radiusMeters: 800)
+            ))
+            context.coordinator.lastFocusRequest = focusRequest
+        }
     }
 
     /// Events get the gold accent; everything else forest green, matching the
@@ -79,6 +103,7 @@ struct GoogleMapView: UIViewRepresentable {
         var markersById: [String: MapPlace] = [:]
         var renderedIds = ""
         var didCenter = false
+        var lastFocusRequest: MapFocusRequest?
 
         init(_ parent: GoogleMapView) { self.parent = parent }
 

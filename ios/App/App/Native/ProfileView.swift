@@ -8,6 +8,9 @@ struct ProfileView: View {
     /// Optional so the tab-bar Profile can own sign-out while other entry
     /// points (e.g. the feed toolbar) just view the profile.
     var onSignedOut: (() -> Void)? = nil
+    /// #133 "view on map" — MainTabView switches to the Map tab and jumps
+    /// to this item's pin.
+    var onViewOnMap: ((String) -> Void)? = nil
 
     @State private var profile: RexProfileDetail?
     @State private var recommendations: [FeedRecommendation] = []
@@ -343,7 +346,8 @@ struct ProfileView: View {
                                     onBookAuthorTap: { author in
                                         path.append(AuthorRoute(author: author))
                                     },
-                                    onCommentTap: { path.append(rec.item_id) }
+                                    onCommentTap: { path.append(rec.item_id) },
+                                    onViewOnMap: onViewOnMap
                                 )
                             }
                         }

@@ -26,6 +26,18 @@ struct MainTabView: View {
     /// gives it a reason to reload without needing pull-to-refresh (which
     /// would fight the map's own pan gesture).
     @State private var mapRefreshSignal = 0
+    /// #133 "view on map" — set from a card's map icon (Feed or Profile),
+    /// read by RexMapView to jump straight to that pin. The nonce lives
+    /// alongside it so tapping the same card's icon twice in a row still
+    /// re-centres rather than a same-value change being ignored.
+    @State private var mapFocusRequest: MapFocusRequest?
+    @State private var mapFocusNonce = 0
+
+    private func focusMap(onItemId itemId: String) {
+        mapFocusNonce += 1
+        mapFocusRequest = MapFocusRequest(itemId: itemId, nonce: mapFocusNonce)
+        selection = 1
+    }
 
     var body: some View {
         ZStack(alignment: .bottom) {
@@ -34,11 +46,12 @@ struct MainTabView: View {
                     onSignedOut: onSignedOut,
                     popToRootSignal: feedPopSignal,
                     onFriendsTap: { selection = 4 },
-                    addRexRefreshSignal: addRexRefreshSignal
+                    addRexRefreshSignal: addRexRefreshSignal,
+                    onViewOnMap: { focusMap(onItemId: $0) }
                 ).tag(0)
 
                 NavigationStack {
-                    RexMapView(refreshSignal: mapRefreshSignal)
+                    RexMapView(refreshSignal: mapRefreshSignal, focusRequest: mapFocusRequest)
                         .navigationDestination(for: String.self) { ItemDetailView(itemId: $0) }
                         .navigationDestination(for: UserProfileRoute.self) { UserProfileView(route: $0) }
                 }
@@ -67,7 +80,7 @@ struct MainTabView: View {
 
                 // No wrapping NavigationStack here — ProfileView owns its
                 // own now, so a swiped row can push onto a real bound path.
-                ProfileView(onSignedOut: onSignedOut)
+                ProfileView(onSignedOut: onSignedOut, onViewOnMap: { focusMap(onItemId: $0) })
                     .tag(5)
             }
             // Deliberately NOT .page style. That style pages on a horizontal

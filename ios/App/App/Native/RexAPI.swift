@@ -2427,6 +2427,42 @@ final class RexAPI {
         return places.filter { $0.lat != nil && $0.lng != nil }
     }
 
+    /// One specific place/event, regardless of whether it's in
+    /// fetchMapPlaces' most-recent-200 sample — #133's "view on map" needs
+    /// to guarantee the pin it's jumping to actually loads, the same reason
+    /// fetchMapPlaces(forTrip:) exists rather than trusting the sample.
+    func fetchMapPlace(itemId: String) async throws -> MapPlace? {
+        let token = try await validToken()
+        let select = "id,title,subtitle,type,genre,address,lat,lng,image_url," +
+            "recommendations!inner(id,rating,user_id,trip_id,profiles(username,display_name,avatar_url))"
+        var components = URLComponents(url: baseURL.appendingPathComponent("/rest/v1/items"), resolvingAgainstBaseURL: false)!
+        components.queryItems = [
+            URLQueryItem(name: "select", value: select),
+            URLQueryItem(name: "id", value: "eq.\(itemId)"),
+            URLQueryItem(name: "limit", value: "1"),
+        ]
+        var request = URLRequest(url: components.url!)
+        request.setValue(anonKey, forHTTPHeaderField: "apikey")
+        request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+
+        let (data, response) = try await URLSession.shared.data(for: request)
+        guard let http = response as? HTTPURLResponse, http.statusCode < 400 else {
+            throw RexAPIError.server(friendlyError(data, fallback: "Couldn't load that place."))
+        }
+        var place = (try? JSONDecoder().decode([MapPlace].self, from: data))?.first
+        // Same self-heal as fetchMapPlaces — jumping to a place with no
+        // coordinates yet (#146) should still work, not just show nothing.
+        if let p = place, p.lat == nil || p.lng == nil, let address = p.address, !address.isEmpty,
+           let located = await repairPlaceCoordsIfNeeded(itemId: p.id, address: address) {
+            place = MapPlace(
+                id: p.id, title: p.title, subtitle: p.subtitle, type: p.type,
+                genre: p.genre, address: p.address, lat: located.lat, lng: located.lng,
+                image_url: p.image_url, recommendations: p.recommendations
+            )
+        }
+        return place
+    }
+
     // MARK: - Import (#109 "Lists" category, #15/#38 native trip import)
 
     /// Sends pasted text to the extract-recommendations edge function and

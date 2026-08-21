@@ -20,6 +20,11 @@ struct RecommendationCardView: View {
     /// issue as #120's swipe conflict). Same explicit hand-back-up pattern
     /// as onAuthorTap/onBookAuthorTap instead of relying on pass-through.
     var onCommentTap: (() -> Void)? = nil
+    /// #133 — jumps to this item's pin on the map. Only meaningful for
+    /// place/event categories (anything else has no coordinates at all), so
+    /// the locality row below only becomes tappable when both this is
+    /// provided and the category actually has one.
+    var onViewOnMap: ((String) -> Void)? = nil
 
     @State private var noteExpanded = false
 
@@ -108,14 +113,23 @@ struct RecommendationCardView: View {
                         // too long to scan, so this is the useful middle bit:
                         // Peckham, or Bristol.
                         if let locality = shortLocality(item.address) {
+                            let canViewOnMap = onViewOnMap != nil && (category == .place || category == .event)
                             HStack(spacing: 3) {
-                                Image(systemName: "mappin")
-                                    .font(.system(size: 9))
+                                Image(systemName: canViewOnMap ? "mappin.circle.fill" : "mappin")
+                                    .font(.system(size: canViewOnMap ? 11 : 9))
                                 Text(locality)
                                     .font(RexFont.text(12, weight: .medium))
                                     .lineLimit(1)
+                                if canViewOnMap {
+                                    Text("· View on map")
+                                        .font(RexFont.text(11, weight: .semibold))
+                                }
                             }
-                            .foregroundStyle(RexColor.mutedForeground)
+                            .foregroundStyle(canViewOnMap ? RexColor.primary : RexColor.mutedForeground)
+                            .contentShape(Rectangle())
+                            .onTapGesture {
+                                if canViewOnMap { onViewOnMap?(rec.item_id) }
+                            }
                         }
 
                         if let note = rec.note, !note.isEmpty {
