@@ -25,6 +25,7 @@ struct ItemDetailView: View {
             } else if let item {
                 VStack(alignment: .leading, spacing: 0) {
                     header(item: item)
+                    communityPhotosSection
                     recipeSection(item: item)
                     yourTakeSection
                     friendsSection
@@ -134,6 +135,32 @@ struct ItemDetailView: View {
             }
         }
         .padding(16)
+    }
+
+    /// #121 — every photo anyone's attached to a take on this item, pooled
+    /// into one swipeable carousel. Most-recent-take-first, since `recs`
+    /// already comes back ordered that way (fetchRecommendations(forItem:)).
+    /// A single Rex's own photos already get this treatment on its card
+    /// (RecommendationCardView's PhotoCarouselView) — this is the same
+    /// component, just fed everyone's photos on this item at once rather
+    /// than one person's.
+    private var communityPhotoURLs: [String] {
+        recs.flatMap { $0.photo_urls ?? ($0.photo_url.map { [$0] } ?? []) }
+    }
+
+    @ViewBuilder
+    private var communityPhotosSection: some View {
+        if !communityPhotoURLs.isEmpty {
+            VStack(alignment: .leading, spacing: RexSpacing.sm) {
+                Text("Photos from friends")
+                    .font(RexFont.text(13, weight: .semibold))
+                    .foregroundStyle(RexColor.mutedForeground)
+                    .padding(.horizontal, 16)
+                PhotoCarouselView(urls: communityPhotoURLs, height: 220, cornerRadius: RexRadius.card)
+                    .padding(.horizontal, 16)
+            }
+            .padding(.top, RexSpacing.sm)
+        }
     }
 
     // #126 — recipe_text saved correctly on post; this is the other half
