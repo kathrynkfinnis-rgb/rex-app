@@ -680,23 +680,56 @@ final class RexAPI {
         return try JSONDecoder().decode([RexItem].self, from: data)
     }
 
+    /// #149 — used to lean on `on_conflict=user_id,item_id`, matching the
+    /// table's old blanket UNIQUE(user_id,item_id) constraint. That
+    /// constraint is what made adding an already-Rex'd place to a trip or
+    /// list fail as a duplicate, so it's now three narrower partial indexes
+    /// (see migration 20260821190000) — none of which "on_conflict" can
+    /// target directly, since PostgREST only takes a plain column list, not
+    /// a WHERE-qualified arbiter. Looks up the existing *standalone* row
+    /// explicitly instead (trip_id/list_id both null) and PATCHes it if
+    /// found, so re-rating something you've already Rex'd on its own still
+    /// updates in place rather than erroring or duplicating.
     func upsertRecommendation(itemId: String, rating: Double, note: String?) async throws {
         let token = try await validToken()
         guard let userId = currentUserId else { throw RexAPIError.notSignedIn }
-        var request = URLRequest(url: baseURL.appendingPathComponent("/rest/v1/recommendations"))
-        request.httpMethod = "POST"
-        request.setValue(anonKey, forHTTPHeaderField: "apikey")
-        request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
-        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
-        request.setValue("resolution=merge-duplicates", forHTTPHeaderField: "Prefer")
+
+        var lookupComponents = URLComponents(url: baseURL.appendingPathComponent("/rest/v1/recommendations"), resolvingAgainstBaseURL: false)!
+        lookupComponents.queryItems = [
+            URLQueryItem(name: "select", value: "id"),
+            URLQueryItem(name: "user_id", value: "eq.\(userId)"),
+            URLQueryItem(name: "item_id", value: "eq.\(itemId)"),
+            URLQueryItem(name: "trip_id", value: "is.null"),
+            URLQueryItem(name: "list_id", value: "is.null"),
+            URLQueryItem(name: "limit", value: "1"),
+        ]
+        var lookupRequest = URLRequest(url: lookupComponents.url!)
+        lookupRequest.setValue(anonKey, forHTTPHeaderField: "apikey")
+        lookupRequest.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+        struct ExistingRow: Codable { let id: String }
+        var existingId: String?
+        if let (lookupData, lookupResponse) = try? await URLSession.shared.data(for: lookupRequest),
+           let lookupHttp = lookupResponse as? HTTPURLResponse, lookupHttp.statusCode < 400 {
+            existingId = (try? JSONDecoder().decode([ExistingRow].self, from: lookupData))?.first?.id
+        }
 
         var body: [String: Any] = ["user_id": userId, "item_id": itemId, "rating": rating]
         body["note"] = note?.isEmpty == false ? note : NSNull()
-        request.httpBody = try JSONSerialization.data(withJSONObject: body)
 
-        var urlComponents = URLComponents(url: request.url!, resolvingAgainstBaseURL: false)!
-        urlComponents.queryItems = [URLQueryItem(name: "on_conflict", value: "user_id,item_id")]
-        request.url = urlComponents.url
+        var request: URLRequest
+        if let existingId {
+            var components = URLComponents(url: baseURL.appendingPathComponent("/rest/v1/recommendations"), resolvingAgainstBaseURL: false)!
+            components.queryItems = [URLQueryItem(name: "id", value: "eq.\(existingId)")]
+            request = URLRequest(url: components.url!)
+            request.httpMethod = "PATCH"
+        } else {
+            request = URLRequest(url: baseURL.appendingPathComponent("/rest/v1/recommendations"))
+            request.httpMethod = "POST"
+        }
+        request.setValue(anonKey, forHTTPHeaderField: "apikey")
+        request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        request.httpBody = try JSONSerialization.data(withJSONObject: body)
 
         let (data, response) = try await URLSession.shared.data(for: request)
         guard let http = response as? HTTPURLResponse, http.statusCode < 400 else {
