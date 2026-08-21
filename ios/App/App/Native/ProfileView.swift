@@ -22,6 +22,12 @@ struct ProfileView: View {
     @State private var editingProfile = false
     @State private var addingToCollection: FeedRecommendation?
     @State private var rexCounts: [String: Int] = [:]
+    /// #147: the old Lovable web profile led with a row of stat cards
+    /// (Rex count / average rating / friends / collections) rather than the
+    /// single compact line this had — friends and collections aren't part
+    /// of `recommendations` at all, so they need their own small fetches.
+    @State private var friendCount = 0
+    @State private var collectionCount = 0
     /// Owned here rather than by the caller, so a swiped row's tap can push
     /// onto it directly — the wrapping NavigationStack used to live in
     /// MainTabView with no bindable path for this view to reach into.
@@ -168,6 +174,14 @@ struct ProfileView: View {
             // it's the same social proof the feed already shows.
             let itemIds = Array(Set(recommendations.map { $0.item_id }))
             rexCounts = (try? await RexAPI.shared.fetchRexCounts(itemIds: itemIds)) ?? [:]
+            // Best-effort, same as rexCounts above — a stat card reading 0
+            // because one of these failed is better than the whole profile
+            // failing to load over it.
+            async let friendshipsTask = RexAPI.shared.fetchFriendships()
+            async let listsTask = RexAPI.shared.fetchLists()
+            let friendships = (try? await friendshipsTask) ?? []
+            friendCount = friendships.filter { $0.status == "accepted" }.count
+            collectionCount = (try? await listsTask)?.count ?? 0
         } catch {
             errorMessage = error.localizedDescription
         }
@@ -175,40 +189,77 @@ struct ProfileView: View {
     }
 
     private var header: some View {
-        HStack(spacing: 14) {
-            UserAvatarView(
-                url: profile?.avatar_url,
-                name: profile?.display_name ?? profile?.username ?? "?",
-                size: 64
-            )
+        VStack(alignment: .leading, spacing: 0) {
+            HStack(spacing: 14) {
+                UserAvatarView(
+                    url: profile?.avatar_url,
+                    name: profile?.display_name ?? profile?.username ?? "?",
+                    size: 64
+                )
 
-            VStack(alignment: .leading, spacing: 3) {
-                Text(profile?.display_name ?? profile?.username ?? "")
-                    .font(.system(size: 20, weight: .semibold, design: .rounded))
-                    .foregroundStyle(RexColor.foreground)
-                if let username = profile?.username {
-                    Text("@\(username)").font(.system(size: 13)).foregroundStyle(RexColor.mutedForeground)
+                VStack(alignment: .leading, spacing: 3) {
+                    Text(profile?.display_name ?? profile?.username ?? "")
+                        .font(.system(size: 20, weight: .semibold, design: .rounded))
+                        .foregroundStyle(RexColor.foreground)
+                    if let username = profile?.username {
+                        Text("@\(username)").font(.system(size: 13)).foregroundStyle(RexColor.mutedForeground)
+                    }
                 }
-                HStack(spacing: 10) {
-                    Text("\(recommendations.count) Rex").font(.system(size: 12)).foregroundStyle(RexColor.mutedForeground)
-                    RexRatingAverageBadge(ratings: recommendations.map { $0.rating })
+                Spacer()
+                Button {
+                    editingProfile = true
+                } label: {
+                    Text("Edit")
+                        .font(RexFont.text(13, weight: .semibold))
+                        .foregroundStyle(RexColor.primary)
+                        .padding(.horizontal, RexSpacing.md)
+                        .padding(.vertical, 6)
+                        .overlay(Capsule().stroke(RexColor.primary, lineWidth: 1))
                 }
-                .padding(.top, 2)
+                .buttonStyle(.plain)
             }
-            Spacer()
-            Button {
-                editingProfile = true
-            } label: {
-                Text("Edit")
-                    .font(RexFont.text(13, weight: .semibold))
-                    .foregroundStyle(RexColor.primary)
-                    .padding(.horizontal, RexSpacing.md)
-                    .padding(.vertical, 6)
-                    .overlay(Capsule().stroke(RexColor.primary, lineWidth: 1))
+
+            // #147: the old Lovable web profile's own header led with this
+            // stat-card row (Rex / avg rating / friends / collections)
+            // before going straight into the feed of your own Rex — same
+            // shape, kept here rather than the "Your activity" grid and
+            // "What you Rex" bars the web profile also had below it, which
+            // Kathryn asked to drop in favour of going straight to the feed.
+            HStack(spacing: RexSpacing.sm) {
+                statCard(value: "\(recommendations.count)", label: "REX")
+                statCard(value: averageRatingText, label: "AVG RATING")
+                statCard(value: "\(friendCount)", label: "FRIENDS")
+                statCard(value: "\(collectionCount)", label: "COLLECTIONS")
             }
-            .buttonStyle(.plain)
+            .padding(.top, RexSpacing.md)
         }
         .padding(16)
+    }
+
+    private var averageRatingText: String {
+        guard let avg = RexRatingTier.averageTier(ratings: recommendations.map { $0.rating }) else { return "–" }
+        return String(format: "%.1f", avg)
+    }
+
+    private func statCard(value: String, label: String) -> some View {
+        VStack(spacing: 2) {
+            Text(value)
+                .font(.system(size: 18, weight: .bold, design: .rounded))
+                .foregroundStyle(RexColor.foreground)
+            Text(label)
+                .font(.system(size: 10, weight: .semibold))
+                .foregroundStyle(RexColor.mutedForeground)
+                .lineLimit(1)
+                .minimumScaleFactor(0.8)
+        }
+        .frame(maxWidth: .infinity)
+        .padding(.vertical, RexSpacing.sm)
+        .background(RexColor.card)
+        .clipShape(RoundedRectangle(cornerRadius: RexRadius.input, style: .continuous))
+        .overlay(
+            RoundedRectangle(cornerRadius: RexRadius.input, style: .continuous)
+                .stroke(RexColor.border, lineWidth: 1)
+        )
     }
 
     private var filterRow: some View {
