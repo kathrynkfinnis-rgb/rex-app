@@ -49,11 +49,18 @@ struct TripStopsBuilderView: View {
     /// Only the categories offered for this container's entries. A trip's
     /// stops are almost always a place; a list can hold anything.
     var itemTypes: [RexCategory] = [.place, .event, .recipe, .other]
-    /// The document-import hand-off only exists for trips today (#38) — a
-    /// List already has its own "Import from doc" entry point one screen up
-    /// in AddRexView, so this would just be a confusing second link there.
+    /// The document-import entry point only exists for trips today (#38) —
+    /// a List already has its own "Import from doc" entry point one screen
+    /// up in AddRexView, so this would just be a confusing second link there.
     var showImportLink: Bool = true
+    /// Fires once the document-import flow has actually created and posted
+    /// a real trip (ImportReviewView's "Trip" destination) — unlike this
+    /// screen's own stops, that trip already exists by the time this
+    /// callback runs, so the caller should treat it as "done", the same as
+    /// a normal successful post.
+    var onImportedAsTrip: (() -> Void)? = nil
 
+    @State private var showingDocImport = false
     @State private var adding = false
     @State private var type: RexCategory = .place
     @State private var title = ""
@@ -174,28 +181,38 @@ struct TripStopsBuilderView: View {
                 .font(RexFont.text(11))
                 .foregroundStyle(RexColor.mutedForeground)
 
-            // Importing a curated itinerary means picking a Word/Excel file and
-            // parsing it — something you'd realistically do at a desk. Rather
-            // than rebuild that on the phone, hand off to the web importer,
-            // which already handles headings and links. Lists have no
-            // equivalent web hand-off yet, hence showImportLink.
+            // Used to hand off to the web importer for a Word/Excel file —
+            // ImportReviewView already had a "Trip" destination
+            // (approveStagingAsTrip) sitting unused behind that hand-off
+            // the whole time, identical machinery to what Lists already
+            // use internally. Brought in-app: same paste-and-extract flow,
+            // just posts straight to a real trip instead of staging drafts
+            // for this screen to pick up, since the trip already exists by
+            // the time this returns.
             if showImportLink {
-                Link(destination: URL(string: "https://kathrynkfinnis-rgb-rex-app.kathryn-k-finnis.workers.dev/import")!) {
+                Button {
+                    showingDocImport = true
+                } label: {
                     HStack(spacing: RexSpacing.sm) {
                         Image(systemName: "square.and.arrow.down")
                             .font(.system(size: 13))
                         Text("Import a \(containerNoun) from a document")
                             .font(RexFont.text(13, weight: .medium))
                         Spacer()
-                        Image(systemName: "arrow.up.right")
-                            .font(.system(size: 11))
                     }
                     .foregroundStyle(RexColor.primary)
                     .padding(RexSpacing.md)
                     .background(RexColor.badgeBackground)
                     .clipShape(RoundedRectangle(cornerRadius: RexRadius.input, style: .continuous))
                 }
+                .buttonStyle(.plain)
             }
+        }
+        .sheet(isPresented: $showingDocImport) {
+            ListsImportView(onDone: {
+                showingDocImport = false
+                onImportedAsTrip?()
+            })
         }
     }
 

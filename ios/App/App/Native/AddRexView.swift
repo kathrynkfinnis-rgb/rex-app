@@ -213,7 +213,10 @@ struct AddRexView: View {
             }
 
             if category == .trip {
-                TripStopsBuilderView(stops: $tripStops)
+                TripStopsBuilderView(
+                    stops: $tripStops,
+                    onImportedAsTrip: { withAnimation { didPost = true } }
+                )
             }
 
             if category == .list {
