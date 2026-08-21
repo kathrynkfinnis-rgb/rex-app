@@ -16,6 +16,12 @@ struct EditRexView: View {
     @State private var photoURLs: [String]
     @State private var tags: [String]
     @State private var tagDraft = ""
+    /// #125 — the item's own shared thumbnail (its catalogue cover, shown on
+    /// every card and the item page), not the "Photos" section above which is
+    /// this one take's own attached photos. Same shared-catalogue model as
+    /// title editing. A single-element array so PhotoPickerView's existing
+    /// add/remove UI works unmodified with maxPhotos: 1.
+    @State private var thumbnailURLs: [String]
     /// #134 — was List-items-only (ListDetailView's own toggle); the
     /// underlying column already lived on every recommendation regardless
     /// of type, it just only ever got set explicitly for list items. Any
@@ -47,6 +53,7 @@ struct EditRexView: View {
         _note = State(initialValue: rec.note ?? "")
         _photoURLs = State(initialValue: rec.photo_urls ?? (rec.photo_url.map { [$0] } ?? []))
         _tags = State(initialValue: rec.tags ?? [])
+        _thumbnailURLs = State(initialValue: rec.items?.image_url.map { [$0] } ?? [])
         _showInFeed = State(initialValue: rec.show_in_feed ?? true)
     }
 
@@ -66,6 +73,14 @@ struct EditRexView: View {
                             TextField("Title", text: $title)
                                 .font(RexFont.display(22, weight: .semibold))
                                 .foregroundStyle(RexColor.foreground)
+                        }
+
+                        // #125 — same shared-catalogue model as the title
+                        // above: this is the cover shown on every card and
+                        // the item page, not this take's own "Photos" below.
+                        VStack(alignment: .leading, spacing: RexSpacing.sm) {
+                            Text("Thumbnail").font(RexFont.text(14, weight: .semibold))
+                            PhotoPickerView(photoURLs: $thumbnailURLs, maxPhotos: 1)
                         }
                     }
 
@@ -244,6 +259,10 @@ struct EditRexView: View {
             // card sharing this item doesn't need a write on every save.
             if let item = rec.items, trimmedTitle != item.title {
                 try await RexAPI.shared.updateItemTitle(itemId: rec.item_id, title: trimmedTitle)
+            }
+            let newThumbnail = thumbnailURLs.first
+            if newThumbnail != rec.items?.image_url {
+                try await RexAPI.shared.updateItemImageURL(itemId: rec.item_id, imageURL: newThumbnail)
             }
 
             switch (wantRowId, wantToTry) {
