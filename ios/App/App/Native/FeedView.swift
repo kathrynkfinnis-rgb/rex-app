@@ -527,10 +527,10 @@ struct FeedView: View {
     /// to type-check it as part of this view's already-large body.
     private var wordmarkToolbarItem: some View {
         Button {} label: {
-            Image("RexWordmark")
+            Image("RexDinoLogo")
                 .resizable()
                 .scaledToFit()
-                .frame(height: 20)
+                .frame(height: 28)
         }
         .buttonStyle(.plain)
         .disabled(true)
