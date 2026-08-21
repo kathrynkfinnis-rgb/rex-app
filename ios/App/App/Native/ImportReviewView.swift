@@ -40,7 +40,7 @@ struct ImportReviewView: View {
                         .frame(maxWidth: .infinity)
                         .padding(.top, 40)
                 } else {
-                    Text("\(rows.count) found \u{2014} swipe away anything that shouldn't be here")
+                    Text("\(rows.count) found \u{2014} tap the trash icon on anything that shouldn't be here")
                         .font(RexFont.text(13, weight: .medium))
                         .foregroundStyle(RexColor.mutedForeground)
 
@@ -86,13 +86,23 @@ struct ImportReviewView: View {
         }
     }
 
+    // Live report — "when you are importing from a doc, you can't scroll
+    // down to review all the rex before posting." SwipeToRemove's own
+    // header comment already spells out why: it uses .highPriorityGesture
+    // so a horizontal swipe wins outright over the enclosing ScrollView's
+    // pan — but that gesture claims priority for ANY drag direction, not
+    // just horizontal ones, so a vertical scroll starting on a row (most
+    // of the screen, on a document with many rows) got captured the same
+    // way. Feed/Profile get away with it because there's always somewhere
+    // to start a scroll that isn't mid-card; a long pasted document
+    // doesn't leave much of that, and this screen's whole point is
+    // reaching the Save button at the bottom. Rather than touch the
+    // shared SwipeToRemove (used everywhere else and hard-won against a
+    // real regression — #111/#120), this screen drops the swipe gesture
+    // entirely in favor of a plain, always-tappable trash icon: same
+    // remove action, zero gesture competition with the ScrollView.
     private func rowCard(_ row: ImportStagingRow) -> some View {
-        SwipeToRemove(
-            label: "Remove",
-            systemImage: "trash",
-            onTap: { editingRow = row },
-            action: { await discard(row) }
-        ) {
+        Group {
             HStack(alignment: .top, spacing: RexSpacing.md) {
                 VStack(alignment: .leading, spacing: 4) {
                     HStack(spacing: 6) {
@@ -150,15 +160,26 @@ struct ImportReviewView: View {
                     }
                 }
                 Spacer(minLength: 0)
-                Button { editingRow = row } label: {
-                    Image(systemName: "pencil.circle")
-                        .font(.system(size: 20))
-                        .foregroundStyle(RexColor.mutedForeground)
+                VStack(spacing: RexSpacing.md) {
+                    Button { editingRow = row } label: {
+                        Image(systemName: "pencil.circle")
+                            .font(.system(size: 20))
+                            .foregroundStyle(RexColor.mutedForeground)
+                    }
+                    .buttonStyle(.plain)
+
+                    Button { Task { await discard(row) } } label: {
+                        Image(systemName: "trash.circle")
+                            .font(.system(size: 20))
+                            .foregroundStyle(RexColor.destructive)
+                    }
+                    .buttonStyle(.plain)
                 }
-                .buttonStyle(.plain)
             }
             .padding(RexSpacing.cardPadding)
             .rexCard()
+            .contentShape(Rectangle())
+            .onTapGesture { editingRow = row }
         }
     }
 
