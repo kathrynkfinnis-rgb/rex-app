@@ -46,23 +46,6 @@ struct RecommendationCardView: View {
                     VStack(alignment: .leading, spacing: RexSpacing.xs) {
                         HStack(spacing: RexSpacing.sm) {
                             categoryBadge
-                            // Genre tags: what kind of place/book/etc it is,
-                            // e.g. PLACE · Restaurant · Bar. #136 — was
-                            // .first only, so a place tagged with several
-                            // subcategories showed just one of them. Capped
-                            // at 3, same as the note's #hashtags below, so a
-                            // heavily-tagged place doesn't crowd out the
-                            // rating badge at the far end of this row.
-                            ForEach(splitGenres(item.genre).prefix(3), id: \.self) { genre in
-                                Text(genre)
-                                    .font(.system(size: 10, weight: .medium))
-                                    .foregroundStyle(RexColor.mutedForeground)
-                                    .padding(.horizontal, RexSpacing.sm)
-                                    .padding(.vertical, 3)
-                                    .background(RexColor.muted)
-                                    .clipShape(Capsule())
-                                    .lineLimit(1)
-                            }
                             Spacer(minLength: RexSpacing.sm)
                             // A blast is a question, not a verdict.
                             if rec.isBlast {
@@ -162,6 +145,31 @@ struct RecommendationCardView: View {
                         }
 
                         rexdByRow
+
+                        // Genre tags: what kind of place/book/etc it is,
+                        // e.g. Restaurant · Bar. #136 moved these from
+                        // .first to up to 3, which then crowded the header
+                        // row above (categoryBadge + blast/want indicator +
+                        // rating badge + the floating edit-pencil) badly
+                        // enough to truncate mid-word. Kathryn flagged it
+                        // with a screenshot and asked for them down here
+                        // instead, alongside the #hashtags row rather than
+                        // competing for space up top.
+                        if !splitGenres(item.genre).isEmpty {
+                            HStack(spacing: RexSpacing.xs) {
+                                ForEach(splitGenres(item.genre).prefix(3), id: \.self) { genre in
+                                    Text(genre)
+                                        .font(.system(size: 10, weight: .medium))
+                                        .foregroundStyle(RexColor.mutedForeground)
+                                        .padding(.horizontal, RexSpacing.sm)
+                                        .padding(.vertical, 3)
+                                        .background(RexColor.muted)
+                                        .clipShape(Capsule())
+                                        .lineLimit(1)
+                                }
+                            }
+                            .padding(.top, RexSpacing.xs)
+                        }
 
                         if let tags = rec.tags, !tags.isEmpty {
                             // Neutral, not green — tags aren't an accent surface.
