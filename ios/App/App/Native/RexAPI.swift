@@ -281,18 +281,20 @@ final class RexAPI {
         // history, so it needs real range to find it.
         let limit = isFiltered ? 300 : 50
 
-        // Trip stops are unconditionally hidden (trip_id.is.null). List
-        // items default visible but can be toggled off individually — so
-        // unlike trips, this needs an actual per-row check rather than a
-        // blanket exclusion: show it if it isn't a list item at all, or if
-        // it is one that's been left on. Filters on list_id/show_in_feed,
-        // which don't exist until migration 20260816230000 is run — this
-        // is the core feed, not a best-effort feature, so it can't just
-        // break for everyone in the meantime the way a missing column
-        // elsewhere in the app gets a quiet ?? [] fallback. Try the real
-        // query first; a 400 specifically (not any other failure) falls
-        // back to the pre-migration shape once, rather than the feed going
-        // blank for every user until the migration happens to be run.
+        // Trip stops are unconditionally hidden (trip_id.is.null). Anything
+        // else defaults visible but can be toggled off individually — #134
+        // widened this from list items only (show it if it isn't a list
+        // item, or if it is one that's been left on) to any Rex at all, so
+        // the check is just the column itself: absent/null (never touched,
+        // the vast majority of rows) or explicitly true both show; only an
+        // explicit false hides. Filters on show_in_feed, which doesn't exist
+        // until migration 20260816230000 is run — this is the core feed,
+        // not a best-effort feature, so it can't just break for everyone in
+        // the meantime the way a missing column elsewhere in the app gets a
+        // quiet ?? [] fallback. Try the real query first; a 400 specifically
+        // (not any other failure) falls back to the pre-migration shape
+        // once, rather than the feed going blank for every user until the
+        // migration happens to be run.
         //
         // `extraFilter` is one more (name, value) query item AND'd onto
         // the request — used both for the category filter and, for
@@ -307,7 +309,7 @@ final class RexAPI {
             ]
             if let extraFilter { queryItems.append(URLQueryItem(name: extraFilter.0, value: extraFilter.1)) }
             if includeListFilter {
-                queryItems.append(URLQueryItem(name: "or", value: "(list_id.is.null,show_in_feed.eq.true)"))
+                queryItems.append(URLQueryItem(name: "or", value: "(show_in_feed.is.null,show_in_feed.eq.true)"))
             }
             components.queryItems = queryItems
             var request = URLRequest(url: components.url!)

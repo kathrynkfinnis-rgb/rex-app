@@ -16,6 +16,12 @@ struct EditRexView: View {
     @State private var photoURLs: [String]
     @State private var tags: [String]
     @State private var tagDraft = ""
+    /// #134 — was List-items-only (ListDetailView's own toggle); the
+    /// underlying column already lived on every recommendation regardless
+    /// of type, it just only ever got set explicitly for list items. Any
+    /// Rex can hide from the main feed now while still showing wherever it
+    /// was deliberately looked up (your own profile, this item's page).
+    @State private var showInFeed: Bool
     @State private var isSaving = false
     @State private var confirmDelete = false
     @State private var errorMessage: String?
@@ -41,6 +47,7 @@ struct EditRexView: View {
         _note = State(initialValue: rec.note ?? "")
         _photoURLs = State(initialValue: rec.photo_urls ?? (rec.photo_url.map { [$0] } ?? []))
         _tags = State(initialValue: rec.tags ?? [])
+        _showInFeed = State(initialValue: rec.show_in_feed ?? true)
     }
 
     var body: some View {
@@ -146,6 +153,21 @@ struct EditRexView: View {
                         }
                     }
 
+                    // #134 — was List-items-only. Anything you've Rex'd can
+                    // sit off the main feed (still on your profile, still on
+                    // the item's own page) without needing to delete it.
+                    if !wantToTry {
+                        Toggle(isOn: $showInFeed) {
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text("Show on feed").font(RexFont.text(14, weight: .semibold))
+                                Text("Still shows on your profile and this item's page either way.")
+                                    .font(RexFont.text(12))
+                                    .foregroundStyle(RexColor.mutedForeground)
+                            }
+                        }
+                        .tint(RexColor.primary)
+                    }
+
                     if let errorMessage {
                         Text(errorMessage)
                             .font(RexFont.text(13))
@@ -236,7 +258,8 @@ struct EditRexView: View {
                 try await RexAPI.shared.createRecommendation(
                     itemId: rec.item_id, rating: rating,
                     note: note.isEmpty ? nil : note,
-                    photoURLs: photoURLs, tags: tags
+                    photoURLs: photoURLs, tags: tags,
+                    showInFeed: showInFeed
                 )
                 try await RexAPI.shared.deleteWant(id: id)
             case (nil, true):
@@ -249,6 +272,13 @@ struct EditRexView: View {
                     note: note.isEmpty ? nil : note,
                     photoURLs: photoURLs, tags: tags
                 )
+                // Separate call rather than folding into updateRecommendation
+                // — that function is shared with every other Rex edit path
+                // (want<->rated conversion aside) and #134 is the first
+                // caller that ever needs this column touched.
+                if showInFeed != (rec.show_in_feed ?? true) {
+                    try await RexAPI.shared.updateShowInFeed(recommendationId: rec.id, showInFeed: showInFeed)
+                }
             }
             onSaved()
             dismiss()
