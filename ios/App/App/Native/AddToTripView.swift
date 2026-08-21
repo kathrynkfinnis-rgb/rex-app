@@ -20,6 +20,13 @@ struct AddToTripView: View {
     @State private var busyId: String?
     @State private var addedId: String?
     @State private var errorMessage: String?
+    /// #150 — this sheet only ever listed trips you'd already started;
+    /// there was no way to start one from here, so a place you wanted to
+    /// build a new trip around meant leaving, going to "+", building the
+    /// trip, then coming back to add this place a second time.
+    @State private var showingNewTrip = false
+    @State private var newTripTitle = ""
+    @State private var isCreatingTrip = false
 
     var body: some View {
         NavigationStack {
@@ -75,6 +82,52 @@ struct AddToTripView: View {
                         }
                     }
 
+                    if showingNewTrip {
+                        VStack(alignment: .leading, spacing: RexSpacing.sm) {
+                            Text("New trip").font(RexFont.text(14, weight: .semibold))
+                            TextField("e.g. Rye, Sussex", text: $newTripTitle)
+                                .font(RexFont.text(15))
+                                .padding(RexSpacing.md)
+                                .background(RexColor.card)
+                                .clipShape(RoundedRectangle(cornerRadius: RexRadius.input, style: .continuous))
+                                .overlay(
+                                    RoundedRectangle(cornerRadius: RexRadius.input, style: .continuous)
+                                        .stroke(RexColor.border, lineWidth: 1)
+                                )
+                            HStack {
+                                Button("Cancel") {
+                                    showingNewTrip = false
+                                    newTripTitle = ""
+                                }
+                                .font(RexFont.text(13))
+                                .foregroundStyle(RexColor.mutedForeground)
+                                Spacer()
+                                Button {
+                                    Task { await createTripAndAdd() }
+                                } label: {
+                                    if isCreatingTrip {
+                                        ProgressView().tint(RexColor.primaryForeground)
+                                    } else {
+                                        Text("Create & add")
+                                    }
+                                }
+                                .buttonStyle(RexPrimaryButtonStyle())
+                                .disabled(isCreatingTrip || newTripTitle.trimmingCharacters(in: .whitespaces).isEmpty)
+                            }
+                        }
+                        .padding(RexSpacing.md)
+                        .rexCard()
+                    } else {
+                        Button {
+                            showingNewTrip = true
+                        } label: {
+                            Label("New trip", systemImage: "plus")
+                                .font(RexFont.text(14, weight: .medium))
+                        }
+                        .buttonStyle(RexSecondaryButtonStyle())
+                        .disabled(busyId != nil || addedId != nil)
+                    }
+
                     if let errorMessage {
                         Text(errorMessage)
                             .font(RexFont.text(13))
@@ -119,5 +172,28 @@ struct AddToTripView: View {
             errorMessage = error.localizedDescription
         }
         busyId = nil
+    }
+
+    /// #150 — same two-step shape AddRexView uses to post a trip (create
+    /// the trip's own item+recommendation, then add stops under it), just
+    /// starting from zero stops and adding exactly one: this place.
+    private func createTripAndAdd() async {
+        let trimmed = newTripTitle.trimmingCharacters(in: .whitespaces)
+        guard !trimmed.isEmpty else { return }
+        isCreatingTrip = true
+        errorMessage = nil
+        do {
+            let tripItemId = try await RexAPI.shared.createItem(type: RexCategory.trip.rawValue, title: trimmed, subtitle: nil, address: nil)
+            let tripRecId = try await RexAPI.shared.createRecommendation(itemId: tripItemId, rating: 0, note: nil, returningId: true)
+            try await RexAPI.shared.createRecommendation(itemId: itemId, rating: 0, note: nil, tripId: tripRecId)
+            // A beat so success actually registers before the sheet closes,
+            // same reasoning as add(to:) above.
+            try? await Task.sleep(for: .seconds(0.5))
+            onDone()
+            dismiss()
+        } catch {
+            errorMessage = error.localizedDescription
+        }
+        isCreatingTrip = false
     }
 }
