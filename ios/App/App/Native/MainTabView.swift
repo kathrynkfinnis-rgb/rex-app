@@ -1,13 +1,20 @@
 import SwiftUI
 
-/// Bottom navigation. White surface, thin top border, forest green only on
-/// the active tab. Trialing "+" moved up to the feed's top bar (next to the
-/// profile avatar) instead of a raised centre button, freeing this bar's
-/// centre slot for the new Explore tab.
+/// Bottom navigation with a raised centre "+" button, mirroring the web's
+/// BottomNav. White surface, thin top border, forest green only on the
+/// active tab and the add button. + was trialed up in the feed's top bar
+/// for a while (freeing this bar's centre slot for the new Explore tab),
+/// but Kathryn asked for it back down here — Friends moved up to the top
+/// bar in its place instead, next to the profile avatar.
 struct MainTabView: View {
     var onSignedOut: () -> Void
 
     @State private var selection = 0
+    @State private var showingAddRex = false
+    /// Bumped when the add-a-Rex sheet dismisses, so Feed picks up
+    /// whatever was just posted — same purpose as feedPopSignal/
+    /// mapRefreshSignal below, just for this one.
+    @State private var addRexRefreshSignal = 0
     /// Bumped when Feed is tapped while already selected — FeedView watches it
     /// and pops back to the top, so "home" always means the feed rather than
     /// whatever Rex you were last looking at.
@@ -23,7 +30,12 @@ struct MainTabView: View {
     var body: some View {
         ZStack(alignment: .bottom) {
             TabView(selection: $selection) {
-                FeedView(onSignedOut: onSignedOut, popToRootSignal: feedPopSignal).tag(0)
+                FeedView(
+                    onSignedOut: onSignedOut,
+                    popToRootSignal: feedPopSignal,
+                    onFriendsTap: { selection = 4 },
+                    addRexRefreshSignal: addRexRefreshSignal
+                ).tag(0)
 
                 NavigationStack {
                     RexMapView(refreshSignal: mapRefreshSignal)
@@ -75,19 +87,41 @@ struct MainTabView: View {
         }
         .ignoresSafeArea(.keyboard)
         .tint(RexColor.primary)
+        .sheet(isPresented: $showingAddRex, onDismiss: { addRexRefreshSignal += 1 }) {
+            AddRexView(onDone: { showingAddRex = false })
+        }
     }
 
     private var bottomBar: some View {
         HStack(spacing: 0) {
             tabButton(index: 0, title: "Feed", icon: "house")
             tabButton(index: 1, title: "Map", icon: "map")
+
+            // Raised centre action, the way the web app does it — and the
+            // way this bar looked before the Explore-tab trial moved it up
+            // to the feed's top bar.
+            Button {
+                showingAddRex = true
+            } label: {
+                ZStack {
+                    Circle()
+                        .fill(RexColor.primary)
+                        .frame(width: 52, height: 52)
+                        .shadow(color: RexColor.primary.opacity(0.25), radius: 8, y: 3)
+                    Image(systemName: "plus")
+                        .font(.system(size: 22, weight: .semibold))
+                        .foregroundStyle(RexColor.primaryForeground)
+                }
+                .offset(y: -14)
+            }
+            .buttonStyle(.plain)
+            .frame(maxWidth: .infinity)
+            .accessibilityLabel("Add a Rex")
+
             tabButton(index: 2, title: "Collections", icon: "bookmark")
-            // Trial: Explore takes the bottom bar's centre slot that the
-            // raised "+" used to own; + moved up to the feed's top bar
-            // instead (next to the profile avatar).
+            // Friends is reached from the feed's top bar now; Explore keeps
+            // this slot instead.
             tabButton(index: 3, title: "Explore", icon: "sparkle.magnifyingglass")
-            // Profile is reached from the avatar in the feed's top bar.
-            tabButton(index: 4, title: "Friends", icon: "person.2")
         }
         .padding(.top, RexSpacing.sm)
         .padding(.horizontal, RexSpacing.sm)

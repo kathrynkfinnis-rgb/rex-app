@@ -6,13 +6,21 @@ struct FeedView: View {
     var onSignedOut: () -> Void
     /// Incremented by the tab bar when Feed is tapped while already active.
     var popToRootSignal: Int = 0
+    /// Friends moved up here from the bottom tab bar, per Kathryn's ask —
+    /// Friends is still a real tab (MainTabView keeps it alive so its own
+    /// scroll position/state survive), this just switches `selection` to
+    /// it instead of being reachable from the bottom bar directly.
+    var onFriendsTap: () -> Void = {}
+    /// Bumped by MainTabView's raised "+" button (Add-a-Rex moved back
+    /// there, per Kathryn's ask) whenever that sheet dismisses, so the feed
+    /// picks up whatever was just posted the same way it always has.
+    var addRexRefreshSignal: Int = 0
 
     @State private var path = NavigationPath()
 
     @State private var recommendations: [FeedRecommendation] = []
     @State private var isLoading = true
     @State private var errorMessage: String?
-    @State private var showingAddRex = false
     /// A sheet, not a NavigationLink push — see the comment on the avatar
     /// button for why.
     @State private var showingProfile = false
@@ -339,18 +347,17 @@ struct FeedView: View {
                 }
                 ToolbarItem(placement: .topBarTrailing) {
                     HStack(spacing: RexSpacing.lg) {
-                        // Moved up from the bottom tab bar's raised centre
-                        // button — trialing it living next to the profile
-                        // avatar instead, freeing that bottom-centre slot
-                        // for the new Explore tab.
+                        // + is back on the bottom tab bar's raised centre
+                        // button, per Kathryn's ask — see MainTabView.
+                        // Friends moved up here in its place.
                         Button {
-                            showingAddRex = true
+                            onFriendsTap()
                         } label: {
-                            Image(systemName: "plus.circle.fill")
-                                .font(.system(size: 20))
-                                .foregroundStyle(RexColor.primary)
+                            Image(systemName: "person.2")
+                                .font(.system(size: 18))
+                                .foregroundStyle(RexColor.mutedForeground)
                         }
-                        .accessibilityLabel("Add a Rex")
+                        .accessibilityLabel("Friends")
 
                         NavigationLink(value: FeedbackRoute()) {
                             Image(systemName: "exclamationmark.bubble")
@@ -398,12 +405,10 @@ struct FeedView: View {
         }
         .onChange(of: filter) { _, _ in scheduleFilteredFetch() }
         .onChange(of: query) { _, _ in scheduleFilteredFetch(debounced: true) }
+        .onChange(of: addRexRefreshSignal) { _, _ in Task { await loadFeed() } }
         .task {
             await loadFeed()
             myProfile = try? await RexAPI.shared.fetchMyProfile()
-        }
-        .sheet(isPresented: $showingAddRex, onDismiss: { Task { await loadFeed() } }) {
-            AddRexView(onDone: { showingAddRex = false })
         }
         .sheet(item: $editing) { rec in
             EditRexView(
