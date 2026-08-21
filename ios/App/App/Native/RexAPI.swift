@@ -2127,8 +2127,10 @@ final class RexAPI {
         var components = URLComponents(url: baseURL.appendingPathComponent("/rest/v1/wants"), resolvingAgainstBaseURL: false)!
         components.queryItems = [
             URLQueryItem(name: "select", value: select),
-            // Your own wants already live on your list; the feed is other people.
-            URLQueryItem(name: "user_id", value: "neq.\(userId)"),
+            // Used to be neq.\(userId) — "your own wants already live on
+            // your list; the feed is other people." Kathryn asked directly
+            // to see her own want-to-trys on her own feed too, so this now
+            // pulls everyone's, same as the rest of the feed does.
             URLQueryItem(name: "order", value: "created_at.desc"),
             // Was 30 — a want to try has no rating and often no note either,
             // so it's easy for a page this small to end up entirely stale
