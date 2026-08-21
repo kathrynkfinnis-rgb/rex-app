@@ -616,14 +616,14 @@ struct AddRexView: View {
                 // same meaning, whichever route created the list.
                 genre: category == .list ? listKind : (subcategories.isEmpty ? nil : subcategories.sorted().joined(separator: ", ")),
                 linkURL: productLink.trimmingCharacters(in: .whitespaces).isEmpty ? nil : productLink.trimmingCharacters(in: .whitespaces),
-                // #21 "guaranteed image": recipes have no catalogue to
-                // auto-import a cover photo from the way books/movies do,
-                // so every recipe card fell back to the same generic
-                // fork-and-knife placeholder. If a photo was attached to
-                // the post, promote it to the item's own cover too - fine
-                // if there isn't one (no forced upload step), but a real
-                // photo when there is one.
-                imageURL: category == .recipe ? photoURLs.first : nil,
+                // #21/#154 "guaranteed image", generalized beyond recipes:
+                // whenever the catalogue hasn't already supplied a cover
+                // (no search result picked, or the picked one had no photo —
+                // recipes always land here since they never have a hit at
+                // all), promote whatever photo the post itself carries
+                // instead of leaving every card on the generic placeholder
+                // icon. A real photo, when there is one, beats no photo.
+                imageURL: (picked?.imageURL?.isEmpty ?? true) ? photoURLs.first : nil,
                 recipeText: category == .recipe && !recipeText.isEmpty ? recipeText : nil
             )
             // Trip stops become their own Rex, linked to the trip.
