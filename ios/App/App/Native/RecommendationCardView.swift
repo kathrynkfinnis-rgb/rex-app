@@ -212,6 +212,15 @@ struct RecommendationCardView: View {
                         // SwipeToRemove (when this card is your own, in the
                         // feed) as a delete-swipe instead of paging photos.
                         .swipeToRemoveExclusionZone()
+                } else if category == .trip {
+                    // A trip has no photos of its own — its stops do — so in
+                    // that empty-carousel slot show where the trip actually
+                    // goes instead. rec.id is the trip's own recommendation
+                    // row, which is exactly what every stop's trip_id points
+                    // back to.
+                    TripMapTileView(tripRecommendationId: rec.id)
+                        .padding(.bottom, RexSpacing.sm)
+                        .swipeToRemoveExclusionZone()
                 }
 
                 Rectangle()

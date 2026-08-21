@@ -2549,7 +2549,29 @@ final class RexAPI {
             throw RexAPIError.server(friendlyError(data, fallback: "Couldn't load this trip's stops."))
         }
         let places = try JSONDecoder().decode([MapPlace].self, from: data)
-        return places.filter { $0.lat != nil && $0.lng != nil }
+        // Same self-heal as fetchMapPlaces() — a trip stop with an address
+        // but no coordinates (pre-#135 data, or a doc-import row whose query
+        // didn't resolve first time) should still get a shot at geocoding
+        // here rather than just quietly missing from the trip's map/tile.
+        let repaired = await withTaskGroup(of: MapPlace.self) { group in
+            for place in places {
+                group.addTask {
+                    guard place.lat == nil || place.lng == nil,
+                          let address = place.address, !address.isEmpty,
+                          let located = await self.repairPlaceCoordsIfNeeded(itemId: place.id, address: address)
+                    else { return place }
+                    return MapPlace(
+                        id: place.id, title: place.title, subtitle: place.subtitle, type: place.type,
+                        genre: place.genre, address: place.address, lat: located.lat, lng: located.lng,
+                        image_url: place.image_url, recommendations: place.recommendations
+                    )
+                }
+            }
+            var results: [MapPlace] = []
+            for await place in group { results.append(place) }
+            return results
+        }
+        return repaired.filter { $0.lat != nil && $0.lng != nil }
     }
 
     /// One specific place/event, regardless of whether it's in
