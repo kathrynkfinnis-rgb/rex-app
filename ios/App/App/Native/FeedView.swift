@@ -149,6 +149,92 @@ struct FeedView: View {
         }
     }
 
+    /// #17 "trial" — Deliveroo-style horizontal shelves, one per category,
+    /// browsable above the main vertical feed rather than replacing it.
+    /// Only on the plain unfiltered/unsearched view — once a filter or
+    /// search is active there's already a dedicated result list right
+    /// below, so a second copy of the same thing here would just be noise.
+    private var categoryShelves: [(category: RexCategory, recs: [FeedRecommendation])] {
+        guard filter == nil, subFilter == nil, !blastsOnly, ratingFilter == nil,
+              query.trimmingCharacters(in: .whitespaces).isEmpty
+        else { return [] }
+        var byCategory: [RexCategory: [FeedRecommendation]] = [:]
+        for rec in recommendations where !rec.isWant && !rec.isBlast {
+            byCategory[RexCategory(rawType: rec.items?.type), default: []].append(rec)
+        }
+        // A shelf of one item isn't worth a whole horizontal row — that's
+        // just the same card the vertical feed already shows, framed oddly.
+        return rexAllCategories.compactMap { category in
+            guard let recs = byCategory[category], recs.count >= 2 else { return nil }
+            return (category, Array(recs.prefix(10)))
+        }
+    }
+
+    @ViewBuilder
+    private var categoryShelvesSection: some View {
+        if !categoryShelves.isEmpty {
+            VStack(alignment: .leading, spacing: RexSpacing.lg) {
+                ForEach(categoryShelves, id: \.category) { shelf in
+                    VStack(alignment: .leading, spacing: RexSpacing.sm) {
+                        Text(shelf.category.label)
+                            .font(RexFont.display(17, weight: .semibold))
+                            .foregroundStyle(RexColor.foreground)
+                            .padding(.horizontal, RexSpacing.page)
+                        ScrollView(.horizontal, showsIndicators: false) {
+                            HStack(spacing: RexSpacing.md) {
+                                ForEach(shelf.recs) { rec in
+                                    Button { open(rec) } label: { shelfCard(rec) }
+                                        .buttonStyle(.plain)
+                                }
+                            }
+                            .padding(.horizontal, RexSpacing.page)
+                        }
+                    }
+                }
+            }
+            .padding(.bottom, RexSpacing.sm)
+        }
+    }
+
+    private func shelfCard(_ rec: FeedRecommendation) -> some View {
+        VStack(alignment: .leading, spacing: RexSpacing.xs) {
+            Group {
+                if let urlString = rec.items?.image_url, let url = URL(string: urlString) {
+                    AsyncImage(url: url) { phase in
+                        if let image = phase.image {
+                            image.resizable().aspectRatio(contentMode: .fill)
+                        } else {
+                            RexColor.muted
+                        }
+                    }
+                } else {
+                    RexColor.muted.overlay(
+                        Image(systemName: RexCategory(rawType: rec.items?.type).symbol)
+                            .font(.system(size: 20))
+                            .foregroundStyle(RexColor.mutedForeground)
+                    )
+                }
+            }
+            .frame(width: 132, height: 96)
+            .clipShape(RoundedRectangle(cornerRadius: RexRadius.input, style: .continuous))
+            .overlay(
+                RoundedRectangle(cornerRadius: RexRadius.input, style: .continuous)
+                    .stroke(RexColor.border, lineWidth: 1)
+            )
+
+            Text(rec.items?.title ?? "")
+                .font(RexFont.text(12.5, weight: .medium))
+                .foregroundStyle(RexColor.foreground)
+                .lineLimit(2)
+                .multilineTextAlignment(.leading)
+
+            if rec.rating > 0 {
+                RexRatingBadge(raw: rec.rating, compact: true)
+            }
+        }
+        .frame(width: 132, alignment: .leading)
+    }
+
     /// Newest-first is already how loadFeed merges everything, so only
     /// "Most liked" needs an actual re-sort here.
     private var sorted: [FeedRecommendation] {
@@ -184,6 +270,8 @@ struct FeedView: View {
                     LazyVStack(spacing: RexSpacing.betweenCards) {
                         header
                             .id("top")
+
+                        categoryShelvesSection
 
                         if isLoading {
                             ForEach(0..<3, id: \.self) { _ in
