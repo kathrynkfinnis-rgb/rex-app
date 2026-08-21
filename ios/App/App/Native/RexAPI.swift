@@ -296,10 +296,13 @@ final class RexAPI {
         // once, rather than the feed going blank for every user until the
         // migration happens to be run.
         //
-        // `extraFilter` is one more (name, value) query item AND'd onto
-        // the request — used both for the category filter and, for
-        // search, for exactly one field at a time (see below for why).
-        func fetch(includeListFilter: Bool, extraFilter: (String, String)? = nil) async throws -> (Data, HTTPURLResponse) {
+        // `extraFilters` is a list of (name, value) query items, all AND'd
+        // onto the request — #151: this used to be a single optional tuple,
+        // which meant search (needing one field-match filter) and the
+        // category chip (needing its own type filter) could never both
+        // apply at once. Picking "Trip" and typing a search query silently
+        // dropped the category and searched every type instead.
+        func fetch(includeListFilter: Bool, extraFilters: [(String, String)] = []) async throws -> (Data, HTTPURLResponse) {
             var components = URLComponents(url: baseURL.appendingPathComponent("/rest/v1/recommendations"), resolvingAgainstBaseURL: false)!
             var queryItems = [
                 URLQueryItem(name: "select", value: select),
@@ -307,7 +310,7 @@ final class RexAPI {
                 URLQueryItem(name: "order", value: "created_at.desc"),
                 URLQueryItem(name: "limit", value: "\(limit)"),
             ]
-            if let extraFilter { queryItems.append(URLQueryItem(name: extraFilter.0, value: extraFilter.1)) }
+            for filter in extraFilters { queryItems.append(URLQueryItem(name: filter.0, value: filter.1)) }
             if includeListFilter {
                 queryItems.append(URLQueryItem(name: "or", value: "(show_in_feed.is.null,show_in_feed.eq.true)"))
             }
@@ -320,10 +323,10 @@ final class RexAPI {
             return (data, http)
         }
 
-        func decodedPage(includeListFilter: Bool, extraFilter: (String, String)? = nil) async throws -> [FeedRecommendation] {
-            var (data, http) = try await fetch(includeListFilter: includeListFilter, extraFilter: extraFilter)
+        func decodedPage(includeListFilter: Bool, extraFilters: [(String, String)] = []) async throws -> [FeedRecommendation] {
+            var (data, http) = try await fetch(includeListFilter: includeListFilter, extraFilters: extraFilters)
             if http.statusCode == 400, includeListFilter {
-                (data, http) = try await fetch(includeListFilter: false, extraFilter: extraFilter)
+                (data, http) = try await fetch(includeListFilter: false, extraFilters: extraFilters)
             }
             if http.statusCode >= 400 {
                 throw RexAPIError.server(friendlyError(data, fallback: "Couldn't load your feed (\(http.statusCode))."))
@@ -340,11 +343,13 @@ final class RexAPI {
             // username/display_name, this runs one query per field (each a
             // valid standalone filter) and merges + dedupes the results —
             // same net effect, just four small requests instead of one.
+            // Each still carries the category filter too, if one's active.
             let q = trimmedSearch
-            async let byTitle = decodedPage(includeListFilter: true, extraFilter: ("items.title", "ilike.*\(q)*"))
-            async let byNote = decodedPage(includeListFilter: true, extraFilter: ("note", "ilike.*\(q)*"))
-            async let byUsername = decodedPage(includeListFilter: true, extraFilter: ("profiles.username", "ilike.*\(q)*"))
-            async let byDisplayName = decodedPage(includeListFilter: true, extraFilter: ("profiles.display_name", "ilike.*\(q)*"))
+            let categoryFilter: [(String, String)] = category.map { [("items.type", "eq.\($0)")] } ?? []
+            async let byTitle = decodedPage(includeListFilter: true, extraFilters: categoryFilter + [("items.title", "ilike.*\(q)*")])
+            async let byNote = decodedPage(includeListFilter: true, extraFilters: categoryFilter + [("note", "ilike.*\(q)*")])
+            async let byUsername = decodedPage(includeListFilter: true, extraFilters: categoryFilter + [("profiles.username", "ilike.*\(q)*")])
+            async let byDisplayName = decodedPage(includeListFilter: true, extraFilters: categoryFilter + [("profiles.display_name", "ilike.*\(q)*")])
             let pages = try await [byTitle, byNote, byUsername, byDisplayName]
             var seen = Set<String>()
             var merged: [FeedRecommendation] = []
@@ -357,7 +362,7 @@ final class RexAPI {
 
         return try await decodedPage(
             includeListFilter: true,
-            extraFilter: category.map { ("items.type", "eq.\($0)") }
+            extraFilters: category.map { [("items.type", "eq.\($0)")] } ?? []
         )
     }
 
