@@ -701,6 +701,17 @@ struct FeedView: View {
             )
             if Task.isCancelled { return }
             filteredRecommendations = result ?? []
+            // Regression from this fix itself: a filtered/searched card can
+            // surface an item never in the original unfiltered 50-row page,
+            // so rexCounts had nothing for it — "Also Rex'd by" silently
+            // never showed on any filtered or searched result. Merge in
+            // counts for whatever just loaded rather than replacing
+            // rexCounts outright, so the unfiltered feed's own counts
+            // (already showing) aren't lost switching back to it.
+            let itemIds = Array(Set((result ?? []).map { $0.item_id }))
+            if let newCounts = try? await RexAPI.shared.fetchRexCounts(itemIds: itemIds) {
+                for (id, count) in newCounts { rexCounts[id] = count }
+            }
             isLoadingFiltered = false
         }
     }
