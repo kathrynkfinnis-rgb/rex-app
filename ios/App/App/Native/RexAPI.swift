@@ -255,13 +255,31 @@ final class RexAPI {
         refreshTokenValue = nil
     }
 
-    func fetchFeed() async throws -> [FeedRecommendation] {
+    /// `category`/`searchText` are the fix for a real bug: the default,
+    /// unfiltered call caps at 50 (below) purely to keep the everyday feed
+    /// fast — but the category chips and the search bar were just
+    /// re-slicing that same capped, unfiltered 50 client-side, so
+    /// filtering to a rare category ("only 1 film") or searching for
+    /// something older than the last 50 posts ("recent Rex's also don't
+    /// come up") came back near-empty even though the content exists.
+    /// Passing either one switches to a real server-side filter with a
+    /// much higher limit instead of trusting whatever happened to be in
+    /// the unfiltered page.
+    func fetchFeed(category: String? = nil, searchText: String? = nil) async throws -> [FeedRecommendation] {
         let token = try await validToken()
 
         let select = "id,rating,note,created_at,photo_url,photo_urls,tags\(await anonymousField()),user_id,item_id,trip_id," +
             "items!inner(id,type,title,subtitle,image_url,genre,address)," +
             "profiles!recommendations_user_id_fkey(username,display_name,avatar_url)," +
             "creators(slug,name,color,emoji)"
+
+        let trimmedSearch = searchText?.trimmingCharacters(in: .whitespaces)
+        let isFiltered = category != nil || !(trimmedSearch ?? "").isEmpty
+        // The default view stays capped at 50 — fast, and everything on
+        // screen is recent enough that it's never actually been an issue.
+        // A filter or search means the match could be anywhere in your
+        // history, so it needs real range to find it.
+        let limit = isFiltered ? 300 : 50
 
         // Trip stops are unconditionally hidden (trip_id.is.null). List
         // items default visible but can be toggled off individually — so
@@ -275,14 +293,19 @@ final class RexAPI {
         // query first; a 400 specifically (not any other failure) falls
         // back to the pre-migration shape once, rather than the feed going
         // blank for every user until the migration happens to be run.
-        func fetch(includeListFilter: Bool) async throws -> (Data, HTTPURLResponse) {
+        //
+        // `extraFilter` is one more (name, value) query item AND'd onto
+        // the request — used both for the category filter and, for
+        // search, for exactly one field at a time (see below for why).
+        func fetch(includeListFilter: Bool, extraFilter: (String, String)? = nil) async throws -> (Data, HTTPURLResponse) {
             var components = URLComponents(url: baseURL.appendingPathComponent("/rest/v1/recommendations"), resolvingAgainstBaseURL: false)!
             var queryItems = [
                 URLQueryItem(name: "select", value: select),
                 URLQueryItem(name: "trip_id", value: "is.null"),
                 URLQueryItem(name: "order", value: "created_at.desc"),
-                URLQueryItem(name: "limit", value: "50"),
+                URLQueryItem(name: "limit", value: "\(limit)"),
             ]
+            if let extraFilter { queryItems.append(URLQueryItem(name: extraFilter.0, value: extraFilter.1)) }
             if includeListFilter {
                 queryItems.append(URLQueryItem(name: "or", value: "(list_id.is.null,show_in_feed.eq.true)"))
             }
@@ -295,14 +318,45 @@ final class RexAPI {
             return (data, http)
         }
 
-        var (data, http) = try await fetch(includeListFilter: true)
-        if http.statusCode == 400 {
-            (data, http) = try await fetch(includeListFilter: false)
+        func decodedPage(includeListFilter: Bool, extraFilter: (String, String)? = nil) async throws -> [FeedRecommendation] {
+            var (data, http) = try await fetch(includeListFilter: includeListFilter, extraFilter: extraFilter)
+            if http.statusCode == 400, includeListFilter {
+                (data, http) = try await fetch(includeListFilter: false, extraFilter: extraFilter)
+            }
+            if http.statusCode >= 400 {
+                throw RexAPIError.server(friendlyError(data, fallback: "Couldn't load your feed (\(http.statusCode))."))
+            }
+            return try JSONDecoder().decode([FeedRecommendation].self, from: data)
         }
-        if http.statusCode >= 400 {
-            throw RexAPIError.server(friendlyError(data, fallback: "Couldn't load your feed (\(http.statusCode))."))
+
+        if let trimmedSearch, !trimmedSearch.isEmpty {
+            // PostgREST's or=() logic tree doesn't support embedded-
+            // resource references at all in this project's version —
+            // verified live: or=(items.title.ilike...) 400s even on its
+            // own, while items.title=ilike... as a plain standalone filter
+            // is fine. So instead of one query that ORs across title/note/
+            // username/display_name, this runs one query per field (each a
+            // valid standalone filter) and merges + dedupes the results —
+            // same net effect, just four small requests instead of one.
+            let q = trimmedSearch
+            async let byTitle = decodedPage(includeListFilter: true, extraFilter: ("items.title", "ilike.*\(q)*"))
+            async let byNote = decodedPage(includeListFilter: true, extraFilter: ("note", "ilike.*\(q)*"))
+            async let byUsername = decodedPage(includeListFilter: true, extraFilter: ("profiles.username", "ilike.*\(q)*"))
+            async let byDisplayName = decodedPage(includeListFilter: true, extraFilter: ("profiles.display_name", "ilike.*\(q)*"))
+            let pages = try await [byTitle, byNote, byUsername, byDisplayName]
+            var seen = Set<String>()
+            var merged: [FeedRecommendation] = []
+            for rec in pages.flatMap({ $0 }) where !seen.contains(rec.id) {
+                seen.insert(rec.id)
+                merged.append(rec)
+            }
+            return merged.sorted { $0.created_at > $1.created_at }
         }
-        return try JSONDecoder().decode([FeedRecommendation].self, from: data)
+
+        return try await decodedPage(
+            includeListFilter: true,
+            extraFilter: category.map { ("items.type", "eq.\($0)") }
+        )
     }
 
     /// One recommendation by id, same shape as fetchFeed's rows. #138 —
@@ -2076,7 +2130,10 @@ final class RexAPI {
             // Your own wants already live on your list; the feed is other people.
             URLQueryItem(name: "user_id", value: "neq.\(userId)"),
             URLQueryItem(name: "order", value: "created_at.desc"),
-            URLQueryItem(name: "limit", value: "30"),
+            // Was 30 — a want to try has no rating and often no note either,
+            // so it's easy for a page this small to end up entirely stale
+            // ones from a quiet week rather than anything recent.
+            URLQueryItem(name: "limit", value: "100"),
         ]
         var request = URLRequest(url: components.url!)
         request.setValue(anonKey, forHTTPHeaderField: "apikey")

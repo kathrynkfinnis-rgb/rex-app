@@ -33,6 +33,19 @@ struct FeedView: View {
     @State private var addingToCollection: FeedRecommendation?
     @State private var addingToTrip: FeedRecommendation?
 
+    /// #129/live report — a category filter or search query used to just
+    /// re-slice `recommendations`, which fetchFeed() caps at 50 unfiltered
+    /// rows. Filtering to a rare category ("only 1 film") or searching for
+    /// anything older than the last 50 posts ("recent Rex's also don't
+    /// come up") came back near-empty even though the content exists. When
+    /// this is non-nil, it's a dedicated wider server-side fetch for the
+    /// active filter/search, and takes over from `recommendations` as
+    /// `matching`'s base; nil means no filter/search is active, so the
+    /// normal capped feed is exactly what should show.
+    @State private var filteredRecommendations: [FeedRecommendation]?
+    @State private var isLoadingFiltered = false
+    @State private var filterFetchTask: Task<Void, Never>?
+
     /// Every category, always offered — not just the ones present in the
     /// currently-loaded page.
     ///
@@ -102,7 +115,7 @@ struct FeedView: View {
     }
 
     private var matching: [FeedRecommendation] {
-        recommendations.filter { rec in
+        (filteredRecommendations ?? recommendations).filter { rec in
             if blastsOnly { return rec.isBlast }
             if rec.isBlast { return filter == nil } // never in a category filter
             if let filter, RexCategory(rawType: rec.items?.type) != filter { return false }
@@ -171,6 +184,17 @@ struct FeedView: View {
                             errorState(errorMessage)
                         } else if recommendations.isEmpty {
                             emptyState
+                        } else if isLoadingFiltered {
+                            // Filtering/searching just triggered a fresh,
+                            // wider server fetch (see filteredRecommendations) —
+                            // without this, the old capped page's client-side
+                            // filter result flashes "Nothing matches" for a
+                            // moment before the real answer arrives.
+                            ForEach(0..<3, id: \.self) { _ in
+                                RoundedRectangle(cornerRadius: RexRadius.card)
+                                    .fill(RexColor.muted)
+                                    .frame(height: 130)
+                            }
                         } else if visible.isEmpty {
                             noMatchesState
                         } else {
@@ -372,6 +396,8 @@ struct FeedView: View {
             path = NavigationPath()
             withAnimation { scrolledRowID = "top" }
         }
+        .onChange(of: filter) { _, _ in scheduleFilteredFetch() }
+        .onChange(of: query) { _, _ in scheduleFilteredFetch(debounced: true) }
         .task {
             await loadFeed()
             myProfile = try? await RexAPI.shared.fetchMyProfile()
@@ -641,6 +667,36 @@ struct FeedView: View {
         } catch {
             // Put it back rather than pretending it's gone.
             await loadFeed()
+        }
+    }
+
+    /// #129/live report — see filteredRecommendations' doc comment. Runs a
+    /// dedicated, wider server-side fetch whenever a category filter or
+    /// search query is active; clears back to the normal capped feed when
+    /// both are off. Debounced for search so it isn't firing on every
+    /// keystroke, immediate for a category chip tap.
+    private func scheduleFilteredFetch(debounced: Bool = false) {
+        filterFetchTask?.cancel()
+        let category = filter?.rawValue
+        let text = query.trimmingCharacters(in: .whitespaces)
+        guard category != nil || !text.isEmpty else {
+            filteredRecommendations = nil
+            isLoadingFiltered = false
+            return
+        }
+        filterFetchTask = Task {
+            if debounced {
+                try? await Task.sleep(nanoseconds: 350_000_000)
+                if Task.isCancelled { return }
+            }
+            isLoadingFiltered = true
+            let result = try? await RexAPI.shared.fetchFeed(
+                category: category,
+                searchText: text.isEmpty ? nil : text
+            )
+            if Task.isCancelled { return }
+            filteredRecommendations = result ?? []
+            isLoadingFiltered = false
         }
     }
 
