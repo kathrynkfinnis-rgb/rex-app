@@ -430,15 +430,7 @@ struct FeedView: View {
             }
             .toolbar {
                 ToolbarItem(placement: .topBarLeading) {
-                    // Non-interactive — Explore has its own tab now (see
-                    // MainTabView), so the logo doesn't need to do anything.
-                    // The supplied wordmark artwork, used without distortion
-                    // per the brand guidelines.
-                    Image("RexWordmark")
-                        .resizable()
-                        .scaledToFit()
-                        .frame(height: 20)
-                        .accessibilityLabel("REX")
+                    wordmarkToolbarItem
                 }
                 ToolbarItem(placement: .topBarTrailing) {
                     HStack(spacing: RexSpacing.lg) {
@@ -521,6 +513,28 @@ struct FeedView: View {
         .sheet(isPresented: $showingProfile, onDismiss: { Task { await loadFeed() } }) {
             ProfileView(onSignedOut: onSignedOut)
         }
+    }
+
+    /// Non-interactive — Explore has its own tab now (see MainTabView), so
+    /// the logo doesn't need to do anything. The supplied wordmark artwork,
+    /// used without distortion per the brand guidelines. Wrapped in a
+    /// disabled plain Button rather than a bare Image: iOS 26's toolbar
+    /// otherwise auto-wraps a bare leading-item Image in its own circular
+    /// "Liquid Glass" badge, which is exactly the "REX in a circle" Kathryn
+    /// asked to remove — the plain button style plus hiding the shared
+    /// background opts out of that chrome. Pulled into its own property
+    /// (rather than inline in .toolbar) because the compiler choked trying
+    /// to type-check it as part of this view's already-large body.
+    private var wordmarkToolbarItem: some View {
+        Button {} label: {
+            Image("RexWordmark")
+                .resizable()
+                .scaledToFit()
+                .frame(height: 20)
+        }
+        .buttonStyle(.plain)
+        .disabled(true)
+        .accessibilityLabel("REX")
     }
 
     private var header: some View {
