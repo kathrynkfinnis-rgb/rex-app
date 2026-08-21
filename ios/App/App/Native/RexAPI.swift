@@ -1235,6 +1235,34 @@ final class RexAPI {
     /// fixes it for everyone, since the row is shared.
     private static var repairedItemIds = Set<String>()
 
+    /// #146: same self-healing idea, for place/event items missing lat/lng —
+    /// mostly Lovable-era Rex predating #135's geocode-on-add, which just
+    /// silently never got a map pin (fetchMapPlaces drops anything without
+    /// coordinates). No SQL backfill here either, for the same reason as
+    /// repairPlacePhotoIfNeeded: geocoding needs an external API call.
+    private static var geocodeRepairedItemIds = Set<String>()
+
+    /// Geocodes `address` and writes the result back onto the item if it
+    /// resolves. Returns the coordinates so the caller can show the pin
+    /// immediately rather than waiting for the next map load.
+    func repairPlaceCoordsIfNeeded(itemId: String, address: String) async -> (lat: Double, lng: Double)? {
+        guard !Self.geocodeRepairedItemIds.contains(itemId) else { return nil }
+        Self.geocodeRepairedItemIds.insert(itemId)
+
+        guard let located = await RexSearch.geocode(address) else { return nil }
+        guard let token = try? await validToken() else { return nil }
+        var components = URLComponents(url: baseURL.appendingPathComponent("/rest/v1/items"), resolvingAgainstBaseURL: false)!
+        components.queryItems = [URLQueryItem(name: "id", value: "eq.\(itemId)")]
+        var request = URLRequest(url: components.url!)
+        request.httpMethod = "PATCH"
+        request.setValue(anonKey, forHTTPHeaderField: "apikey")
+        request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        request.httpBody = try? JSONSerialization.data(withJSONObject: ["lat": located.lat, "lng": located.lng])
+        _ = try? await URLSession.shared.data(for: request)
+        return located
+    }
+
     func repairPlacePhotoIfNeeded(itemId: String, imageURL: String?) async {
         guard let imageURL, imageURL.contains("places.googleapis.com") else { return }
         guard !Self.repairedItemIds.contains(itemId) else { return }
@@ -2344,8 +2372,30 @@ final class RexAPI {
             throw RexAPIError.server("Couldn't load the map.")
         }
         let places = try JSONDecoder().decode([MapPlace].self, from: data)
-        // lat/lng are nullable in the schema even though we need them to place a pin.
-        return places.filter { $0.lat != nil && $0.lng != nil }
+        // lat/lng are nullable in the schema even though we need them to
+        // place a pin. #146: rather than just dropping every place that's
+        // missing one — mostly Lovable-era Rex from before #135 added
+        // geocoding to the add-a-place flow — try to geocode it from its
+        // address first, same self-healing pattern as repairPlacePhotoIfNeeded.
+        let repaired = await withTaskGroup(of: MapPlace.self) { group in
+            for place in places {
+                group.addTask {
+                    guard place.lat == nil || place.lng == nil,
+                          let address = place.address, !address.isEmpty,
+                          let located = await self.repairPlaceCoordsIfNeeded(itemId: place.id, address: address)
+                    else { return place }
+                    return MapPlace(
+                        id: place.id, title: place.title, subtitle: place.subtitle, type: place.type,
+                        genre: place.genre, address: place.address, lat: located.lat, lng: located.lng,
+                        image_url: place.image_url, recommendations: place.recommendations
+                    )
+                }
+            }
+            var results: [MapPlace] = []
+            for await place in group { results.append(place) }
+            return results
+        }
+        return repaired.filter { $0.lat != nil && $0.lng != nil }
     }
 
     /// A specific trip's own stops, regardless of whether they're in
