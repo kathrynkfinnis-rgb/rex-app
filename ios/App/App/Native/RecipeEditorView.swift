@@ -222,8 +222,36 @@ struct RecipeEditorView: View {
                     .foregroundStyle(RexColor.mutedForeground)
             }
 
+            // #123 — order matters here more than almost anywhere else in
+            // the app (Method is literally numbered 1, 2, 3…), and there was
+            // previously no way to fix it short of deleting and retyping
+            // every line back in the right order. Up/down rather than true
+            // finger-drag, same pragmatic call as trip stops (#122) — this
+            // is a plain VStack/ForEach, not a List, and reordering by
+            // dragging a row while its TextField still wants tap-to-focus
+            // underneath it is a lot more gesture-conflict risk for the
+            // same net result.
             ForEach(items.wrappedValue.indices, id: \.self) { i in
                 HStack(spacing: RexSpacing.sm) {
+                    VStack(spacing: 2) {
+                        Button {
+                            guard i > 0 else { return }
+                            items.wrappedValue.swapAt(i, i - 1)
+                        } label: {
+                            Image(systemName: "chevron.up").font(.system(size: 10, weight: .semibold))
+                        }
+                        .disabled(i == 0)
+                        Button {
+                            guard i < items.wrappedValue.count - 1 else { return }
+                            items.wrappedValue.swapAt(i, i + 1)
+                        } label: {
+                            Image(systemName: "chevron.down").font(.system(size: 10, weight: .semibold))
+                        }
+                        .disabled(i == items.wrappedValue.count - 1)
+                    }
+                    .buttonStyle(.plain)
+                    .foregroundStyle(RexColor.mutedForeground)
+
                     TextField(placeholder, text: Binding(
                         get: { i < items.wrappedValue.count ? items.wrappedValue[i] : "" },
                         set: { if i < items.wrappedValue.count { items.wrappedValue[i] = $0 } }
