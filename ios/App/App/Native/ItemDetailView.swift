@@ -11,9 +11,25 @@ struct ItemDetailView: View {
     @State private var rating: Double = 10
     @State private var note: String = ""
     @State private var isSaving = false
+    /// The card's own save button merged bookmark ("want to try") and this
+    /// into one icon a while back — two save actions there tested as
+    /// confusing ("what does that tick mean?"). Kathryn asked for a
+    /// dedicated save-to-collection action back, just scoped to here (the
+    /// full item page, which has the room) rather than reintroducing that
+    /// on the card.
+    @State private var addingToCollection: FeedRecommendation?
 
     private var myRec: FeedRecommendation? {
         recs.first { $0.user_id == RexAPI.shared.currentUserId }
+    }
+
+    /// Which take a save-to-collection action here actually attaches to —
+    /// collections are per-recommendation (saved_posts references one), so
+    /// this needs a real rec. Your own take if you have one, otherwise
+    /// whichever friend's take is showing — same as saving straight from
+    /// their card in the feed.
+    private var collectionTargetRec: FeedRecommendation? {
+        myRec ?? recs.first
     }
 
     var body: some View {
@@ -39,6 +55,9 @@ struct ItemDetailView: View {
         // A drag can drop the keyboard too, so the comment field and its Post
         // button aren't only reachable via the keyboard's own Done button.
         .scrollDismissesKeyboard(.interactively)
+        .sheet(item: $addingToCollection) { rec in
+            AddToCollectionView(rec: rec, onDone: {})
+        }
         .task { await load() }
     }
 
@@ -122,15 +141,35 @@ struct ItemDetailView: View {
                 }
             }
 
-            if !recs.isEmpty {
-                HStack(spacing: 6) {
-                    if recs.count == 1 {
-                        RexRatingBadge(raw: recs[0].rating)
-                    } else {
-                        RexRatingAverageBadge(ratings: recs.map { $0.rating })
+            HStack(spacing: RexSpacing.md) {
+                if !recs.isEmpty {
+                    HStack(spacing: 6) {
+                        if recs.count == 1 {
+                            RexRatingBadge(raw: recs[0].rating)
+                        } else {
+                            RexRatingAverageBadge(ratings: recs.map { $0.rating })
+                        }
+                        Text("· \(recs.count) Rex\(recs.count == 1 ? "" : "es")")
+                            .font(.system(size: 13)).foregroundStyle(RexColor.mutedForeground)
                     }
-                    Text("· \(recs.count) Rex\(recs.count == 1 ? "" : "es")")
-                        .font(.system(size: 13)).foregroundStyle(RexColor.mutedForeground)
+                }
+
+                Spacer(minLength: 0)
+
+                if let collectionTargetRec {
+                    Button {
+                        addingToCollection = collectionTargetRec
+                    } label: {
+                        HStack(spacing: 4) {
+                            Image(systemName: "folder.badge.plus").font(.system(size: 12))
+                            Text("Save to collection").font(RexFont.text(12, weight: .semibold))
+                        }
+                        .foregroundStyle(RexColor.primary)
+                        .padding(.horizontal, RexSpacing.sm)
+                        .padding(.vertical, 6)
+                        .overlay(Capsule().stroke(RexColor.primary, lineWidth: 1))
+                    }
+                    .buttonStyle(.plain)
                 }
             }
         }
