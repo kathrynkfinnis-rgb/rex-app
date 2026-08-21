@@ -1367,6 +1367,57 @@ final class RexAPI {
         }
     }
 
+    // MARK: - Trip editing (#122)
+
+    /// Bulk-renames a heading across every stop that carries it. A heading
+    /// isn't its own row anywhere — it's just the trip_section string
+    /// repeated on however many stops share it — so renaming means patching
+    /// every one of them in a single request rather than one row.
+    func renameTripSection(tripId: String, from: String?, to: String?) async throws {
+        let token = try await validToken()
+        var components = URLComponents(url: baseURL.appendingPathComponent("/rest/v1/recommendations"), resolvingAgainstBaseURL: false)!
+        components.queryItems = [
+            URLQueryItem(name: "trip_id", value: "eq.\(tripId)"),
+            URLQueryItem(name: "trip_section", value: (from?.isEmpty ?? true) ? "is.null" : "eq.\(from!)"),
+        ]
+        var request = URLRequest(url: components.url!)
+        request.httpMethod = "PATCH"
+        request.setValue(anonKey, forHTTPHeaderField: "apikey")
+        request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        let body: [String: Any] = ["trip_section": (to?.isEmpty ?? true) ? NSNull() : to!]
+        request.httpBody = try JSONSerialization.data(withJSONObject: body)
+
+        let (data, response) = try await URLSession.shared.data(for: request)
+        guard let http = response as? HTTPURLResponse, http.statusCode < 400 else {
+            throw RexAPIError.server(friendlyError(data, fallback: "Couldn't rename that heading."))
+        }
+    }
+
+    /// Reordering has no dedicated sort column to write to — a stop's
+    /// position is just where its created_at falls among its trip siblings
+    /// (see fetchTripStops' order: created_at.asc). To move one stop up or
+    /// down within its heading, swap timestamps with its neighbour instead
+    /// of inventing a new one — that way both stops stay inside the same
+    /// heading's original time range, so this can never accidentally bleed
+    /// a stop into a different heading's position in the overall itinerary.
+    func setRecommendationCreatedAt(id: String, createdAt: String) async throws {
+        let token = try await validToken()
+        var components = URLComponents(url: baseURL.appendingPathComponent("/rest/v1/recommendations"), resolvingAgainstBaseURL: false)!
+        components.queryItems = [URLQueryItem(name: "id", value: "eq.\(id)")]
+        var request = URLRequest(url: components.url!)
+        request.httpMethod = "PATCH"
+        request.setValue(anonKey, forHTTPHeaderField: "apikey")
+        request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        request.httpBody = try JSONSerialization.data(withJSONObject: ["created_at": createdAt])
+
+        let (data, response) = try await URLSession.shared.data(for: request)
+        guard let http = response as? HTTPURLResponse, http.statusCode < 400 else {
+            throw RexAPIError.server(friendlyError(data, fallback: "Couldn't reorder that stop."))
+        }
+    }
+
     // MARK: - Saves & wants (card actions)
 
     func isSaved(recommendationId: String) async throws -> Bool {

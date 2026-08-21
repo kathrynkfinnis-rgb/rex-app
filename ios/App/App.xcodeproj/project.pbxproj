@@ -37,6 +37,7 @@
 		FEED033B0000000000000000 /* CollectionDetailView.swift in Sources */ = {isa = PBXBuildFile; fileRef = FEED033A0000000000000000 /* CollectionDetailView.swift */; };
 		FEED034B0000000000000000 /* SwipeToRemove.swift in Sources */ = {isa = PBXBuildFile; fileRef = FEED034A0000000000000000 /* SwipeToRemove.swift */; };
 		FEED055B0000000000000000 /* ThumbnailGridView.swift in Sources */ = {isa = PBXBuildFile; fileRef = FEED055A0000000000000000 /* ThumbnailGridView.swift */; };
+		FEED056B0000000000000000 /* AddTripStopSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = FEED056A0000000000000000 /* AddTripStopSheet.swift */; };
 		FEED042B0000000000000000 /* RexRatingScale.swift in Sources */ = {isa = PBXBuildFile; fileRef = FEED042A0000000000000000 /* RexRatingScale.swift */; };
 		FEED043B0000000000000000 /* AuthorBooksView.swift in Sources */ = {isa = PBXBuildFile; fileRef = FEED043A0000000000000000 /* AuthorBooksView.swift */; };
 		FEED044B0000000000000000 /* GoogleSafeAsyncImage.swift in Sources */ = {isa = PBXBuildFile; fileRef = FEED044A0000000000000000 /* GoogleSafeAsyncImage.swift */; };
@@ -102,6 +103,7 @@
 		FEED033A0000000000000000 /* CollectionDetailView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CollectionDetailView.swift; sourceTree = "<group>"; };
 		FEED034A0000000000000000 /* SwipeToRemove.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SwipeToRemove.swift; sourceTree = "<group>"; };
 		FEED055A0000000000000000 /* ThumbnailGridView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ThumbnailGridView.swift; sourceTree = "<group>"; };
+		FEED056A0000000000000000 /* AddTripStopSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AddTripStopSheet.swift; sourceTree = "<group>"; };
 		FEED042A0000000000000000 /* RexRatingScale.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RexRatingScale.swift; sourceTree = "<group>"; };
 		FEED043A0000000000000000 /* AuthorBooksView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AuthorBooksView.swift; sourceTree = "<group>"; };
 		FEED044A0000000000000000 /* GoogleSafeAsyncImage.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GoogleSafeAsyncImage.swift; sourceTree = "<group>"; };
@@ -205,6 +207,7 @@
 				FEED033A0000000000000000 /* CollectionDetailView.swift */,
 				FEED034A0000000000000000 /* SwipeToRemove.swift */,
 				FEED055A0000000000000000 /* ThumbnailGridView.swift */,
+				FEED056A0000000000000000 /* AddTripStopSheet.swift */,
 				FEED042A0000000000000000 /* RexRatingScale.swift */,
 				FEED043A0000000000000000 /* AuthorBooksView.swift */,
 				FEED044A0000000000000000 /* GoogleSafeAsyncImage.swift */,
@@ -345,6 +348,7 @@
 				FEED033B0000000000000000 /* CollectionDetailView.swift in Sources */,
 				FEED034B0000000000000000 /* SwipeToRemove.swift in Sources */,
 				FEED055B0000000000000000 /* ThumbnailGridView.swift in Sources */,
+				FEED056B0000000000000000 /* AddTripStopSheet.swift in Sources */,
 				FEED042B0000000000000000 /* RexRatingScale.swift in Sources */,
 				FEED043B0000000000000000 /* AuthorBooksView.swift in Sources */,
 				FEED044B0000000000000000 /* GoogleSafeAsyncImage.swift in Sources */,

@@ -12,6 +12,10 @@ struct TripRoute: Hashable, Identifiable {
 
 /// The itinerary for a trip: every stop, grouped under its optional heading,
 /// in the order it was added. Mirrors the web trip page.
+///
+/// #122: the trip's own author can also edit it here — add/remove stops,
+/// reorder them within a heading, and rename headings — rather than only
+/// being able to build the itinerary once up front in TripStopsBuilderView.
 struct TripDetailView: View {
     let route: TripRoute
 
@@ -21,6 +25,15 @@ struct TripDetailView: View {
     @State private var isDraft = false
     @State private var isPublishing = false
     @State private var publishError: String?
+
+    @State private var isOwner = false
+    @State private var isEditing = false
+    @State private var isMutating = false
+    @State private var mutationError: String?
+    @State private var renamingHeading: String?
+    @State private var renameDraft = ""
+    @State private var showingAddStop = false
+    @State private var addStopSection = ""
 
     /// Stops grouped by heading, preserving the order both groups and stops
     /// first appear in — same rule as the web's groupStops().
@@ -56,20 +69,72 @@ struct TripDetailView: View {
                         .padding(.vertical, 28)
                         .background(RexColor.card)
                         .clipShape(RoundedRectangle(cornerRadius: 16))
+                    if isEditing {
+                        addStopButton(heading: "")
+                    }
                 } else {
+                    if let mutationError {
+                        Text(mutationError)
+                            .font(RexFont.text(12))
+                            .foregroundStyle(RexColor.destructive)
+                    }
                     ForEach(Array(groups.enumerated()), id: \.offset) { _, group in
                         VStack(alignment: .leading, spacing: 8) {
-                            if !group.heading.isEmpty {
-                                Text(group.heading)
-                                    .font(.system(size: 18, weight: .semibold, design: .rounded))
-                                    .foregroundStyle(RexColor.foreground)
-                                    .padding(.top, 4)
-                            }
-                            ForEach(group.stops) { stop in
-                                NavigationLink(value: stop.item_id) {
-                                    RecommendationCardView(rec: stop)
+                            if !group.heading.isEmpty || isEditing {
+                                HStack(spacing: RexSpacing.sm) {
+                                    Text(group.heading.isEmpty ? "No heading" : group.heading)
+                                        .font(.system(size: 18, weight: .semibold, design: .rounded))
+                                        .foregroundStyle(group.heading.isEmpty ? RexColor.mutedForeground : RexColor.foreground)
+                                        .padding(.top, 4)
+                                    if isEditing {
+                                        Button {
+                                            renamingHeading = group.heading
+                                            renameDraft = group.heading
+                                        } label: {
+                                            Image(systemName: "pencil")
+                                                .font(.system(size: 12))
+                                                .foregroundStyle(RexColor.mutedForeground)
+                                        }
+                                    }
+                                    Spacer()
                                 }
-                                .buttonStyle(.plain)
+                            }
+                            ForEach(Array(group.stops.enumerated()), id: \.element.id) { index, stop in
+                                VStack(alignment: .leading, spacing: 4) {
+                                    if isEditing {
+                                        HStack(spacing: RexSpacing.lg) {
+                                            Button {
+                                                Task { await moveStop(stop, in: group, direction: -1) }
+                                            } label: {
+                                                Image(systemName: "chevron.up")
+                                            }
+                                            .disabled(isMutating || index == 0)
+                                            Button {
+                                                Task { await moveStop(stop, in: group, direction: 1) }
+                                            } label: {
+                                                Image(systemName: "chevron.down")
+                                            }
+                                            .disabled(isMutating || index == group.stops.count - 1)
+                                            Spacer()
+                                            Button(role: .destructive) {
+                                                Task { await removeStop(stop) }
+                                            } label: {
+                                                Image(systemName: "trash")
+                                            }
+                                            .disabled(isMutating)
+                                        }
+                                        .font(.system(size: 14))
+                                        .foregroundStyle(RexColor.mutedForeground)
+                                        .padding(.horizontal, RexSpacing.sm)
+                                    }
+                                    NavigationLink(value: stop.item_id) {
+                                        RecommendationCardView(rec: stop)
+                                    }
+                                    .buttonStyle(.plain)
+                                }
+                            }
+                            if isEditing {
+                                addStopButton(heading: group.heading)
                             }
                         }
                     }
@@ -80,7 +145,40 @@ struct TripDetailView: View {
         .background(RexColor.background.ignoresSafeArea())
         .navigationTitle("Trip")
         .navigationBarTitleDisplayMode(.inline)
+        .toolbar {
+            if isOwner {
+                ToolbarItem(placement: .topBarTrailing) {
+                    Button(isEditing ? "Done" : "Edit") {
+                        withAnimation { isEditing.toggle() }
+                    }
+                }
+            }
+        }
         .task { await load() }
+        .alert("Rename heading", isPresented: Binding(
+            get: { renamingHeading != nil },
+            set: { if !$0 { renamingHeading = nil } }
+        )) {
+            TextField("Heading", text: $renameDraft)
+            Button("Cancel", role: .cancel) { renamingHeading = nil }
+            Button("Save") { Task { await renameHeading() } }
+        } message: {
+            Text("Applies to every stop under this heading.")
+        }
+        .sheet(isPresented: $showingAddStop, onDismiss: { Task { await load() } }) {
+            AddTripStopSheet(tripId: route.recommendationId, initialSection: addStopSection, onAdded: {})
+        }
+    }
+
+    private func addStopButton(heading: String) -> some View {
+        Button {
+            addStopSection = heading
+            showingAddStop = true
+        } label: {
+            Label(heading.isEmpty ? "Add a stop" : "Add to \(heading)", systemImage: "plus")
+                .font(RexFont.text(13, weight: .medium))
+        }
+        .padding(.top, 2)
     }
 
     private var header: some View {
@@ -172,14 +270,74 @@ struct TripDetailView: View {
         do {
             async let stopsTask = RexAPI.shared.fetchTripStops(tripRecommendationId: route.recommendationId)
             async let draftTask = RexAPI.shared.isDraft(recommendationId: route.recommendationId)
+            // Best-effort, same as isDraft below — not knowing who owns this
+            // trip should hide the Edit button, not break loading the page.
+            async let ownerTask: FeedRecommendation? = try? RexAPI.shared.fetchRecommendation(id: route.recommendationId)
             stops = try await stopsTask
-            // Best-effort: not knowing whether it's a draft shouldn't block
-            // seeing the itinerary itself.
             isDraft = (try? await draftTask) ?? false
+            isOwner = (await ownerTask)?.user_id == RexAPI.shared.currentUserId
         } catch {
             errorMessage = error.localizedDescription
         }
         isLoading = false
+    }
+
+    /// Bulk-renames a heading across every stop under it (see
+    /// RexAPI.renameTripSection — a heading is just a repeated string, not
+    /// its own row).
+    private func renameHeading() async {
+        guard let from = renamingHeading else { return }
+        let to = renameDraft.trimmingCharacters(in: .whitespacesAndNewlines)
+        renamingHeading = nil
+        guard to.caseInsensitiveCompare(from) != .orderedSame else { return }
+        isMutating = true
+        mutationError = nil
+        do {
+            try await RexAPI.shared.renameTripSection(
+                tripId: route.recommendationId,
+                from: from.isEmpty ? nil : from,
+                to: to.isEmpty ? nil : to
+            )
+            await load()
+        } catch {
+            mutationError = error.localizedDescription
+        }
+        isMutating = false
+    }
+
+    private func removeStop(_ stop: FeedRecommendation) async {
+        isMutating = true
+        mutationError = nil
+        do {
+            try await RexAPI.shared.deleteRecommendation(id: stop.id)
+            await load()
+        } catch {
+            mutationError = error.localizedDescription
+        }
+        isMutating = false
+    }
+
+    /// Swaps this stop's created_at with its neighbour — the only "sort
+    /// order" a stop has is where its created_at falls among its trip
+    /// siblings (fetchTripStops orders by created_at.asc), and swapping
+    /// keeps both timestamps inside this heading's own original range, so a
+    /// reorder can never bleed a stop into a different heading's position.
+    private func moveStop(_ stop: FeedRecommendation, in group: (heading: String, stops: [FeedRecommendation]), direction: Int) async {
+        guard let idx = group.stops.firstIndex(where: { $0.id == stop.id }) else { return }
+        let otherIdx = idx + direction
+        guard group.stops.indices.contains(otherIdx) else { return }
+        let a = group.stops[idx]
+        let b = group.stops[otherIdx]
+        isMutating = true
+        mutationError = nil
+        do {
+            try await RexAPI.shared.setRecommendationCreatedAt(id: a.id, createdAt: b.created_at)
+            try await RexAPI.shared.setRecommendationCreatedAt(id: b.id, createdAt: a.created_at)
+            await load()
+        } catch {
+            mutationError = error.localizedDescription
+        }
+        isMutating = false
     }
 
     private func errorState(_ message: String) -> some View {
