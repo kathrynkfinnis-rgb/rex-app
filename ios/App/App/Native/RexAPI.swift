@@ -1282,6 +1282,40 @@ final class RexAPI {
     /// repairPlacePhotoIfNeeded: geocoding needs an external API call.
     private static var geocodeRepairedItemIds = Set<String>()
 
+    /// #141: same self-healing idea again, for items with no thumbnail at
+    /// all — mostly pre-v10 Rex from before any category had automatic
+    /// photo lookup. Re-runs that category's own search catalogue against
+    /// the item's own title (RexSearch.search already knows book vs
+    /// movie/tv vs podcast vs place/event vs other) and takes the first
+    /// hit's photo, same shared-row self-heal as the others above.
+    private static var thumbnailRepairedItemIds = Set<String>()
+
+    func repairMissingThumbnailIfNeeded(itemId: String, type: String, title: String, subtitle: String?) async {
+        guard !Self.thumbnailRepairedItemIds.contains(itemId) else { return }
+        Self.thumbnailRepairedItemIds.insert(itemId)
+
+        // Recipe photos are always user-uploaded — there's no catalogue to
+        // look one up in, so nothing to do there.
+        let category = RexCategory(rawType: type)
+        guard category != .recipe else { return }
+
+        let query = [title, subtitle].compactMap { $0 }.filter { !$0.isEmpty }.joined(separator: " ")
+        guard !query.isEmpty else { return }
+        let hits = await RexSearch.search(category: category, query: query)
+        guard let imageURL = hits.first(where: { $0.imageURL != nil })?.imageURL else { return }
+
+        guard let token = try? await validToken() else { return }
+        var components = URLComponents(url: baseURL.appendingPathComponent("/rest/v1/items"), resolvingAgainstBaseURL: false)!
+        components.queryItems = [URLQueryItem(name: "id", value: "eq.\(itemId)")]
+        var request = URLRequest(url: components.url!)
+        request.httpMethod = "PATCH"
+        request.setValue(anonKey, forHTTPHeaderField: "apikey")
+        request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        request.httpBody = try? JSONSerialization.data(withJSONObject: ["image_url": imageURL])
+        _ = try? await URLSession.shared.data(for: request)
+    }
+
     /// Geocodes `address` and writes the result back onto the item if it
     /// resolves. Returns the coordinates so the caller can show the pin
     /// immediately rather than waiting for the next map load.

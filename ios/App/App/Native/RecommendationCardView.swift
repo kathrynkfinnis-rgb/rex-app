@@ -340,6 +340,13 @@ struct RecommendationCardView: View {
                         .font(.system(size: 18))
                         .foregroundStyle(RexColor.mutedForeground)
                 )
+                // #141 — backfill a thumbnail for pre-v10 Rex that predate
+                // any category having automatic photo lookup.
+                .task {
+                    await RexAPI.shared.repairMissingThumbnailIfNeeded(
+                        itemId: item.id, type: item.type, title: item.title, subtitle: item.subtitle
+                    )
+                }
             }
         }
         .frame(width: 60, height: 60)
