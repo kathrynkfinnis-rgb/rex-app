@@ -158,6 +158,9 @@ struct RecommendationCardView: View {
                             }
                         }
 
+                        TaggedFriendsRow(friends: rec.taggedFriends)
+                            .padding(.top, RexSpacing.xs)
+
                         rexdByRow
 
                         // Genre tags: what kind of place/book/etc it is,

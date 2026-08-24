@@ -163,7 +163,8 @@ struct ListDetailView: View {
                     photo_url: item.photo_url, photo_urls: item.photo_urls, tags: item.tags,
                     user_id: item.user_id, item_id: item.item_id, items: item.items,
                     profiles: item.profiles, creators: item.creators, trip_section: item.trip_section,
-                    is_anonymous: item.is_anonymous, list_section: item.list_section, show_in_feed: newValue
+                    is_anonymous: item.is_anonymous, list_section: item.list_section, show_in_feed: newValue,
+                    recommendation_tags: item.recommendation_tags
                 )
                 Task { try? await RexAPI.shared.updateShowInFeed(recommendationId: item.id, showInFeed: newValue) }
             }

@@ -33,6 +33,8 @@ struct EditRexView: View {
     /// (everything except book/movie/tv/podcast/list — those come from a
     /// catalogue with their own page, or aren't a single thing to link to).
     @State private var linkURL: String
+    /// #162 — friends tagged on this Rex.
+    @State private var taggedFriendIds: Set<String>
     @State private var isSaving = false
     @State private var confirmDelete = false
     @State private var errorMessage: String?
@@ -66,6 +68,7 @@ struct EditRexView: View {
         _thumbnailURLs = State(initialValue: rec.items?.image_url.map { [$0] } ?? [])
         _showInFeed = State(initialValue: rec.show_in_feed ?? true)
         _linkURL = State(initialValue: rec.items?.link_url ?? "")
+        _taggedFriendIds = State(initialValue: Set(rec.taggedFriends.map { $0.id }))
     }
 
     var body: some View {
@@ -193,6 +196,13 @@ struct EditRexView: View {
                     }
 
                     if !wantToTry {
+                    VStack(alignment: .leading, spacing: RexSpacing.sm) {
+                        Text("Tag friends").font(RexFont.text(14, weight: .semibold))
+                        FriendTagPickerView(selectedIds: $taggedFriendIds)
+                    }
+                    }
+
+                    if !wantToTry {
                         VStack(alignment: .leading, spacing: RexSpacing.sm) {
                             Text("Photos").font(RexFont.text(14, weight: .semibold))
                             PhotoPickerView(photoURLs: $photoURLs)
@@ -312,12 +322,16 @@ struct EditRexView: View {
                 // Want -> rated: this row moves tables. Create the
                 // recommendation first — if that fails, the want is still
                 // there rather than the Rex vanishing into neither table.
-                try await RexAPI.shared.createRecommendation(
+                let newRecId = try await RexAPI.shared.createRecommendation(
                     itemId: rec.item_id, rating: rating,
                     note: note.isEmpty ? nil : note,
                     photoURLs: photoURLs, tags: tags,
-                    showInFeed: showInFeed
+                    showInFeed: showInFeed,
+                    returningId: !taggedFriendIds.isEmpty
                 )
+                if !taggedFriendIds.isEmpty {
+                    try? await RexAPI.shared.setTaggedFriends(recommendationId: newRecId, userIds: Array(taggedFriendIds))
+                }
                 try await RexAPI.shared.deleteWant(id: id)
             case (nil, true):
                 // Rated -> want: same ordering logic, create then delete.
@@ -335,6 +349,9 @@ struct EditRexView: View {
                 // caller that ever needs this column touched.
                 if showInFeed != (rec.show_in_feed ?? true) {
                     try await RexAPI.shared.updateShowInFeed(recommendationId: rec.id, showInFeed: showInFeed)
+                }
+                if taggedFriendIds != Set(rec.taggedFriends.map { $0.id }) {
+                    try? await RexAPI.shared.setTaggedFriends(recommendationId: rec.id, userIds: Array(taggedFriendIds))
                 }
             }
             onSaved()

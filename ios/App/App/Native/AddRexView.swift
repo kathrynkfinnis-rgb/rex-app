@@ -56,6 +56,7 @@ struct AddRexView: View {
     @State private var picked: RexSearchHit?
     @State private var searchTask: Task<Void, Never>?
     @State private var photoURLs: [String] = []
+    @State private var taggedFriendIds: Set<String> = []
     @State private var subcategories: Set<String> = []
     @State private var productLink = ""
     @State private var tripStops: [DraftStop] = []
@@ -298,6 +299,9 @@ struct AddRexView: View {
 
                 Text("Photos").font(.system(size: 14, weight: .semibold)).foregroundStyle(RexColor.foreground)
                 PhotoPickerView(photoURLs: $photoURLs)
+
+                Text("Tag friends (optional)").font(.system(size: 14, weight: .semibold)).foregroundStyle(RexColor.foreground)
+                FriendTagPickerView(selectedIds: $taggedFriendIds)
 
                 Toggle(isOn: $anonymous) {
                     VStack(alignment: .leading, spacing: 2) {
@@ -744,14 +748,18 @@ struct AddRexView: View {
 
             switch mode {
             case .rated:
-                try await RexAPI.shared.createRecommendation(
+                let newRecId = try await RexAPI.shared.createRecommendation(
                     itemId: itemId,
                     rating: rating,
                     note: note.isEmpty ? nil : note,
                     photoURLs: photoURLs,
                     anonymous: anonymous,
+                    returningId: !taggedFriendIds.isEmpty,
                     asDraft: category == .trip && asDraft
                 )
+                if !taggedFriendIds.isEmpty {
+                    try? await RexAPI.shared.setTaggedFriends(recommendationId: newRecId, userIds: Array(taggedFriendIds))
+                }
                 didWant = false
                 didSaveDraft = category == .trip && asDraft
             case .want:
@@ -794,6 +802,7 @@ struct AddRexView: View {
             productLink = ""
             photoURLs = []
             subcategories = []
+            taggedFriendIds = []
             anonymous = false
             rating = 8
             picked = nil

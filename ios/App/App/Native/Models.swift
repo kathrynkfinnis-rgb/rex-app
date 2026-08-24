@@ -45,6 +45,11 @@ struct RexProfileDetail: Codable, Identifiable {
     let avatar_url: String?
 }
 
+/// One row of the recommendation_tags join table, as PostgREST embeds it.
+struct RecommendationTagRow: Codable {
+    let profiles: RexProfileDetail?
+}
+
 /// A friends-of-friends candidate from suggested_friends_for_me, ranked by
 /// how many mutual friends you share.
 struct SuggestedFriend: Codable, Identifiable {
@@ -240,6 +245,11 @@ struct FeedRecommendation: Codable, Identifiable {
     /// this keeps working against a database where the migration hasn't run
     /// yet, and for every query that doesn't select it at all.
     let show_in_feed: Bool?
+    /// #162 — friends tagged on this Rex ("went here with Phoebe"). Optional
+    /// so this keeps working against a database where the migration hasn't
+    /// run yet, and for every query that doesn't select it at all.
+    let recommendation_tags: [RecommendationTagRow]?
+    var taggedFriends: [RexProfileDetail] { (recommendation_tags ?? []).compactMap { $0.profiles } }
 
     /// A want rather than a Rex — someone saying they'd like to try this. The
     /// feed carries both, and an unrated row is what marks the difference.

@@ -271,7 +271,8 @@ final class RexAPI {
         let select = "id,rating,note,created_at,photo_url,photo_urls,tags\(await anonymousField()),user_id,item_id,trip_id," +
             "items!inner(id,type,title,subtitle,image_url,genre,address,link_url)," +
             "profiles!recommendations_user_id_fkey(username,display_name,avatar_url)," +
-            "creators(slug,name,color,emoji)"
+            "creators(slug,name,color,emoji)," +
+            "recommendation_tags(profiles(id,username,display_name,avatar_url))"
 
         let trimmedSearch = searchText?.trimmingCharacters(in: .whitespaces)
         let isFiltered = category != nil || !(trimmedSearch ?? "").isEmpty
@@ -378,7 +379,8 @@ final class RexAPI {
         let select = "id,rating,note,created_at,photo_url,photo_urls,tags\(await anonymousField()),user_id,item_id,trip_id," +
             "items!inner(id,type,title,subtitle,image_url,genre,address,link_url)," +
             "profiles!recommendations_user_id_fkey(username,display_name,avatar_url)," +
-            "creators(slug,name,color,emoji)"
+            "creators(slug,name,color,emoji)," +
+            "recommendation_tags(profiles(id,username,display_name,avatar_url))"
         var components = URLComponents(url: baseURL.appendingPathComponent("/rest/v1/recommendations"), resolvingAgainstBaseURL: false)!
         components.queryItems = [
             URLQueryItem(name: "select", value: select),
@@ -406,7 +408,8 @@ final class RexAPI {
         let token = try await validToken()
         let select = "id,rating,note,created_at,photo_url,photo_urls,tags\(await anonymousField()),user_id,item_id,trip_id," +
             "items!inner(id,type,title,subtitle,image_url,genre,address,link_url)," +
-            "profiles!recommendations_user_id_fkey(username,display_name,avatar_url)"
+            "profiles!recommendations_user_id_fkey(username,display_name,avatar_url)," +
+            "recommendation_tags(profiles(id,username,display_name,avatar_url))"
         var components = URLComponents(url: baseURL.appendingPathComponent("/rest/v1/recommendations"), resolvingAgainstBaseURL: false)!
         components.queryItems = [
             URLQueryItem(name: "select", value: select),
@@ -519,7 +522,8 @@ final class RexAPI {
         guard let userId = currentUserId else { throw RexAPIError.notSignedIn }
         let select = "id,rating,note,created_at,photo_url,photo_urls,tags,user_id,item_id,trip_id," +
             "items!inner(id,type,title,subtitle,image_url,genre,address,link_url)," +
-            "profiles!recommendations_user_id_fkey(username,display_name,avatar_url)"
+            "profiles!recommendations_user_id_fkey(username,display_name,avatar_url)," +
+            "recommendation_tags(profiles(id,username,display_name,avatar_url))"
         var components = URLComponents(url: baseURL.appendingPathComponent("/rest/v1/recommendations"), resolvingAgainstBaseURL: false)!
         components.queryItems = [
             URLQueryItem(name: "select", value: select),
@@ -548,7 +552,8 @@ final class RexAPI {
         guard let userId = currentUserId else { throw RexAPIError.notSignedIn }
         let select = "id,rating,note,created_at,photo_url,photo_urls,tags,user_id,item_id,trip_id," +
             "items!inner(id,type,title,subtitle,image_url,genre,address,link_url)," +
-            "profiles!recommendations_user_id_fkey(username,display_name,avatar_url)"
+            "profiles!recommendations_user_id_fkey(username,display_name,avatar_url)," +
+            "recommendation_tags(profiles(id,username,display_name,avatar_url))"
         var components = URLComponents(url: baseURL.appendingPathComponent("/rest/v1/recommendations"), resolvingAgainstBaseURL: false)!
         components.queryItems = [
             URLQueryItem(name: "select", value: select),
@@ -576,7 +581,8 @@ final class RexAPI {
         let token = try await validToken()
         let select = "id,rating,note,created_at,photo_url,photo_urls,tags\(await anonymousField()),user_id,item_id,trip_id,trip_section," +
             "items!inner(id,type,title,subtitle,image_url,genre,address,link_url)," +
-            "profiles!recommendations_user_id_fkey(username,display_name,avatar_url)"
+            "profiles!recommendations_user_id_fkey(username,display_name,avatar_url)," +
+            "recommendation_tags(profiles(id,username,display_name,avatar_url))"
         var components = URLComponents(url: baseURL.appendingPathComponent("/rest/v1/recommendations"), resolvingAgainstBaseURL: false)!
         components.queryItems = [
             URLQueryItem(name: "select", value: select),
@@ -600,7 +606,8 @@ final class RexAPI {
         let token = try await validToken()
         let select = "id,rating,note,created_at,photo_url,photo_urls,tags\(await anonymousField()),user_id,item_id,list_id,list_section,show_in_feed," +
             "items!inner(id,type,title,subtitle,image_url,genre,address,link_url)," +
-            "profiles!recommendations_user_id_fkey(username,display_name,avatar_url)"
+            "profiles!recommendations_user_id_fkey(username,display_name,avatar_url)," +
+            "recommendation_tags(profiles(id,username,display_name,avatar_url))"
         var components = URLComponents(url: baseURL.appendingPathComponent("/rest/v1/recommendations"), resolvingAgainstBaseURL: false)!
         components.queryItems = [
             URLQueryItem(name: "select", value: select),
@@ -641,7 +648,8 @@ final class RexAPI {
     func fetchRecommendations(forItem itemId: String) async throws -> [FeedRecommendation] {
         let token = try await validToken()
         let select = "id,rating,note,created_at,photo_url,photo_urls,tags\(await anonymousField()),user_id,item_id," +
-            "profiles!recommendations_user_id_fkey(username,display_name,avatar_url)"
+            "profiles!recommendations_user_id_fkey(username,display_name,avatar_url)," +
+            "recommendation_tags(profiles(id,username,display_name,avatar_url))"
         var components = URLComponents(url: baseURL.appendingPathComponent("/rest/v1/recommendations"), resolvingAgainstBaseURL: false)!
         components.queryItems = [
             URLQueryItem(name: "select", value: select),
@@ -972,7 +980,8 @@ final class RexAPI {
         let select = "id,rating,note,created_at,photo_url,photo_urls,tags\(await anonymousField()),user_id,item_id," +
             "items!inner(id,type,title,subtitle,image_url,genre,address,link_url)," +
             "profiles!recommendations_user_id_fkey(username,display_name,avatar_url)," +
-            "creators(slug,name,color,emoji)"
+            "creators(slug,name,color,emoji)," +
+            "recommendation_tags(profiles(id,username,display_name,avatar_url))"
         var components = URLComponents(url: baseURL.appendingPathComponent("/rest/v1/recommendations"), resolvingAgainstBaseURL: false)!
         components.queryItems = [
             URLQueryItem(name: "select", value: select),
@@ -1008,6 +1017,45 @@ final class RexAPI {
             throw RexAPIError.server("Couldn't load friends.")
         }
         return try JSONDecoder().decode([Friendship].self, from: data)
+    }
+
+    /// #162 — the friend picker for tagging people on a Rex. Same two-step
+    /// friendships-then-profiles shape FriendsView already uses, just
+    /// collapsed into one call and filtered to accepted only (no point
+    /// offering to tag someone who hasn't accepted yet).
+    func fetchAcceptedFriendProfiles() async throws -> [RexProfileDetail] {
+        guard let me = currentUserId else { return [] }
+        let friendships = try await fetchFriendships().filter { $0.status == "accepted" }
+        let ids = friendships.map { $0.requester_id == me ? $0.addressee_id : $0.requester_id }
+        return try await fetchProfiles(ids: ids)
+    }
+
+    /// Replaces the full set of friends tagged on a Rex with `userIds` —
+    /// simplest correct thing (delete then re-insert) rather than diffing,
+    /// since this only ever runs from a picker that already knows the
+    /// intended final set, not an incremental add/remove.
+    func setTaggedFriends(recommendationId: String, userIds: [String]) async throws {
+        let token = try await validToken()
+
+        var delComponents = URLComponents(url: baseURL.appendingPathComponent("/rest/v1/recommendation_tags"), resolvingAgainstBaseURL: false)!
+        delComponents.queryItems = [URLQueryItem(name: "recommendation_id", value: "eq.\(recommendationId)")]
+        var delRequest = URLRequest(url: delComponents.url!)
+        delRequest.httpMethod = "DELETE"
+        delRequest.setValue(anonKey, forHTTPHeaderField: "apikey")
+        delRequest.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+        _ = try? await URLSession.shared.data(for: delRequest)
+
+        guard !userIds.isEmpty else { return }
+        var insRequest = URLRequest(url: baseURL.appendingPathComponent("/rest/v1/recommendation_tags"))
+        insRequest.httpMethod = "POST"
+        insRequest.setValue(anonKey, forHTTPHeaderField: "apikey")
+        insRequest.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+        insRequest.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        insRequest.httpBody = try JSONSerialization.data(withJSONObject: userIds.map { ["recommendation_id": recommendationId, "user_id": $0] })
+        let (data, response) = try await URLSession.shared.data(for: insRequest)
+        guard let http = response as? HTTPURLResponse, http.statusCode < 400 else {
+            throw RexAPIError.server(friendlyError(data, fallback: "Couldn't tag your friends."))
+        }
     }
 
     func fetchProfiles(ids: [String]) async throws -> [RexProfileDetail] {
@@ -1933,7 +1981,8 @@ final class RexAPI {
                 trip_section: nil,
                 is_anonymous: false,
                 list_section: nil,
-                show_in_feed: nil
+                show_in_feed: nil,
+                recommendation_tags: nil
             )
         }
     }
@@ -2408,7 +2457,8 @@ final class RexAPI {
                 trip_section: nil,
                 is_anonymous: false,
                 list_section: nil,
-                show_in_feed: nil
+                show_in_feed: nil,
+                recommendation_tags: nil
             )
         }
     }

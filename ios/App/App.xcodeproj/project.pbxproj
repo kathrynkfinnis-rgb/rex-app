@@ -54,6 +54,7 @@
 		FEED035B0000000000000000 /* NewCollectionView.swift in Sources */ = {isa = PBXBuildFile; fileRef = FEED035A0000000000000000 /* NewCollectionView.swift */; };
 		FEED037B0000000000000000 /* AppleSignInButton.swift in Sources */ = {isa = PBXBuildFile; fileRef = FEED037A0000000000000000 /* AppleSignInButton.swift */; };
 		FEED058B0000000000000000 /* TripMapTileView.swift in Sources */ = {isa = PBXBuildFile; fileRef = FEED058A0000000000000000 /* TripMapTileView.swift */; };
+		FEED059B0000000000000000 /* FriendTagPickerView.swift in Sources */ = {isa = PBXBuildFile; fileRef = FEED059A0000000000000000 /* FriendTagPickerView.swift */; };
 		FEED031B0000000000000000 /* AskForRexView.swift in Sources */ = {isa = PBXBuildFile; fileRef = FEED031A0000000000000000 /* AskForRexView.swift */; };
 		FEED030B0000000000000000 /* FeedbackView.swift in Sources */ = {isa = PBXBuildFile; fileRef = FEED030A0000000000000000 /* FeedbackView.swift */; };
 		FEED029B0000000000000000 /* RecipeEditorView.swift in Sources */ = {isa = PBXBuildFile; fileRef = FEED029A0000000000000000 /* RecipeEditorView.swift */; };
@@ -125,6 +126,7 @@
 		FEED031A0000000000000000 /* AskForRexView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AskForRexView.swift; sourceTree = "<group>"; };
 		FEED030A0000000000000000 /* FeedbackView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FeedbackView.swift; sourceTree = "<group>"; };
 		FEED058A0000000000000000 /* TripMapTileView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TripMapTileView.swift; sourceTree = "<group>"; };
+		FEED059A0000000000000000 /* FriendTagPickerView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FriendTagPickerView.swift; sourceTree = "<group>"; };
 		FEED029A0000000000000000 /* RecipeEditorView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RecipeEditorView.swift; sourceTree = "<group>"; };
 		FEED028A0000000000000000 /* EditProfileView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EditProfileView.swift; sourceTree = "<group>"; };
 		FEED027A0000000000000000 /* UserProfileView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UserProfileView.swift; sourceTree = "<group>"; };
@@ -234,6 +236,7 @@
 				FEED027A0000000000000000 /* UserProfileView.swift */,
 				FEED026A0000000000000000 /* TripStopsBuilderView.swift */,
 				FEED058A0000000000000000 /* TripMapTileView.swift */,
+				FEED059A0000000000000000 /* FriendTagPickerView.swift */,
 				FEED025A0000000000000000 /* PhotoCarouselView.swift */,
 				FEED024A0000000000000000 /* RexCardActions.swift */,
 				FEED023A0000000000000000 /* EditRexView.swift */,
@@ -377,6 +380,7 @@
 				FEED027B0000000000000000 /* UserProfileView.swift in Sources */,
 				FEED026B0000000000000000 /* TripStopsBuilderView.swift in Sources */,
 				FEED058B0000000000000000 /* TripMapTileView.swift in Sources */,
+				FEED059B0000000000000000 /* FriendTagPickerView.swift in Sources */,
 				FEED025B0000000000000000 /* PhotoCarouselView.swift in Sources */,
 				FEED024B0000000000000000 /* RexCardActions.swift in Sources */,
 				FEED023B0000000000000000 /* EditRexView.swift in Sources */,
