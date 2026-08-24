@@ -1205,6 +1205,32 @@ final class RexAPI {
         return notifications
     }
 
+    /// #176 — the badge dot on the bell icon. `Prefer: count=exact` +
+    /// limit=1 gets PostgREST to report the true total in the Content-Range
+    /// response header (formatted "0-0/42") without transferring all the
+    /// unread rows themselves.
+    func fetchUnreadNotificationCount() async -> Int {
+        guard let token = try? await validToken(), let userId = currentUserId else { return 0 }
+        var components = URLComponents(url: baseURL.appendingPathComponent("/rest/v1/notifications"), resolvingAgainstBaseURL: false)!
+        components.queryItems = [
+            URLQueryItem(name: "select", value: "id"),
+            URLQueryItem(name: "user_id", value: "eq.\(userId)"),
+            URLQueryItem(name: "read_at", value: "is.null"),
+            URLQueryItem(name: "limit", value: "1"),
+        ]
+        var request = URLRequest(url: components.url!)
+        request.setValue(anonKey, forHTTPHeaderField: "apikey")
+        request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+        request.setValue("count=exact", forHTTPHeaderField: "Prefer")
+
+        guard let (_, response) = try? await URLSession.shared.data(for: request),
+              let http = response as? HTTPURLResponse,
+              let range = http.value(forHTTPHeaderField: "Content-Range"),
+              let total = range.split(separator: "/").last
+        else { return 0 }
+        return Int(total) ?? 0
+    }
+
     func markNotificationsRead(ids: [String]) async throws {
         guard !ids.isEmpty else { return }
         let token = try await validToken()

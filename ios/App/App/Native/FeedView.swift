@@ -273,6 +273,9 @@ struct FeedView: View {
     /// infer it — tapping into a Rex and pressing back was landing you at
     /// the top of the feed instead of where you'd scrolled to.
     @State private var scrolledRowID: String?
+    /// #176 — badge dot on the bell icon. Refreshed alongside the feed
+    /// itself (loadFeed) rather than its own separate polling loop.
+    @State private var unreadNotificationCount = 0
 
     var body: some View {
         NavigationStack(path: $path) {
@@ -451,6 +454,14 @@ struct FeedView: View {
         .onChange(of: filter) { _, _ in scheduleFilteredFetch() }
         .onChange(of: query) { _, _ in scheduleFilteredFetch(debounced: true) }
         .onChange(of: addRexRefreshSignal) { _, _ in Task { await loadFeed() } }
+        // Popping back to the feed root (e.g. from Notifications, after
+        // marking things read) is the moment the badge count is stalest —
+        // cheap enough to just refetch rather than plumb a callback through.
+        .onChange(of: path) { _, newValue in
+            if newValue.isEmpty {
+                Task { unreadNotificationCount = await RexAPI.shared.fetchUnreadNotificationCount() }
+            }
+        }
         .task {
             await loadFeed()
             myProfile = try? await RexAPI.shared.fetchMyProfile()
@@ -554,8 +565,16 @@ struct FeedView: View {
                     Image(systemName: "bell")
                         .font(.system(size: 18))
                         .foregroundStyle(RexColor.mutedForeground)
+                        .overlay(alignment: .topTrailing) {
+                            if unreadNotificationCount > 0 {
+                                Circle()
+                                    .fill(Color.red)
+                                    .frame(width: 8, height: 8)
+                                    .offset(x: 3, y: -2)
+                            }
+                        }
                 }
-                .accessibilityLabel("Notifications")
+                .accessibilityLabel(unreadNotificationCount > 0 ? "Notifications, unread" : "Notifications")
 
                 // Your own picture, not a generic glyph. A sheet
                 // rather than a NavigationLink push deliberately —
@@ -896,6 +915,7 @@ struct FeedView: View {
             async let wants = RexAPI.shared.fetchWants()
             rexCounts = (try? await counts) ?? [:]
             myWantItemIds = Set(((try? await wants) ?? []).compactMap { $0.items?.id })
+            unreadNotificationCount = await RexAPI.shared.fetchUnreadNotificationCount()
         } catch {
             errorMessage = error.localizedDescription
         }
