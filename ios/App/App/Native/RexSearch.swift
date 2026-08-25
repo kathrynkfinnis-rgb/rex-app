@@ -310,10 +310,18 @@ enum RexSearch {
     /// resolve (typo, too vague, key missing the Geocoding API product)
     /// just stays pinless the way it already did, rather than blocking
     /// whatever's creating the stop.
+    /// #168 — this had no regional bias at all, unlike places() (#22, same
+    /// underlying problem: an ambiguous name resolves to whichever match
+    /// Google ranks first worldwide, which in practice skewed American for
+    /// a British pub/hotel name like "The Crown"). `bounds` is the legacy
+    /// Geocoding API's equivalent of places()'s locationBias — also soft,
+    /// so a genuine non-European address still resolves correctly, this
+    /// just stops Europe losing ties it should win. Same rough Europe +
+    /// UK/Ireland + Scandinavia rectangle as places().
     static func geocode(_ query: String) async -> (lat: Double, lng: Double)? {
         let q = query.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !q.isEmpty, !googleKey.isEmpty else { return nil }
-        guard let url = URL(string: "https://maps.googleapis.com/maps/api/geocode/json?address=\(esc(q))&key=\(googleKey)") else { return nil }
+        guard let url = URL(string: "https://maps.googleapis.com/maps/api/geocode/json?address=\(esc(q))&bounds=34.0,-12.0|71.0,40.0&key=\(googleKey)") else { return nil }
         var request = URLRequest(url: url)
         request.setValue(bundleId, forHTTPHeaderField: "X-Ios-Bundle-Identifier")
         guard let (data, response) = try? await URLSession.shared.data(for: request),
