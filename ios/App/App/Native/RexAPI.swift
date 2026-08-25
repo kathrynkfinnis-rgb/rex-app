@@ -2639,7 +2639,16 @@ final class RexAPI {
             URLQueryItem(name: "select", value: select),
             URLQueryItem(name: "type", value: "in.(place,event)"),
             URLQueryItem(name: "order", value: "created_at.desc"),
-            URLQueryItem(name: "limit", value: "200"),
+            // #164 — this used to cap at 200, which meant genuinely old
+            // (pre-Lovable-migration) place/event Rex could be excluded from
+            // the map's own dataset outright, before the self-heal geocode
+            // repair below even got a chance to run on them: created_at.desc
+            // + limit only ever takes the newest 200, so an old row past
+            // that cutoff was never fetched at all, geocoded or not. Raised
+            // well past any real friend group's total place/event count
+            // rather than removed outright, so a single pathological account
+            // can't make this unbounded.
+            URLQueryItem(name: "limit", value: "2000"),
         ]
         var request = URLRequest(url: components.url!)
         request.setValue(anonKey, forHTTPHeaderField: "apikey")
