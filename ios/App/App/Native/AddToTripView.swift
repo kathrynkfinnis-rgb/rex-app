@@ -159,9 +159,7 @@ struct AddToTripView: View {
         busyId = trip.id
         errorMessage = nil
         do {
-            try await RexAPI.shared.createRecommendation(
-                itemId: itemId, rating: 0, note: nil, tripId: trip.id
-            )
+            try await RexAPI.shared.addPlaceToTrip(itemId: itemId, tripId: trip.id)
             addedId = trip.id
             // A beat so "added" actually registers before the sheet closes,
             // rather than the checkmark flashing and vanishing instantly.
@@ -185,7 +183,7 @@ struct AddToTripView: View {
         do {
             let tripItemId = try await RexAPI.shared.createItem(type: RexCategory.trip.rawValue, title: trimmed, subtitle: nil, address: nil)
             let tripRecId = try await RexAPI.shared.createRecommendation(itemId: tripItemId, rating: 0, note: nil, returningId: true)
-            try await RexAPI.shared.createRecommendation(itemId: itemId, rating: 0, note: nil, tripId: tripRecId)
+            try await RexAPI.shared.addPlaceToTrip(itemId: itemId, tripId: tripRecId)
             // A beat so success actually registers before the sheet closes,
             // same reasoning as add(to:) above.
             try? await Task.sleep(for: .seconds(0.5))

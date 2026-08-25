@@ -750,6 +750,36 @@ final class RexAPI {
         }
     }
 
+    /// TestFlight feedback (Aug 24) found a case upsertRecommendation's own
+    /// fix didn't cover: AddToTripView's "add to trip" flow called plain
+    /// createRecommendation, which — being a bare INSERT, not an upsert —
+    /// still throws a raw duplicate-key error if this exact place is
+    /// already a stop on this exact trip (recommendations_unique_trip_stop,
+    /// same partial-index reasoning as upsertRecommendation's own comment).
+    /// Re-adding an existing stop should just be a no-op, not an error.
+    func addPlaceToTrip(itemId: String, tripId: String) async throws {
+        let token = try await validToken()
+        guard let userId = currentUserId else { throw RexAPIError.notSignedIn }
+
+        var lookupComponents = URLComponents(url: baseURL.appendingPathComponent("/rest/v1/recommendations"), resolvingAgainstBaseURL: false)!
+        lookupComponents.queryItems = [
+            URLQueryItem(name: "select", value: "id"),
+            URLQueryItem(name: "user_id", value: "eq.\(userId)"),
+            URLQueryItem(name: "item_id", value: "eq.\(itemId)"),
+            URLQueryItem(name: "trip_id", value: "eq.\(tripId)"),
+            URLQueryItem(name: "limit", value: "1"),
+        ]
+        var lookupRequest = URLRequest(url: lookupComponents.url!)
+        lookupRequest.setValue(anonKey, forHTTPHeaderField: "apikey")
+        lookupRequest.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+        if let (lookupData, lookupResponse) = try? await URLSession.shared.data(for: lookupRequest),
+           let lookupHttp = lookupResponse as? HTTPURLResponse, lookupHttp.statusCode < 400,
+           let rows = try? JSONDecoder().decode([[String: String]].self, from: lookupData), !rows.isEmpty {
+            return // already a stop on this trip — nothing to do
+        }
+        try await createRecommendation(itemId: itemId, rating: 0, note: nil, tripId: tripId)
+    }
+
     /// Creates a new item (manual entry — no external search match) and returns its id.
     /// `hit` carries the external catalogue metadata (cover art, coordinates,
     /// genre, source id) when the user picked a search suggestion, so items
