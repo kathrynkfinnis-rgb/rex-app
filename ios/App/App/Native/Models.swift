@@ -16,8 +16,13 @@ struct RexItem: Codable {
     /// (AddRexView's "Link" field), it just was never in this struct at
     /// all, so nothing that read an item back ever saw it.
     let link_url: String?
+    /// #158 — same story again: only ever selected via MapPlace before,
+    /// which has no notion of stop order. fetchTripStops needs its own
+    /// coordinates, in itinerary order, to draw a route.
+    let lat: Double?
+    let lng: Double?
 
-    init(id: String, type: String, title: String, subtitle: String?, image_url: String?, genre: String?, address: String? = nil, google_rating: Double? = nil, google_rating_count: Int? = nil, recipe_text: String? = nil, link_url: String? = nil) {
+    init(id: String, type: String, title: String, subtitle: String?, image_url: String?, genre: String?, address: String? = nil, google_rating: Double? = nil, google_rating_count: Int? = nil, recipe_text: String? = nil, link_url: String? = nil, lat: Double? = nil, lng: Double? = nil) {
         self.id = id
         self.type = type
         self.title = title
@@ -29,6 +34,8 @@ struct RexItem: Codable {
         self.google_rating_count = google_rating_count
         self.recipe_text = recipe_text
         self.link_url = link_url
+        self.lat = lat
+        self.lng = lng
     }
 }
 

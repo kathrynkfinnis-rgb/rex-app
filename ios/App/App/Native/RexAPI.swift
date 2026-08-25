@@ -580,7 +580,7 @@ final class RexAPI {
     func fetchTripStops(tripRecommendationId: String) async throws -> [FeedRecommendation] {
         let token = try await validToken()
         let select = "id,rating,note,created_at,photo_url,photo_urls,tags\(await anonymousField()),user_id,item_id,trip_id,trip_section," +
-            "items!inner(id,type,title,subtitle,image_url,genre,address,link_url)," +
+            "items!inner(id,type,title,subtitle,image_url,genre,address,link_url,lat,lng)," +
             "profiles!recommendations_user_id_fkey(username,display_name,avatar_url)," +
             "recommendation_tags(profiles(id,username,display_name,avatar_url))"
         var components = URLComponents(url: baseURL.appendingPathComponent("/rest/v1/recommendations"), resolvingAgainstBaseURL: false)!
