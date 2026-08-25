@@ -162,15 +162,42 @@ struct FeedView: View {
         }
     }
 
+    /// #171 — a Rex you're tagged on ("went here with Phoebe") is worth
+    /// surfacing even if strict chronological (or most-liked) order would
+    /// bury it a few posts back. Bounded to a few days so an old tag
+    /// doesn't permanently outrank new content once it's had its moment —
+    /// this is a boost, not a pin.
+    private var taggedBoostThreshold: Date {
+        Calendar.current.date(byAdding: .day, value: -3, to: Date()) ?? .distantPast
+    }
+
+    private func isRecentlyTaggedMe(_ rec: FeedRecommendation) -> Bool {
+        guard let myId = RexAPI.shared.currentUserId,
+              rec.taggedFriends.contains(where: { $0.id == myId }),
+              let created = rec.createdDate
+        else { return false }
+        return created > taggedBoostThreshold
+    }
+
     /// Newest-first is already how loadFeed merges everything, so only
     /// "Most liked" needs an actual re-sort here.
     private var sorted: [FeedRecommendation] {
-        guard sortMode == .mostLiked else { return matching }
-        return matching.sorted { a, b in
-            let la = likeCounts[a.id] ?? 0, lb = likeCounts[b.id] ?? 0
-            if la != lb { return la > lb }
-            return a.created_at > b.created_at // tie-break: newest first
+        let base: [FeedRecommendation]
+        if sortMode == .mostLiked {
+            base = matching.sorted { a, b in
+                let la = likeCounts[a.id] ?? 0, lb = likeCounts[b.id] ?? 0
+                if la != lb { return la > lb }
+                return a.created_at > b.created_at // tie-break: newest first
+            }
+        } else {
+            base = matching
         }
+        var tagged: [FeedRecommendation] = []
+        var rest: [FeedRecommendation] = []
+        for rec in base {
+            if isRecentlyTaggedMe(rec) { tagged.append(rec) } else { rest.append(rec) }
+        }
+        return tagged.isEmpty ? rest : tagged + rest
     }
 
     /// Like counts are fetched on demand, not on every feed load — most
