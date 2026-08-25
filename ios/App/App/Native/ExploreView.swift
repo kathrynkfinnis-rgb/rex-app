@@ -18,6 +18,13 @@ struct ExploreView: View {
     @State private var errorMessage: String?
     @State private var pushedItemId: String?
     @State private var pushedCollection: CollectionRoute?
+    @State private var pushedTrip: TripRoute?
+    @State private var pushedList: ListRoute?
+    /// #169 — moved here from the main feed (#17's "trial"); this is where
+    /// Deliveroo-style category browsing belongs, alongside every other
+    /// horizontal discovery shelf, rather than sitting above the vertical
+    /// feed competing with it for the same screen.
+    @State private var recentRex: [FeedRecommendation] = []
 
     private let filterOptions: [RexCategory] = [
         .place, .trip, .book, .movie, .tv, .podcast, .recipe, .event,
@@ -38,6 +45,24 @@ struct ExploreView: View {
         // A shelf with no category is general-interest — only hide it once
         // a specific filter is chosen and it plainly doesn't match.
         editorial.filter { $0.category == nil || matches($0.category) }
+    }
+
+    /// One shelf per category, same grouping FeedView's own categoryShelves
+    /// used before #169 moved it here. Respects the same filter row every
+    /// other shelf on this screen already does.
+    private var recentByCategory: [(category: RexCategory, recs: [FeedRecommendation])] {
+        var byCategory: [RexCategory: [FeedRecommendation]] = [:]
+        for rec in recentRex where !rec.isWant && !rec.isBlast {
+            byCategory[RexCategory(rawType: rec.items?.type), default: []].append(rec)
+        }
+        // A shelf of one item isn't worth a whole horizontal row — that's
+        // just the same card the vertical feed already shows, framed oddly.
+        return rexAllCategories
+            .filter { filter == nil || $0 == filter }
+            .compactMap { category in
+                guard let recs = byCategory[category], recs.count >= 2 else { return nil }
+                return (category, Array(recs.prefix(10)))
+            }
     }
 
     // No self-wrapping NavigationStack — MainTabView provides one, the same
@@ -88,6 +113,14 @@ struct ExploreView: View {
                                 }
                             }
                         }
+                        ForEach(recentByCategory, id: \.category) { group in
+                            shelf(title: group.category.label, tag: "RECENT") {
+                                ForEach(group.recs) { rec in
+                                    Button { openRex(rec) } label: { recentRexCard(rec) }
+                                        .buttonStyle(.plain)
+                                }
+                            }
+                        }
                     }
                 }
                 .padding(.bottom, RexSpacing.xxl)
@@ -97,6 +130,8 @@ struct ExploreView: View {
             .navigationBarTitleDisplayMode(.inline)
             .navigationDestination(item: $pushedItemId) { ItemDetailView(itemId: $0) }
             .navigationDestination(item: $pushedCollection) { CollectionDetailView(route: $0) }
+            .navigationDestination(item: $pushedTrip) { TripDetailView(route: $0) }
+            .navigationDestination(item: $pushedList) { ListDetailView(route: $0) }
             .refreshable { await load() }
             .task { await load() }
         }
@@ -243,6 +278,37 @@ struct ExploreView: View {
         .buttonStyle(.plain)
     }
 
+    /// Same 3-way routing as FeedView.open(), minus the blast/want branches
+    /// — recentByCategory already excludes both.
+    private func openRex(_ rec: FeedRecommendation) {
+        switch RexCategory(rawType: rec.items?.type) {
+        case .trip:
+            pushedTrip = TripRoute(recommendationId: rec.id, title: rec.items?.title ?? "Trip")
+        case .list:
+            pushedList = ListRoute(recommendationId: rec.id, title: rec.items?.title ?? "List")
+        default:
+            pushedItemId = rec.item_id
+        }
+    }
+
+    private func recentRexCard(_ rec: FeedRecommendation) -> some View {
+        VStack(alignment: .leading, spacing: RexSpacing.xs) {
+            shelfThumbnail(url: rec.items?.image_url, symbol: RexCategory(rawType: rec.items?.type).symbol)
+            Text(rec.items?.title ?? "")
+                .font(RexFont.text(12.5, weight: .medium))
+                .foregroundStyle(RexColor.foreground)
+                .lineLimit(2)
+                .multilineTextAlignment(.leading)
+            if let who = rec.profiles?.display_name ?? rec.profiles?.username {
+                Text(who)
+                    .font(RexFont.text(11))
+                    .foregroundStyle(RexColor.mutedForeground)
+                    .lineLimit(1)
+            }
+        }
+        .frame(width: 132, alignment: .leading)
+    }
+
     @ViewBuilder
     private func editorialCard(_ item: EditorialCollectionItem) -> some View {
         Group {
@@ -309,9 +375,11 @@ struct ExploreView: View {
         async let friendsTask = RexAPI.shared.fetchFriendsCollectionsToExplore()
         async let trendingTask = RexAPI.shared.fetchTrendingItems()
         async let editorialTask = RexAPI.shared.fetchEditorialCollections()
+        async let recentTask = RexAPI.shared.fetchFeed()
         friendsCollections = (try? await friendsTask) ?? []
         trending = (try? await trendingTask) ?? []
         editorial = (try? await editorialTask) ?? []
+        recentRex = (try? await recentTask) ?? []
 
         let ownerIds = Array(Set(friendsCollections.compactMap(\.user_id)))
         if !ownerIds.isEmpty {
