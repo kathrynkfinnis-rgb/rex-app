@@ -9,25 +9,70 @@ struct FriendTagPickerView: View {
 
     @State private var friends: [RexProfileDetail] = []
     @State private var isLoading = true
+    @State private var query = ""
+
+    /// Search narrows the row down to a match on username/display name;
+    /// empty search keeps showing everyone, so the common case (tag one of
+    /// your regular few) never requires typing at all.
+    private var visibleFriends: [RexProfileDetail] {
+        let q = query.trimmingCharacters(in: .whitespaces)
+        guard !q.isEmpty else { return friends }
+        return friends.filter {
+            ($0.display_name ?? "").localizedCaseInsensitiveContains(q)
+                || $0.username.localizedCaseInsensitiveContains(q)
+        }
+    }
 
     var body: some View {
-        Group {
-            if isLoading {
-                ProgressView().frame(maxWidth: .infinity, alignment: .leading)
-            } else if friends.isEmpty {
-                Text("Add friends to tag them on a Rex.")
-                    .font(RexFont.text(12))
-                    .foregroundStyle(RexColor.mutedForeground)
-            } else {
-                ScrollView(.horizontal, showsIndicators: false) {
-                    HStack(spacing: RexSpacing.sm) {
-                        ForEach(friends) { friend in
-                            chip(friend)
+        VStack(alignment: .leading, spacing: RexSpacing.sm) {
+            if !friends.isEmpty {
+                HStack(spacing: 6) {
+                    Image(systemName: "magnifyingglass")
+                        .font(.system(size: 12))
+                        .foregroundStyle(RexColor.mutedForeground)
+                    TextField("Search friends", text: $query)
+                        .font(RexFont.text(13))
+                        .autocorrectionDisabled()
+                        .textInputAutocapitalization(.never)
+                }
+                .padding(.horizontal, RexSpacing.sm)
+                .padding(.vertical, 8)
+                .background(RexColor.muted)
+                .clipShape(RoundedRectangle(cornerRadius: RexRadius.input, style: .continuous))
+            }
+
+            // Fixed height regardless of loading/empty/loaded state — this
+            // sits inside AddRexView/EditRexView's own outer ScrollView, and
+            // letting this row's height change out from under it (Progress-
+            // View -> chips, once the async load resolves) left everything
+            // below it in the form (anonymous toggle, Post button) unable
+            // to register taps, as if the ScrollView's hit-testing geometry
+            // had gone stale relative to what actually re-laid-out on
+            // screen. Reproduced live, fixed by keeping this row's size
+            // constant from first frame to last so no reflow ever happens.
+            Group {
+                if isLoading {
+                    ProgressView().frame(maxWidth: .infinity, alignment: .leading)
+                } else if friends.isEmpty {
+                    Text("Add friends to tag them on a Rex.")
+                        .font(RexFont.text(12))
+                        .foregroundStyle(RexColor.mutedForeground)
+                } else if visibleFriends.isEmpty {
+                    Text("No friends match \"\(query)\".")
+                        .font(RexFont.text(12))
+                        .foregroundStyle(RexColor.mutedForeground)
+                } else {
+                    ScrollView(.horizontal, showsIndicators: false) {
+                        HStack(spacing: RexSpacing.sm) {
+                            ForEach(visibleFriends) { friend in
+                                chip(friend)
+                            }
                         }
+                        .padding(.vertical, 2)
                     }
-                    .padding(.vertical, 2)
                 }
             }
+            .frame(height: 40, alignment: .leading)
         }
         .task { await load() }
     }
