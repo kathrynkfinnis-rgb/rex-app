@@ -257,7 +257,12 @@ struct ImportReviewView: View {
     private func load() async {
         isLoading = true
         rows = (try? await RexAPI.shared.fetchStagingRows(source: source)) ?? []
-        showInFeedIds = Set(rows.map(\.id))
+        // #166 — used to default every row to "on", so importing a list of
+        // 20 books flooded the feed with 20 individual cards unless you
+        // remembered to untoggle each one. The list card itself always
+        // shows what's inside it; showing on the main feed too should be
+        // something you opt a standout item into, not the default for all.
+        showInFeedIds = []
         isLoading = false
         // Best-effort match against the app's own catalogues (OpenLibrary,
         // TMDB, Google Places), quietly in the background — approving still
