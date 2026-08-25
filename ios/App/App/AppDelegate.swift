@@ -48,6 +48,22 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
         // Called when the application is about to terminate. Save data if appropriate. See also applicationDidEnterBackground:.
     }
 
+    // #175 — the device token only ever arrives here, asynchronously, some
+    // time after RexPushNotifications.requestPermission() calls
+    // registerForRemoteNotifications(). Converted to the hex string APNs
+    // itself expects, then handed to RexAPI so the send-push function has
+    // somewhere to deliver to.
+    func application(_ application: UIApplication, didRegisterForRemoteNotificationsWithDeviceToken deviceToken: Data) {
+        let token = deviceToken.map { String(format: "%02x", $0) }.joined()
+        Task { try? await RexAPI.shared.registerPushToken(deviceToken: token) }
+    }
+
+    func application(_ application: UIApplication, didFailToRegisterForRemoteNotificationsWithError error: Error) {
+        // Best-effort feature — a registration failure (simulator, no
+        // network, revoked permission mid-flight) shouldn't crash or
+        // otherwise interrupt anything else the app is doing.
+    }
+
     func application(_ application: UIApplication,
                      configurationForConnecting connectingSceneSession: UISceneSession,
                      options: UIScene.ConnectionOptions) -> UISceneConfiguration {

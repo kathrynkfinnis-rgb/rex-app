@@ -1231,6 +1231,81 @@ final class RexAPI {
         return Int(total) ?? 0
     }
 
+    /// #175 — mirrors the web's notification-settings page (same columns,
+    /// same defaults), just grouped into sections instead of one flat list.
+    /// Web's PrefRow/DEFAULT_PREFS also lists rec_saved/mention — those
+    /// aren't real columns on this table (checked the migration directly),
+    /// so they're left out here rather than copied over as a second bug.
+    func fetchNotificationPreferences() async throws -> RexNotificationPreferences {
+        let token = try await validToken()
+        guard let userId = currentUserId else { throw RexAPIError.notSignedIn }
+        var components = URLComponents(url: baseURL.appendingPathComponent("/rest/v1/notification_preferences"), resolvingAgainstBaseURL: false)!
+        components.queryItems = [
+            URLQueryItem(name: "select", value: "*"),
+            URLQueryItem(name: "user_id", value: "eq.\(userId)"),
+            URLQueryItem(name: "limit", value: "1"),
+        ]
+        var request = URLRequest(url: components.url!)
+        request.setValue(anonKey, forHTTPHeaderField: "apikey")
+        request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+        let (data, response) = try await URLSession.shared.data(for: request)
+        guard let http = response as? HTTPURLResponse, http.statusCode < 400 else {
+            throw RexAPIError.server(friendlyError(data, fallback: "Couldn't load your notification settings."))
+        }
+        if let existing = (try? JSONDecoder().decode([RexNotificationPreferences].self, from: data))?.first {
+            return existing
+        }
+        // No row yet (never touched a toggle) — same defaults DEFAULT_PREFS
+        // uses on web, returned client-side rather than pre-creating a row
+        // nobody's actually customized.
+        return RexNotificationPreferences(user_id: userId)
+    }
+
+    /// One PATCH-or-create call — user_id is the table's actual primary key
+    /// (not a partial index), so PostgREST's on_conflict works normally
+    /// here, unlike recommendations' upsertRecommendation.
+    func updateNotificationPreference(_ patch: [String: Bool]) async throws {
+        let token = try await validToken()
+        guard let userId = currentUserId else { throw RexAPIError.notSignedIn }
+        var components = URLComponents(url: baseURL.appendingPathComponent("/rest/v1/notification_preferences"), resolvingAgainstBaseURL: false)!
+        components.queryItems = [URLQueryItem(name: "on_conflict", value: "user_id")]
+        var request = URLRequest(url: components.url!)
+        request.httpMethod = "POST"
+        request.setValue(anonKey, forHTTPHeaderField: "apikey")
+        request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        request.setValue("resolution=merge-duplicates", forHTTPHeaderField: "Prefer")
+        var body: [String: Any] = patch
+        body["user_id"] = userId
+        request.httpBody = try JSONSerialization.data(withJSONObject: body)
+        let (data, response) = try await URLSession.shared.data(for: request)
+        guard let http = response as? HTTPURLResponse, http.statusCode < 400 else {
+            throw RexAPIError.server(friendlyError(data, fallback: "Couldn't save that."))
+        }
+    }
+
+    /// #175 — called once permission is granted and a device token is in
+    /// hand (see AppDelegate). Upserts on (user_id, device_token) so a
+    /// reinstall/re-login on the same device doesn't create a duplicate row
+    /// the send-push function would then double-deliver to.
+    func registerPushToken(deviceToken: String) async throws {
+        let token = try await validToken()
+        guard let userId = currentUserId else { throw RexAPIError.notSignedIn }
+        var components = URLComponents(url: baseURL.appendingPathComponent("/rest/v1/push_tokens"), resolvingAgainstBaseURL: false)!
+        components.queryItems = [URLQueryItem(name: "on_conflict", value: "user_id,device_token")]
+        var request = URLRequest(url: components.url!)
+        request.httpMethod = "POST"
+        request.setValue(anonKey, forHTTPHeaderField: "apikey")
+        request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        request.setValue("resolution=merge-duplicates", forHTTPHeaderField: "Prefer")
+        request.httpBody = try JSONSerialization.data(withJSONObject: ["user_id": userId, "device_token": deviceToken])
+        let (data, response) = try await URLSession.shared.data(for: request)
+        guard let http = response as? HTTPURLResponse, http.statusCode < 400 else {
+            throw RexAPIError.server(friendlyError(data, fallback: "Couldn't register for push."))
+        }
+    }
+
     func markNotificationsRead(ids: [String]) async throws {
         guard !ids.isEmpty else { return }
         let token = try await validToken()

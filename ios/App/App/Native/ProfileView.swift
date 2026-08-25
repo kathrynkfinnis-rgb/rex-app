@@ -82,6 +82,14 @@ struct ProfileView: View {
                 }
                 .foregroundStyle(RexColor.primary)
             }
+            ToolbarItem(placement: .topBarLeading) {
+                Button {
+                    path.append(NotificationPreferencesRoute())
+                } label: {
+                    Image(systemName: "bell")
+                }
+                .foregroundStyle(RexColor.primary)
+            }
             ToolbarItem(placement: .topBarTrailing) {
                 if !recommendations.isEmpty {
                     Button(selecting ? "Done" : "Select") {
@@ -139,6 +147,7 @@ struct ProfileView: View {
         .navigationDestination(for: UserProfileRoute.self) { UserProfileView(route: $0) }
         .navigationDestination(for: AuthorRoute.self) { AuthorBooksView(route: $0) }
         .navigationDestination(for: DraftsRoute.self) { _ in DraftsView() }
+        .navigationDestination(for: NotificationPreferencesRoute.self) { _ in NotificationPreferencesView() }
         }
     }
 

@@ -39,6 +39,22 @@ struct RexItem: Codable {
     }
 }
 
+/// #175 — matches notification_preferences exactly (see the SQL migration),
+/// not the web app's PrefRow (which references rec_saved/mention columns
+/// that don't actually exist in the table).
+struct RexNotificationPreferences: Codable {
+    let user_id: String
+    var rec_like = true
+    var rec_comment = true
+    var rec_tagged = true
+    var friend_request = true
+    var friend_accepted = true
+    var friend_new_rec = false
+    var blast_new = true
+    var blast_comment = true
+    var push_enabled = false
+}
+
 struct RexProfile: Codable {
     let username: String
     let display_name: String?
