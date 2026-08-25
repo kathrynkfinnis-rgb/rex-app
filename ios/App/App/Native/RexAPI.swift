@@ -1507,6 +1507,28 @@ final class RexAPI {
         }
     }
 
+    /// #170 — a trip-level note (the trip's own recommendation row, not any
+    /// one stop's). A lighter PATCH than updateRecommendation() on purpose:
+    /// that one always rewrites rating/tags/photos too, which the trip note
+    /// editor has no business touching.
+    func updateNote(recommendationId: String, note: String?) async throws {
+        let token = try await validToken()
+        var components = URLComponents(url: baseURL.appendingPathComponent("/rest/v1/recommendations"), resolvingAgainstBaseURL: false)!
+        components.queryItems = [URLQueryItem(name: "id", value: "eq.\(recommendationId)")]
+        var request = URLRequest(url: components.url!)
+        request.httpMethod = "PATCH"
+        request.setValue(anonKey, forHTTPHeaderField: "apikey")
+        request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        let trimmed = note?.trimmingCharacters(in: .whitespacesAndNewlines)
+        let body: [String: Any] = ["note": (trimmed?.isEmpty == false ? trimmed : nil) ?? (NSNull() as Any)]
+        request.httpBody = try JSONSerialization.data(withJSONObject: body)
+        let (data, response) = try await URLSession.shared.data(for: request)
+        guard let http = response as? HTTPURLResponse, http.statusCode < 400 else {
+            throw RexAPIError.server(friendlyError(data, fallback: "Couldn't save that note."))
+        }
+    }
+
     /// Items are shared across everyone who's Rex'd them (not per-user like
     /// the fields above), so this fixes the title for the catalogue entry
     /// itself, not just your own take on it — same model already used for

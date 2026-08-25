@@ -34,6 +34,11 @@ struct TripDetailView: View {
     @State private var renameDraft = ""
     @State private var showingAddStop = false
     @State private var addStopSection = ""
+    /// #170 — the trip's own free-text note (separate from any stop's).
+    @State private var tripNote: String?
+    @State private var editingNote = false
+    @State private var noteDraft = ""
+    @State private var isSavingNote = false
 
     /// Stops grouped by heading, preserving the order both groups and stops
     /// first appear in — same rule as the web's groupStops().
@@ -202,10 +207,56 @@ struct TripDetailView: View {
                     .foregroundStyle(RexColor.mutedForeground)
             }
 
+            if let tripNote, !tripNote.isEmpty {
+                noteRow(tripNote)
+            } else if isOwner && !isLoading {
+                Button {
+                    noteDraft = ""
+                    editingNote = true
+                } label: {
+                    Label("Add a note", systemImage: "text.badge.plus")
+                        .font(RexFont.text(13, weight: .medium))
+                        .foregroundStyle(RexColor.mutedForeground)
+                }
+                .padding(.top, 2)
+            }
+
             if isDraft {
                 draftBanner
             }
         }
+        .alert("Trip note", isPresented: $editingNote) {
+            TextField("What's this trip about?", text: $noteDraft, axis: .vertical)
+            Button("Cancel", role: .cancel) {}
+            Button("Save") { Task { await saveNote() } }
+        }
+    }
+
+    /// #170 — the trip's own note, same quoted styling RecommendationCardView
+    /// uses for a stop's note. Tapping it (owner only) reopens the editor.
+    private func noteRow(_ note: String) -> some View {
+        Text("\u{201C}\(note)\u{201D}")
+            .font(RexFont.text(14))
+            .foregroundStyle(RexColor.foreground.opacity(0.88))
+            .padding(.top, 2)
+            .contentShape(Rectangle())
+            .onTapGesture {
+                guard isOwner else { return }
+                noteDraft = note
+                editingNote = true
+            }
+    }
+
+    private func saveNote() async {
+        let next = noteDraft
+        isSavingNote = true
+        do {
+            try await RexAPI.shared.updateNote(recommendationId: route.recommendationId, note: next)
+            tripNote = next.trimmingCharacters(in: .whitespacesAndNewlines)
+        } catch {
+            mutationError = error.localizedDescription
+        }
+        isSavingNote = false
     }
 
     /// Only ever shown to the trip's own author — RLS hides a draft from
@@ -275,7 +326,9 @@ struct TripDetailView: View {
             async let ownerTask: FeedRecommendation? = try? RexAPI.shared.fetchRecommendation(id: route.recommendationId)
             stops = try await stopsTask
             isDraft = (try? await draftTask) ?? false
-            isOwner = (await ownerTask)?.user_id == RexAPI.shared.currentUserId
+            let tripRec = await ownerTask
+            isOwner = tripRec?.user_id == RexAPI.shared.currentUserId
+            tripNote = tripRec?.note
         } catch {
             errorMessage = error.localizedDescription
         }

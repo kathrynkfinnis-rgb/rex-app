@@ -17,6 +17,14 @@ struct RexCardActions: View {
     @State private var commentCount = 0
     @State private var busy = false
 
+    /// #177 — used to share plain text with no link at all, so there was
+    /// nothing for the recipient to actually open. `/r/$id` is a real public
+    /// page the web app already serves (OG tags, sign-up prompt, "Open in
+    /// REX" deep link) — same URL shape ShareButton uses on web already.
+    private var shareURL: URL {
+        URL(string: "https://pocket-app-pioneers.lovable.app/r/\(rec.id)")!
+    }
+
     private var shareText: String {
         let title = rec.items?.title ?? "this"
         let who = rec.profiles?.display_name ?? rec.profiles?.username ?? "A friend"
@@ -72,7 +80,7 @@ struct RexCardActions: View {
                 Task { await toggleWant() }
             }
 
-            ShareLink(item: shareText) {
+            ShareLink(item: shareURL, message: Text(shareText)) {
                 Image(systemName: "paperplane")
                     .font(.system(size: 15))
                     .foregroundStyle(RexColor.mutedForeground)
