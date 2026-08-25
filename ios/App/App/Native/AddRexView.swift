@@ -8,6 +8,23 @@ import SwiftUI
 struct AddRexView: View {
     var onDone: () -> Void
 
+    /// #167 — "add a Rex by finding a place on the map first": the map
+    /// already resolves a tapped point to a real place (reverse-geocoded,
+    /// same as the "type of place" header does elsewhere), so this reuses
+    /// the exact same picked-hit path a Google Places search result takes
+    /// (see apply(_:)) rather than inventing a second prefill mechanism —
+    /// jumping straight past the category picker and the search box into
+    /// the already-filled-in form.
+    init(onDone: @escaping () -> Void, initialPlaceHit: RexSearchHit? = nil) {
+        self.onDone = onDone
+        if let hit = initialPlaceHit {
+            _category = State(initialValue: .place)
+            _picked = State(initialValue: hit)
+            _title = State(initialValue: hit.title)
+            _address = State(initialValue: hit.address ?? "")
+        }
+    }
+
     // Trip sits second, as on the web. A trip is created as a normal Rex here
     // and stops get added to it afterwards from the trip screen. List sits
     // right after — same "container + its own items" shape as Trip — for

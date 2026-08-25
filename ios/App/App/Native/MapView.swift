@@ -45,6 +45,12 @@ struct RexMapView: View {
     /// actual height to avoid starting underneath it. Measured rather than
     /// guessed since the bar's height changes (trip banner, sort row).
     @State private var topBarHeight: CGFloat = 160
+    /// #167 — "add a Rex by finding a place on the map first": long-press
+    /// drops a pin, reverse-geocodes it (same CLGeocoder already used for
+    /// areaName below) into a real address, then opens Add a Rex prefilled.
+    @State private var isResolvingLongPress = false
+    @State private var pendingPlaceHit: RexSearchHit?
+    @State private var longPressError: String?
 
     enum MapSortMode: String, CaseIterable {
         case recent = "Most recent"
@@ -105,9 +111,22 @@ struct RexMapView: View {
                     center: center,
                     radiusMeters: radiusMeters,
                     focusRequest: focusRequest,
-                    onSelect: { selectedPlace = $0 }
+                    onSelect: { selectedPlace = $0 },
+                    onLongPress: { coordinate in Task { await resolveLongPress(coordinate) } }
                 )
                 .ignoresSafeArea(edges: .bottom)
+            }
+
+            if isResolvingLongPress {
+                VStack(spacing: RexSpacing.sm) {
+                    ProgressView().tint(.white)
+                    Text("Finding this place…")
+                        .font(RexFont.text(13, weight: .medium))
+                        .foregroundStyle(.white)
+                }
+                .padding(RexSpacing.lg)
+                .background(Color.black.opacity(0.65))
+                .clipShape(RoundedRectangle(cornerRadius: RexRadius.card, style: .continuous))
             }
 
             topBar
@@ -140,6 +159,17 @@ struct RexMapView: View {
         .navigationDestination(item: $openTrip) { TripDetailView(route: $0) }
         .sheet(isPresented: $showingTripSearch) {
             TripSearchView(onSelect: { id, title in followTrip(id: id, title: title) })
+        }
+        .sheet(item: $pendingPlaceHit) { hit in
+            AddRexView(onDone: { pendingPlaceHit = nil; Task { await load() } }, initialPlaceHit: hit)
+        }
+        .alert("Couldn't find that place", isPresented: Binding(
+            get: { longPressError != nil },
+            set: { if !$0 { longPressError = nil } }
+        )) {
+            Button("OK", role: .cancel) {}
+        } message: {
+            Text(longPressError ?? "")
         }
     }
 
@@ -437,6 +467,45 @@ struct RexMapView: View {
         if let placemark = try? await CLGeocoder().reverseGeocodeLocation(location).first {
             areaName = placemark.locality ?? placemark.subAdministrativeArea ?? placemark.administrativeArea
         }
+    }
+
+    /// #167 — reverse-geocodes a long-pressed point into a real address,
+    /// then hands it to Add a Rex as a RexSearchHit, the same shape a
+    /// picked Google Places result takes (see AddRexView's custom init).
+    /// externalSource is its own tag rather than "google_places" — this is
+    /// a CLGeocoder reverse-geocode, not an actual Google Place match, and
+    /// createItem's (external_source, external_id) dedup lookup shouldn't
+    /// conflate the two.
+    private func resolveLongPress(_ coordinate: CLLocationCoordinate2D) async {
+        isResolvingLongPress = true
+        longPressError = nil
+        let location = CLLocation(latitude: coordinate.latitude, longitude: coordinate.longitude)
+        let placemark = try? await CLGeocoder().reverseGeocodeLocation(location).first
+        isResolvingLongPress = false
+        guard let placemark else {
+            longPressError = "Couldn't identify a place at that spot — try a different point, or add it manually instead."
+            return
+        }
+        let name = placemark.name ?? placemark.thoroughfare ?? "Dropped pin"
+        let address = [placemark.name, placemark.thoroughfare, placemark.locality, placemark.country]
+            .compactMap { $0 }
+            .filter { !$0.isEmpty }
+            .reduce(into: [String]()) { acc, part in if acc.last != part { acc.append(part) } }
+            .joined(separator: ", ")
+        pendingPlaceHit = RexSearchHit(
+            externalId: "\(coordinate.latitude),\(coordinate.longitude)",
+            externalSource: "map_long_press",
+            title: name,
+            subtitle: nil,
+            imageURL: nil,
+            genre: nil,
+            address: address.isEmpty ? name : address,
+            lat: coordinate.latitude,
+            lng: coordinate.longitude,
+            googleRating: nil,
+            googleRatingCount: nil,
+            productURL: nil
+        )
     }
 
     @ViewBuilder

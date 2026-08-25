@@ -22,6 +22,10 @@ struct GoogleMapView: UIViewRepresentable {
     /// Jump straight to one place, overriding wherever the map currently sits.
     var focusRequest: MapFocusRequest?
     var onSelect: (MapPlace) -> Void
+    /// #167 — "add a Rex by finding a place on the map first". A tap alone
+    /// is already claimed (panning/pin selection); long-press is the same
+    /// gesture Apple/Google Maps themselves use for "drop a pin here".
+    var onLongPress: ((CLLocationCoordinate2D) -> Void)? = nil
 
     func makeCoordinator() -> Coordinator { Coordinator(self) }
 
@@ -112,6 +116,10 @@ struct GoogleMapView: UIViewRepresentable {
                 parent.onSelect(place)
             }
             return true
+        }
+
+        func mapView(_ mapView: GMSMapView, didLongPressAt coordinate: CLLocationCoordinate2D) {
+            parent.onLongPress?(coordinate)
         }
     }
 }
