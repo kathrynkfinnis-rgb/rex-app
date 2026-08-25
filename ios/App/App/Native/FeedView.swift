@@ -162,6 +162,38 @@ struct FeedView: View {
         }
     }
 
+    /// #165 — the same item Rex'd by more than one person (or once
+    /// standalone and again as a trip stop) showed as a separate feed card
+    /// per row, back to back, saying the same thing twice. One card per
+    /// item now: your own take if you have one, else whichever is most
+    /// recent — everyone else still surfaces via the "Also Rex'd by"
+    /// footer (rexCounts), so nothing's actually lost, just not repeated.
+    /// Wants/blasts are left alone — a want and an actually-done Rex for
+    /// the same item are different facts, not duplicates of each other.
+    private func collapseDuplicateItems(_ rows: [FeedRecommendation]) -> [FeedRecommendation] {
+        let myId = RexAPI.shared.currentUserId
+        var primaryIdByItem: [String: String] = [:]
+        for rec in rows where !rec.isWant && !rec.isBlast {
+            guard let existingId = primaryIdByItem[rec.item_id],
+                  let existing = rows.first(where: { $0.id == existingId })
+            else {
+                primaryIdByItem[rec.item_id] = rec.id
+                continue
+            }
+            let recIsMine = rec.user_id == myId
+            let existingIsMine = existing.user_id == myId
+            if recIsMine && !existingIsMine {
+                primaryIdByItem[rec.item_id] = rec.id
+            } else if recIsMine == existingIsMine, rec.created_at > existing.created_at {
+                primaryIdByItem[rec.item_id] = rec.id
+            }
+        }
+        return rows.filter { rec in
+            if rec.isWant || rec.isBlast { return true }
+            return primaryIdByItem[rec.item_id] == rec.id
+        }
+    }
+
     /// #171 — a Rex you're tagged on ("went here with Phoebe") is worth
     /// surfacing even if strict chronological (or most-liked) order would
     /// bury it a few posts back. Bounded to a few days so an old tag
@@ -192,9 +224,16 @@ struct FeedView: View {
         } else {
             base = matching
         }
+        // Same reasoning as visible()'s own guard: once a filter/search has
+        // deliberately narrowed things down, collapsing duplicates again on
+        // top of that risks reading as "my search lost the result" even
+        // though the match is technically still folded into the footer.
+        let noActiveFilter = filter == nil && subFilter == nil && !blastsOnly && ratingFilter == nil
+            && query.trimmingCharacters(in: .whitespaces).isEmpty
+        let deduped = noActiveFilter ? collapseDuplicateItems(base) : base
         var tagged: [FeedRecommendation] = []
         var rest: [FeedRecommendation] = []
-        for rec in base {
+        for rec in deduped {
             if isRecentlyTaggedMe(rec) { tagged.append(rec) } else { rest.append(rec) }
         }
         return tagged.isEmpty ? rest : tagged + rest
