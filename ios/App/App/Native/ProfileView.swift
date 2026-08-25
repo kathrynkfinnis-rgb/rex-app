@@ -24,6 +24,7 @@ struct ProfileView: View {
     @State private var isDeleting = false
     @State private var editingProfile = false
     @State private var addingToCollection: FeedRecommendation?
+    @State private var addingToTrip: FeedRecommendation?
     @State private var rexCounts: [String: Int] = [:]
     /// #147: the old Lovable web profile led with a row of stat cards
     /// (Rex count / average rating / friends / collections) rather than the
@@ -142,6 +143,9 @@ struct ProfileView: View {
         }
         .sheet(item: $addingToCollection) { rec in
             AddToCollectionView(rec: rec) { addingToCollection = nil }
+        }
+        .sheet(item: $addingToTrip) { rec in
+            AddToTripView(itemId: rec.item_id, itemTitle: rec.items?.title ?? "This place", onDone: {})
         }
         .navigationDestination(for: String.self) { ItemDetailView(itemId: $0) }
         .navigationDestination(for: UserProfileRoute.self) { UserProfileView(route: $0) }
@@ -369,6 +373,16 @@ struct ProfileView: View {
                             addingToCollection = rec
                         } label: {
                             Label("Add to collection", systemImage: "folder.badge.plus")
+                        }
+                        // Places only (#104), same as the feed's own card
+                        // menu — a trip is a sequence of places. This menu
+                        // just never got the option added at all here.
+                        if RexCategory(rawType: rec.items?.type) == .place {
+                            Button {
+                                addingToTrip = rec
+                            } label: {
+                                Label("Add to trip", systemImage: "bag.badge.plus")
+                            }
                         }
                         Button {
                             editing = rec
