@@ -13,6 +13,23 @@ struct WishListCategoryView: View {
     @State private var isLoading = true
     @State private var pushedItemId: String?
     @State private var addingToCollection: WantRow?
+    /// Sub-category filter (genre) within this one category — same idea as
+    /// the feed's own subcategory row, just scoped to what's actually saved
+    /// here rather than the whole feed.
+    @State private var subFilter: String?
+
+    private var availableSubcategories: [String] {
+        var set = Set<String>()
+        for want in wants {
+            set.formUnion(splitGenres(want.items?.genre))
+        }
+        return set.sorted()
+    }
+
+    private var visibleWants: [WantRow] {
+        guard let subFilter else { return wants }
+        return wants.filter { splitGenres($0.items?.genre).contains(subFilter) }
+    }
 
     private var title: String {
         switch route.category {
@@ -44,7 +61,27 @@ struct WishListCategoryView: View {
                 } else if wants.isEmpty {
                     empty()
                 } else {
-                    ForEach(wants) { want in
+                    if !availableSubcategories.isEmpty {
+                        ScrollView(.horizontal, showsIndicators: false) {
+                            HStack(spacing: RexSpacing.sm) {
+                                ForEach(availableSubcategories, id: \.self) { genre in
+                                    filterChip(genre, isSelected: subFilter == genre) {
+                                        subFilter = (subFilter == genre) ? nil : genre
+                                    }
+                                }
+                            }
+                            .padding(.horizontal, 1)
+                        }
+                        .padding(.bottom, RexSpacing.xs)
+                    }
+                    if visibleWants.isEmpty {
+                        Text("Nothing matches that filter.")
+                            .font(RexFont.text(13))
+                            .foregroundStyle(RexColor.mutedForeground)
+                            .frame(maxWidth: .infinity)
+                            .padding(.vertical, 24)
+                    }
+                    ForEach(visibleWants) { want in
                         if let item = want.items {
                             SwipeToRemove(
                                 label: "Remove",
@@ -114,6 +151,19 @@ struct WishListCategoryView: View {
             }
         }
         .task { await load() }
+    }
+
+    private func filterChip(_ label: String, isSelected: Bool, action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            Text(label)
+                .font(.system(size: 13, weight: .medium))
+                .padding(.horizontal, 14).padding(.vertical, 7)
+                .background(isSelected ? RexColor.primary : RexColor.card)
+                .foregroundStyle(isSelected ? RexColor.primaryForeground : RexColor.foreground)
+                .clipShape(Capsule())
+                .overlay(Capsule().stroke(RexColor.border, lineWidth: isSelected ? 0 : 1))
+        }
+        .buttonStyle(.plain)
     }
 
     @ViewBuilder
