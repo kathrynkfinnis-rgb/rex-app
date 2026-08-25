@@ -35,6 +35,10 @@ struct EditRexView: View {
     @State private var linkURL: String
     /// #162 — friends tagged on this Rex.
     @State private var taggedFriendIds: Set<String>
+    /// #172 — recipe ingredients/method, previously only editable at
+    /// creation. RecipeEditorView's own parse()/serialize() round-trip
+    /// the same free-text format createItem already stores.
+    @State private var recipeText: String
     @State private var isSaving = false
     @State private var confirmDelete = false
     @State private var errorMessage: String?
@@ -69,6 +73,7 @@ struct EditRexView: View {
         _showInFeed = State(initialValue: rec.show_in_feed ?? true)
         _linkURL = State(initialValue: rec.items?.link_url ?? "")
         _taggedFriendIds = State(initialValue: Set(rec.taggedFriends.map { $0.id }))
+        _recipeText = State(initialValue: rec.items?.recipe_text ?? "")
     }
 
     var body: some View {
@@ -116,6 +121,12 @@ struct EditRexView: View {
                                     )
                             }
                         }
+                    }
+
+                    // #172 — was write-once at creation, same gap
+                    // title/link/thumbnail had before their own fixes.
+                    if category == .recipe {
+                        RecipeEditorView(recipeText: $recipeText, title: $title)
                     }
 
                     // #124: a want and a Rex are different tables underneath,
@@ -311,6 +322,9 @@ struct EditRexView: View {
                 if newLink != rec.items?.link_url {
                     try await RexAPI.shared.updateItemLinkURL(itemId: rec.item_id, linkURL: newLink)
                 }
+            }
+            if category == .recipe, recipeText != (rec.items?.recipe_text ?? "") {
+                try await RexAPI.shared.updateItemRecipeText(itemId: rec.item_id, recipeText: recipeText)
             }
 
             switch (wantRowId, wantToTry) {

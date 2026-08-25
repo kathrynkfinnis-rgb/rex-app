@@ -1595,6 +1595,27 @@ final class RexAPI {
         }
     }
 
+    /// #172 — recipe_text was write-once at creation (createItem), same gap
+    /// title/link/thumbnail had before #45/#101/#125 fixed those. Same
+    /// shared-catalogue pattern: anyone who's Rex'd this recipe sees the fix.
+    func updateItemRecipeText(itemId: String, recipeText: String?) async throws {
+        let token = try await validToken()
+        var components = URLComponents(url: baseURL.appendingPathComponent("/rest/v1/items"), resolvingAgainstBaseURL: false)!
+        components.queryItems = [URLQueryItem(name: "id", value: "eq.\(itemId)")]
+        var request = URLRequest(url: components.url!)
+        request.httpMethod = "PATCH"
+        request.setValue(anonKey, forHTTPHeaderField: "apikey")
+        request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        let body: [String: Any] = ["recipe_text": recipeText?.isEmpty == false ? recipeText! : (NSNull() as Any)]
+        request.httpBody = try JSONSerialization.data(withJSONObject: body)
+
+        let (data, response) = try await URLSession.shared.data(for: request)
+        guard let http = response as? HTTPURLResponse, http.statusCode < 400 else {
+            throw RexAPIError.server(friendlyError(data, fallback: "Couldn't save the recipe."))
+        }
+    }
+
     func deleteRecommendation(id: String) async throws {
         let token = try await validToken()
         var components = URLComponents(url: baseURL.appendingPathComponent("/rest/v1/recommendations"), resolvingAgainstBaseURL: false)!

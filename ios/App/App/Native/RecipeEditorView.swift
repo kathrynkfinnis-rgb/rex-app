@@ -252,11 +252,18 @@ struct RecipeEditorView: View {
                     .buttonStyle(.plain)
                     .foregroundStyle(RexColor.mutedForeground)
 
+                    // #173 — a plain single-line TextField truncates a long
+                    // ingredient/method step with "…" and there's no way to
+                    // read or fix the hidden part short of arrow-keying
+                    // through it blind. axis: .vertical makes the field grow
+                    // with its content instead, same pattern as every other
+                    // free-text field in the app (note, trip note, etc.).
                     TextField(placeholder, text: Binding(
                         get: { i < items.wrappedValue.count ? items.wrappedValue[i] : "" },
                         set: { if i < items.wrappedValue.count { items.wrappedValue[i] = $0 } }
-                    ))
+                    ), axis: .vertical)
                     .font(RexFont.text(15))
+                    .lineLimit(1...6)
                     .padding(RexSpacing.md)
                     .background(RexColor.card)
                     .clipShape(RoundedRectangle(cornerRadius: RexRadius.input, style: .continuous))
