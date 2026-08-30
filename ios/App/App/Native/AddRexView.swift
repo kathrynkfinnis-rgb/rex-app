@@ -107,9 +107,7 @@ struct AddRexView: View {
                         Button("Back") {
                             withAnimation {
                                 category = nil
-                                manualEntry = false
-                                picked = nil
-                                hits = []
+                                resetDraftFields()
                             }
                         }
                     }
@@ -129,15 +127,32 @@ struct AddRexView: View {
                     Button {
                         withAnimation { category = cat }
                     } label: {
-                        VStack(spacing: 8) {
-                            Image(systemName: cat.symbol).font(.system(size: 22)).foregroundStyle(RexColor.primary)
-                            Text(cat.label).font(.system(size: 14, weight: .semibold)).foregroundStyle(RexColor.foreground)
+                        HStack(spacing: 0) {
+                            // Left accent bar — the one colour cue that
+                            // reads before the icon/label even register,
+                            // same trick the reference picker uses.
+                            Rectangle()
+                                .fill(cat.tintColor)
+                                .frame(width: 5)
+
+                            HStack(spacing: 10) {
+                                Image(systemName: cat.symbol)
+                                    .font(.system(size: 20))
+                                    .foregroundStyle(cat.tintColor)
+                                Text(cat.label)
+                                    .font(.system(size: 15, weight: .semibold))
+                                    .foregroundStyle(RexColor.foreground)
+                                Spacer(minLength: 0)
+                            }
+                            .padding(.vertical, 16)
+                            .padding(.horizontal, 14)
                         }
-                        .frame(maxWidth: .infinity)
-                        .padding(.vertical, 20)
                         .background(RexColor.card)
-                        .clipShape(RoundedRectangle(cornerRadius: 18))
-                        .overlay(RoundedRectangle(cornerRadius: 18).stroke(RexColor.border, lineWidth: 1))
+                        .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 16, style: .continuous)
+                                .stroke(RexColor.border, lineWidth: 1)
+                        )
                     }
                     .buttonStyle(.plain)
                 }
@@ -423,36 +438,50 @@ struct AddRexView: View {
                         }
                         .padding(RexSpacing.md)
                     }
-                    ForEach(hits.prefix(6)) { hit in
-                        Button {
-                            apply(hit)
-                        } label: {
-                            HStack(spacing: RexSpacing.md) {
-                                thumb(hit)
-                                VStack(alignment: .leading, spacing: 2) {
-                                    Text(hit.title)
-                                        .font(RexFont.text(14, weight: .medium))
-                                        .foregroundStyle(RexColor.foreground)
-                                        .lineLimit(1)
-                                    if let sub = hit.address ?? hit.subtitle, !sub.isEmpty {
-                                        Text(sub)
-                                            .font(RexFont.text(12))
-                                            .foregroundStyle(RexColor.mutedForeground)
-                                            .lineLimit(1)
+                    // "You should be able to scroll down the list of
+                    // suggestions if it's a generic title and the initial
+                    // one doesn't come up" — this used to hard-cap at 6 with
+                    // no way to reach anything past that, silently dropping
+                    // real results a search provider (up to 15 from
+                    // OpenLibrary/iTunes, 10 from Places) already returned.
+                    // Capped-height ScrollView instead of a bare list: all
+                    // of `hits` is reachable now, without letting a big
+                    // result set push the rest of the form far off-screen.
+                    ScrollView {
+                        VStack(spacing: 0) {
+                            ForEach(hits) { hit in
+                                Button {
+                                    apply(hit)
+                                } label: {
+                                    HStack(spacing: RexSpacing.md) {
+                                        thumb(hit)
+                                        VStack(alignment: .leading, spacing: 2) {
+                                            Text(hit.title)
+                                                .font(RexFont.text(14, weight: .medium))
+                                                .foregroundStyle(RexColor.foreground)
+                                                .lineLimit(1)
+                                            if let sub = hit.address ?? hit.subtitle, !sub.isEmpty {
+                                                Text(sub)
+                                                    .font(RexFont.text(12))
+                                                    .foregroundStyle(RexColor.mutedForeground)
+                                                    .lineLimit(1)
+                                            }
+                                        }
+                                        Spacer()
                                     }
+                                    .padding(.horizontal, RexSpacing.md)
+                                    .padding(.vertical, RexSpacing.sm)
+                                    .contentShape(Rectangle())
                                 }
-                                Spacer()
-                            }
-                            .padding(.horizontal, RexSpacing.md)
-                            .padding(.vertical, RexSpacing.sm)
-                            .contentShape(Rectangle())
-                        }
-                        .buttonStyle(.plain)
+                                .buttonStyle(.plain)
 
-                        if hit.id != hits.prefix(6).last?.id {
-                            Rectangle().fill(RexColor.divider).frame(height: 1)
+                                if hit.id != hits.last?.id {
+                                    Rectangle().fill(RexColor.divider).frame(height: 1)
+                                }
+                            }
                         }
                     }
+                    .frame(maxHeight: 280)
                 }
                 .background(RexColor.card)
                 .clipShape(RoundedRectangle(cornerRadius: RexRadius.input, style: .continuous))
@@ -814,19 +843,38 @@ struct AddRexView: View {
             didWant = false
             didSaveDraft = false
             lastWantItemId = nil
-            title = ""
-            note = ""
-            productLink = ""
-            photoURLs = []
-            subcategories = []
-            taggedFriendIds = []
-            anonymous = false
-            rating = 8
-            picked = nil
-            hits = []
-            manualEntry = false
-            errorMessage = nil
+            resetDraftFields()
         }
+    }
+
+    /// Everything typed into the form for one category, cleared whenever
+    /// that draft is abandoned — either by posting (startAnother) or by
+    /// backing out to the category picker to start a different kind of Rex.
+    /// The Back button used to only clear category/manualEntry/picked/hits,
+    /// which is how a list ended up carrying a trip's leftover subtitle:
+    /// pick Trip, type a title and subtitle, hit Back, pick List instead —
+    /// subtitle (and address/tripStops/listItems/etc, none of which mean
+    /// the same thing for a List) rode along into the post untouched, and
+    /// since ListDetailView has no subtitle field to fix it afterwards, it
+    /// was stuck there for good.
+    private func resetDraftFields() {
+        title = ""
+        note = ""
+        productLink = ""
+        photoURLs = []
+        subcategories = []
+        taggedFriendIds = []
+        anonymous = false
+        rating = 8
+        picked = nil
+        hits = []
+        manualEntry = false
+        errorMessage = nil
+        subtitle = ""
+        address = ""
+        tripStops = []
+        listItems = []
+        recipeText = ""
     }
 
     private var successState: some View {

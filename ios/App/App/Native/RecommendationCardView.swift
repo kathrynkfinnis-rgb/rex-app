@@ -30,6 +30,17 @@ struct RecommendationCardView: View {
 
     private var category: RexCategory { RexCategory(rawType: rec.items?.type) }
 
+    /// How much trailing space the title's own line needs to clear, to
+    /// leave room for whichever badge is floating in the same top corner —
+    /// see the .overlay(alignment: .topTrailing) below. "Asking"/"Wants to
+    /// try" carry a text label and need real room; a rating is just one
+    /// small emoji; a plain Rex with none of the three needs nothing.
+    private var titleTrailingReserve: CGFloat {
+        if rec.isBlast || rec.isWant { return 110 }
+        if rec.rating > 0 { return 40 }
+        return 0
+    }
+
     private static let relativeFormatter: RelativeDateTimeFormatter = {
         let f = RelativeDateTimeFormatter()
         f.unitsStyle = .abbreviated
@@ -44,14 +55,162 @@ struct RecommendationCardView: View {
     var body: some View {
         guard let item = rec.items else { return AnyView(EmptyView()) }
         return AnyView(
-            VStack(alignment: .leading, spacing: 0) {
-                HStack(alignment: .top, spacing: RexSpacing.md) {
-                    thumbnail(item: item)
+            HStack(spacing: 0) {
+                // "A similar bar down the left of the cards on the feed to
+                // show which category it's in" — same tintColor/treatment
+                // as the Add-a-Rex category picker, just along the whole
+                // card's edge instead of one grid tile's.
+                Rectangle()
+                    .fill(category.tintColor)
+                    .frame(width: 5)
 
-                    VStack(alignment: .leading, spacing: RexSpacing.xs) {
-                        HStack(spacing: RexSpacing.sm) {
-                            categoryBadge
-                            Spacer(minLength: RexSpacing.sm)
+                VStack(alignment: .leading, spacing: 0) {
+                    HStack(alignment: .top, spacing: RexSpacing.md) {
+                        thumbnail(item: item)
+
+                        VStack(alignment: .leading, spacing: RexSpacing.xs) {
+                            Text(item.title)
+                                .font(RexFont.display(17, weight: .semibold))
+                                .foregroundStyle(RexColor.foreground)
+                                .lineLimit(1)
+                                .truncationMode(.tail)
+                                // Room for the floating blast/want/rating badge
+                                // sharing this same corner now that it's an
+                                // overlay rather than its own row above — sized
+                                // to whichever of those is actually showing, so
+                                // a plain rated Rex (just a small emoji) doesn't
+                                // lose title width it doesn't need to.
+                                .padding(.trailing, titleTrailingReserve)
+
+                            if let subtitle = item.subtitle, !subtitle.isEmpty {
+                                if category == .book, let onBookAuthorTap {
+                                    bookSubtitleRow(subtitle, onTap: onBookAuthorTap)
+                                } else {
+                                    Text(subtitle)
+                                        .font(RexFont.text(13))
+                                        .foregroundStyle(RexColor.mutedForeground)
+                                        .lineLimit(1)
+                                }
+                            }
+
+                            // "Move the category tag under the name as well, next
+                            // to the sub category tags (to the left though so
+                            // category comes first)" — categoryBadge used to live
+                            // in the header row up top; it moved down here, first
+                            // in line, ahead of the genre/subcategory tags that
+                            // already relocated here for the same "under the
+                            // title" reason (#136 → reference design).
+                            HStack(spacing: RexSpacing.xs) {
+                                categoryBadge
+                                ForEach(splitGenres(item.genre).prefix(3), id: \.self) { genre in
+                                    Text(genre)
+                                        .font(.system(size: 10, weight: .medium))
+                                        .foregroundStyle(RexColor.mutedForeground)
+                                        .padding(.horizontal, RexSpacing.sm)
+                                        .padding(.vertical, 3)
+                                        .background(RexColor.muted)
+                                        .clipShape(Capsule())
+                                        .lineLimit(1)
+                                }
+                            }
+                            .padding(.top, 2)
+
+                            // "The place should be under the tags, not the
+                            // thumbnail — there isn't space." Back inside the
+                            // text column (the thumbnail's fixed 60pt height is
+                            // routinely shorter than title+tags, so "under the
+                            // thumbnail" as a full-width row landed well past
+                            // it, not tight beneath it as intended) — right
+                            // after the tags row, same as everything else here.
+                            if let locality = shortLocality(item.address) {
+                                let canViewOnMap = onViewOnMap != nil && (category == .place || category == .event)
+                                HStack(spacing: 3) {
+                                    Image(systemName: "mappin")
+                                        .font(.system(size: 9))
+                                    Text(locality)
+                                        .font(RexFont.text(12, weight: .medium))
+                                        .lineLimit(1)
+                                }
+                                .foregroundStyle(RexColor.mutedForeground)
+                                .padding(.top, 2)
+                                // "Don't need pin and map icon — just keep the
+                                // pin, make the whole location clickable." No
+                                // second icon any more; the tap target is the
+                                // whole row instead of a dedicated glyph.
+                                .contentShape(Rectangle())
+                                .onTapGesture {
+                                    if canViewOnMap { onViewOnMap?(rec.item_id) }
+                                }
+                            }
+
+                            if let note = rec.note, !note.isEmpty {
+                                VStack(alignment: .leading, spacing: 2) {
+                                    // Links people paste into a note become
+                                    // tappable rather than dead text.
+                                    Text(linkified("\u{201C}\(note)\u{201D}"))
+                                        .font(RexFont.text(14))
+                                        .foregroundStyle(RexColor.foreground.opacity(0.88))
+                                        .tint(RexColor.primary)
+                                        .lineLimit(noteExpanded ? nil : 3)
+                                        .fixedSize(horizontal: false, vertical: true)
+                                    // Only offer to expand when there's more to see.
+                                    if !noteExpanded, note.count > 140 {
+                                        Text("Read more")
+                                            .font(RexFont.text(12, weight: .semibold))
+                                            .foregroundStyle(RexColor.primary)
+                                    }
+                                }
+                                .padding(.top, RexSpacing.xs)
+                                .contentShape(Rectangle())
+                                .onTapGesture {
+                                    if note.count > 140 {
+                                        withAnimation(.snappy) { noteExpanded.toggle() }
+                                    }
+                                }
+                            }
+
+                            TaggedFriendsRow(friends: rec.taggedFriends)
+                                .padding(.top, RexSpacing.xs)
+
+                            rexdByRow
+
+                            if let tags = rec.tags, !tags.isEmpty {
+                                // Neutral, not green — tags aren't an accent surface.
+                                HStack(spacing: RexSpacing.xs) {
+                                    ForEach(tags.prefix(3), id: \.self) { tag in
+                                        Text("#\(tag)")
+                                            .font(RexFont.text(11, weight: .medium))
+                                            .foregroundStyle(RexColor.badgeForeground)
+                                            .padding(.horizontal, RexSpacing.sm)
+                                            .padding(.vertical, 3)
+                                            .background(RexColor.badgeBackground)
+                                            .clipShape(Capsule())
+                                    }
+                                }
+                                .padding(.top, RexSpacing.xs)
+                            }
+                        }
+                    }
+                    // Has to come BEFORE the .overlay below, not after: overlay
+                    // aligns to whatever size its content already reports at
+                    // the point it's attached, so a frame stretch applied
+                    // afterwards would just leave the whole (HStack+overlay)
+                    // pair sitting left-aligned in extra empty space, rather
+                    // than actually moving the overlay itself rightward — which
+                    // is exactly the "floating in the middle" bug this line
+                    // fixes. Widening the HStack FIRST means the overlay's own
+                    // topTrailing is computed against the true full-width edge.
+                    //
+                    // Also fixes "make sure the title is top-aligned to the
+                    // card": the blast/want/rating badge used to sit inline
+                    // above the title as its own row, which meant the title —
+                    // not that row — was what needed to line up with the
+                    // thumbnail's top edge, and didn't. Floating it instead
+                    // frees the title to be the text column's first, top-
+                    // aligned element.
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .overlay(alignment: .topTrailing) {
+                        HStack(spacing: 4) {
                             // A blast is a question, not a verdict.
                             if rec.isBlast {
                                 HStack(spacing: 4) {
@@ -73,175 +232,70 @@ struct RecommendationCardView: View {
                                 }
                                 .foregroundStyle(RexColor.mutedForeground)
                             }
-                            // Rating is an "important element" — one of the
-                            // few places the spec allows forest green. Emoji
-                            // only here: the header row already carries the
-                            // category and genre badges, and a full label
-                            // ("Do not Rex") ran under the edit-pencil overlay
-                            // in the corner. The word appears on the detail
+                            // Rating is an "important element" — one of the few
+                            // places the spec allows forest green. Emoji only
+                            // here: there's no room for a full label ("Do not
+                            // Rex") this close to the floating edit-pencil in
+                            // the same corner. The word appears on the detail
                             // screen instead, where there's room for it.
                             if rec.rating > 0 {
                                 RexRatingBadge(raw: rec.rating, compact: true)
                             }
                         }
                         // Your own cards get an edit-pencil floating in this
-                        // exact corner (EditableIfMine, applied outside this
-                        // view) — without this, anything flush-right here
-                        // rendered underneath the opaque pencil circle and
-                        // just vanished.
+                        // exact corner too (EditableIfMine, applied outside this
+                        // view) — clearance so the two don't overlap. No extra
+                        // top/trailing inset needed beyond that: the HStack
+                        // this overlay hangs off gets the same .padding(
+                        // cardPadding) as everything else below, which already
+                        // insets the whole thing (overlay included) from the
+                        // card's edges.
                         .padding(.trailing, 26)
+                    }
+                    .padding(RexSpacing.cardPadding)
 
-                        Text(item.title)
-                            .font(RexFont.display(19, weight: .semibold))
-                            .foregroundStyle(RexColor.foreground)
-                            .lineLimit(2)
-                            .fixedSize(horizontal: false, vertical: true)
+                    if let photos = rec.photo_urls, !photos.isEmpty {
+                        PhotoCarouselView(urls: photos, height: 280, cornerRadius: 0)
+                            .padding(.bottom, RexSpacing.sm)
+                            // #120: without this, a swipe started on the photo
+                            // itself was captured by the enclosing
+                            // SwipeToRemove (when this card is your own, in the
+                            // feed) as a delete-swipe instead of paging photos.
+                            .swipeToRemoveExclusionZone()
+                    } else if category == .trip {
+                        // A trip has no photos of its own — its stops do — so in
+                        // that empty-carousel slot show where the trip actually
+                        // goes instead. rec.id is the trip's own recommendation
+                        // row, which is exactly what every stop's trip_id points
+                        // back to.
+                        TripMapTileView(tripRecommendationId: rec.id)
+                            .padding(.bottom, RexSpacing.sm)
+                            .swipeToRemoveExclusionZone()
+                    }
 
-                        if let subtitle = item.subtitle, !subtitle.isEmpty {
-                            if category == .book, let onBookAuthorTap {
-                                bookSubtitleRow(subtitle, onTap: onBookAuthorTap)
-                            } else {
-                                Text(subtitle)
-                                    .font(RexFont.text(13))
-                                    .foregroundStyle(RexColor.mutedForeground)
-                                    .lineLimit(1)
-                            }
-                        }
+                    Rectangle()
+                        .fill(RexColor.divider)
+                        .frame(height: 1)
 
-                        // Whereabouts, at a glance. "Is it near me?" is the
-                        // first question about a place and the full address is
-                        // too long to scan, so this is the useful middle bit:
-                        // Peckham, or Bristol.
-                        if let locality = shortLocality(item.address) {
-                            let canViewOnMap = onViewOnMap != nil && (category == .place || category == .event)
-                            HStack(spacing: 3) {
-                                Image(systemName: canViewOnMap ? "mappin.circle.fill" : "mappin")
-                                    .font(.system(size: canViewOnMap ? 11 : 9))
-                                Text(locality)
-                                    .font(RexFont.text(12, weight: .medium))
-                                    .lineLimit(1)
-                                if canViewOnMap {
-                                    Text("· View on map")
-                                        .font(RexFont.text(11, weight: .semibold))
-                                }
-                            }
-                            .foregroundStyle(canViewOnMap ? RexColor.primary : RexColor.mutedForeground)
-                            .contentShape(Rectangle())
-                            .onTapGesture {
-                                if canViewOnMap { onViewOnMap?(rec.item_id) }
-                            }
-                        }
-
-                        if let note = rec.note, !note.isEmpty {
-                            VStack(alignment: .leading, spacing: 2) {
-                                // Links people paste into a note become
-                                // tappable rather than dead text.
-                                Text(linkified("\u{201C}\(note)\u{201D}"))
-                                    .font(RexFont.text(14))
-                                    .foregroundStyle(RexColor.foreground.opacity(0.88))
-                                    .tint(RexColor.primary)
-                                    .lineLimit(noteExpanded ? nil : 3)
-                                    .fixedSize(horizontal: false, vertical: true)
-                                // Only offer to expand when there's more to see.
-                                if !noteExpanded, note.count > 140 {
-                                    Text("Read more")
-                                        .font(RexFont.text(12, weight: .semibold))
-                                        .foregroundStyle(RexColor.primary)
-                                }
-                            }
-                            .padding(.top, RexSpacing.xs)
-                            .contentShape(Rectangle())
-                            .onTapGesture {
-                                if note.count > 140 {
-                                    withAnimation(.snappy) { noteExpanded.toggle() }
-                                }
-                            }
-                        }
-
-                        TaggedFriendsRow(friends: rec.taggedFriends)
-                            .padding(.top, RexSpacing.xs)
-
-                        rexdByRow
-
-                        // Genre tags: what kind of place/book/etc it is,
-                        // e.g. Restaurant · Bar. #136 moved these from
-                        // .first to up to 3, which then crowded the header
-                        // row above (categoryBadge + blast/want indicator +
-                        // rating badge + the floating edit-pencil) badly
-                        // enough to truncate mid-word. Kathryn flagged it
-                        // with a screenshot and asked for them down here
-                        // instead, alongside the #hashtags row rather than
-                        // competing for space up top.
-                        if !splitGenres(item.genre).isEmpty {
-                            HStack(spacing: RexSpacing.xs) {
-                                ForEach(splitGenres(item.genre).prefix(3), id: \.self) { genre in
-                                    Text(genre)
-                                        .font(.system(size: 10, weight: .medium))
-                                        .foregroundStyle(RexColor.mutedForeground)
-                                        .padding(.horizontal, RexSpacing.sm)
-                                        .padding(.vertical, 3)
-                                        .background(RexColor.muted)
-                                        .clipShape(Capsule())
-                                        .lineLimit(1)
-                                }
-                            }
-                            .padding(.top, RexSpacing.xs)
-                        }
-
-                        if let tags = rec.tags, !tags.isEmpty {
-                            // Neutral, not green — tags aren't an accent surface.
-                            HStack(spacing: RexSpacing.xs) {
-                                ForEach(tags.prefix(3), id: \.self) { tag in
-                                    Text("#\(tag)")
-                                        .font(RexFont.text(11, weight: .medium))
-                                        .foregroundStyle(RexColor.badgeForeground)
-                                        .padding(.horizontal, RexSpacing.sm)
-                                        .padding(.vertical, 3)
-                                        .background(RexColor.badgeBackground)
-                                        .clipShape(Capsule())
-                                }
-                            }
-                            .padding(.top, RexSpacing.xs)
+                    HStack(spacing: RexSpacing.sm) {
+                        authorRow
+                        Spacer(minLength: RexSpacing.sm)
+                        // "You should still have all the icons in the bottom
+                        // right of the card" for a want, same as any other
+                        // Rex — RexCardActions itself hides just the two
+                        // (like/comment) that have no real row to attach to
+                        // for a want, per Kathryn's call, and keeps
+                        // dino-count + bookmark working since those key off
+                        // the item rather than a recommendation row. Blasts
+                        // are a genuinely different, questions-not-Rex
+                        // shape, so they're still excluded outright.
+                        if !rec.isBlast {
+                            RexCardActions(rec: rec, rexCount: rexCount, onCommentTap: onCommentTap)
                         }
                     }
+                    .padding(.horizontal, RexSpacing.cardPadding)
+                    .padding(.vertical, RexSpacing.md)
                 }
-                .padding(RexSpacing.cardPadding)
-
-                if let photos = rec.photo_urls, !photos.isEmpty {
-                    PhotoCarouselView(urls: photos, height: 200, cornerRadius: 0)
-                        .padding(.bottom, RexSpacing.sm)
-                        // #120: without this, a swipe started on the photo
-                        // itself was captured by the enclosing
-                        // SwipeToRemove (when this card is your own, in the
-                        // feed) as a delete-swipe instead of paging photos.
-                        .swipeToRemoveExclusionZone()
-                } else if category == .trip {
-                    // A trip has no photos of its own — its stops do — so in
-                    // that empty-carousel slot show where the trip actually
-                    // goes instead. rec.id is the trip's own recommendation
-                    // row, which is exactly what every stop's trip_id points
-                    // back to.
-                    TripMapTileView(tripRecommendationId: rec.id)
-                        .padding(.bottom, RexSpacing.sm)
-                        .swipeToRemoveExclusionZone()
-                }
-
-                Rectangle()
-                    .fill(RexColor.divider)
-                    .frame(height: 1)
-
-                HStack(spacing: RexSpacing.sm) {
-                    authorRow
-                    Spacer(minLength: RexSpacing.sm)
-                    // Likes and comments key off a recommendation id, which a
-                    // want doesn't have — so those actions stay off until wants
-                    // and Rex share a table.
-                    if !rec.isWant && !rec.isBlast {
-                        RexCardActions(rec: rec, onCommentTap: onCommentTap)
-                    }
-                }
-                .padding(.horizontal, RexSpacing.cardPadding)
-                .padding(.vertical, RexSpacing.md)
             }
             .rexCard()
         )
@@ -338,11 +392,12 @@ struct RecommendationCardView: View {
                 // aren't per-user.
                 .task { await RexAPI.shared.repairPlacePhotoIfNeeded(itemId: item.id, imageURL: urlString) }
             } else {
-                RexColor.muted.overlay(
-                    Image(systemName: category.symbol)
-                        .font(.system(size: 18))
-                        .foregroundStyle(RexColor.mutedForeground)
-                )
+                // Kathryn's illustrated mascot, one per category, rather
+                // than a plain tinted SF Symbol tile.
+                Image(category.placeholderImageName)
+                    .resizable()
+                    .aspectRatio(contentMode: .fill)
+                    .background(RexColor.muted)
                 // #141 — backfill a thumbnail for pre-v10 Rex that predate
                 // any category having automatic photo lookup.
                 .task {

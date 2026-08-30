@@ -54,7 +54,7 @@ struct UserProfileView: View {
                         HStack(spacing: RexSpacing.sm) {
                             chip("All", active: filter == nil) { filter = nil }
                             ForEach(availableCategories, id: \.self) { c in
-                                chip(c.label, active: filter == c) {
+                                chip(c.pluralLabel, active: filter == c) {
                                     filter = (filter == c) ? nil : c
                                 }
                             }

@@ -428,7 +428,20 @@ struct RexMapView: View {
                     merged[want.id] = want
                 }
             }
-            places = Array(merged.values)
+            let allMerged = Array(merged.values)
+            // Show what's already geocoded immediately; anything still
+            // missing lat/lng gets repaired in the background and folded in
+            // as it resolves, rather than the map's first load waiting on
+            // the whole legacy backlog (see fetchMapPlaces' doc comment —
+            // this is the fix for "map takes ages to load").
+            places = allMerged.filter { $0.lat != nil && $0.lng != nil }
+            RexAPI.shared.repairMissingMapCoords(allMerged) { repaired in
+                if let idx = places.firstIndex(where: { $0.id == repaired.id }) {
+                    places[idx] = repaired
+                } else {
+                    places.append(repaired)
+                }
+            }
             let tripIds = Array(Set(places.flatMap { $0.tripIds }))
             tripTitles = (try? await RexAPI.shared.fetchTripTitles(recommendationIds: tripIds)) ?? [:]
         } catch {
@@ -469,16 +482,28 @@ struct RexMapView: View {
         }
     }
 
-    /// #167 — reverse-geocodes a long-pressed point into a real address,
-    /// then hands it to Add a Rex as a RexSearchHit, the same shape a
-    /// picked Google Places result takes (see AddRexView's custom init).
-    /// externalSource is its own tag rather than "google_places" — this is
-    /// a CLGeocoder reverse-geocode, not an actual Google Place match, and
-    /// createItem's (external_source, external_id) dedup lookup shouldn't
-    /// conflate the two.
+    /// #167, then "tap to Rex... only doesn't let you click on venues
+    /// (restaurants/cafes etc) only addresses" — CLGeocoder's reverse
+    /// geocode only ever resolves to a street address, never the business
+    /// at it, so long-pressing directly on a restaurant's icon added its
+    /// street address as the title instead of the restaurant's name. Now
+    /// tries RexSearch.nearby() first — the same Google Places catalogue
+    /// search() uses, ranked by distance with a tight radius — which finds
+    /// the actual venue under the pin; a real Places match, so it's tagged
+    /// "google_places" like any other search pick (same createItem dedup
+    /// path, same photo/rating/genre). Only falls back to the old
+    /// address-only CLGeocoder path (tagged "map_long_press", its own
+    /// external source so the dedup lookup doesn't conflate the two) when
+    /// nothing's within that radius — a genuinely venue-less spot, the
+    /// middle of a park or a random field.
     private func resolveLongPress(_ coordinate: CLLocationCoordinate2D) async {
         isResolvingLongPress = true
         longPressError = nil
+        if let hit = await RexSearch.nearby(lat: coordinate.latitude, lng: coordinate.longitude) {
+            isResolvingLongPress = false
+            pendingPlaceHit = hit
+            return
+        }
         let location = CLLocation(latitude: coordinate.latitude, longitude: coordinate.longitude)
         let placemark = try? await CLGeocoder().reverseGeocodeLocation(location).first
         isResolvingLongPress = false
@@ -609,7 +634,9 @@ struct RexMapView: View {
 
     private func errorState(_ message: String) -> some View {
         VStack(spacing: RexSpacing.sm) {
-            Image(systemName: "exclamationmark.triangle").font(.title).foregroundStyle(RexColor.destructive)
+            // Kathryn's dejected-Rex illustration, standard for any error
+            // state across the app, rather than a plain SF Symbol triangle.
+            Image("RexErrorState").resizable().scaledToFit().frame(width: 96, height: 96)
             Text(message).font(RexFont.text(13)).foregroundStyle(RexColor.mutedForeground).multilineTextAlignment(.center)
             Button("Retry") { Task { await load() } }
                 .font(RexFont.text(13, weight: .semibold))

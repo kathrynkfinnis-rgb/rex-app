@@ -16,7 +16,17 @@ struct PhotoCarouselView: View {
                     ForEach(Array(urls.enumerated()), id: \.offset) { i, url in
                         AsyncImage(url: URL(string: url)) { phase in
                             if let image = phase.image {
-                                image.resizable().aspectRatio(contentMode: .fill)
+                                // Was .fill — a portrait photo in this wide,
+                                // fixed-height strip meant scaling up to
+                                // cover the full width, which pushed a
+                                // sizeable chunk (often what read as "the
+                                // bottom third") outside the frame and
+                                // straight into .clipped()'s crop. .fit
+                                // shows the whole photo, letterboxed on
+                                // RexColor.muted rather than cropped.
+                                RexColor.muted.overlay(
+                                    image.resizable().aspectRatio(contentMode: .fit)
+                                )
                             } else if phase.error != nil {
                                 RexColor.muted.overlay(
                                     Image(systemName: "photo")
@@ -49,6 +59,14 @@ struct PhotoCarouselView: View {
             }
             .frame(height: height)
             .clipShape(RoundedRectangle(cornerRadius: cornerRadius, style: .continuous))
+            // "You can no longer swipe through the carousel photos on a
+            // card because it takes you to delete when you swipe right" —
+            // SwipeToRemove already has a full exclusion-zone mechanism
+            // built specifically for this (#120/#111, see its own doc
+            // comment), this view just never actually called it, so the
+            // zone it reads was always nil and every carousel swipe still
+            // went to the card's delete action instead of paging.
+            .swipeToRemoveExclusionZone()
         }
     }
 }

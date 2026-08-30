@@ -1,6 +1,10 @@
 import SwiftUI
 
 struct NotificationsRoute: Hashable {}
+/// "I would prefer the profile to always be a new screen. not a pop up. in
+/// an existing screen." — was a `.sheet`; pushed onto this stack now
+/// instead, same as everywhere else Feed navigates to.
+struct ProfileRoute: Hashable {}
 
 struct FeedView: View {
     var onSignedOut: () -> Void
@@ -24,15 +28,12 @@ struct FeedView: View {
     @State private var recommendations: [FeedRecommendation] = []
     @State private var isLoading = true
     @State private var errorMessage: String?
-    /// A sheet, not a NavigationLink push — see the comment on the avatar
-    /// button for why.
-    @State private var showingProfile = false
-    @State private var filter: RexCategory?
+    /// Was a single optional category — "filter two things at once, ie if
+    /// you're only interested in books and films" needed real multi-select,
+    /// not a picker that replaces itself on every tap.
+    @State private var selectedCategories: Set<RexCategory> = []
     @State private var subFilter: String?
     @State private var blastsOnly = false
-    /// Independent of category/genre — "Loved places" and "Loved books" are
-    /// both valid, so this doesn't get cleared when the category changes.
-    @State private var ratingFilter: RexRatingTier?
     private enum SortMode { case recent, mostLiked }
     @State private var sortMode: SortMode = .recent
     @State private var likeCounts: [String: Int] = [:]
@@ -72,17 +73,12 @@ struct FeedView: View {
     /// same honest outcome without the disappearing-button confusion.
     private var availableCategories: [RexCategory] { rexAllCategories }
 
-    /// Only the tiers actually represented, same reasoning as
-    /// availableCategories — no point offering a filter that would empty
-    /// the feed.
-    private var availableRatingTiers: [RexRatingTier] {
-        let present = Set(recommendations.filter { $0.rating > 0 }.map { RexRatingTier.tier(forRaw: $0.rating) })
-        return RexRatingTier.allCases.filter { present.contains($0) }
-    }
-
-    /// Subcategories (genres) within the selected category, mirroring the web.
+    /// Subcategories (genres) within the selected category, mirroring the
+    /// web. Only offered for a single selected category — genre doesn't
+    /// mean the same thing across, say, Books and Films at once, so this
+    /// stays out of the way once more than one category is picked.
     private var availableSubcategories: [String] {
-        guard let filter else { return [] }
+        guard selectedCategories.count == 1, let filter = selectedCategories.first else { return [] }
         var set = Set<String>()
         for rec in recommendations where RexCategory(rawType: rec.items?.type) == filter {
             for genre in splitGenres(rec.items?.genre) { set.insert(genre) }
@@ -111,7 +107,7 @@ struct FeedView: View {
     /// on top of that just hides the thing you searched for.
     private var visible: [FeedRow] {
         let rows = sorted
-        guard filter == nil, subFilter == nil, !blastsOnly, ratingFilter == nil,
+        guard selectedCategories.isEmpty, subFilter == nil, !blastsOnly,
               query.trimmingCharacters(in: .whitespaces).isEmpty
         else { return rows.map { FeedRow.rex($0) } }
         var out: [FeedRow] = []
@@ -141,15 +137,9 @@ struct FeedView: View {
     private var matching: [FeedRecommendation] {
         (filteredRecommendations ?? recommendations).filter { rec in
             if blastsOnly { return rec.isBlast }
-            if rec.isBlast { return filter == nil } // never in a category filter
-            if let filter, RexCategory(rawType: rec.items?.type) != filter { return false }
+            if rec.isBlast { return selectedCategories.isEmpty } // never in a category filter
+            if !selectedCategories.isEmpty, !selectedCategories.contains(RexCategory(rawType: rec.items?.type)) { return false }
             if let subFilter, !splitGenres(rec.items?.genre).contains(subFilter) { return false }
-            // Wants and blasts have no rating to bucket into a tier, so a
-            // rating filter naturally hides them rather than matching by
-            // accident on the zero sentinel.
-            if let ratingFilter {
-                guard rec.rating > 0, RexRatingTier.tier(forRaw: rec.rating) == ratingFilter else { return false }
-            }
             if !query.trimmingCharacters(in: .whitespaces).isEmpty {
                 let q = query.lowercased()
                 let haystack = [
@@ -228,7 +218,7 @@ struct FeedView: View {
         // deliberately narrowed things down, collapsing duplicates again on
         // top of that risks reading as "my search lost the result" even
         // though the match is technically still folded into the footer.
-        let noActiveFilter = filter == nil && subFilter == nil && !blastsOnly && ratingFilter == nil
+        let noActiveFilter = selectedCategories.isEmpty && subFilter == nil && !blastsOnly
             && query.trimmingCharacters(in: .whitespaces).isEmpty
         let deduped = noActiveFilter ? collapseDuplicateItems(base) : base
         var tagged: [FeedRecommendation] = []
@@ -263,10 +253,11 @@ struct FeedView: View {
                 RexColor.background.ignoresSafeArea()
 
                 ScrollView {
-                    LazyVStack(spacing: RexSpacing.betweenCards) {
-                        header
+                    LazyVStack(spacing: RexSpacing.betweenCards, pinnedViews: [.sectionHeaders]) {
+                        topBar
                             .id("top")
 
+                        Section {
                         if isLoading {
                             ForEach(0..<3, id: \.self) { _ in
                                 RoundedRectangle(cornerRadius: RexRadius.card)
@@ -291,7 +282,7 @@ struct FeedView: View {
                         } else if visible.isEmpty {
                             noMatchesState
                         } else {
-                            if filter == nil && subFilter == nil && query.isEmpty {
+                            if selectedCategories.isEmpty && subFilter == nil && query.isEmpty {
                                 askForRexCard
                             }
                             ForEach(visible) { row in
@@ -384,6 +375,9 @@ struct FeedView: View {
                               }
                             }
                         }
+                        } header: {
+                            filterChipsBar
+                        }
                     }
                     .padding(.horizontal, RexSpacing.page)
                     .padding(.bottom, RexSpacing.xxl)
@@ -410,6 +404,9 @@ struct FeedView: View {
             .navigationDestination(for: NotificationsRoute.self) { _ in
                 NotificationsView()
             }
+            .navigationDestination(for: NotificationPreferencesRoute.self) { _ in
+                NotificationPreferencesView()
+            }
             .navigationDestination(for: AuthorRoute.self) { r in
                 AuthorBooksView(route: r)
             }
@@ -422,6 +419,19 @@ struct FeedView: View {
             .navigationDestination(for: AskRoute.self) { _ in
                 AskForRexView()
             }
+            // Aug 30 — the Profile blank-warning-triangle bug: this one
+            // used to sit after the .sheet modifiers below, OUTSIDE this
+            // NavigationStack's own content closure — every other
+            // navigationDestination here is inside it. A
+            // navigationDestination declared after a .sheet in the same
+            // modifier chain silently fails to register (a known SwiftUI
+            // gotcha), so pushing ProfileRoute had no matching destination
+            // to find; SwiftUI's fallback for that is exactly the bare
+            // yellow warning-triangle glyph this bug reports. Moving it up
+            // here, alongside its siblings, is the fix.
+            .navigationDestination(for: ProfileRoute.self) { _ in
+                ProfileView(onSignedOut: onSignedOut, path: $path)
+            }
             .toolbar { feedToolbarContent }
         }
         .tint(RexColor.primary)
@@ -429,7 +439,7 @@ struct FeedView: View {
             path = NavigationPath()
             withAnimation { scrolledRowID = "top" }
         }
-        .onChange(of: filter) { _, _ in scheduleFilteredFetch() }
+        .onChange(of: selectedCategories) { _, _ in scheduleFilteredFetch() }
         .onChange(of: query) { _, _ in scheduleFilteredFetch(debounced: true) }
         .onChange(of: addRexRefreshSignal) { _, _ in Task { await loadFeed() } }
         // Popping back to the feed root (e.g. from Notifications, after
@@ -437,7 +447,14 @@ struct FeedView: View {
         // cheap enough to just refetch rather than plumb a callback through.
         .onChange(of: path) { _, newValue in
             if newValue.isEmpty {
-                Task { unreadNotificationCount = await RexAPI.shared.fetchUnreadNotificationCount() }
+                // Was Profile's own sheet onDismiss — now that it's pushed
+                // onto this same path instead, popping back to root is the
+                // equivalent moment (also covers returning from Notifications,
+                // Drafts, etc., which is a fine superset of the old behavior).
+                Task {
+                    unreadNotificationCount = await RexAPI.shared.fetchUnreadNotificationCount()
+                    await loadFeed()
+                }
             }
         }
         .task {
@@ -456,9 +473,6 @@ struct FeedView: View {
         }
         .sheet(item: $addingToTrip) { rec in
             AddToTripView(itemId: rec.item_id, itemTitle: rec.items?.title ?? "This place", onDone: {})
-        }
-        .sheet(isPresented: $showingProfile, onDismiss: { Task { await loadFeed() } }) {
-            ProfileView(onSignedOut: onSignedOut)
         }
     }
 
@@ -554,19 +568,18 @@ struct FeedView: View {
                 }
                 .accessibilityLabel(unreadNotificationCount > 0 ? "Notifications, unread" : "Notifications")
 
-                // Your own picture, not a generic glyph. A sheet
-                // rather than a NavigationLink push deliberately —
-                // ProfileView owns its own NavigationStack (needed
-                // so a swiped row can push onto a real bound path
-                // when Profile is the tab root), and pushing it
-                // inside Feed's NavigationStack nested one
-                // NavigationStack inside another. That's explicitly
-                // unsupported in SwiftUI and rendered as a blank
-                // screen with a dead back button — a real bug this
-                // session caught, not a hypothetical. A sheet is its
-                // own presentation context, so there's no nesting.
+                // Your own picture, not a generic glyph. Pushed onto
+                // this same stack now — "I would prefer the profile
+                // to always be a new screen. not a pop up." Used to
+                // be a sheet specifically because ProfileView owned
+                // its own separate NavigationStack (nesting one
+                // NavigationStack inside another is unsupported in
+                // SwiftUI, a real blank-screen-and-dead-back-button
+                // bug this session already hit once) — ProfileView
+                // no longer does that (see its `path` doc comment),
+                // so pushing it here is safe now.
                 Button {
-                    showingProfile = true
+                    path.append(ProfileRoute())
                 } label: {
                     UserAvatarView(
                         url: myProfile?.avatar_url,
@@ -579,7 +592,7 @@ struct FeedView: View {
         }
     }
 
-    private var header: some View {
+    private var topBar: some View {
         VStack(alignment: .leading, spacing: RexSpacing.md) {
             // No "Your feed" heading — the feed is the home screen, so naming
             // it just eats vertical space above the content.
@@ -617,36 +630,44 @@ struct FeedView: View {
             if searchFocused && query.isEmpty {
                 inspirationPanel
             }
+        }
+        .padding(.top, RexSpacing.sm)
+    }
 
+    /// Split out of what used to be one `header` view — "the filter bar
+    /// [should] pop back up when you scroll up so that you can filter
+    /// without having to go right back to the top of your feed". Pinned
+    /// as a Section header (see body) instead: rather than a hide-on-
+    /// scroll-down/reveal-on-scroll-up animation, which needs its own
+    /// scroll-offset tracking to get right, this just stays put once
+    /// you've scrolled to it, the same way a table's section headers do —
+    /// solves the same "don't lose access to the filters" complaint with
+    /// a much simpler, sturdier mechanism.
+    private var filterChipsBar: some View {
+        VStack(alignment: .leading, spacing: RexSpacing.md) {
             if !availableCategories.isEmpty {
                 ScrollView(.horizontal, showsIndicators: false) {
                     HStack(spacing: RexSpacing.sm) {
-                        filterChip(title: "All", isActive: filter == nil && !blastsOnly && ratingFilter == nil) {
-                            filter = nil; subFilter = nil; blastsOnly = false; ratingFilter = nil
+                        filterChip(title: "All", isActive: selectedCategories.isEmpty && !blastsOnly) {
+                            selectedCategories = []; subFilter = nil; blastsOnly = false
                         }
                         if recommendations.contains(where: \.isBlast) {
                             filterChip(title: "Blasts", isActive: blastsOnly) {
                                 blastsOnly.toggle()
-                                filter = nil; subFilter = nil
+                                selectedCategories = []; subFilter = nil
                             }
                         }
+                        // Toggles membership rather than replacing the
+                        // selection — "should be able to filter two things
+                        // at once, ie books and films".
                         ForEach(availableCategories, id: \.self) { category in
-                            filterChip(title: category.label, isActive: filter == category) {
-                                filter = (filter == category) ? nil : category
+                            filterChip(title: category.pluralLabel, isActive: selectedCategories.contains(category)) {
+                                if selectedCategories.contains(category) {
+                                    selectedCategories.remove(category)
+                                } else {
+                                    selectedCategories.insert(category)
+                                }
                                 subFilter = nil; blastsOnly = false
-                            }
-                        }
-                    }
-                    .padding(.horizontal, 1)
-                }
-            }
-
-            if !availableRatingTiers.isEmpty {
-                ScrollView(.horizontal, showsIndicators: false) {
-                    HStack(spacing: RexSpacing.sm) {
-                        ForEach(availableRatingTiers) { tier in
-                            filterChip(title: "\(tier.emoji) \(tier.label)", isActive: ratingFilter == tier, small: true) {
-                                ratingFilter = (ratingFilter == tier) ? nil : tier
                             }
                         }
                     }
@@ -667,7 +688,11 @@ struct FeedView: View {
                 }
             }
         }
-        .padding(.top, RexSpacing.sm)
+        .padding(.vertical, RexSpacing.sm)
+        // Opaque, not just a color fill with default blending — this sits
+        // pinned above cards scrolling underneath it once you're past the
+        // top, so it needs to actually hide them, not let them show through.
+        .background(RexColor.background)
     }
 
     private var askForRexCard: some View {
@@ -810,9 +835,14 @@ struct FeedView: View {
             path.append(BlastRoute(requestId: requestId, title: rec.items?.title ?? "Blast"))
             return
         }
-        // A want isn't backed by a real item either, and has no responses
-        // mechanism of its own — nowhere to push to.
-        guard !rec.isWant else { return }
+        // "also can't click on a 'want to try'" — a want has no responses
+        // mechanism of its own, but it does point at a real catalogue item
+        // (the place/book/etc. someone wants to try), so there's a real
+        // item screen to show — friends' actual Rex of it, if any, same as
+        // tapping through from any other card. This guard predates wants
+        // reliably showing in the feed at all (see #184's fetchWantsFeed
+        // fix), written back when the question of "what happens when you
+        // tap one" barely came up in practice.
         switch RexCategory(rawType: rec.items?.type) {
         case .trip:
             path.append(TripRoute(recommendationId: rec.id, title: rec.items?.title ?? "Trip"))
@@ -840,9 +870,15 @@ struct FeedView: View {
     /// keystroke, immediate for a category chip tap.
     private func scheduleFilteredFetch(debounced: Bool = false) {
         filterFetchTask?.cancel()
-        let category = filter?.rawValue
+        // One category string per selected chip — fetchFeed/fetchWantsFeed
+        // only ever take one category each (a plain items.type=eq. filter
+        // server-side), so multi-select fans out one fetch per category
+        // and merges, the same shape the search path already uses to fan
+        // out one request per matched field. `[nil]` (no categories) still
+        // runs a single pass so search-only filtering keeps working.
+        let categories: [String?] = selectedCategories.isEmpty ? [nil] : selectedCategories.map { $0.rawValue }
         let text = query.trimmingCharacters(in: .whitespaces)
-        guard category != nil || !text.isEmpty else {
+        guard !selectedCategories.isEmpty || !text.isEmpty else {
             filteredRecommendations = nil
             isLoadingFiltered = false
             return
@@ -853,12 +889,40 @@ struct FeedView: View {
                 if Task.isCancelled { return }
             }
             isLoadingFiltered = true
-            let result = try? await RexAPI.shared.fetchFeed(
-                category: category,
-                searchText: text.isEmpty ? nil : text
-            )
+            // #184 — this used to be fetchFeed() alone, which only ever
+            // queries recommendations: a want-to-try has no row there at
+            // all, so the moment a category chip or search query went
+            // active, every want vanished outright — reproduced concretely
+            // by adding one and then searching for it. fetchWantsFeed now
+            // takes the same category/searchText fetchFeed does, merged in
+            // here the same way loadFeed() merges wants into the unfiltered
+            // feed.
+            async let rexPages: [FeedRecommendation] = withTaskGroup(of: [FeedRecommendation].self) { group in
+                for category in categories {
+                    group.addTask { (try? await RexAPI.shared.fetchFeed(category: category, searchText: text.isEmpty ? nil : text)) ?? [] }
+                }
+                var all: [FeedRecommendation] = []
+                for await page in group { all.append(contentsOf: page) }
+                return all
+            }
+            async let wantsPages: [FeedRecommendation] = withTaskGroup(of: [FeedRecommendation].self) { group in
+                for category in categories {
+                    group.addTask { (try? await RexAPI.shared.fetchWantsFeed(category: category, searchText: text.isEmpty ? nil : text)) ?? [] }
+                }
+                var all: [FeedRecommendation] = []
+                for await page in group { all.append(contentsOf: page) }
+                return all
+            }
+            let rexResult = await rexPages
+            let wants = await wantsPages
             if Task.isCancelled { return }
-            filteredRecommendations = result ?? []
+            var seen = Set<String>()
+            var merged: [FeedRecommendation] = []
+            for rec in (rexResult + wants) where !seen.contains(rec.id) {
+                seen.insert(rec.id)
+                merged.append(rec)
+            }
+            filteredRecommendations = merged.sorted { $0.created_at > $1.created_at }
             // Regression from this fix itself: a filtered/searched card can
             // surface an item never in the original unfiltered 50-row page,
             // so rexCounts had nothing for it — "Also Rex'd by" silently
@@ -866,7 +930,7 @@ struct FeedView: View {
             // counts for whatever just loaded rather than replacing
             // rexCounts outright, so the unfiltered feed's own counts
             // (already showing) aren't lost switching back to it.
-            let itemIds = Array(Set((result ?? []).map { $0.item_id }))
+            let itemIds = Array(Set(merged.map { $0.item_id }))
             if let newCounts = try? await RexAPI.shared.fetchRexCounts(itemIds: itemIds) {
                 for (id, count) in newCounts { rexCounts[id] = count }
             }
@@ -949,9 +1013,12 @@ struct FeedView: View {
 
     private func errorState(_ message: String) -> some View {
         VStack(spacing: RexSpacing.sm) {
-            Image(systemName: "exclamationmark.triangle")
-                .font(.title)
-                .foregroundStyle(RexColor.destructive)
+            // Kathryn's dejected-Rex illustration, standard for any error
+            // state across the app, rather than a plain SF Symbol triangle.
+            Image("RexErrorState")
+                .resizable()
+                .scaledToFit()
+                .frame(width: 96, height: 96)
             Text(message)
                 .font(RexFont.text(13))
                 .foregroundStyle(RexColor.mutedForeground)

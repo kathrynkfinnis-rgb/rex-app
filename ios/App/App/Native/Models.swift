@@ -68,6 +68,19 @@ struct RexProfileDetail: Codable, Identifiable {
     let avatar_url: String?
 }
 
+/// One person who's Rex'd a given item — "the little rex icon ... should be
+/// clickable so you can see a list" (of who). A trimmed-down cousin of
+/// FeedRecommendation: just enough to show an avatar, a name (or nothing, if
+/// anonymous), and their rating in a simple list.
+struct RexerInfo: Codable, Identifiable {
+    let id: String
+    let user_id: String
+    let rating: Double
+    let created_at: String
+    let is_anonymous: Bool?
+    let profiles: RexProfile?
+}
+
 /// One row of the recommendation_tags join table, as PostgREST embeds it.
 struct RecommendationTagRow: Codable {
     let profiles: RexProfileDetail?

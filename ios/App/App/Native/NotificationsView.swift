@@ -84,8 +84,24 @@ struct NotificationsView: View {
                         .foregroundStyle(RexColor.primary)
                 }
             }
+            // "Please add the option to turn on push notifications from
+            // this page (as well as the profile page)" — Profile's own
+            // bell already links here (NotificationPreferencesRoute); this
+            // is the same destination, just reachable from the list of
+            // notifications itself too.
+            ToolbarItem(placement: .topBarTrailing) {
+                NavigationLink(value: NotificationPreferencesRoute()) {
+                    Image(systemName: "gearshape")
+                        .foregroundStyle(RexColor.foreground)
+                }
+            }
         }
-        .task { await load(markRead: false) }
+        // "Once I open this page, all of the unread notifications should
+        // appear read" — reverses the earlier deliberate choice below
+        // (kept on `refreshable`, where an unseen badge mid-session is
+        // still worth preserving; opening the screen itself is now treated
+        // as having seen everything on it).
+        .task { await load(markRead: true) }
         .alert("Couldn't update request", isPresented: Binding(
             get: { respondErrorMessage != nil },
             set: { if !$0 { respondErrorMessage = nil } }
@@ -277,8 +293,10 @@ struct NotificationsView: View {
         isLoading = false
     }
 
-    /// Explicit rather than automatic on open — marking everything read the
-    /// instant the screen appears means you lose track of what you hadn't seen.
+    /// Called automatically on open (see the .task above) as well as from
+    /// the explicit "Mark all read" button — kept as its own function
+    /// either way, since a pull-to-refresh mid-session still shouldn't
+    /// silently clear a badge you haven't actually opened the screen for.
     private func markAllRead() async {
         let unread = notifications.filter { $0.read_at == nil }.map(\.id)
         guard !unread.isEmpty else { return }

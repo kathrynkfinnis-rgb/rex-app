@@ -61,6 +61,10 @@ struct TripStopsBuilderView: View {
     var onImportedAsTrip: (() -> Void)? = nil
 
     @State private var showingDocImport = false
+    /// #183 — "pool all your Rex into a trip", the other way (besides
+    /// document import) to get a trip's stops pre-populated instead of
+    /// adding each one here by hand.
+    @State private var showingBuildFromRex = false
     @State private var adding = false
     @State private var type: RexCategory = .place
     @State private var title = ""
@@ -206,11 +210,38 @@ struct TripStopsBuilderView: View {
                     .clipShape(RoundedRectangle(cornerRadius: RexRadius.input, style: .continuous))
                 }
                 .buttonStyle(.plain)
+
+                // #183 — same "another way to pre-populate this trip's
+                // stops instead of adding each by hand" idea as the import
+                // link above, just pulling from places/events you've
+                // already Rex'd standalone rather than a pasted document.
+                Button {
+                    showingBuildFromRex = true
+                } label: {
+                    HStack(spacing: RexSpacing.sm) {
+                        Image(systemName: "square.stack.3d.up")
+                            .font(.system(size: 13))
+                        Text("Build a \(containerNoun) from your Rex")
+                            .font(RexFont.text(13, weight: .medium))
+                        Spacer()
+                    }
+                    .foregroundStyle(RexColor.primary)
+                    .padding(RexSpacing.md)
+                    .background(RexColor.badgeBackground)
+                    .clipShape(RoundedRectangle(cornerRadius: RexRadius.input, style: .continuous))
+                }
+                .buttonStyle(.plain)
             }
         }
         .sheet(isPresented: $showingDocImport) {
             ListsImportView(onDone: {
                 showingDocImport = false
+                onImportedAsTrip?()
+            })
+        }
+        .sheet(isPresented: $showingBuildFromRex) {
+            BuildTripFromRexView(onDone: {
+                showingBuildFromRex = false
                 onImportedAsTrip?()
             })
         }

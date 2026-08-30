@@ -39,6 +39,29 @@ struct EditRexView: View {
     /// creation. RecipeEditorView's own parse()/serialize() round-trip
     /// the same free-text format createItem already stores.
     @State private var recipeText: String
+    /// #183 — a place/event's address, and the coordinates geocoded from
+    /// it, used to only ever get set once (a live search pick at creation,
+    /// or the map's own self-heal). This is the first way to fix either
+    /// after the fact — a stop added by hand with a typo, a place that's
+    /// moved, or a pin that geocoded to the wrong branch entirely.
+    @State private var address: String
+    @State private var lat: Double?
+    @State private var lng: Double?
+    @State private var isGeocoding = false
+    @State private var geocodeError: String?
+    /// "When you go to edit one of your stops... it doesn't come up with
+    /// the ability to auto populate from Google etc" — AddRexView/
+    /// AddTripStopSheet both search-as-you-type against the same live
+    /// catalogue; editing only ever had a plain text field plus a manual
+    /// "re-check" against whatever's already typed. This is that same
+    /// live search, added here too.
+    @State private var addressHits: [RexSearchHit] = []
+    @State private var addressSearchTask: Task<Void, Never>?
+    /// #183 — AddRexView's own subcategory chips (e.g. Restaurant/Activity
+    /// for a place), stored as the same sorted comma-joined string
+    /// splitGenres() reads everywhere. Free-text here rather than
+    /// rebuilding that chip picker — same format, editable after the fact.
+    @State private var genre: String
     @State private var isSaving = false
     @State private var confirmDelete = false
     @State private var errorMessage: String?
@@ -47,6 +70,7 @@ struct EditRexView: View {
     private var offersLink: Bool {
         !([.book, .movie, .tv, .podcast, .list] as [RexCategory]).contains(category)
     }
+    private var offersAddress: Bool { category == .place || category == .event }
 
     /// wants and recommendations are two separate tables (see fetchWantsFeed) —
     /// a want has no rating, no photos, no tags of its own, so there's a real
@@ -74,6 +98,10 @@ struct EditRexView: View {
         _linkURL = State(initialValue: rec.items?.link_url ?? "")
         _taggedFriendIds = State(initialValue: Set(rec.taggedFriends.map { $0.id }))
         _recipeText = State(initialValue: rec.items?.recipe_text ?? "")
+        _address = State(initialValue: rec.items?.address ?? "")
+        _lat = State(initialValue: rec.items?.lat)
+        _lng = State(initialValue: rec.items?.lng)
+        _genre = State(initialValue: rec.items?.genre ?? "")
     }
 
     var body: some View {
@@ -120,6 +148,122 @@ struct EditRexView: View {
                                             .stroke(RexColor.border, lineWidth: 1)
                                     )
                             }
+                        }
+                    }
+
+                    // #183 — same shared-catalogue model as title/link:
+                    // fixes an address typo, or a place that's moved, for
+                    // everyone who's Rex'd it — not just this take. Coords
+                    // only ever move together with a fresh geocode, never
+                    // edited directly, so they can't drift out of sync with
+                    // whatever address is actually showing.
+                    if offersAddress {
+                        VStack(alignment: .leading, spacing: RexSpacing.sm) {
+                            Text("Address").font(RexFont.text(14, weight: .semibold))
+                            TextField("Address", text: $address, axis: .vertical)
+                                .font(RexFont.text(15))
+                                .padding(RexSpacing.md)
+                                .background(RexColor.card)
+                                .clipShape(RoundedRectangle(cornerRadius: RexRadius.input, style: .continuous))
+                                .overlay(
+                                    RoundedRectangle(cornerRadius: RexRadius.input, style: .continuous)
+                                        .stroke(RexColor.border, lineWidth: 1)
+                                )
+                                .onChange(of: address) { _, _ in scheduleAddressSearch() }
+
+                            if !addressHits.isEmpty {
+                                VStack(spacing: 0) {
+                                    ForEach(addressHits) { hit in
+                                        Button {
+                                            applyAddressHit(hit)
+                                        } label: {
+                                            VStack(alignment: .leading, spacing: 2) {
+                                                Text(hit.title)
+                                                    .font(RexFont.text(14, weight: .medium))
+                                                    .foregroundStyle(RexColor.foreground)
+                                                if let sub = hit.address ?? hit.subtitle, !sub.isEmpty {
+                                                    Text(sub)
+                                                        .font(RexFont.text(12))
+                                                        .foregroundStyle(RexColor.mutedForeground)
+                                                        .lineLimit(1)
+                                                }
+                                            }
+                                            .frame(maxWidth: .infinity, alignment: .leading)
+                                            .padding(RexSpacing.sm)
+                                            .contentShape(Rectangle())
+                                        }
+                                        .buttonStyle(.plain)
+                                        if hit.id != addressHits.last?.id {
+                                            Rectangle().fill(RexColor.divider).frame(height: 1)
+                                        }
+                                    }
+                                }
+                                .background(RexColor.card)
+                                .clipShape(RoundedRectangle(cornerRadius: RexRadius.input, style: .continuous))
+                                .overlay(
+                                    RoundedRectangle(cornerRadius: RexRadius.input, style: .continuous)
+                                        .stroke(RexColor.border, lineWidth: 1)
+                                )
+                            }
+
+                            HStack(spacing: RexSpacing.sm) {
+                                Button {
+                                    Task { await recheckLocation() }
+                                } label: {
+                                    if isGeocoding {
+                                        ProgressView().controlSize(.small)
+                                    } else {
+                                        Label("Re-check location", systemImage: "mappin.and.ellipse")
+                                    }
+                                }
+                                .font(RexFont.text(13, weight: .medium))
+                                .disabled(isGeocoding || address.trimmingCharacters(in: .whitespaces).isEmpty)
+                                if lat != nil, lng != nil {
+                                    Label("Pin set", systemImage: "checkmark.circle.fill")
+                                        .font(RexFont.text(12))
+                                        .foregroundStyle(RexColor.mutedForeground)
+                                }
+                            }
+                            // "This recheck location button doesn't work" —
+                            // it was correctly disabled (nothing to geocode
+                            // with an empty address — common for a
+                            // document-imported place, which never gets one
+                            // set at all, per #135), just silently, with no
+                            // way to tell "disabled, type an address first"
+                            // apart from "broken."
+                            if address.trimmingCharacters(in: .whitespaces).isEmpty {
+                                Text("Type an address above, then re-check to set the pin.")
+                                    .font(RexFont.text(12))
+                                    .foregroundStyle(RexColor.mutedForeground)
+                            }
+                            if let geocodeError {
+                                Text(geocodeError)
+                                    .font(RexFont.text(12))
+                                    .foregroundStyle(RexColor.destructive)
+                            }
+                        }
+                    }
+
+                    // #183 — "Type of place"/"Type" at creation (AddRexView's
+                    // FlowChips, keyed by rexSubcategories) was write-once
+                    // too. Free-text here rather than rebuilding that chip
+                    // picker, but same category gate and same comma-joined
+                    // format, so a value set either way reads back fine.
+                    if let options = rexSubcategories[category], !options.isEmpty {
+                        VStack(alignment: .leading, spacing: RexSpacing.sm) {
+                            Text("Subcategories").font(RexFont.text(14, weight: .semibold))
+                            TextField("e.g. \(options.first ?? "Type")", text: $genre)
+                                .font(RexFont.text(15))
+                                .padding(RexSpacing.md)
+                                .background(RexColor.card)
+                                .clipShape(RoundedRectangle(cornerRadius: RexRadius.input, style: .continuous))
+                                .overlay(
+                                    RoundedRectangle(cornerRadius: RexRadius.input, style: .continuous)
+                                        .stroke(RexColor.border, lineWidth: 1)
+                                )
+                            Text("Comma separated, same as when you first added it.")
+                                .font(RexFont.text(12))
+                                .foregroundStyle(RexColor.mutedForeground)
                         }
                     }
 
@@ -279,6 +423,54 @@ struct EditRexView: View {
         .tint(RexColor.primary)
     }
 
+    /// Same debounced search-as-you-type AddTripStopSheet's own address
+    /// field uses. category is always .place or .event here (offersAddress
+    /// gates the whole section on exactly those), matching what
+    /// RexSearch.search expects.
+    private func scheduleAddressSearch() {
+        addressSearchTask?.cancel()
+        let term = address
+        guard term.trimmingCharacters(in: .whitespaces).count >= 2 else { addressHits = []; return }
+        addressSearchTask = Task {
+            try? await Task.sleep(nanoseconds: 300_000_000)
+            if Task.isCancelled { return }
+            let results = await RexSearch.search(category: category, query: term)
+            if Task.isCancelled { return }
+            await MainActor.run { addressHits = results }
+        }
+    }
+
+    /// A picked suggestion already carries real coordinates — no need for
+    /// the separate "re-check" geocode round-trip a hand-typed address
+    /// still needs.
+    private func applyAddressHit(_ hit: RexSearchHit) {
+        address = hit.address ?? hit.title
+        if let hitLat = hit.lat, let hitLng = hit.lng {
+            lat = hitLat
+            lng = hitLng
+        }
+        addressHits = []
+        geocodeError = nil
+    }
+
+    /// #183 — re-geocodes whatever's currently typed in the address field.
+    /// Doesn't save anything itself (that's still "Save changes", same as
+    /// every other field here) — just updates lat/lng in memory so you can
+    /// see it worked (or didn't) before committing.
+    private func recheckLocation() async {
+        let trimmed = address.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { return }
+        isGeocoding = true
+        geocodeError = nil
+        if let located = await RexSearch.geocode(trimmed) {
+            lat = located.lat
+            lng = located.lng
+        } else {
+            geocodeError = "Couldn't find that address. You can still save the text as typed."
+        }
+        isGeocoding = false
+    }
+
     private func addTag() {
         let t = tagDraft.trimmingCharacters(in: .whitespaces).replacingOccurrences(of: "#", with: "")
         guard !t.isEmpty, !tags.contains(where: { $0.caseInsensitiveCompare(t) == .orderedSame }), tags.count < 8 else {
@@ -325,6 +517,18 @@ struct EditRexView: View {
             }
             if category == .recipe, recipeText != (rec.items?.recipe_text ?? "") {
                 try await RexAPI.shared.updateItemRecipeText(itemId: rec.item_id, recipeText: recipeText)
+            }
+            if offersAddress {
+                let trimmedAddress = address.trimmingCharacters(in: .whitespacesAndNewlines)
+                if trimmedAddress != (rec.items?.address ?? "") || lat != rec.items?.lat || lng != rec.items?.lng {
+                    try await RexAPI.shared.updateItemAddressAndCoords(itemId: rec.item_id, address: trimmedAddress, lat: lat, lng: lng)
+                }
+            }
+            if rexSubcategories[category] != nil {
+                let trimmedGenre = genre.trimmingCharacters(in: .whitespacesAndNewlines)
+                if trimmedGenre != (rec.items?.genre ?? "") {
+                    try await RexAPI.shared.updateItemGenre(itemId: rec.item_id, genre: trimmedGenre)
+                }
             }
 
             switch (wantRowId, wantToTry) {

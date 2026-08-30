@@ -246,12 +246,18 @@ struct CollectionsView: View {
             shelf(title: "Friends' Collections", systemImage: "person.2.fill") {
                 ForEach(matched.prefix(8)) { list in
                     let isMine = sharedWithMe.contains(where: { $0.id == list.id })
+                    let owner = list.user_id.flatMap { owners[$0] }
                     NavigationLink(value: CollectionRoute(listId: list.id, name: list.name, isMine: isMine)) {
                         shelfTile(
                             title: list.name,
                             count: (contents[list.id] ?? []).count,
                             emoji: list.emoji,
-                            authorInitial: list.user_id.flatMap { owners[$0] }.map { ($0.display_name ?? $0.username).prefix(1).uppercased() },
+                            authorInitial: owner.map { ($0.display_name ?? $0.username).prefix(1).uppercased() },
+                            // The corner badge alone was just an initial — no
+                            // way to tell which friend without tapping in.
+                            // "under Friends Collections it should say
+                            // who's collection it is."
+                            authorName: owner.map { $0.display_name ?? $0.username },
                             thumbnails: (contents[list.id] ?? []).compactMap { $0.recommendations?.items?.image_url }
                         )
                     }
@@ -294,6 +300,7 @@ struct CollectionsView: View {
         symbol: String? = nil,
         locked: Bool = false,
         authorInitial: String? = nil,
+        authorName: String? = nil,
         thumbnails: [String]
     ) -> some View {
         VStack(alignment: .leading, spacing: 6) {
@@ -345,9 +352,10 @@ struct CollectionsView: View {
                 .lineLimit(2)
                 .multilineTextAlignment(.leading)
                 .frame(height: 34, alignment: .top)
-            Text(count == 1 ? "1 item" : "\(count) items")
+            Text(authorName.map { "\(count == 1 ? "1 item" : "\(count) items") · \($0)" } ?? (count == 1 ? "1 item" : "\(count) items"))
                 .font(RexFont.text(11))
                 .foregroundStyle(RexColor.mutedForeground)
+                .lineLimit(1)
         }
         .frame(width: 128, alignment: .leading)
     }

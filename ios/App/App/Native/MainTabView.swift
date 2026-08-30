@@ -1,5 +1,47 @@
 import SwiftUI
 
+/// "View on map function via a button" (item detail page — RecommendationCardView's
+/// feed/profile cards already had one, per #133, but the full item page
+/// never did). focusMap lives on MainTabView (it switches tabs), while
+/// ItemDetailView is reached from a good half-dozen different navigation
+/// stacks (Feed, Profile, Trip, List, Explore, search…) via the same
+/// generic `.navigationDestination(for: String.self)` — threading a
+/// closure through every one of those call sites individually would be a
+/// lot of surface area for one button. An environment value instead: set
+/// once here, read wherever ItemDetailView happens to be reached from.
+private struct ViewOnMapKey: EnvironmentKey {
+    static let defaultValue: ((String) -> Void)? = nil
+}
+extension EnvironmentValues {
+    var viewOnMap: ((String) -> Void)? {
+        get { self[ViewOnMapKey.self] }
+        set { self[ViewOnMapKey.self] = newValue }
+    }
+}
+
+/// "Can we make the friends and collections boxes here both buttons that
+/// take you to your respective pages?" (Profile's stat row). Same
+/// environment-value shape as viewOnMap above, for the same reason:
+/// ProfileView is reached both as MainTabView's own tag(5) and pushed from
+/// inside FeedView's own stack, and this way it doesn't matter which —
+/// the closure is set once, here.
+private struct GoToFriendsKey: EnvironmentKey {
+    static let defaultValue: (() -> Void)? = nil
+}
+private struct GoToCollectionsKey: EnvironmentKey {
+    static let defaultValue: (() -> Void)? = nil
+}
+extension EnvironmentValues {
+    var goToFriends: (() -> Void)? {
+        get { self[GoToFriendsKey.self] }
+        set { self[GoToFriendsKey.self] = newValue }
+    }
+    var goToCollections: (() -> Void)? {
+        get { self[GoToCollectionsKey.self] }
+        set { self[GoToCollectionsKey.self] = newValue }
+    }
+}
+
 /// Bottom navigation with a raised centre "+" button, mirroring the web's
 /// BottomNav. White surface, thin top border, forest green only on the
 /// active tab and the add button. + was trialed up in the feed's top bar
@@ -32,6 +74,10 @@ struct MainTabView: View {
     /// re-centres rather than a same-value change being ignored.
     @State private var mapFocusRequest: MapFocusRequest?
     @State private var mapFocusNonce = 0
+    /// Profile's own tab-root NavigationStack (see ProfileView's `path`
+    /// doc comment) — separate from FeedView's own path, since tag(5) and
+    /// FeedView's pushed-avatar route are two different stacks.
+    @State private var profilePath = NavigationPath()
 
     private func focusMap(onItemId itemId: String) {
         mapFocusNonce += 1
@@ -78,10 +124,14 @@ struct MainTabView: View {
                 }
                 .tag(4)
 
-                // No wrapping NavigationStack here — ProfileView owns its
-                // own now, so a swiped row can push onto a real bound path.
-                ProfileView(onSignedOut: onSignedOut, onViewOnMap: { focusMap(onItemId: $0) })
-                    .tag(5)
+                // ProfileView no longer owns its own NavigationStack (see
+                // its `path` doc comment) — same shape as every other tab
+                // here, its own stack + bound path provided by whichever
+                // call site hosts it.
+                NavigationStack(path: $profilePath) {
+                    ProfileView(onSignedOut: onSignedOut, onViewOnMap: { focusMap(onItemId: $0) }, path: $profilePath)
+                }
+                .tag(5)
             }
             // Deliberately NOT .page style. That style pages on a horizontal
             // swipe ANYWHERE on screen, not just via the tab bar — which is
@@ -100,6 +150,9 @@ struct MainTabView: View {
         }
         .ignoresSafeArea(.keyboard)
         .tint(RexColor.primary)
+        .environment(\.viewOnMap, { focusMap(onItemId: $0) })
+        .environment(\.goToFriends, { selection = 4 })
+        .environment(\.goToCollections, { selection = 2 })
         .sheet(isPresented: $showingAddRex, onDismiss: { addRexRefreshSignal += 1 }) {
             AddRexView(onDone: { showingAddRex = false })
         }

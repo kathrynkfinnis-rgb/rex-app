@@ -39,6 +39,25 @@ struct TripDetailView: View {
     @State private var editingNote = false
     @State private var noteDraft = ""
     @State private var isSavingNote = false
+    /// #183 — the trip is itself an item (its own recommendation just
+    /// points at it, same as every stop points at its own item), so
+    /// renaming it is exactly EditRexView's existing updateItemTitle path —
+    /// this just needs the trip's own item_id, which route only ever
+    /// carried a display title for, not an id.
+    @State private var tripItemId: String?
+    @State private var editingTitle = false
+    @State private var titleDraft = ""
+    @State private var displayTitle: String
+    /// #183 — a stop's own title/note/address/subcategories etc, via the
+    /// same EditRexView every other Rex is edited through. Trip stops
+    /// never had any edit entry point of their own before this — only
+    /// reorder/remove, added by #122.
+    @State private var editingStop: FeedRecommendation?
+
+    init(route: TripRoute) {
+        self.route = route
+        _displayTitle = State(initialValue: route.title)
+    }
 
     /// Stops grouped by heading, preserving the order both groups and stops
     /// first appear in — same rule as the web's groupStops().
@@ -121,6 +140,19 @@ struct TripDetailView: View {
                                             }
                                             .disabled(isMutating || index == group.stops.count - 1)
                                             Spacer()
+                                            // #183 — title, note, address/
+                                            // geocoding, subcategories:
+                                            // every field EditRexView
+                                            // already handles for any other
+                                            // Rex, now reachable for a trip
+                                            // stop too instead of only
+                                            // reorder/remove.
+                                            Button {
+                                                editingStop = stop
+                                            } label: {
+                                                Image(systemName: "pencil")
+                                            }
+                                            .disabled(isMutating)
                                             Button(role: .destructive) {
                                                 Task { await removeStop(stop) }
                                             } label: {
@@ -173,6 +205,13 @@ struct TripDetailView: View {
         .sheet(isPresented: $showingAddStop, onDismiss: { Task { await load() } }) {
             AddTripStopSheet(tripId: route.recommendationId, initialSection: addStopSection, onAdded: {})
         }
+        .sheet(item: $editingStop) { stop in
+            EditRexView(
+                rec: stop,
+                onSaved: { Task { await load() } },
+                onDeleted: { Task { await load() } }
+            )
+        }
     }
 
     private func addStopButton(heading: String) -> some View {
@@ -197,9 +236,24 @@ struct TripDetailView: View {
             .background(RexColor.primary.opacity(0.1))
             .clipShape(Capsule())
 
-            Text(route.title)
-                .font(.system(size: 26, weight: .semibold, design: .rounded))
-                .foregroundStyle(RexColor.foreground)
+            HStack(spacing: RexSpacing.sm) {
+                Text(displayTitle)
+                    .font(.system(size: 26, weight: .semibold, design: .rounded))
+                    .foregroundStyle(RexColor.foreground)
+                // #183 — was static (route.title, whatever the card you
+                // came from happened to show) with no way to fix a typo
+                // short of deleting and rebuilding the whole trip.
+                if isOwner && isEditing {
+                    Button {
+                        titleDraft = displayTitle
+                        editingTitle = true
+                    } label: {
+                        Image(systemName: "pencil")
+                            .font(.system(size: 14))
+                            .foregroundStyle(RexColor.mutedForeground)
+                    }
+                }
+            }
 
             if !isLoading {
                 Text("\(stops.count) \(stops.count == 1 ? "stop" : "stops")")
@@ -224,6 +278,11 @@ struct TripDetailView: View {
             if isDraft {
                 draftBanner
             }
+        }
+        .alert("Rename trip", isPresented: $editingTitle) {
+            TextField("Trip title", text: $titleDraft)
+            Button("Cancel", role: .cancel) {}
+            Button("Save") { Task { await renameTrip() } }
         }
         .alert("Trip note", isPresented: $editingNote) {
             TextField("What's this trip about?", text: $noteDraft, axis: .vertical)
@@ -329,10 +388,29 @@ struct TripDetailView: View {
             let tripRec = await ownerTask
             isOwner = tripRec?.user_id == RexAPI.shared.currentUserId
             tripNote = tripRec?.note
+            tripItemId = tripRec?.item_id
+            if let title = tripRec?.items?.title { displayTitle = title }
         } catch {
             errorMessage = error.localizedDescription
         }
         isLoading = false
+    }
+
+    /// #183 — same shared-catalogue updateItemTitle every other Rex's
+    /// title goes through, just needs the trip's own item_id rather than a
+    /// stop's.
+    private func renameTrip() async {
+        let trimmed = titleDraft.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard let tripItemId, !trimmed.isEmpty, trimmed != displayTitle else { return }
+        isMutating = true
+        mutationError = nil
+        do {
+            try await RexAPI.shared.updateItemTitle(itemId: tripItemId, title: trimmed)
+            displayTitle = trimmed
+        } catch {
+            mutationError = error.localizedDescription
+        }
+        isMutating = false
     }
 
     /// Bulk-renames a heading across every stop under it (see

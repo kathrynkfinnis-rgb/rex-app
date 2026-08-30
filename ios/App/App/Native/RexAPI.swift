@@ -221,6 +221,27 @@ final class RexAPI {
     /// confirming by email.
     var hasSession: Bool { accessToken != nil }
 
+    /// #182 — records that this account explicitly agreed to the Terms of
+    /// Use / Privacy Policy at sign-up (the LegalContentView checkbox),
+    /// so there's a real timestamped record rather than just trusting the
+    /// UI state. Best-effort: a failure here shouldn't block someone from
+    /// actually getting into the app they just signed up for — the
+    /// checkbox itself is still the real gate on the sign-up screen.
+    func recordTermsAcceptance() async {
+        guard let userId = currentUserId, let token = try? await validToken() else { return }
+        var components = URLComponents(url: baseURL.appendingPathComponent("/rest/v1/profiles"), resolvingAgainstBaseURL: false)!
+        components.queryItems = [URLQueryItem(name: "id", value: "eq.\(userId)")]
+        var request = URLRequest(url: components.url!)
+        request.httpMethod = "PATCH"
+        request.setValue(anonKey, forHTTPHeaderField: "apikey")
+        request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        request.httpBody = try? JSONSerialization.data(withJSONObject: [
+            "accepted_terms_at": ISO8601DateFormatter().string(from: Date()),
+        ])
+        _ = try? await URLSession.shared.data(for: request)
+    }
+
     /// Sign in with the identity token Apple handed us. Supabase verifies it
     /// against the bundle ID listed in its Apple provider settings, so this
     /// needs no client secret.
@@ -265,12 +286,71 @@ final class RexAPI {
     /// Passing either one switches to a real server-side filter with a
     /// much higher limit instead of trusting whatever happened to be in
     /// the unfiltered page.
+    /// #181 — whether the recommendations_display view (the anonymous-post
+    /// identity mask: null profile instead of the real one, whenever
+    /// is_anonymous and you're not the owner) exists yet. Same
+    /// probe-once-and-remember shape as anonymousColumn/wantNoteColumn,
+    /// but a missing VIEW isn't something you can drop a column to work
+    /// around — the whole resource 400s — so fetchFeed falls all the way
+    /// back to querying the base table (with the un-masked embed, i.e.
+    /// today's pre-#181 behaviour) rather than the entire main feed going
+    /// blank until this migration's been run.
+    private var recommendationsDisplayView: Bool?
+
+    private func useRecommendationsDisplayView() async -> Bool {
+        if let recommendationsDisplayView { return recommendationsDisplayView }
+        guard let token = try? await validToken() else { return false }
+        var components = URLComponents(url: baseURL.appendingPathComponent("/rest/v1/recommendations_display"), resolvingAgainstBaseURL: false)!
+        components.queryItems = [URLQueryItem(name: "select", value: "id"), URLQueryItem(name: "limit", value: "1")]
+        var request = URLRequest(url: components.url!)
+        request.setValue(anonKey, forHTTPHeaderField: "apikey")
+        request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+        let ok = (try? await URLSession.shared.data(for: request))
+            .flatMap { ($0.1 as? HTTPURLResponse)?.statusCode }
+            .map { $0 < 400 } ?? false
+        recommendationsDisplayView = ok
+        return ok
+    }
+
+    /// #181, part two — fetchFeed got its own inline version of this dance
+    /// (it also needs `useView` separately, for the search-filter
+    /// dot-vs-jsonb-arrow syntax). Every other function that reads straight
+    /// from recommendations just needs the resource path and the profiles
+    /// select fragment, so they go through this instead of repeating the
+    /// probe-and-fallback inline each time.
+    private func recommendationsReadPath() async -> (path: String, profilesSelect: String) {
+        let useView = await useRecommendationsDisplayView()
+        return (
+            useView ? "/rest/v1/recommendations_display" : "/rest/v1/recommendations",
+            useView ? "profiles" : "profiles!recommendations_user_id_fkey(username,display_name,avatar_url)"
+        )
+    }
+
     func fetchFeed(category: String? = nil, searchText: String? = nil) async throws -> [FeedRecommendation] {
         let token = try await validToken()
-
+        let useView = await useRecommendationsDisplayView()
+        let resourcePath = useView ? "/rest/v1/recommendations_display" : "/rest/v1/recommendations"
+        // The view returns profiles as a plain (already-masked) jsonb
+        // column instead of an automatic FK embed — replacing the embed
+        // with a CASE would have broken PostgREST's relationship
+        // inference, which needs a plain, unmodified FK column to trace.
+        // Everything else about the row is an untouched passthrough, so
+        // items!inner(...)/creators(...)/recommendation_tags(...) keep
+        // working exactly as before either way.
+        // "can't edit any of the details" on a recipe — recipe_text was
+        // missing from every one of this select string's copies across
+        // this file (fetchFeed and its siblings), so whatever recommendation
+        // EditRexView opened from always carried a nil recipe_text
+        // regardless of what was actually saved. RecipeEditorView's own
+        // onAppear guard (`if !parsed.ingredients.isEmpty { ingredients =
+        // parsed.ingredients }`) then had nothing to parse, so it never
+        // overwrote its default single blank row — the editor opened, it
+        // just always looked empty. Added to every occurrence of this
+        // select shape in the file, not just this one.
+        let profilesSelect = useView ? "profiles" : "profiles!recommendations_user_id_fkey(username,display_name,avatar_url)"
         let select = "id,rating,note,created_at,photo_url,photo_urls,tags\(await anonymousField()),user_id,item_id,trip_id," +
-            "items!inner(id,type,title,subtitle,image_url,genre,address,link_url)," +
-            "profiles!recommendations_user_id_fkey(username,display_name,avatar_url)," +
+            "items!inner(id,type,title,subtitle,image_url,genre,address,link_url,recipe_text)," +
+            "\(profilesSelect)," +
             "creators(slug,name,color,emoji)," +
             "recommendation_tags(profiles(id,username,display_name,avatar_url))"
 
@@ -304,7 +384,7 @@ final class RexAPI {
         // apply at once. Picking "Trip" and typing a search query silently
         // dropped the category and searched every type instead.
         func fetch(includeListFilter: Bool, extraFilters: [(String, String)] = []) async throws -> (Data, HTTPURLResponse) {
-            var components = URLComponents(url: baseURL.appendingPathComponent("/rest/v1/recommendations"), resolvingAgainstBaseURL: false)!
+            var components = URLComponents(url: baseURL.appendingPathComponent(resourcePath), resolvingAgainstBaseURL: false)!
             var queryItems = [
                 URLQueryItem(name: "select", value: select),
                 URLQueryItem(name: "trip_id", value: "is.null"),
@@ -345,13 +425,29 @@ final class RexAPI {
             // valid standalone filter) and merges + dedupes the results —
             // same net effect, just four small requests instead of one.
             // Each still carries the category filter too, if one's active.
+            // profiles is a plain jsonb column on the view (not an embed —
+            // see profilesSelect above), so matching into it needs the
+            // ->> jsonb operator instead of the embedded-resource dot
+            // syntax the base-table fallback still uses.
             let q = trimmedSearch
             let categoryFilter: [(String, String)] = category.map { [("items.type", "eq.\($0)")] } ?? []
+            let usernameFilter = useView ? "profiles->>username" : "profiles.username"
+            let displayNameFilter = useView ? "profiles->>display_name" : "profiles.display_name"
             async let byTitle = decodedPage(includeListFilter: true, extraFilters: categoryFilter + [("items.title", "ilike.*\(q)*")])
+            // "If you search the author of a book Rex'd it should also be
+            // searchable rather than just the title" — a book's subtitle
+            // *is* its author (see fetchBooksByAuthor's doc comment: no
+            // normalized author field, subtitle is the joined author names
+            // OpenLibrary returned). The unfiltered client-side `matching`
+            // filter already searches subtitle, so author search quietly
+            // worked right up until you actually typed something — the
+            // moment that switches to this wider server-side fetch, which
+            // never had a subtitle variant to begin with.
+            async let bySubtitle = decodedPage(includeListFilter: true, extraFilters: categoryFilter + [("items.subtitle", "ilike.*\(q)*")])
             async let byNote = decodedPage(includeListFilter: true, extraFilters: categoryFilter + [("note", "ilike.*\(q)*")])
-            async let byUsername = decodedPage(includeListFilter: true, extraFilters: categoryFilter + [("profiles.username", "ilike.*\(q)*")])
-            async let byDisplayName = decodedPage(includeListFilter: true, extraFilters: categoryFilter + [("profiles.display_name", "ilike.*\(q)*")])
-            let pages = try await [byTitle, byNote, byUsername, byDisplayName]
+            async let byUsername = decodedPage(includeListFilter: true, extraFilters: categoryFilter + [(usernameFilter, "ilike.*\(q)*")])
+            async let byDisplayName = decodedPage(includeListFilter: true, extraFilters: categoryFilter + [(displayNameFilter, "ilike.*\(q)*")])
+            let pages = try await [byTitle, bySubtitle, byNote, byUsername, byDisplayName]
             var seen = Set<String>()
             var merged: [FeedRecommendation] = []
             for rec in pages.flatMap({ $0 }) where !seen.contains(rec.id) {
@@ -376,12 +472,13 @@ final class RexAPI {
     /// the list re-renders and scroll position holds.
     func fetchRecommendation(id: String) async throws -> FeedRecommendation {
         let token = try await validToken()
+        let (resourcePath, profilesSelect) = await recommendationsReadPath()
         let select = "id,rating,note,created_at,photo_url,photo_urls,tags\(await anonymousField()),user_id,item_id,trip_id," +
-            "items!inner(id,type,title,subtitle,image_url,genre,address,link_url)," +
-            "profiles!recommendations_user_id_fkey(username,display_name,avatar_url)," +
+            "items!inner(id,type,title,subtitle,image_url,genre,address,link_url,recipe_text)," +
+            "\(profilesSelect)," +
             "creators(slug,name,color,emoji)," +
             "recommendation_tags(profiles(id,username,display_name,avatar_url))"
-        var components = URLComponents(url: baseURL.appendingPathComponent("/rest/v1/recommendations"), resolvingAgainstBaseURL: false)!
+        var components = URLComponents(url: baseURL.appendingPathComponent(resourcePath), resolvingAgainstBaseURL: false)!
         components.queryItems = [
             URLQueryItem(name: "select", value: select),
             URLQueryItem(name: "id", value: "eq.\(id)"),
@@ -406,11 +503,12 @@ final class RexAPI {
     /// else — this is trip-only and capped much higher.
     func fetchTrips() async throws -> [FeedRecommendation] {
         let token = try await validToken()
+        let (resourcePath, profilesSelect) = await recommendationsReadPath()
         let select = "id,rating,note,created_at,photo_url,photo_urls,tags\(await anonymousField()),user_id,item_id,trip_id," +
-            "items!inner(id,type,title,subtitle,image_url,genre,address,link_url)," +
-            "profiles!recommendations_user_id_fkey(username,display_name,avatar_url)," +
+            "items!inner(id,type,title,subtitle,image_url,genre,address,link_url,recipe_text)," +
+            "\(profilesSelect)," +
             "recommendation_tags(profiles(id,username,display_name,avatar_url))"
-        var components = URLComponents(url: baseURL.appendingPathComponent("/rest/v1/recommendations"), resolvingAgainstBaseURL: false)!
+        var components = URLComponents(url: baseURL.appendingPathComponent(resourcePath), resolvingAgainstBaseURL: false)!
         components.queryItems = [
             URLQueryItem(name: "select", value: select),
             URLQueryItem(name: "trip_id", value: "is.null"),
@@ -521,7 +619,7 @@ final class RexAPI {
         let token = try await validToken()
         guard let userId = currentUserId else { throw RexAPIError.notSignedIn }
         let select = "id,rating,note,created_at,photo_url,photo_urls,tags,user_id,item_id,trip_id," +
-            "items!inner(id,type,title,subtitle,image_url,genre,address,link_url)," +
+            "items!inner(id,type,title,subtitle,image_url,genre,address,link_url,recipe_text)," +
             "profiles!recommendations_user_id_fkey(username,display_name,avatar_url)," +
             "recommendation_tags(profiles(id,username,display_name,avatar_url))"
         var components = URLComponents(url: baseURL.appendingPathComponent("/rest/v1/recommendations"), resolvingAgainstBaseURL: false)!
@@ -543,6 +641,65 @@ final class RexAPI {
         return try JSONDecoder().decode([FeedRecommendation].self, from: data)
     }
 
+    /// #183 — "pool all your Rex into a trip": every place/event you've
+    /// rated standalone (not already a stop on some other trip, not a list
+    /// item) that BuildTripFromRexView can offer to fold into a brand-new
+    /// trip. Oldest first — "simplest: just the order added" was the call
+    /// on itinerary ordering, and fetchTripStops already sorts stops by
+    /// created_at.asc, so keeping this fetch in the same order means
+    /// whatever you tick becomes the itinerary order with no reordering
+    /// step at all.
+    func fetchStandalonePlaceRex() async throws -> [FeedRecommendation] {
+        let token = try await validToken()
+        guard let userId = currentUserId else { throw RexAPIError.notSignedIn }
+        let select = "id,rating,note,created_at,photo_url,photo_urls,tags,user_id,item_id,trip_id,list_id," +
+            "items!inner(id,type,title,subtitle,image_url,genre,address,link_url,recipe_text)," +
+            "profiles!recommendations_user_id_fkey(username,display_name,avatar_url)"
+        var components = URLComponents(url: baseURL.appendingPathComponent("/rest/v1/recommendations"), resolvingAgainstBaseURL: false)!
+        components.queryItems = [
+            URLQueryItem(name: "select", value: select),
+            URLQueryItem(name: "user_id", value: "eq.\(userId)"),
+            URLQueryItem(name: "trip_id", value: "is.null"),
+            URLQueryItem(name: "list_id", value: "is.null"),
+            URLQueryItem(name: "items.type", value: "in.(place,event)"),
+            URLQueryItem(name: "order", value: "created_at.asc"),
+            URLQueryItem(name: "limit", value: "500"),
+        ]
+        var request = URLRequest(url: components.url!)
+        request.setValue(anonKey, forHTTPHeaderField: "apikey")
+        request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+
+        let (data, response) = try await URLSession.shared.data(for: request)
+        guard let http = response as? HTTPURLResponse, http.statusCode < 400 else {
+            throw RexAPIError.server(friendlyError(data, fallback: "Couldn't load your Rex."))
+        }
+        return try JSONDecoder().decode([FeedRecommendation].self, from: data)
+    }
+
+    /// #183 — folds an existing standalone Rex into a trip as a stop, in
+    /// place, rather than creating a duplicate: the same partial-index
+    /// reasoning as everywhere else this session (recommendations_unique
+    /// only applies while trip_id/list_id are both null), so this UPDATE
+    /// just moves the row out from under that constraint and under
+    /// recommendations_unique_trip_stop instead — no new row, rating/note/
+    /// photos/tags all come along untouched.
+    func assignRecommendationToTrip(recommendationId: String, tripId: String) async throws {
+        let token = try await validToken()
+        var components = URLComponents(url: baseURL.appendingPathComponent("/rest/v1/recommendations"), resolvingAgainstBaseURL: false)!
+        components.queryItems = [URLQueryItem(name: "id", value: "eq.\(recommendationId)")]
+        var request = URLRequest(url: components.url!)
+        request.httpMethod = "PATCH"
+        request.setValue(anonKey, forHTTPHeaderField: "apikey")
+        request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        request.httpBody = try JSONSerialization.data(withJSONObject: ["trip_id": tripId])
+
+        let (data, response) = try await URLSession.shared.data(for: request)
+        guard let http = response as? HTTPURLResponse, http.statusCode < 400 else {
+            throw RexAPIError.server(friendlyError(data, fallback: "Couldn't add that stop to the trip."))
+        }
+    }
+
     /// Your own draft trips — trip_id is.null (a trip itself, not a stop)
     /// and published_at is.null (never published). Only ever your own by
     /// construction: RLS hides anyone else's drafts before this query even
@@ -551,7 +708,7 @@ final class RexAPI {
         let token = try await validToken()
         guard let userId = currentUserId else { throw RexAPIError.notSignedIn }
         let select = "id,rating,note,created_at,photo_url,photo_urls,tags,user_id,item_id,trip_id," +
-            "items!inner(id,type,title,subtitle,image_url,genre,address,link_url)," +
+            "items!inner(id,type,title,subtitle,image_url,genre,address,link_url,recipe_text)," +
             "profiles!recommendations_user_id_fkey(username,display_name,avatar_url)," +
             "recommendation_tags(profiles(id,username,display_name,avatar_url))"
         var components = URLComponents(url: baseURL.appendingPathComponent("/rest/v1/recommendations"), resolvingAgainstBaseURL: false)!
@@ -579,11 +736,12 @@ final class RexAPI {
     /// Ordered oldest-first so the itinerary reads in the order it was built.
     func fetchTripStops(tripRecommendationId: String) async throws -> [FeedRecommendation] {
         let token = try await validToken()
+        let (resourcePath, profilesSelect) = await recommendationsReadPath()
         let select = "id,rating,note,created_at,photo_url,photo_urls,tags\(await anonymousField()),user_id,item_id,trip_id,trip_section," +
             "items!inner(id,type,title,subtitle,image_url,genre,address,link_url,lat,lng)," +
-            "profiles!recommendations_user_id_fkey(username,display_name,avatar_url)," +
+            "\(profilesSelect)," +
             "recommendation_tags(profiles(id,username,display_name,avatar_url))"
-        var components = URLComponents(url: baseURL.appendingPathComponent("/rest/v1/recommendations"), resolvingAgainstBaseURL: false)!
+        var components = URLComponents(url: baseURL.appendingPathComponent(resourcePath), resolvingAgainstBaseURL: false)!
         components.queryItems = [
             URLQueryItem(name: "select", value: select),
             URLQueryItem(name: "trip_id", value: "eq.\(tripRecommendationId)"),
@@ -604,11 +762,12 @@ final class RexAPI {
     /// exactly, see fetchTripStops.
     func fetchListItems(listRecommendationId: String) async throws -> [FeedRecommendation] {
         let token = try await validToken()
+        let (resourcePath, profilesSelect) = await recommendationsReadPath()
         let select = "id,rating,note,created_at,photo_url,photo_urls,tags\(await anonymousField()),user_id,item_id,list_id,list_section,show_in_feed," +
-            "items!inner(id,type,title,subtitle,image_url,genre,address,link_url)," +
-            "profiles!recommendations_user_id_fkey(username,display_name,avatar_url)," +
+            "items!inner(id,type,title,subtitle,image_url,genre,address,link_url,recipe_text)," +
+            "\(profilesSelect)," +
             "recommendation_tags(profiles(id,username,display_name,avatar_url))"
-        var components = URLComponents(url: baseURL.appendingPathComponent("/rest/v1/recommendations"), resolvingAgainstBaseURL: false)!
+        var components = URLComponents(url: baseURL.appendingPathComponent(resourcePath), resolvingAgainstBaseURL: false)!
         components.queryItems = [
             URLQueryItem(name: "select", value: select),
             URLQueryItem(name: "list_id", value: "eq.\(listRecommendationId)"),
@@ -815,6 +974,21 @@ final class RexAPI {
             return existingId
         }
 
+        // "Also Rex'd by" still missing — that count groups strictly by
+        // item_id, and two people adding "the same place" through
+        // different paths (one via search, one hand-typed; or picking two
+        // slightly different Google matches for the same physical venue)
+        // always landed on two separate item rows, so the count never saw
+        // them as the same place. The external_id lookup above only
+        // catches "picked the identical Google result" — this catches
+        // "picked a different result, or typed it, for the same real
+        // place" instead, before falling through to a genuine new row.
+        if (type == "place" || type == "event"),
+           let resolvedLat = lat ?? hit?.lat, let resolvedLng = lng ?? hit?.lng,
+           let existingId = await findNearbyItem(type: type, title: title, lat: resolvedLat, lng: resolvedLng) {
+            return existingId
+        }
+
         var request = URLRequest(url: baseURL.appendingPathComponent("/rest/v1/items"))
         request.httpMethod = "POST"
         request.setValue(anonKey, forHTTPHeaderField: "apikey")
@@ -899,6 +1073,64 @@ final class RexAPI {
         guard let http = response as? HTTPURLResponse, http.statusCode < 400 else { return nil }
         struct Row: Codable { let id: String }
         return (try? JSONDecoder().decode([Row].self, from: data))?.first?.id
+    }
+
+    /// An existing item at (almost) the same coordinates with the same
+    /// name, if any — see createItem's doc comment for why. No PostGIS
+    /// filter available over PostgREST here, so this pre-filters with a
+    /// plain lat/lng bounding box (~65m per side, comfortably wider than
+    /// the real 30m radius check below) and does the actual distance math
+    /// client-side over whatever small set of candidates that returns.
+    /// Deliberately conservative — exact normalized-title match, not a
+    /// fuzzy one — better to occasionally miss a real duplicate than merge
+    /// two different shops that happen to share a building.
+    private func findNearbyItem(type: String, title: String, lat: Double, lng: Double) async -> String? {
+        guard let token = try? await validToken() else { return nil }
+        let delta = 0.0006
+        var components = URLComponents(url: baseURL.appendingPathComponent("/rest/v1/items"), resolvingAgainstBaseURL: false)!
+        components.queryItems = [
+            URLQueryItem(name: "select", value: "id,title,lat,lng"),
+            URLQueryItem(name: "type", value: "eq.\(type)"),
+            URLQueryItem(name: "lat", value: "gte.\(lat - delta)"),
+            URLQueryItem(name: "lat", value: "lte.\(lat + delta)"),
+            URLQueryItem(name: "lng", value: "gte.\(lng - delta)"),
+            URLQueryItem(name: "lng", value: "lte.\(lng + delta)"),
+            URLQueryItem(name: "limit", value: "25"),
+        ]
+        var request = URLRequest(url: components.url!)
+        request.setValue(anonKey, forHTTPHeaderField: "apikey")
+        request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+        guard let (data, response) = try? await URLSession.shared.data(for: request),
+              let http = response as? HTTPURLResponse, http.statusCode < 400
+        else { return nil }
+        struct Candidate: Codable { let id: String; let title: String; let lat: Double?; let lng: Double? }
+        let candidates = (try? JSONDecoder().decode([Candidate].self, from: data)) ?? []
+        let target = Self.normalizeForMatch(title)
+        for candidate in candidates {
+            guard let clat = candidate.lat, let clng = candidate.lng,
+                  Self.normalizeForMatch(candidate.title) == target,
+                  Self.haversineMeters(lat, lng, clat, clng) <= 30
+            else { continue }
+            return candidate.id
+        }
+        return nil
+    }
+
+    private static func normalizeForMatch(_ s: String) -> String {
+        s.lowercased()
+            .replacingOccurrences(of: "['’‘\"]", with: "", options: .regularExpression)
+            .replacingOccurrences(of: "[^a-z0-9]+", with: " ", options: .regularExpression)
+            .trimmingCharacters(in: .whitespaces)
+    }
+
+    private static func haversineMeters(_ lat1: Double, _ lng1: Double, _ lat2: Double, _ lng2: Double) -> Double {
+        let r = 6_371_000.0
+        let dLat = (lat2 - lat1) * .pi / 180
+        let dLng = (lng2 - lng1) * .pi / 180
+        let a = sin(dLat / 2) * sin(dLat / 2)
+            + cos(lat1 * .pi / 180) * cos(lat2 * .pi / 180) * sin(dLng / 2) * sin(dLng / 2)
+        let c = 2 * atan2(sqrt(a), sqrt(1 - a))
+        return r * c
     }
 
     /// Creates a brand-new recommendation (used right after createItem — no existing row to merge with).
@@ -1007,15 +1239,26 @@ final class RexAPI {
 
     func fetchRecommendations(forUser userId: String) async throws -> [FeedRecommendation] {
         let token = try await validToken()
+        let (resourcePath, profilesSelect) = await recommendationsReadPath()
         let select = "id,rating,note,created_at,photo_url,photo_urls,tags\(await anonymousField()),user_id,item_id," +
-            "items!inner(id,type,title,subtitle,image_url,genre,address,link_url)," +
-            "profiles!recommendations_user_id_fkey(username,display_name,avatar_url)," +
+            "items!inner(id,type,title,subtitle,image_url,genre,address,link_url,recipe_text)," +
+            "\(profilesSelect)," +
             "creators(slug,name,color,emoji)," +
             "recommendation_tags(profiles(id,username,display_name,avatar_url))"
-        var components = URLComponents(url: baseURL.appendingPathComponent("/rest/v1/recommendations"), resolvingAgainstBaseURL: false)!
+        var components = URLComponents(url: baseURL.appendingPathComponent(resourcePath), resolvingAgainstBaseURL: false)!
         components.queryItems = [
             URLQueryItem(name: "select", value: select),
             URLQueryItem(name: "user_id", value: "eq.\(userId)"),
+            // "I just added this REX to a trip and now it has duplicated in
+            // my feed" — reported on the profile page specifically. Adding
+            // an existing standalone Rex to a trip (addPlaceToTrip) creates
+            // a brand-new recommendation row for the same item — trip_id
+            // set, rating 0, no photo/note of its own — that's meant to be
+            // a stop, invisible outside the trip's own page, exactly like
+            // fetchFeed's own trip_id.is.null already treats it. This query
+            // had no such filter at all, so both the real standalone Rex
+            // and the bare new stop row showed here side by side.
+            URLQueryItem(name: "trip_id", value: "is.null"),
             URLQueryItem(name: "order", value: "created_at.desc"),
         ]
         var request = URLRequest(url: components.url!)
@@ -1656,6 +1899,29 @@ final class RexAPI {
         }
     }
 
+    /// Same shared-catalogue model as updateItemTitle, for subtitle instead.
+    /// Added specifically so a List's subtitle can be fixed after the fact —
+    /// AddRexView's category-switch bug (see resetDraftFields) could leave a
+    /// list carrying a different category's leftover subtitle text, and
+    /// until this there was no field anywhere to clear or edit it.
+    func updateItemSubtitle(itemId: String, subtitle: String?) async throws {
+        let token = try await validToken()
+        var components = URLComponents(url: baseURL.appendingPathComponent("/rest/v1/items"), resolvingAgainstBaseURL: false)!
+        components.queryItems = [URLQueryItem(name: "id", value: "eq.\(itemId)")]
+        var request = URLRequest(url: components.url!)
+        request.httpMethod = "PATCH"
+        request.setValue(anonKey, forHTTPHeaderField: "apikey")
+        request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        let body: [String: Any] = ["subtitle": subtitle?.isEmpty == false ? subtitle! : (NSNull() as Any)]
+        request.httpBody = try JSONSerialization.data(withJSONObject: body)
+
+        let (data, response) = try await URLSession.shared.data(for: request)
+        guard let http = response as? HTTPURLResponse, http.statusCode < 400 else {
+            throw RexAPIError.server(friendlyError(data, fallback: "Couldn't update the subtitle."))
+        }
+    }
+
     /// #125 — same "shared catalogue entry, not your own take" model as
     /// updateItemTitle, for the thumbnail instead. nil clears it back to the
     /// category's generic placeholder icon rather than leaving a broken URL.
@@ -1721,6 +1987,59 @@ final class RexAPI {
         }
     }
 
+    /// #183 — trip stops (and any place/event) could only ever get an
+    /// address/coordinates once, at creation — via a live search pick, or
+    /// self-healing geocode-on-read if that missed. There was no way to fix
+    /// one afterwards short of deleting and re-adding. Same shared-catalogue
+    /// model as updateItemTitle: whoever's editing corrects it for anyone
+    /// who's Rex'd the same place. lat/lng travel with address so a stale
+    /// pin can't survive next to a freshly-typed address — see
+    /// EditRexView's "Re-check location" flow, which always sets both.
+    func updateItemAddressAndCoords(itemId: String, address: String?, lat: Double?, lng: Double?) async throws {
+        let token = try await validToken()
+        var components = URLComponents(url: baseURL.appendingPathComponent("/rest/v1/items"), resolvingAgainstBaseURL: false)!
+        components.queryItems = [URLQueryItem(name: "id", value: "eq.\(itemId)")]
+        var request = URLRequest(url: components.url!)
+        request.httpMethod = "PATCH"
+        request.setValue(anonKey, forHTTPHeaderField: "apikey")
+        request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        request.httpBody = try JSONSerialization.data(withJSONObject: [
+            "address": address?.isEmpty == false ? address! : (NSNull() as Any),
+            "lat": lat ?? (NSNull() as Any),
+            "lng": lng ?? (NSNull() as Any),
+        ])
+
+        let (data, response) = try await URLSession.shared.data(for: request)
+        guard let http = response as? HTTPURLResponse, http.statusCode < 400 else {
+            throw RexAPIError.server(friendlyError(data, fallback: "Couldn't update the location."))
+        }
+    }
+
+    /// #183 — genre (AddRexView's "subcategories" chips, e.g. Restaurant /
+    /// Activity for a place, or a recipe's Pasta / Salad) was write-once at
+    /// creation too, same gap title/link/recipe_text had before their own
+    /// fixes. Stored as the same sorted, comma-joined string
+    /// splitGenres() already reads everywhere else.
+    func updateItemGenre(itemId: String, genre: String?) async throws {
+        let token = try await validToken()
+        var components = URLComponents(url: baseURL.appendingPathComponent("/rest/v1/items"), resolvingAgainstBaseURL: false)!
+        components.queryItems = [URLQueryItem(name: "id", value: "eq.\(itemId)")]
+        var request = URLRequest(url: components.url!)
+        request.httpMethod = "PATCH"
+        request.setValue(anonKey, forHTTPHeaderField: "apikey")
+        request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        request.httpBody = try JSONSerialization.data(withJSONObject: [
+            "genre": genre?.isEmpty == false ? genre! : (NSNull() as Any),
+        ])
+
+        let (data, response) = try await URLSession.shared.data(for: request)
+        guard let http = response as? HTTPURLResponse, http.statusCode < 400 else {
+            throw RexAPIError.server(friendlyError(data, fallback: "Couldn't update the category."))
+        }
+    }
+
     func deleteRecommendation(id: String) async throws {
         let token = try await validToken()
         var components = URLComponents(url: baseURL.appendingPathComponent("/rest/v1/recommendations"), resolvingAgainstBaseURL: false)!
@@ -1754,6 +2073,31 @@ final class RexAPI {
         request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
         let body: [String: Any] = ["trip_section": (to?.isEmpty ?? true) ? NSNull() : to!]
+        request.httpBody = try JSONSerialization.data(withJSONObject: body)
+
+        let (data, response) = try await URLSession.shared.data(for: request)
+        guard let http = response as? HTTPURLResponse, http.statusCode < 400 else {
+            throw RexAPIError.server(friendlyError(data, fallback: "Couldn't rename that heading."))
+        }
+    }
+
+    /// Same as renameTripSection, list_id/list_section instead of
+    /// trip_id/trip_section — "editing the heading doesn't work" was
+    /// literally true for a list: TripDetailView got heading rename with
+    /// #122, ListDetailView never got the equivalent.
+    func renameListSection(listId: String, from: String?, to: String?) async throws {
+        let token = try await validToken()
+        var components = URLComponents(url: baseURL.appendingPathComponent("/rest/v1/recommendations"), resolvingAgainstBaseURL: false)!
+        components.queryItems = [
+            URLQueryItem(name: "list_id", value: "eq.\(listId)"),
+            URLQueryItem(name: "list_section", value: (from?.isEmpty ?? true) ? "is.null" : "eq.\(from!)"),
+        ]
+        var request = URLRequest(url: components.url!)
+        request.httpMethod = "PATCH"
+        request.setValue(anonKey, forHTTPHeaderField: "apikey")
+        request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        let body: [String: Any] = ["list_section": (to?.isEmpty ?? true) ? NSNull() : to!]
         request.httpBody = try JSONSerialization.data(withJSONObject: body)
 
         let (data, response) = try await URLSession.shared.data(for: request)
@@ -2460,14 +2804,43 @@ final class RexAPI {
         return (try? JSONDecoder().decode([EditorialCollection].self, from: data)) ?? []
     }
 
+    /// #181 — saved_posts embeds recommendations embeds profiles, and
+    /// PostgREST's nested embedding is resolved by an actual FK to the
+    /// named table specifically (saved_posts.recommendation_id ->
+    /// recommendations.id) — there's no way to point a *nested* embed at
+    /// recommendations_display instead, the way fetchFeed's own top-level
+    /// query can (a view has no FK for anything to embed *through*).
+    /// Two-step fetch instead: pull the bare saved_posts rows, batch the
+    /// real (masked) recommendations separately via recommendationsReadPath
+    /// — same technique fetchWantsFeed already uses for its own profiles —
+    /// and merge client-side.
+    private func fetchRecommendationsByIds(_ ids: [String]) async -> [String: FeedRecommendation] {
+        guard !ids.isEmpty else { return [:] }
+        guard let token = try? await validToken() else { return [:] }
+        let (resourcePath, profilesSelect) = await recommendationsReadPath()
+        let select = "id,rating,note,created_at,photo_url,photo_urls,tags\(await anonymousField()),user_id,item_id," +
+            "items(id,type,title,subtitle,image_url,genre,recipe_text)," +
+            "\(profilesSelect)"
+        var components = URLComponents(url: baseURL.appendingPathComponent(resourcePath), resolvingAgainstBaseURL: false)!
+        components.queryItems = [
+            URLQueryItem(name: "select", value: select),
+            URLQueryItem(name: "id", value: "in.(\(ids.joined(separator: ",")))"),
+        ]
+        var request = URLRequest(url: components.url!)
+        request.setValue(anonKey, forHTTPHeaderField: "apikey")
+        request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+        guard let (data, response) = try? await URLSession.shared.data(for: request),
+              let http = response as? HTTPURLResponse, http.statusCode < 400,
+              let recs = try? JSONDecoder().decode([FeedRecommendation].self, from: data)
+        else { return [:] }
+        return Dictionary(uniqueKeysWithValues: recs.map { ($0.id, $0) })
+    }
+
     /// Posts saved from other people — the Pinterest-style half of Collections.
     func fetchSavedPosts() async throws -> [SavedPost] {
         let token = try await validToken()
         guard let userId = currentUserId else { throw RexAPIError.notSignedIn }
-        let select = "id,created_at,list_id,recommendation_id," +
-            "recommendations(id,rating,note,created_at,photo_url,photo_urls,tags\(await anonymousField()),user_id,item_id," +
-            "items(id,type,title,subtitle,image_url,genre)," +
-            "profiles!recommendations_user_id_fkey(username,display_name,avatar_url))"
+        let select = "id,created_at,list_id,recommendation_id"
         var components = URLComponents(url: baseURL.appendingPathComponent("/rest/v1/saved_posts"), resolvingAgainstBaseURL: false)!
         components.queryItems = [
             URLQueryItem(name: "select", value: select),
@@ -2482,7 +2855,13 @@ final class RexAPI {
         guard let http = response as? HTTPURLResponse, http.statusCode < 400 else {
             throw RexAPIError.server(friendlyError(data, fallback: "Couldn't load your saved posts."))
         }
-        return try JSONDecoder().decode([SavedPost].self, from: data)
+        struct Row: Codable { let id: String; let created_at: String?; let list_id: String?; let recommendation_id: String }
+        let rows = (try? JSONDecoder().decode([Row].self, from: data)) ?? []
+        let recsById = await fetchRecommendationsByIds(rows.map { $0.recommendation_id })
+        return rows.map {
+            SavedPost(id: $0.id, created_at: $0.created_at, list_id: $0.list_id,
+                       recommendation_id: $0.recommendation_id, recommendations: recsById[$0.recommendation_id])
+        }
     }
 
     /// What's inside one collection. Unlike `fetchSavedPosts` this isn't scoped
@@ -2490,10 +2869,7 @@ final class RexAPI {
     /// hitlist_lists is what decides whether you can see it.
     func fetchCollectionItems(listId: String) async throws -> [SavedPost] {
         let token = try await validToken()
-        let select = "id,created_at,list_id,recommendation_id," +
-            "recommendations(id,rating,note,created_at,photo_url,photo_urls,tags\(await anonymousField()),user_id,item_id," +
-            "items(id,type,title,subtitle,image_url,genre)," +
-            "profiles!recommendations_user_id_fkey(username,display_name,avatar_url))"
+        let select = "id,created_at,list_id,recommendation_id"
         var components = URLComponents(url: baseURL.appendingPathComponent("/rest/v1/saved_posts"), resolvingAgainstBaseURL: false)!
         components.queryItems = [
             URLQueryItem(name: "select", value: select),
@@ -2508,7 +2884,13 @@ final class RexAPI {
         guard let http = response as? HTTPURLResponse, http.statusCode < 400 else {
             throw RexAPIError.server(friendlyError(data, fallback: "Couldn't load that collection."))
         }
-        return try JSONDecoder().decode([SavedPost].self, from: data)
+        struct Row: Codable { let id: String; let created_at: String?; let list_id: String?; let recommendation_id: String }
+        let rows = (try? JSONDecoder().decode([Row].self, from: data)) ?? []
+        let recsById = await fetchRecommendationsByIds(rows.map { $0.recommendation_id })
+        return rows.map {
+            SavedPost(id: $0.id, created_at: $0.created_at, list_id: $0.list_id,
+                       recommendation_id: $0.recommendation_id, recommendations: recsById[$0.recommendation_id])
+        }
     }
 
     func fetchWants() async throws -> [WantRow] {
@@ -2578,32 +2960,37 @@ final class RexAPI {
     ///
     /// Presented as recommendations with no rating so the feed can render them
     /// with everything else; `rating: 0` is what marks them as a want.
-    func fetchWantsFeed() async throws -> [FeedRecommendation] {
+    /// #184 — "want to try not appearing on the feed", the actual bug: not
+    /// the search/filter path (fixed first, real but secondary — see below),
+    /// but that wants NEVER showed in the feed at all, for anyone, in any
+    /// state. Root cause was the `profiles!wants_user_id_fkey(...)` embed
+    /// on the old query. That constraint name is real (Postgres's default
+    /// auto-name for wants.user_id's FK), but pointed at auth.users, not
+    /// public.profiles — the identically-shaped `profiles!
+    /// recommendations_user_id_fkey` embed used throughout the rest of this
+    /// file works anyway (PostgREST bridges it through profiles' own FK to
+    /// auth.users), but whatever made that work didn't hold for wants, so
+    /// PostgREST couldn't resolve the relationship and every single request
+    /// failed — silently, since the failure is swallowed by `try?` a few
+    /// lines down, so it read as "no wants" rather than an error.
+    /// Rather than keep relying on unverifiable embed-inference behaviour,
+    /// this now fetches wants+items the same proven-safe way fetchWants()
+    /// (Collections, which never broke) already does — plain items(...),
+    /// no !inner, no profiles embed at all — and batches profiles
+    /// separately via fetchProfiles(ids:), merged in client-side.
+    ///
+    /// category/searchText mirror fetchFeed's own parameters (added when
+    /// the search/filter path was found to skip wants entirely) so
+    /// FeedView can merge wants into a filtered/searched result the same
+    /// way loadFeed() merges them into the unfiltered one. Searching by
+    /// the poster's username/display name isn't supported here any more —
+    /// that relied on the same broken embed — only title/note match.
+    func fetchWantsFeed(category: String? = nil, searchText: String? = nil) async throws -> [FeedRecommendation] {
         let token = try await validToken()
-        guard let userId = currentUserId else { return [] }
+        guard currentUserId != nil else { return [] }
         let noteField = await wantNoteField()
         let select = "id,created_at,item_id,user_id\(noteField)," +
-            "items!inner(id,type,title,subtitle,image_url,genre,address,link_url)," +
-            "profiles!wants_user_id_fkey(username,display_name,avatar_url)"
-        var components = URLComponents(url: baseURL.appendingPathComponent("/rest/v1/wants"), resolvingAgainstBaseURL: false)!
-        components.queryItems = [
-            URLQueryItem(name: "select", value: select),
-            // Used to be neq.\(userId) — "your own wants already live on
-            // your list; the feed is other people." Kathryn asked directly
-            // to see her own want-to-trys on her own feed too, so this now
-            // pulls everyone's, same as the rest of the feed does.
-            URLQueryItem(name: "order", value: "created_at.desc"),
-            // Was 30 — a want to try has no rating and often no note either,
-            // so it's easy for a page this small to end up entirely stale
-            // ones from a quiet week rather than anything recent.
-            URLQueryItem(name: "limit", value: "100"),
-        ]
-        var request = URLRequest(url: components.url!)
-        request.setValue(anonKey, forHTTPHeaderField: "apikey")
-        request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
-
-        let (data, response) = try await URLSession.shared.data(for: request)
-        guard let http = response as? HTTPURLResponse, http.statusCode < 400 else { return [] }
+            "items(id,type,title,subtitle,image_url,genre,address,link_url,recipe_text)"
         struct Row: Codable {
             let id: String
             let created_at: String
@@ -2611,9 +2998,73 @@ final class RexAPI {
             let user_id: String
             let note: String?
             let items: RexItem?
-            let profiles: RexProfile?
         }
-        let rows = (try? JSONDecoder().decode([Row].self, from: data)) ?? []
+
+        let trimmedSearch = searchText?.trimmingCharacters(in: .whitespaces)
+        let isFiltered = category != nil || !(trimmedSearch ?? "").isEmpty
+        // Was 30, then 100 — a want to try has no rating and often no note
+        // either, so it's easy for a page this small to end up entirely
+        // stale ones from a quiet week rather than anything recent. Filtered
+        // needs real range for the same reason fetchFeed's does: the match
+        // could be anywhere in your history, not just the last page.
+        let limit = isFiltered ? 300 : 100
+
+        func fetchRows(extraFilters: [(String, String)]) async -> [Row] {
+            var components = URLComponents(url: baseURL.appendingPathComponent("/rest/v1/wants"), resolvingAgainstBaseURL: false)!
+            var queryItems = [
+                URLQueryItem(name: "select", value: select),
+                URLQueryItem(name: "order", value: "created_at.desc"),
+                URLQueryItem(name: "limit", value: "\(limit)"),
+            ]
+            for filter in extraFilters { queryItems.append(URLQueryItem(name: filter.0, value: filter.1)) }
+            components.queryItems = queryItems
+            var request = URLRequest(url: components.url!)
+            request.setValue(anonKey, forHTTPHeaderField: "apikey")
+            request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+            guard let (data, response) = try? await URLSession.shared.data(for: request),
+                  let http = response as? HTTPURLResponse, http.statusCode < 400
+            else { return [] }
+            return (try? JSONDecoder().decode([Row].self, from: data)) ?? []
+        }
+
+        let categoryFilter: [(String, String)] = category.map { [("items.type", "eq.\($0)")] } ?? []
+        let rows: [Row]
+        let profilesById: [String: RexProfile]
+        if let trimmedSearch, !trimmedSearch.isEmpty {
+            // Poster username/display_name search used to go through the
+            // same profiles!wants_user_id_fkey embed that turned out to be
+            // broken (see this function's doc comment) — dropping it fixed
+            // wants showing up at all, but lost name search as a casualty.
+            // Restored here without the embed: pull everything in the
+            // category (unfiltered by text — wants are low-volume enough
+            // that this is cheap), batch-fetch profiles once, then match
+            // title/subtitle/note/username/display_name together client-
+            // side. Covers strictly more than the old embed-based search
+            // did (that only ever matched title or note, one field per
+            // request), in one pass instead of several.
+            let candidates = await fetchRows(extraFilters: categoryFilter)
+            let byId = Dictionary(
+                uniqueKeysWithValues: ((try? await fetchProfiles(ids: Array(Set(candidates.map { $0.user_id })))) ?? [])
+                    .map { ($0.id, RexProfile(username: $0.username, display_name: $0.display_name, avatar_url: $0.avatar_url)) }
+            )
+            let q = trimmedSearch.lowercased()
+            rows = candidates.filter { row in
+                let profile = byId[row.user_id]
+                let haystack = [
+                    row.items?.title, row.items?.subtitle, row.note,
+                    profile?.username, profile?.display_name,
+                ].compactMap { $0 }.joined(separator: " ").lowercased()
+                return haystack.contains(q)
+            }
+            profilesById = byId
+        } else {
+            rows = await fetchRows(extraFilters: categoryFilter)
+            profilesById = Dictionary(
+                uniqueKeysWithValues: ((try? await fetchProfiles(ids: Array(Set(rows.map { $0.user_id })))) ?? [])
+                    .map { ($0.id, RexProfile(username: $0.username, display_name: $0.display_name, avatar_url: $0.avatar_url)) }
+            )
+        }
+
         return rows.map { row in
             FeedRecommendation(
                 id: "want-\(row.id)",
@@ -2626,7 +3077,7 @@ final class RexAPI {
                 user_id: row.user_id,
                 item_id: row.item_id,
                 items: row.items,
-                profiles: row.profiles,
+                profiles: profilesById[row.user_id],
                 creators: nil,
                 trip_section: nil,
                 is_anonymous: false,
@@ -2663,12 +3114,27 @@ final class RexAPI {
     /// because PostgREST has no group-by; the id list is one feed page, so this
     /// stays small.
     func fetchRexCounts(itemIds: [String]) async throws -> [String: Int] {
-        guard !itemIds.isEmpty else { return [:] }
+        // A blast has no real `items` row — FeedRecommendation gives it a
+        // synthetic "blast-<uuid>" item_id purely so it has an Identifiable
+        // id to key off of client-side. That string isn't a real uuid, so
+        // whenever a blast rode along in this batch (any real feed page,
+        // basically), PostgREST 400'd on the whole `in.(...)` list with
+        // "invalid input syntax for type uuid" — and since the guard below
+        // just swallows a non-2xx response as "no counts", the ENTIRE
+        // page's rex-counts silently came back empty, not just the blast's.
+        // Invisible before now because a zero count used to just hide the
+        // "Also Rex'd by" row; the always-shown rex-icon count (see
+        // RexCardActions) is what actually surfaced it as every card
+        // reading 0. Filtering these out is the fix, not a workaround —
+        // there was never a real count to fetch for a blast in the first
+        // place.
+        let realItemIds = itemIds.filter { !$0.hasPrefix("blast-") }
+        guard !realItemIds.isEmpty else { return [:] }
         let token = try await validToken()
         var components = URLComponents(url: baseURL.appendingPathComponent("/rest/v1/recommendations"), resolvingAgainstBaseURL: false)!
         components.queryItems = [
             URLQueryItem(name: "select", value: "item_id"),
-            URLQueryItem(name: "item_id", value: "in.(\(itemIds.joined(separator: ",")))"),
+            URLQueryItem(name: "item_id", value: "in.(\(realItemIds.joined(separator: ",")))"),
             URLQueryItem(name: "trip_id", value: "is.null"),
             URLQueryItem(name: "limit", value: "2000"),
         ]
@@ -2681,6 +3147,32 @@ final class RexAPI {
         struct Row: Codable { let item_id: String }
         let rows = (try? JSONDecoder().decode([Row].self, from: data)) ?? []
         return rows.reduce(into: [:]) { counts, row in counts[row.item_id, default: 0] += 1 }
+    }
+
+    /// Everyone who's Rex'd this item, newest first — the tap target behind
+    /// the card's rex-icon count (see RexCardActions). Same masked-profiles
+    /// path as every other recommendations read, so an anonymous poster
+    /// shows up in the list (they still count) without naming them.
+    func fetchRexers(itemId: String) async throws -> [RexerInfo] {
+        let token = try await validToken()
+        let (resourcePath, profilesSelect) = await recommendationsReadPath()
+        let select = "id,user_id,rating,created_at\(await anonymousField()),\(profilesSelect)"
+        var components = URLComponents(url: baseURL.appendingPathComponent(resourcePath), resolvingAgainstBaseURL: false)!
+        components.queryItems = [
+            URLQueryItem(name: "select", value: select),
+            URLQueryItem(name: "item_id", value: "eq.\(itemId)"),
+            URLQueryItem(name: "trip_id", value: "is.null"),
+            URLQueryItem(name: "order", value: "created_at.desc"),
+        ]
+        var request = URLRequest(url: components.url!)
+        request.setValue(anonKey, forHTTPHeaderField: "apikey")
+        request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+
+        let (data, response) = try await URLSession.shared.data(for: request)
+        guard let http = response as? HTTPURLResponse, http.statusCode < 400 else {
+            throw RexAPIError.server("Couldn't load who's Rex'd this.")
+        }
+        return try JSONDecoder().decode([RexerInfo].self, from: data)
     }
 
     /// Titles for a set of trips, keyed by the trip's recommendation id — what
@@ -2737,8 +3229,21 @@ final class RexAPI {
 
     func fetchMapPlaces() async throws -> [MapPlace] {
         let token = try await validToken()
+        // "the map doesn't even load" (Aug 26/27) — the embedded profiles(...)
+        // here used to be unqualified, which was fine until #162 added
+        // recommendation_tags: that table's own FKs to both recommendations
+        // and profiles gave PostgREST a second path between them, so a bare
+        // `profiles(...)` embed became ambiguous. PostgREST answers an
+        // ambiguous embed with HTTP 300 and an error object describing the
+        // two candidate relationships instead of the row data — which slid
+        // straight past this function's `statusCode < 400` success check
+        // and into JSONDecoder, which then failed on a dictionary where it
+        // expected an array. Naming the FK explicitly (as PostgREST's own
+        // error hint suggested) resolves the ambiguity outright — same fix
+        // applied to fetchMapPlaces(forTrip:) and fetchMapPlace(itemId:)
+        // below, which embed the exact same way.
         let select = "id,title,subtitle,type,genre,address,lat,lng,image_url," +
-            "recommendations!inner(id,rating,user_id,trip_id,profiles(username,display_name,avatar_url))"
+            "recommendations!inner(id,rating,user_id,trip_id,profiles!recommendations_user_id_fkey(username,display_name,avatar_url))"
         var components = URLComponents(url: baseURL.appendingPathComponent("/rest/v1/items"), resolvingAgainstBaseURL: false)!
         components.queryItems = [
             URLQueryItem(name: "select", value: select),
@@ -2747,7 +3252,7 @@ final class RexAPI {
             // #164 — this used to cap at 200, which meant genuinely old
             // (pre-Lovable-migration) place/event Rex could be excluded from
             // the map's own dataset outright, before the self-heal geocode
-            // repair below even got a chance to run on them: created_at.desc
+            // repair even got a chance to run on them: created_at.desc
             // + limit only ever takes the newest 200, so an old row past
             // that cutoff was never fetched at all, geocoded or not. Raised
             // well past any real friend group's total place/event count
@@ -2763,31 +3268,43 @@ final class RexAPI {
         guard let http = response as? HTTPURLResponse, http.statusCode < 400 else {
             throw RexAPIError.server("Couldn't load the map.")
         }
-        let places = try JSONDecoder().decode([MapPlace].self, from: data)
         // lat/lng are nullable in the schema even though we need them to
-        // place a pin. #146: rather than just dropping every place that's
-        // missing one — mostly Lovable-era Rex from before #135 added
-        // geocoding to the add-a-place flow — try to geocode it from its
-        // address first, same self-healing pattern as repairPlacePhotoIfNeeded.
-        let repaired = await withTaskGroup(of: MapPlace.self) { group in
-            for place in places {
-                group.addTask {
-                    guard place.lat == nil || place.lng == nil,
-                          let address = place.address, !address.isEmpty,
-                          let located = await self.repairPlaceCoordsIfNeeded(itemId: place.id, address: address)
-                    else { return place }
-                    return MapPlace(
-                        id: place.id, title: place.title, subtitle: place.subtitle, type: place.type,
-                        genre: place.genre, address: place.address, lat: located.lat, lng: located.lng,
-                        image_url: place.image_url, recommendations: place.recommendations
-                    )
-                }
+        // place a pin, mostly for Lovable-era Rex predating #135's
+        // geocode-on-add. This used to self-heal right here — geocoding
+        // every missing one via a TaskGroup and awaiting the whole batch
+        // before returning — but with #164's limit raised to 2000, a
+        // legacy backlog of un-geocoded rows turned "open the map" into a
+        // multi-second wait on Google's Geocoding API, once per item, on
+        // every single load (reported: "map takes ages to load"). Repair
+        // now happens in the background via repairMissingMapCoords, kicked
+        // off by MapView.load() *after* this returns rather than before —
+        // this just returns what's already geocoded, immediately.
+        return try JSONDecoder().decode([MapPlace].self, from: data)
+    }
+
+    /// Fire-and-forget geocode repair for whatever fetchMapPlaces()/
+    /// fetchMapWants() came back with that's still missing lat/lng — see
+    /// fetchMapPlaces' doc comment for why this moved out of the awaited
+    /// load path. Each repaired place is reported back via `onRepaired` as
+    /// it resolves (on the main actor, safe to fold straight into @State)
+    /// rather than blocking the map's initial render on the whole backlog.
+    /// repairPlaceCoordsIfNeeded's own dedup guard keeps this from re-firing
+    /// for the same item within a session, and it persists successes to the
+    /// item row, so the backlog only ever gets smaller across app launches.
+    func repairMissingMapCoords(_ places: [MapPlace], onRepaired: @escaping (MapPlace) -> Void) {
+        for place in places {
+            guard place.lat == nil || place.lng == nil,
+                  let address = place.address, !address.isEmpty else { continue }
+            Task {
+                guard let located = await self.repairPlaceCoordsIfNeeded(itemId: place.id, address: address) else { return }
+                let repaired = MapPlace(
+                    id: place.id, title: place.title, subtitle: place.subtitle, type: place.type,
+                    genre: place.genre, address: place.address, lat: located.lat, lng: located.lng,
+                    image_url: place.image_url, recommendations: place.recommendations
+                )
+                await MainActor.run { onRepaired(repaired) }
             }
-            var results: [MapPlace] = []
-            for await place in group { results.append(place) }
-            return results
         }
-        return repaired.filter { $0.lat != nil && $0.lng != nil }
     }
 
     /// A specific trip's own stops, regardless of whether they're in
@@ -2799,7 +3316,7 @@ final class RexAPI {
     func fetchMapPlaces(forTrip tripRecommendationId: String) async throws -> [MapPlace] {
         let token = try await validToken()
         let select = "id,title,subtitle,type,genre,address,lat,lng,image_url," +
-            "recommendations!inner(id,rating,user_id,trip_id,profiles(username,display_name,avatar_url))"
+            "recommendations!inner(id,rating,user_id,trip_id,profiles!recommendations_user_id_fkey(username,display_name,avatar_url))"
         var components = URLComponents(url: baseURL.appendingPathComponent("/rest/v1/items"), resolvingAgainstBaseURL: false)!
         components.queryItems = [
             URLQueryItem(name: "select", value: select),
@@ -2848,7 +3365,7 @@ final class RexAPI {
     func fetchMapPlace(itemId: String) async throws -> MapPlace? {
         let token = try await validToken()
         let select = "id,title,subtitle,type,genre,address,lat,lng,image_url," +
-            "recommendations!inner(id,rating,user_id,trip_id,profiles(username,display_name,avatar_url))"
+            "recommendations!inner(id,rating,user_id,trip_id,profiles!recommendations_user_id_fkey(username,display_name,avatar_url))"
         var components = URLComponents(url: baseURL.appendingPathComponent("/rest/v1/items"), resolvingAgainstBaseURL: false)!
         components.queryItems = [
             URLQueryItem(name: "select", value: select),
@@ -2884,11 +3401,14 @@ final class RexAPI {
     /// merge — a separate fetch, combined client-side in RexMapView.load(),
     /// rather than fighting PostgREST to OR across two unrelated child
     /// tables in one query.
+    /// #184 — this had the same broken `profiles!wants_user_id_fkey` embed
+    /// fetchWantsFeed did (see that function's doc comment for the full
+    /// story), so it silently 400'd and returned zero want-pins on every
+    /// call. Same fix: drop the embed, batch profiles separately.
     func fetchMapWants() async throws -> [MapPlace] {
         let token = try await validToken()
         let select = "id,user_id,item_id," +
-            "items!inner(id,title,subtitle,type,genre,address,lat,lng,image_url)," +
-            "profiles!wants_user_id_fkey(username,display_name,avatar_url)"
+            "items!inner(id,title,subtitle,type,genre,address,lat,lng,image_url)"
         var components = URLComponents(url: baseURL.appendingPathComponent("/rest/v1/wants"), resolvingAgainstBaseURL: false)!
         components.queryItems = [
             URLQueryItem(name: "select", value: select),
@@ -2906,33 +3426,32 @@ final class RexAPI {
             let user_id: String
             let item_id: String
             let items: Item
-            let profiles: RexProfile?
             struct Item: Codable {
                 let id: String, title: String, subtitle: String?, type: String
                 let genre: String?, address: String?, lat: Double?, lng: Double?, image_url: String?
             }
         }
         let rows = (try? JSONDecoder().decode([Row].self, from: data)) ?? []
-        var places: [MapPlace] = []
-        for row in rows {
-            var lat = row.items.lat, lng = row.items.lng
-            if (lat == nil || lng == nil), let address = row.items.address, !address.isEmpty,
-               let located = await repairPlaceCoordsIfNeeded(itemId: row.items.id, address: address) {
-                lat = located.lat
-                lng = located.lng
-            }
-            guard let lat, let lng else { continue }
-            places.append(MapPlace(
+        let profilesById = Dictionary(
+            uniqueKeysWithValues: ((try? await fetchProfiles(ids: Array(Set(rows.map { $0.user_id })))) ?? [])
+                .map { ($0.id, RexProfile(username: $0.username, display_name: $0.display_name, avatar_url: $0.avatar_url)) }
+        )
+        // Geocode repair used to happen inline here too — one address at a
+        // time, awaited, the worst offender behind "map takes ages to
+        // load" since it wasn't even concurrent the way fetchMapPlaces' was.
+        // Same fix: return what's already geocoded (or not) and let
+        // MapView.load() hand the gaps to repairMissingMapCoords instead.
+        return rows.map { row in
+            MapPlace(
                 id: row.items.id, title: row.items.title, subtitle: row.items.subtitle, type: row.items.type,
-                genre: row.items.genre, address: row.items.address, lat: lat, lng: lng,
+                genre: row.items.genre, address: row.items.address, lat: row.items.lat, lng: row.items.lng,
                 image_url: row.items.image_url,
                 // rating 0 / trip_id nil — a want has neither; the synthetic
                 // "want-" id prefix keeps it distinct if this same item also
                 // has a real recommendation (see the merge in load()).
-                recommendations: [MapRecStub(id: "want-\(row.id)", rating: 0, user_id: row.user_id, trip_id: nil, profiles: row.profiles)]
-            ))
+                recommendations: [MapRecStub(id: "want-\(row.id)", rating: 0, user_id: row.user_id, trip_id: nil, profiles: profilesById[row.user_id])]
+            )
         }
-        return places
     }
 
     // MARK: - Import (#109 "Lists" category, #15/#38 native trip import)
@@ -3167,7 +3686,18 @@ final class RexAPI {
         // own list_id linkage. showInFeed only applies alongside docListId.
         docListId: String? = nil,
         docListSection: String? = nil,
-        showInFeed: Bool? = nil
+        showInFeed: Bool? = nil,
+        // Aug 30 — "all my trips have wildly-off geocoding": raw_creator is
+        // only ever populated when the extraction happened to notice a
+        // city/cuisine on that exact row, which for a casually-pasted
+        // itinerary is inconsistent at best. A bare venue name with nothing
+        // else to disambiguate it ("The Ivy", "The Anchor") reliably
+        // geocodes to a same-named place absolutely anywhere in the world.
+        // The trip/list/collection's own name is almost always itself a
+        // destination (Kathryn's own: "St Mawes trip", "Loire - Les Sables
+        // d'Olonne - Brittany") — a second, usually-present disambiguator
+        // costs nothing to append and fixes the common case outright.
+        locationHint: String? = nil
     ) async throws -> String {
         guard let type = row.suggested_type, !type.isEmpty else {
             throw RexAPIError.server("Set a type before approving.")
@@ -3187,7 +3717,7 @@ final class RexAPI {
             var geocodedLat: Double?
             var geocodedLng: Double?
             if type == "place" || type == "event" {
-                let query = [row.raw_title, row.raw_creator]
+                let query = [row.raw_title, row.raw_creator, locationHint]
                     .compactMap { $0 }.filter { !$0.isEmpty }.joined(separator: ", ")
                 if let located = await RexSearch.geocode(query) {
                     geocodedLat = located.lat
@@ -3262,7 +3792,10 @@ final class RexAPI {
         var failed: [ImportFailure] = []
         for row in rows {
             do {
-                try await approveOneStagingRow(row, rating: nil, note: nil, tripId: tripRecId, tripSection: row.raw_section, listId: nil)
+                try await approveOneStagingRow(
+                    row, rating: nil, note: nil, tripId: tripRecId, tripSection: row.raw_section, listId: nil,
+                    locationHint: tripName
+                )
                 added += 1
             } catch {
                 failed.append(ImportFailure(title: row.raw_title, reason: error.localizedDescription))
@@ -3294,7 +3827,8 @@ final class RexAPI {
             do {
                 try await approveOneStagingRow(
                     row, rating: nil, note: nil, tripId: nil, tripSection: nil, listId: nil,
-                    docListId: listRecId, docListSection: row.raw_section, showInFeed: showInFeedIds.contains(row.id)
+                    docListId: listRecId, docListSection: row.raw_section, showInFeed: showInFeedIds.contains(row.id),
+                    locationHint: listName
                 )
                 added += 1
             } catch {
@@ -3337,7 +3871,10 @@ final class RexAPI {
 
             for row in groupRows {
                 do {
-                    try await approveOneStagingRow(row, rating: nil, note: nil, tripId: nil, tripSection: nil, listId: listId)
+                    try await approveOneStagingRow(
+                        row, rating: nil, note: nil, tripId: nil, tripSection: nil, listId: listId,
+                        locationHint: key
+                    )
                     added += 1
                 } catch {
                     failed.append(ImportFailure(title: row.raw_title, reason: error.localizedDescription))

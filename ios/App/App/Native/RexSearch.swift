@@ -299,6 +299,64 @@ enum RexSearch {
         }
     }
 
+    /// #167's long-press-to-add on the map used CLGeocoder's reverse
+    /// geocode for "what's at this point", which only ever resolves to a
+    /// street address — never the business occupying it, so tapping
+    /// directly on a restaurant/cafe icon added "14 Market Street" instead
+    /// of the restaurant. This asks Google Places (New) — the same
+    /// catalogue search() above already uses — what's actually there
+    /// instead: Nearby Search ranked by distance, with a tight ~40m radius
+    /// so it picks up whatever's directly under the pin rather than
+    /// something down the block. MapView falls back to the old address-only
+    /// CLGeocoder path when this comes back empty (a genuinely
+    /// venue-less spot — the middle of a park, a random field).
+    static func nearby(lat: Double, lng: Double) async -> RexSearchHit? {
+        guard !googleKey.isEmpty else { return nil }
+        guard let url = URL(string: "https://places.googleapis.com/v1/places:searchNearby") else { return nil }
+        var request = URLRequest(url: url)
+        request.httpMethod = "POST"
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        request.setValue(googleKey, forHTTPHeaderField: "X-Goog-Api-Key")
+        request.setValue(bundleId, forHTTPHeaderField: "X-Ios-Bundle-Identifier")
+        request.setValue(
+            "places.id,places.displayName,places.formattedAddress,places.location," +
+            "places.primaryTypeDisplayName,places.photos,places.rating,places.userRatingCount",
+            forHTTPHeaderField: "X-Goog-FieldMask"
+        )
+        request.httpBody = try? JSONSerialization.data(withJSONObject: [
+            "maxResultCount": 1,
+            "rankPreference": "DISTANCE",
+            "locationRestriction": [
+                "circle": ["center": ["latitude": lat, "longitude": lng], "radius": 40.0]
+            ],
+        ])
+        guard let (data, response) = try? await URLSession.shared.data(for: request),
+              let http = response as? HTTPURLResponse, http.statusCode < 400,
+              let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+              let p = (json["places"] as? [[String: Any]])?.first,
+              let id = p["id"] as? String
+        else { return nil }
+        let name = (p["displayName"] as? [String: Any])?["text"] as? String ?? "Untitled"
+        let loc = p["location"] as? [String: Any]
+        let photoName = (p["photos"] as? [[String: Any]])?.first?["name"] as? String
+        let photoURL = photoName.map {
+            "https://places.googleapis.com/v1/\($0)/media?maxWidthPx=800&key=\(googleKey)"
+        }
+        return RexSearchHit(
+            externalId: id,
+            externalSource: "google_places",
+            title: name,
+            subtitle: nil,
+            imageURL: photoURL,
+            genre: (p["primaryTypeDisplayName"] as? [String: Any])?["text"] as? String,
+            address: p["formattedAddress"] as? String,
+            lat: loc?["latitude"] as? Double,
+            lng: loc?["longitude"] as? Double,
+            googleRating: p["rating"] as? Double,
+            googleRatingCount: p["userRatingCount"] as? Int
+        )
+    }
+
     /// #135 — a stop only ever got a map pin if it was picked from a live
     /// places() search result above; anything typed by hand, or brought in
     /// by the document importer (which never geocodes at all), had no

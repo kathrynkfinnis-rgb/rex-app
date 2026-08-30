@@ -159,10 +159,18 @@ private struct SignUpScreen: View {
     @State private var errorMessage: String?
     @State private var checkYourInbox = false
     @FocusState private var focused: AuthField?
+    /// #182 — explicit, unambiguous consent (a real checkbox, not just the
+    /// passive "by continuing you agree..." line on the landing screen)
+    /// gating both sign-up paths below. showingLegal opens the same
+    /// content either the password flow's link or the checkbox's own
+    /// "Terms of Use"/"Privacy Policy" links can trigger.
+    @State private var agreedToTerms = false
+    @State private var showingLegal: LegalContentView.Section?
 
     private var canSubmit: Bool {
         !email.trimmingCharacters(in: .whitespaces).isEmpty
             && password.count >= 6
+            && agreedToTerms
             && !isLoading
     }
 
@@ -193,6 +201,9 @@ private struct SignUpScreen: View {
                 }
                 .padding(.top, RexSpacing.lg)
 
+                agreementRow
+                    .padding(.top, RexSpacing.lg)
+
                 if let errorMessage {
                     Text(errorMessage)
                         .font(RexFont.text(13))
@@ -220,8 +231,45 @@ private struct SignUpScreen: View {
                 }
                 .padding(.vertical, RexSpacing.lg)
 
-                AppleSignInButton(onSignedIn: onSignedIn, errorMessage: $errorMessage)
+                // Apple's own button has no notion of "disabled" styling that
+                // matches ours, so this just blocks the tap and dims it —
+                // same gate as the password path's canSubmit above.
+                AppleSignInButton(onSignedIn: {
+                    Task { await RexAPI.shared.recordTermsAcceptance() }
+                    onSignedIn()
+                }, errorMessage: $errorMessage)
+                .disabled(!agreedToTerms)
+                .opacity(agreedToTerms ? 1 : 0.5)
             }
+        }
+        .sheet(item: $showingLegal) { section in
+            LegalContentView(section: section)
+        }
+    }
+
+    /// #182 — explicit consent, required before either sign-up path is
+    /// enabled. "Terms of Use" and "Privacy Policy" are separately tappable
+    /// so you can actually read either one before ticking the box.
+    private var agreementRow: some View {
+        HStack(alignment: .top, spacing: RexSpacing.sm) {
+            Button {
+                agreedToTerms.toggle()
+            } label: {
+                Image(systemName: agreedToTerms ? "checkmark.square.fill" : "square")
+                    .font(.system(size: 20))
+                    .foregroundStyle(agreedToTerms ? RexColor.primary : RexColor.mutedForeground)
+            }
+            .buttonStyle(.plain)
+
+            (
+                Text("I agree to the ")
+                    .foregroundColor(RexColor.mutedForeground)
+                + Text("Terms of Use").foregroundColor(RexColor.primary).underline()
+                + Text(" and ").foregroundColor(RexColor.mutedForeground)
+                + Text("Privacy Policy").foregroundColor(RexColor.primary).underline()
+            )
+            .font(RexFont.text(13))
+            .onTapGesture { showingLegal = .terms }
         }
     }
 

@@ -1,12 +1,18 @@
 import SwiftUI
 
-/// Adds one stop directly to an already-published trip — the "add" half of
-/// #122's trip editing (add/remove/reorder stops per heading, edit headings).
-/// Mirrors TripStopsBuilderView's own add-form (search, geocode, rating,
-/// note, heading) but posts straight to the server instead of appending to a
-/// draft array, since this trip already exists and has its own id.
+/// Adds one stop/item directly to an already-published trip or list — the
+/// "add" half of #122's trip editing (add/remove/reorder stops per heading,
+/// edit headings), and (Aug 28) ListDetailView's equivalent, which never got
+/// it the first time around — "editing the heading doesn't work" and "I want
+/// to add a heading between cards ... but I can't" were both really "a List
+/// only ever got TripStopsBuilderView's up-front builder, never #122's
+/// after-the-fact editing tools at all." Mirrors TripStopsBuilderView's own
+/// add-form (search, geocode, rating, note, heading) but posts straight to
+/// the server instead of appending to a draft array, since this trip/list
+/// already exists and has its own id.
 struct AddTripStopSheet: View {
-    let tripId: String
+    enum Container { case trip(String), list(String) }
+    let container: Container
     var onAdded: () -> Void
 
     @Environment(\.dismiss) private var dismiss
@@ -24,10 +30,25 @@ struct AddTripStopSheet: View {
     @State private var isGeocoding = false
     @State private var errorMessage: String?
 
-    private let stopTypes: [RexCategory] = [.place, .event, .recipe, .other]
+    /// A list can hold anything TripStopsBuilderView already offers a list
+    /// (#109/#118); a trip's stops are almost always a place. Same category
+    /// set TripStopsBuilderView itself uses per container.
+    private var stopTypes: [RexCategory] {
+        switch container {
+        case .trip: return [.place, .event, .recipe, .other]
+        case .list: return [.place, .event, .book, .movie, .tv, .podcast, .recipe, .other]
+        }
+    }
+    private var noun: String { if case .trip = container { return "stop" } else { return "item" } }
 
     init(tripId: String, initialSection: String? = nil, onAdded: @escaping () -> Void) {
-        self.tripId = tripId
+        self.container = .trip(tripId)
+        self.onAdded = onAdded
+        _section = State(initialValue: initialSection ?? "")
+    }
+
+    init(listId: String, initialSection: String? = nil, onAdded: @escaping () -> Void) {
+        self.container = .list(listId)
         self.onAdded = onAdded
         _section = State(initialValue: initialSection ?? "")
     }
@@ -125,7 +146,7 @@ struct AddTripStopSheet: View {
                             }
                             .frame(maxWidth: .infinity)
                         } else {
-                            Text("Add stop").frame(maxWidth: .infinity)
+                            Text("Add \(noun)").frame(maxWidth: .infinity)
                         }
                     }
                     .buttonStyle(RexPrimaryButtonStyle())
@@ -134,7 +155,7 @@ struct AddTripStopSheet: View {
                 .padding(RexSpacing.page)
             }
             .background(RexColor.background.ignoresSafeArea())
-            .navigationTitle("Add a stop")
+            .navigationTitle("Add \(noun == "stop" ? "a" : "an") \(noun)")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .topBarLeading) {
@@ -204,13 +225,29 @@ struct AddTripStopSheet: View {
                 lat: lat,
                 lng: lng
             )
-            try await RexAPI.shared.createRecommendation(
-                itemId: itemId,
-                rating: rating,
-                note: note.trimmingCharacters(in: .whitespaces).isEmpty ? nil : note,
-                tripId: tripId,
-                tripSection: section.trimmingCharacters(in: .whitespaces).isEmpty ? nil : section.trimmingCharacters(in: .whitespaces)
-            )
+            let trimmedSection = section.trimmingCharacters(in: .whitespaces)
+            switch container {
+            case .trip(let tripId):
+                try await RexAPI.shared.createRecommendation(
+                    itemId: itemId,
+                    rating: rating,
+                    note: note.trimmingCharacters(in: .whitespaces).isEmpty ? nil : note,
+                    tripId: tripId,
+                    tripSection: trimmedSection.isEmpty ? nil : trimmedSection
+                )
+            case .list(let listId):
+                // #118 — every list item defaults visible on the feed, same
+                // as a fresh import; the toggle to hide one after the fact
+                // lives in ListDetailView itself.
+                try await RexAPI.shared.createRecommendation(
+                    itemId: itemId,
+                    rating: rating,
+                    note: note.trimmingCharacters(in: .whitespaces).isEmpty ? nil : note,
+                    listId: listId,
+                    listSection: trimmedSection.isEmpty ? nil : trimmedSection,
+                    showInFeed: true
+                )
+            }
             onAdded()
             dismiss()
         } catch {

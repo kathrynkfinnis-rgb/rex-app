@@ -11,6 +11,26 @@ struct ProfileView: View {
     /// #133 "view on map" — MainTabView switches to the Map tab and jumps
     /// to this item's pin.
     var onViewOnMap: ((String) -> Void)? = nil
+    /// "Can we make the friends and collections boxes here both buttons
+    /// that take you to your respective pages?"
+    @Environment(\.goToFriends) private var goToFriends
+    @Environment(\.goToCollections) private var goToCollections
+    /// A no-op when Profile isn't actually a presented sheet (e.g. reached
+    /// as MainTabView's own tag(5) directly) — only closes anything when
+    /// there's really a presentation to close.
+    @Environment(\.dismiss) private var dismissSelf
+
+    /// "I would prefer the profile to always be a new screen. not a pop
+    /// up. in an existing screen." — used to own its own NavigationStack
+    /// specifically so it could work both as a sheet (no bound path to
+    /// push onto) and as MainTabView's own tag(5) tab root. Dropping the
+    /// sheet entirely removes that need: this now takes whichever
+    /// NavigationStack's path it's pushed onto — FeedView's own, when
+    /// reached from the avatar button, or a dedicated one MainTabView
+    /// wraps around tag(5) — so a nested NavigationStack (unsupported,
+    /// blank-screen-and-dead-back-button territory, a real bug this
+    /// session already hit once) never happens.
+    @Binding var path: NavigationPath
 
     @State private var profile: RexProfileDetail?
     @State private var recommendations: [FeedRecommendation] = []
@@ -32,10 +52,6 @@ struct ProfileView: View {
     /// of `recommendations` at all, so they need their own small fetches.
     @State private var friendCount = 0
     @State private var collectionCount = 0
-    /// Owned here rather than by the caller, so a swiped row's tap can push
-    /// onto it directly — the wrapping NavigationStack used to live in
-    /// MainTabView with no bindable path for this view to reach into.
-    @State private var path = NavigationPath()
 
     private var availableCategories: [RexCategory] {
         let present = Set(recommendations.compactMap { RexCategory(rawValue: $0.items?.type ?? "") })
@@ -49,10 +65,8 @@ struct ProfileView: View {
 
 
     var body: some View {
-        // Owns its own NavigationStack now, rather than relying on one
-        // MainTabView wrapped it in — that outer stack had no bound path,
-        // so a swiped row had nowhere to programmatically push to.
-        NavigationStack(path: $path) {
+        // No wrapping NavigationStack here — takes the `path` binding its
+        // caller passes in instead. See the doc comment on `path` above.
         ScrollView {
             if isLoading {
                 ProgressView().padding(.top, 80)
@@ -152,7 +166,6 @@ struct ProfileView: View {
         .navigationDestination(for: AuthorRoute.self) { AuthorBooksView(route: $0) }
         .navigationDestination(for: DraftsRoute.self) { _ in DraftsView() }
         .navigationDestination(for: NotificationPreferencesRoute.self) { _ in NotificationPreferencesView() }
-        }
     }
 
     private func delete(_ rec: FeedRecommendation) async {
@@ -181,23 +194,42 @@ struct ProfileView: View {
     private func load() async {
         isLoading = true
         errorMessage = nil
+        // "The profile takes ages to load" — this used to run almost
+        // entirely in series: await your profile, only then start
+        // recommendations, only then start rexCounts, and only
+        // friendships/lists at the very end (in parallel with each other,
+        // but after everything above had already finished) — four network
+        // round trips back to back where two would do. currentUserId
+        // decodes locally from the stored JWT (no request of its own — see
+        // its doc comment), so recommendations/friendships/lists never
+        // actually needed to wait on fetchMyProfile() finishing; only
+        // rexCounts genuinely depends on recommendations, since it needs
+        // their item_ids.
+        guard let userId = RexAPI.shared.currentUserId else {
+            errorMessage = "Not signed in."
+            isLoading = false
+            return
+        }
         do {
             async let profileTask = RexAPI.shared.fetchMyProfile()
-            let fetchedProfile = try await profileTask
-            profile = fetchedProfile
-            recommendations = try await RexAPI.shared.fetchRecommendations(forUser: fetchedProfile.id)
-            // "Who else has Rex'd this" was missing on your own profile —
-            // it's the same social proof the feed already shows.
-            let itemIds = Array(Set(recommendations.map { $0.item_id }))
-            rexCounts = (try? await RexAPI.shared.fetchRexCounts(itemIds: itemIds)) ?? [:]
-            // Best-effort, same as rexCounts above — a stat card reading 0
+            async let recommendationsTask = RexAPI.shared.fetchRecommendations(forUser: userId)
+            // Best-effort, same as rexCounts below — a stat card reading 0
             // because one of these failed is better than the whole profile
             // failing to load over it.
             async let friendshipsTask = RexAPI.shared.fetchFriendships()
             async let listsTask = RexAPI.shared.fetchLists()
+
+            profile = try await profileTask
+            recommendations = try await recommendationsTask
+            // "Who else has Rex'd this" was missing on your own profile —
+            // it's the same social proof the feed already shows.
+            let itemIds = Array(Set(recommendations.map { $0.item_id }))
+            async let rexCountsTask = RexAPI.shared.fetchRexCounts(itemIds: itemIds)
+
             let friendships = (try? await friendshipsTask) ?? []
             friendCount = friendships.filter { $0.status == "accepted" }.count
             collectionCount = (try? await listsTask)?.count ?? 0
+            rexCounts = (try? await rexCountsTask) ?? [:]
         } catch {
             errorMessage = error.localizedDescription
         }
@@ -244,8 +276,14 @@ struct ProfileView: View {
             HStack(spacing: RexSpacing.sm) {
                 statCard(value: "\(recommendations.count)", label: "REX")
                 statCard(value: averageRatingText, label: "AVG RATING")
-                statCard(value: "\(friendCount)", label: "FRIENDS")
-                statCard(value: "\(collectionCount)", label: "COLLECTIONS")
+                statCard(value: "\(friendCount)", label: "FRIENDS") {
+                    goToFriends?()
+                    dismissSelf()
+                }
+                statCard(value: "\(collectionCount)", label: "COLLECTIONS") {
+                    goToCollections?()
+                    dismissSelf()
+                }
             }
             .padding(.top, RexSpacing.md)
         }
@@ -257,8 +295,8 @@ struct ProfileView: View {
         return String(format: "%.1f", avg)
     }
 
-    private func statCard(value: String, label: String) -> some View {
-        VStack(spacing: 2) {
+    private func statCard(value: String, label: String, action: (() -> Void)? = nil) -> some View {
+        let card = VStack(spacing: 2) {
             Text(value)
                 .font(.system(size: 18, weight: .bold, design: .rounded))
                 .foregroundStyle(RexColor.foreground)
@@ -276,6 +314,13 @@ struct ProfileView: View {
             RoundedRectangle(cornerRadius: RexRadius.input, style: .continuous)
                 .stroke(RexColor.border, lineWidth: 1)
         )
+        return Group {
+            if let action {
+                Button(action: action) { card }.buttonStyle(.plain)
+            } else {
+                card
+            }
+        }
     }
 
     private var filterRow: some View {
@@ -283,7 +328,7 @@ struct ProfileView: View {
             HStack(spacing: 8) {
                 filterChip("All", isSelected: selectedFilter == nil) { selectedFilter = nil }
                 ForEach(availableCategories, id: \.self) { cat in
-                    filterChip(cat.label, isSelected: selectedFilter == cat) { selectedFilter = cat }
+                    filterChip(cat.pluralLabel, isSelected: selectedFilter == cat) { selectedFilter = cat }
                 }
             }
             .padding(.horizontal, 16)

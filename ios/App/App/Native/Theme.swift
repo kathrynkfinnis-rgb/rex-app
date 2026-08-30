@@ -185,6 +185,28 @@ enum RexCategory: String {
         }
     }
 
+    /// TestFlight feedback (Aug 27): "The titles of these categories (eg
+    /// Book or Place) should be pluralised (ie Books or Places)" — but
+    /// only where the label is naming a GROUP (a filter chip: "show me
+    /// Books"), not where it's naming ONE item's type (a card badge
+    /// reading "BOOK", "Add a book"). `label` stays singular for those;
+    /// this is the filter-chip-only variant. TV/Other/List already read
+    /// fine unpluralized as a category name, so those pass through.
+    var pluralLabel: String {
+        switch self {
+        case .place: return "Places"
+        case .trip: return "Trips"
+        case .book: return "Books"
+        case .movie: return "Movies"
+        case .tv: return "TV"
+        case .podcast: return "Podcasts"
+        case .recipe: return "Recipes"
+        case .event: return "Events"
+        case .other: return "Other"
+        case .list: return "Lists"
+        }
+    }
+
     var symbol: String {
         switch self {
         case .place: return "mappin.circle"
@@ -197,6 +219,45 @@ enum RexCategory: String {
         case .event: return "ticket"
         case .other: return "sparkles"
         case .list: return "list.bullet.rectangle"
+        }
+    }
+
+    /// One colour per category — Add-a-Rex's category picker (a left
+    /// accent bar per card, icon+label tinted to match) and, more subtly,
+    /// the feed itself. Distinct enough to tell apart across a 2-column
+    /// grid at a glance; picked to sit comfortably alongside the brand's
+    /// own forest green rather than competing with it as a second accent.
+    var tintColor: Color {
+        switch self {
+        case .place: return Color(hex: "D2785A")   // terracotta
+        case .trip: return Color(hex: "3E7CB1")    // ocean blue
+        case .list: return Color(hex: "8A6D3B")    // warm brown
+        case .book: return Color(hex: "8457C9")    // plum violet
+        case .movie: return Color(hex: "C0473E")   // crimson
+        case .tv: return Color(hex: "5B5FC7")      // indigo
+        case .podcast: return Color(hex: "1F9A8D") // teal
+        case .recipe: return Color(hex: "C98A2E")  // amber
+        case .event: return Color(hex: "C43F82")   // magenta
+        case .other: return Color(hex: "78807A")   // neutral slate
+        }
+    }
+
+    /// The illustrated REX mascot to show wherever an item has no real
+    /// thumbnail — Kathryn's own drawings, one per category. place/event
+    /// got their own (Aug 28) — map-reading and VIP-lanyard Rex — so
+    /// they no longer share the generic "other" drawing.
+    var placeholderImageName: String {
+        switch self {
+        case .place: return "RexPlaceholderPlace"
+        case .event: return "RexPlaceholderEvent"
+        case .other: return "RexPlaceholderOther"
+        case .trip: return "RexPlaceholderTrip"
+        case .book: return "RexPlaceholderBook"
+        case .movie: return "RexPlaceholderMovie"
+        case .tv: return "RexPlaceholderTV"
+        case .podcast: return "RexPlaceholderPodcast"
+        case .recipe: return "RexPlaceholderRecipe"
+        case .list: return "RexPlaceholderList"
         }
     }
 

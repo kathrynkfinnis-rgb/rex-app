@@ -56,7 +56,10 @@
 		FEED058B0000000000000000 /* TripMapTileView.swift in Sources */ = {isa = PBXBuildFile; fileRef = FEED058A0000000000000000 /* TripMapTileView.swift */; };
 		FEED059B0000000000000000 /* FriendTagPickerView.swift in Sources */ = {isa = PBXBuildFile; fileRef = FEED059A0000000000000000 /* FriendTagPickerView.swift */; };
 		FEED060B0000000000000000 /* NotificationPreferencesView.swift in Sources */ = {isa = PBXBuildFile; fileRef = FEED060A0000000000000000 /* NotificationPreferencesView.swift */; };
+		FEED062B0000000000000000 /* LegalContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = FEED062A0000000000000000 /* LegalContentView.swift */; };
+		FEED063B0000000000000000 /* BuildTripFromRexView.swift in Sources */ = {isa = PBXBuildFile; fileRef = FEED063A0000000000000000 /* BuildTripFromRexView.swift */; };
 		FEED061B0000000000000000 /* RexPushNotifications.swift in Sources */ = {isa = PBXBuildFile; fileRef = FEED061A0000000000000000 /* RexPushNotifications.swift */; };
+		FEED064B0000000000000000 /* RexersSheetView.swift in Sources */ = {isa = PBXBuildFile; fileRef = FEED064A0000000000000000 /* RexersSheetView.swift */; };
 		FEED031B0000000000000000 /* AskForRexView.swift in Sources */ = {isa = PBXBuildFile; fileRef = FEED031A0000000000000000 /* AskForRexView.swift */; };
 		FEED030B0000000000000000 /* FeedbackView.swift in Sources */ = {isa = PBXBuildFile; fileRef = FEED030A0000000000000000 /* FeedbackView.swift */; };
 		FEED029B0000000000000000 /* RecipeEditorView.swift in Sources */ = {isa = PBXBuildFile; fileRef = FEED029A0000000000000000 /* RecipeEditorView.swift */; };
@@ -131,6 +134,9 @@
 		FEED059A0000000000000000 /* FriendTagPickerView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FriendTagPickerView.swift; sourceTree = "<group>"; };
 		FEED060A0000000000000000 /* NotificationPreferencesView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NotificationPreferencesView.swift; sourceTree = "<group>"; };
 		FEED061A0000000000000000 /* RexPushNotifications.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RexPushNotifications.swift; sourceTree = "<group>"; };
+		FEED062A0000000000000000 /* LegalContentView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LegalContentView.swift; sourceTree = "<group>"; };
+		FEED063A0000000000000000 /* BuildTripFromRexView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BuildTripFromRexView.swift; sourceTree = "<group>"; };
+		FEED064A0000000000000000 /* RexersSheetView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RexersSheetView.swift; sourceTree = "<group>"; };
 		FEED029A0000000000000000 /* RecipeEditorView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RecipeEditorView.swift; sourceTree = "<group>"; };
 		FEED028A0000000000000000 /* EditProfileView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EditProfileView.swift; sourceTree = "<group>"; };
 		FEED027A0000000000000000 /* UserProfileView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UserProfileView.swift; sourceTree = "<group>"; };
@@ -243,6 +249,9 @@
 				FEED059A0000000000000000 /* FriendTagPickerView.swift */,
 				FEED060A0000000000000000 /* NotificationPreferencesView.swift */,
 				FEED061A0000000000000000 /* RexPushNotifications.swift */,
+				FEED062A0000000000000000 /* LegalContentView.swift */,
+				FEED063A0000000000000000 /* BuildTripFromRexView.swift */,
+				FEED064A0000000000000000 /* RexersSheetView.swift */,
 				FEED025A0000000000000000 /* PhotoCarouselView.swift */,
 				FEED024A0000000000000000 /* RexCardActions.swift */,
 				FEED023A0000000000000000 /* EditRexView.swift */,
@@ -389,6 +398,9 @@
 				FEED059B0000000000000000 /* FriendTagPickerView.swift in Sources */,
 				FEED060B0000000000000000 /* NotificationPreferencesView.swift in Sources */,
 				FEED061B0000000000000000 /* RexPushNotifications.swift in Sources */,
+				FEED062B0000000000000000 /* LegalContentView.swift in Sources */,
+				FEED064B0000000000000000 /* RexersSheetView.swift in Sources */,
+				FEED063B0000000000000000 /* BuildTripFromRexView.swift in Sources */,
 				FEED025B0000000000000000 /* PhotoCarouselView.swift in Sources */,
 				FEED024B0000000000000000 /* RexCardActions.swift in Sources */,
 				FEED023B0000000000000000 /* EditRexView.swift in Sources */,
@@ -540,7 +552,7 @@
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CODE_SIGN_ENTITLEMENTS = App/App.entitlements;
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 21;
+				CURRENT_PROJECT_VERSION = 28;
 				DEVELOPMENT_TEAM = X54V2C674U;
 				INFOPLIST_FILE = App/Info.plist;
 				IPHONEOS_DEPLOYMENT_TARGET = 18.0;
@@ -564,7 +576,7 @@
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CODE_SIGN_ENTITLEMENTS = App/App.entitlements;
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 21;
+				CURRENT_PROJECT_VERSION = 28;
 				DEVELOPMENT_TEAM = X54V2C674U;
 				INFOPLIST_FILE = App/Info.plist;
 				IPHONEOS_DEPLOYMENT_TARGET = 18.0;

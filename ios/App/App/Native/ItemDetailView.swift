@@ -11,6 +11,14 @@ struct ItemDetailView: View {
     @State private var rating: Double = 10
     @State private var note: String = ""
     @State private var isSaving = false
+    /// "When you click into a 'want to try', you should be able to add to
+    /// want to try — at the moment, on a TV want, I click in and can only
+    /// rate, not add to want to try." A want is its own table/row, separate
+    /// from a rated recommendation (see RexCardActions.toggleWant) — this
+    /// screen only ever offered the rating form, with no way to see or
+    /// toggle the want flag at all once you'd followed a want card in here.
+    @State private var wanted = false
+    @State private var isTogglingWant = false
     /// The card's own save button merged bookmark ("want to try") and this
     /// into one icon a while back — two save actions there tested as
     /// confusing ("what does that tick mean?"). Kathryn asked for a
@@ -18,6 +26,10 @@ struct ItemDetailView: View {
     /// full item page, which has the room) rather than reintroducing that
     /// on the card.
     @State private var addingToCollection: FeedRecommendation?
+    /// "View on map function via a button" — the feed/profile cards
+    /// already had one (#133), the full item page never did.
+    @Environment(\.viewOnMap) private var viewOnMap
+    @State private var editingRec: FeedRecommendation?
 
     private var myRec: FeedRecommendation? {
         recs.first { $0.user_id == RexAPI.shared.currentUserId }
@@ -58,6 +70,13 @@ struct ItemDetailView: View {
         .sheet(item: $addingToCollection) { rec in
             AddToCollectionView(rec: rec, onDone: {})
         }
+        .sheet(item: $editingRec) { rec in
+            EditRexView(
+                rec: rec,
+                onSaved: { Task { await load() } },
+                onDeleted: { Task { await load() } }
+            )
+        }
         .task { await load() }
     }
 
@@ -67,9 +86,14 @@ struct ItemDetailView: View {
         do {
             async let itemTask = RexAPI.shared.fetchItem(id: itemId)
             async let recsTask = RexAPI.shared.fetchRecommendations(forItem: itemId)
+            // Best-effort, same reasoning as everywhere else this is
+            // fetched — not knowing your want status shouldn't break
+            // loading the rest of the page.
+            async let wantedTask = RexAPI.shared.isWanted(itemId: itemId)
             let (fetchedItem, fetchedRecs) = try await (itemTask, recsTask)
             item = fetchedItem
             recs = fetchedRecs
+            wanted = (try? await wantedTask) ?? false
             if let mine = fetchedRecs.first(where: { $0.user_id == RexAPI.shared.currentUserId }) {
                 rating = mine.rating
                 note = mine.note ?? ""
@@ -78,6 +102,22 @@ struct ItemDetailView: View {
             errorMessage = error.localizedDescription
         }
         isLoading = false
+    }
+
+    private func toggleWant() async {
+        isTogglingWant = true
+        let next = !wanted
+        wanted = next
+        do {
+            if next {
+                try await RexAPI.shared.createWant(itemId: itemId)
+            } else {
+                try await RexAPI.shared.removeWant(itemId: itemId)
+            }
+        } catch {
+            wanted = !next
+        }
+        isTogglingWant = false
     }
 
     private func save() {
@@ -108,7 +148,10 @@ struct ItemDetailView: View {
                             }
                         }
                     } else {
-                        RexColor.muted.overlay(Image(systemName: category.symbol).foregroundStyle(RexColor.mutedForeground))
+                        Image(category.placeholderImageName)
+                            .resizable()
+                            .aspectRatio(contentMode: .fill)
+                            .background(RexColor.muted)
                     }
                 }
                 .frame(width: 76, height: 76)
@@ -156,6 +199,22 @@ struct ItemDetailView: View {
 
                 Spacer(minLength: 0)
 
+                if let viewOnMap, category == .place || category == .event {
+                    Button {
+                        viewOnMap(itemId)
+                    } label: {
+                        HStack(spacing: 4) {
+                            Image(systemName: "map").font(.system(size: 12))
+                            Text("View on map").font(RexFont.text(12, weight: .semibold))
+                        }
+                        .foregroundStyle(RexColor.primary)
+                        .padding(.horizontal, RexSpacing.sm)
+                        .padding(.vertical, 6)
+                        .overlay(Capsule().stroke(RexColor.primary, lineWidth: 1))
+                    }
+                    .buttonStyle(.plain)
+                }
+
                 if let collectionTargetRec {
                     Button {
                         addingToCollection = collectionTargetRec
@@ -195,7 +254,7 @@ struct ItemDetailView: View {
                     .font(RexFont.text(13, weight: .semibold))
                     .foregroundStyle(RexColor.mutedForeground)
                     .padding(.horizontal, 16)
-                PhotoCarouselView(urls: communityPhotoURLs, height: 220, cornerRadius: RexRadius.card)
+                PhotoCarouselView(urls: communityPhotoURLs, height: 280, cornerRadius: RexRadius.card)
                     .padding(.horizontal, 16)
             }
             .padding(.top, RexSpacing.sm)
@@ -252,9 +311,53 @@ struct ItemDetailView: View {
 
     private var yourTakeSection: some View {
         VStack(alignment: .leading, spacing: 10) {
-            Text(myRec != nil ? "Update your take" : "Your take")
-                .font(.system(size: 20, weight: .semibold, design: .rounded))
-                .foregroundStyle(RexColor.foreground)
+            HStack {
+                Text(myRec != nil ? "Update your take" : "Your take")
+                    .font(.system(size: 20, weight: .semibold, design: .rounded))
+                    .foregroundStyle(RexColor.foreground)
+                Spacer()
+                // "Still not able to update location within a card when
+                // looking from a collection" — this screen only ever had
+                // the inline rating/note above, never the full edit sheet
+                // (title/address/subcategories/etc.) every other card
+                // context (Feed, Profile, Trip, List) already opens via its
+                // own "Edit" — a card reached through Collections lands
+                // here with no way to get to it at all.
+                if let myRec {
+                    Button {
+                        editingRec = myRec
+                    } label: {
+                        HStack(spacing: 4) {
+                            Image(systemName: "pencil").font(.system(size: 11))
+                            Text("Edit details").font(RexFont.text(12, weight: .semibold))
+                        }
+                        .foregroundStyle(RexColor.primary)
+                    }
+                    .buttonStyle(.plain)
+                }
+            }
+
+            // Independent of the rating below — a want is its own row, not
+            // a step toward posting one. Lets you flag/unflag "want to try"
+            // right here instead of only ever being reachable from the
+            // feed card's own bookmark icon.
+            Button {
+                Task { await toggleWant() }
+            } label: {
+                HStack(spacing: 6) {
+                    Image(systemName: wanted ? "bookmark.fill" : "bookmark")
+                    Text(wanted ? "On your want-to-try list" : "Want to try")
+                }
+                .font(RexFont.text(13, weight: .semibold))
+                .foregroundStyle(wanted ? RexColor.primary : RexColor.mutedForeground)
+                .padding(.horizontal, RexSpacing.md)
+                .padding(.vertical, 8)
+                .background(wanted ? RexColor.badgeBackground : RexColor.card)
+                .clipShape(Capsule())
+                .overlay(Capsule().stroke(RexColor.border, lineWidth: wanted ? 0 : 1))
+            }
+            .buttonStyle(.plain)
+            .disabled(isTogglingWant)
 
             RexRatingPicker(value: $rating)
 

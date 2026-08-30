@@ -41,6 +41,20 @@ struct ExploreView: View {
     private var visibleTrending: [TrendingItem] {
         trending.filter { matches($0.type) }
     }
+    /// "Under 'trending this week' separate list between places, books,
+    /// etc" — one combined shelf mixed every category together; this
+    /// mirrors recentByCategory's own per-category grouping just below it
+    /// on the same screen, same idea applied to trending instead of recent.
+    private var trendingByCategory: [(category: RexCategory, items: [TrendingItem])] {
+        var byCategory: [RexCategory: [TrendingItem]] = [:]
+        for item in visibleTrending {
+            byCategory[RexCategory(rawType: item.type), default: []].append(item)
+        }
+        return rexAllCategories.compactMap { category in
+            guard let items = byCategory[category], !items.isEmpty else { return nil }
+            return (category, items)
+        }
+    }
     private var visibleEditorial: [EditorialCollection] {
         // A shelf with no category is general-interest — only hide it once
         // a specific filter is chosen and it plainly doesn't match.
@@ -106,9 +120,9 @@ struct ExploreView: View {
                                 }
                             }
                         }
-                        if !visibleTrending.isEmpty {
-                            shelf(title: "Trending this week", tag: "POPULAR") {
-                                ForEach(visibleTrending) { item in
+                        ForEach(trendingByCategory, id: \.category) { group in
+                            shelf(title: group.category.pluralLabel, tag: "POPULAR") {
+                                ForEach(group.items) { item in
                                     trendingCard(item)
                                 }
                             }
@@ -143,7 +157,7 @@ struct ExploreView: View {
             HStack(spacing: RexSpacing.sm) {
                 filterChip("All", isSelected: filter == nil) { filter = nil }
                 ForEach(filterOptions, id: \.self) { category in
-                    filterChip(category.label, isSelected: filter == category) { filter = category }
+                    filterChip(category.pluralLabel, isSelected: filter == category) { filter = category }
                 }
             }
             .padding(.horizontal, RexSpacing.page)
@@ -375,11 +389,29 @@ struct ExploreView: View {
         async let friendsTask = RexAPI.shared.fetchFriendsCollectionsToExplore()
         async let trendingTask = RexAPI.shared.fetchTrendingItems()
         async let editorialTask = RexAPI.shared.fetchEditorialCollections()
-        async let recentTask = RexAPI.shared.fetchFeed()
+        // TestFlight feedback (Aug 27): "We should show 10 for each
+        // 'recent' category" — recentByCategory already takes prefix(10)
+        // per category, but the single plain fetchFeed() call this used to
+        // draw from is itself capped at 50 rows total across every
+        // category combined. A quiet week for, say, films meant that
+        // shelf could end up with 2 recent items even though 30 exist
+        // further back, just because they'd aged out of the shared top-50
+        // sample. Fetching one page per category (each already
+        // server-filtered and ordered newest-first) guarantees every
+        // shelf gets its own up-to-10, independent of how active the
+        // other categories have been.
+        async let recentTask: [FeedRecommendation] = withTaskGroup(of: [FeedRecommendation].self) { group in
+            for category in rexAllCategories {
+                group.addTask { (try? await RexAPI.shared.fetchFeed(category: category.rawValue)) ?? [] }
+            }
+            var all: [FeedRecommendation] = []
+            for await page in group { all.append(contentsOf: page) }
+            return all
+        }
         friendsCollections = (try? await friendsTask) ?? []
         trending = (try? await trendingTask) ?? []
         editorial = (try? await editorialTask) ?? []
-        recentRex = (try? await recentTask) ?? []
+        recentRex = await recentTask
 
         let ownerIds = Array(Set(friendsCollections.compactMap(\.user_id)))
         if !ownerIds.isEmpty {

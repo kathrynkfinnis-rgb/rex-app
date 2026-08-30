@@ -15,6 +15,12 @@ struct ListRoute: Hashable, Identifiable {
 /// Trip doesn't have — each item stays editable indefinitely (not just
 /// during the original import review), and its "show on feed" visibility
 /// can be flipped here too.
+///
+/// Aug 28 — "editing the heading doesn't work" and "I want to add a heading
+/// between cards two and three ... but I can't" were both this: a List only
+/// ever got TripStopsBuilderView's up-front builder, never #122's
+/// after-the-fact editing tools (rename heading, reorder, add mid-list)
+/// TripDetailView got at the same time. Ported over, same shapes.
 struct ListDetailView: View {
     let route: ListRoute
 
@@ -22,6 +28,25 @@ struct ListDetailView: View {
     @State private var isLoading = true
     @State private var errorMessage: String?
     @State private var editing: FeedRecommendation?
+
+    @State private var isOwner = false
+    @State private var isEditing = false
+    @State private var isMutating = false
+    @State private var mutationError: String?
+    @State private var renamingHeading: String?
+    @State private var renameDraft = ""
+    @State private var showingAddItem = false
+    @State private var addItemSection = ""
+    /// Aug 29 — "Phoebe's list has adopted the subtitle of a draft trip and
+    /// she can't edit it": a list's underlying item can carry a subtitle
+    /// (shown right under the title on its feed card, same as any other
+    /// category), but nothing anywhere ever gave a List its own field to set
+    /// or clear one — see AddRexView.resetDraftFields for how a stale one
+    /// gets there in the first place. This is that missing field.
+    @State private var listItemId: String?
+    @State private var subtitle = ""
+    @State private var editingSubtitle = false
+    @State private var subtitleDraft = ""
 
     /// Items grouped by heading, preserving the order both groups and items
     /// first appear in — same rule TripDetailView's groups already follow.
@@ -57,17 +82,69 @@ struct ListDetailView: View {
                         .padding(.vertical, 28)
                         .background(RexColor.card)
                         .clipShape(RoundedRectangle(cornerRadius: 16))
+                    if isEditing {
+                        addItemButton(heading: "")
+                    }
                 } else {
+                    if let mutationError {
+                        Text(mutationError)
+                            .font(RexFont.text(12))
+                            .foregroundStyle(RexColor.destructive)
+                    }
                     ForEach(Array(groups.enumerated()), id: \.offset) { _, group in
                         VStack(alignment: .leading, spacing: 8) {
-                            if !group.heading.isEmpty {
-                                Text(group.heading)
-                                    .font(.system(size: 18, weight: .semibold, design: .rounded))
-                                    .foregroundStyle(RexColor.foreground)
-                                    .padding(.top, 4)
+                            if !group.heading.isEmpty || isEditing {
+                                HStack(spacing: RexSpacing.sm) {
+                                    Text(group.heading.isEmpty ? "No heading" : group.heading)
+                                        .font(.system(size: 18, weight: .semibold, design: .rounded))
+                                        .foregroundStyle(group.heading.isEmpty ? RexColor.mutedForeground : RexColor.foreground)
+                                        .padding(.top, 4)
+                                    if isEditing {
+                                        Button {
+                                            renamingHeading = group.heading
+                                            renameDraft = group.heading
+                                        } label: {
+                                            Image(systemName: "pencil")
+                                                .font(.system(size: 12))
+                                                .foregroundStyle(RexColor.mutedForeground)
+                                        }
+                                    }
+                                    Spacer()
+                                }
                             }
-                            ForEach(group.items) { item in
-                                itemRow(item)
+                            ForEach(Array(group.items.enumerated()), id: \.element.id) { index, item in
+                                VStack(alignment: .leading, spacing: 4) {
+                                    if isEditing {
+                                        HStack(spacing: RexSpacing.lg) {
+                                            Button {
+                                                Task { await moveItem(item, in: group, direction: -1) }
+                                            } label: {
+                                                Image(systemName: "chevron.up")
+                                            }
+                                            .disabled(isMutating || index == 0)
+                                            Button {
+                                                Task { await moveItem(item, in: group, direction: 1) }
+                                            } label: {
+                                                Image(systemName: "chevron.down")
+                                            }
+                                            .disabled(isMutating || index == group.items.count - 1)
+                                            Spacer()
+                                            Button(role: .destructive) {
+                                                Task { await removeItem(item) }
+                                            } label: {
+                                                Image(systemName: "trash")
+                                            }
+                                            .disabled(isMutating)
+                                        }
+                                        .font(.system(size: 14))
+                                        .foregroundStyle(RexColor.mutedForeground)
+                                        .padding(.horizontal, RexSpacing.sm)
+                                    }
+                                    itemRow(item)
+                                }
+                            }
+                            if isEditing {
+                                addItemButton(heading: group.heading)
                             }
                         }
                     }
@@ -78,7 +155,36 @@ struct ListDetailView: View {
         .background(RexColor.background.ignoresSafeArea())
         .navigationTitle("List")
         .navigationBarTitleDisplayMode(.inline)
+        .toolbar {
+            if isOwner {
+                ToolbarItem(placement: .topBarTrailing) {
+                    Button(isEditing ? "Done" : "Edit") {
+                        withAnimation { isEditing.toggle() }
+                    }
+                }
+            }
+        }
         .task { await load() }
+        .alert("Rename heading", isPresented: Binding(
+            get: { renamingHeading != nil },
+            set: { if !$0 { renamingHeading = nil } }
+        )) {
+            TextField("Heading", text: $renameDraft)
+            Button("Cancel", role: .cancel) { renamingHeading = nil }
+            Button("Save") { Task { await renameHeading() } }
+        } message: {
+            Text("Applies to every item under this heading.")
+        }
+        .alert("Edit subtitle", isPresented: $editingSubtitle) {
+            TextField("Subtitle", text: $subtitleDraft)
+            Button("Cancel", role: .cancel) {}
+            Button("Save") { Task { await saveSubtitle() } }
+        } message: {
+            Text("Shown under the list's title, including on its feed card.")
+        }
+        .sheet(isPresented: $showingAddItem, onDismiss: { Task { await load() } }) {
+            AddTripStopSheet(listId: route.recommendationId, initialSection: addItemSection, onAdded: {})
+        }
         .sheet(item: $editing) { rec in
             EditRexView(
                 rec: rec,
@@ -86,6 +192,17 @@ struct ListDetailView: View {
                 onDeleted: { Task { await load() } }
             )
         }
+    }
+
+    private func addItemButton(heading: String) -> some View {
+        Button {
+            addItemSection = heading
+            showingAddItem = true
+        } label: {
+            Label(heading.isEmpty ? "Add an item" : "Add to \(heading)", systemImage: "plus")
+                .font(RexFont.text(13, weight: .medium))
+        }
+        .padding(.top, 2)
     }
 
     private var header: some View {
@@ -102,6 +219,25 @@ struct ListDetailView: View {
             Text(route.title)
                 .font(.system(size: 26, weight: .semibold, design: .rounded))
                 .foregroundStyle(RexColor.foreground)
+
+            if !isLoading, !subtitle.isEmpty || isOwner {
+                HStack(spacing: 6) {
+                    Text(subtitle.isEmpty ? "Add a subtitle" : subtitle)
+                        .font(.system(size: 15))
+                        .foregroundStyle(subtitle.isEmpty ? RexColor.mutedForeground.opacity(0.7) : RexColor.mutedForeground)
+                        .italic(subtitle.isEmpty)
+                    if isOwner {
+                        Button {
+                            subtitleDraft = subtitle
+                            editingSubtitle = true
+                        } label: {
+                            Image(systemName: "pencil")
+                                .font(.system(size: 11))
+                                .foregroundStyle(RexColor.mutedForeground)
+                        }
+                    }
+                }
+            }
 
             if !isLoading {
                 Text("\(items.count) \(items.count == 1 ? "item" : "items")")
@@ -176,10 +312,87 @@ struct ListDetailView: View {
         errorMessage = nil
         do {
             items = try await RexAPI.shared.fetchListItems(listRecommendationId: route.recommendationId)
+            // Best-effort, same reasoning as TripDetailView's ownerTask —
+            // not knowing who owns this list should hide the Edit button,
+            // not break loading the page.
+            let listRec = try? await RexAPI.shared.fetchRecommendation(id: route.recommendationId)
+            isOwner = listRec?.user_id == RexAPI.shared.currentUserId
+            listItemId = listRec?.item_id
+            subtitle = listRec?.items?.subtitle ?? ""
         } catch {
             errorMessage = error.localizedDescription
         }
         isLoading = false
+    }
+
+    /// Bulk-renames a heading across every item under it (see
+    /// RexAPI.renameListSection — a heading is just a repeated string, not
+    /// its own row).
+    private func renameHeading() async {
+        guard let from = renamingHeading else { return }
+        let to = renameDraft.trimmingCharacters(in: .whitespacesAndNewlines)
+        renamingHeading = nil
+        guard to.caseInsensitiveCompare(from) != .orderedSame else { return }
+        isMutating = true
+        mutationError = nil
+        do {
+            try await RexAPI.shared.renameListSection(
+                listId: route.recommendationId,
+                from: from.isEmpty ? nil : from,
+                to: to.isEmpty ? nil : to
+            )
+            await load()
+        } catch {
+            mutationError = error.localizedDescription
+        }
+        isMutating = false
+    }
+
+    private func saveSubtitle() async {
+        guard let listItemId else { return }
+        let trimmed = subtitleDraft.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard trimmed != subtitle else { return }
+        isMutating = true
+        mutationError = nil
+        do {
+            try await RexAPI.shared.updateItemSubtitle(itemId: listItemId, subtitle: trimmed)
+            subtitle = trimmed
+        } catch {
+            mutationError = error.localizedDescription
+        }
+        isMutating = false
+    }
+
+    private func removeItem(_ item: FeedRecommendation) async {
+        isMutating = true
+        mutationError = nil
+        do {
+            try await RexAPI.shared.deleteRecommendation(id: item.id)
+            await load()
+        } catch {
+            mutationError = error.localizedDescription
+        }
+        isMutating = false
+    }
+
+    /// Swaps this item's created_at with its neighbour — same trick
+    /// TripDetailView's moveStop uses, see its own doc comment.
+    private func moveItem(_ item: FeedRecommendation, in group: (heading: String, items: [FeedRecommendation]), direction: Int) async {
+        guard let idx = group.items.firstIndex(where: { $0.id == item.id }) else { return }
+        let otherIdx = idx + direction
+        guard group.items.indices.contains(otherIdx) else { return }
+        let a = group.items[idx]
+        let b = group.items[otherIdx]
+        isMutating = true
+        mutationError = nil
+        do {
+            try await RexAPI.shared.setRecommendationCreatedAt(id: a.id, createdAt: b.created_at)
+            try await RexAPI.shared.setRecommendationCreatedAt(id: b.id, createdAt: a.created_at)
+            await load()
+        } catch {
+            mutationError = error.localizedDescription
+        }
+        isMutating = false
     }
 
     private func errorState(_ message: String) -> some View {
