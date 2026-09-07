@@ -168,6 +168,13 @@ struct AddRexView: View {
     /// the edit can be told from ones that were never there.
     @State private var originalStopRecIds: Set<String> = []
     @State private var listItems: [DraftStop] = []
+    /// Sept 5 — a list's items are an ordered heading/item list now, the
+    /// same shape a trip's itinerary uses. listItems above is still what
+    /// gets posted; this flattens into it on save.
+    @State private var listEntries: [ItineraryEntry] = []
+    @State private var editingListEntry: ItineraryEntry?
+    @State private var customListKind = ""
+    @State private var showingCustomListKind = false
     @State private var listKind = rexListKinds.first ?? "Other"
     @State private var recipeText = ""
     /// Searchable categories open on a search field; the full form only
@@ -285,6 +292,15 @@ struct AddRexView: View {
         .padding(16)
         // "If you click on each rex, [it] should take you to the same style
         // of 'add a stop' [sheet] as in the manual add a trip process."
+        .sheet(item: $editingListEntry) { entry in
+            if let item = entry.stop {
+                ListItemSheet(existing: item) { updated in
+                    if let index = listEntries.firstIndex(where: { $0.id == entry.id }) {
+                        listEntries[index].kind = .stop(updated)
+                    }
+                }
+            }
+        }
         .sheet(item: $editingEntry) { entry in
             TripStopSheet(
                 subcategories: rexSubcategories[.place] ?? [],
@@ -305,6 +321,14 @@ struct AddRexView: View {
                     manualEntry = true
                     if title.trimmingCharacters(in: .whitespaces).isEmpty { title = name }
                     tripEntries = entries
+                },
+                onExtractedAsList: { name, kind, entries in
+                    showingListsImport = false
+                    category = .list
+                    manualEntry = true
+                    if title.trimmingCharacters(in: .whitespaces).isEmpty { title = name }
+                    if !kind.isEmpty { listKind = kind }
+                    listEntries = entries
                 }
             )
         }
@@ -326,7 +350,7 @@ struct AddRexView: View {
             // everything else "Title" is still the right word, since you're
             // naming a thing that already exists rather than christening
             // something of your own.
-            field(searchFirst ? "Search" : (category == .trip ? "Name your trip" : "Title"), text: $title,
+            field(searchFirst ? "Search" : (category == .trip ? "Name your trip" : category == .list ? "Name your list" : "Title"), text: $title,
                   placeholder: searchFirst
                       ? "Search \(category.label.lowercased())s…"
                       : "e.g. \(placeholderTitle(for: category))")
@@ -426,18 +450,34 @@ struct AddRexView: View {
             }
 
             if category == .list {
-                // Same builder Trip uses for its stops — a list's items are
-                // the same shape (grouped under optional headings, own
-                // rating, own note), just drawn from any category instead
-                // of almost-always-a-place. See #118's list_id/list_section
-                // /show_in_feed columns this posts against.
-                TripStopsBuilderView(
-                    stops: $listItems,
-                    singularNoun: "item",
-                    containerNoun: "list",
-                    itemTypes: listItemTypes,
-                    showImportLink: false
+                // Sept 5 — "update the list inputs so it's similar to the
+                // trip input: headings and items in draggable boxes". Same
+                // builder the trip uses, in its list mode — the structure
+                // is identical, only the wording and the item sheet differ.
+                VStack(alignment: .leading, spacing: RexSpacing.xs) {
+                    Text("Cover photo").font(.system(size: 14, weight: .semibold))
+                        .foregroundStyle(RexColor.foreground)
+                    PhotoPickerView(photoURLs: $photoURLs, maxPhotos: 1)
+                }
+
+                TripItineraryBuilderView(
+                    entries: $listEntries,
+                    mode: .list,
+                    onEditStop: { entry in editingListEntry = entry }
                 )
+
+                Button {
+                    showingListsImport = true
+                } label: {
+                    Label("Import a list from a document", systemImage: "doc.text")
+                        .font(RexFont.text(13, weight: .medium))
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, RexSpacing.md)
+                        .background(RexColor.badgeBackground)
+                        .clipShape(RoundedRectangle(cornerRadius: RexRadius.input, style: .continuous))
+                }
+                .buttonStyle(.plain)
+                .foregroundStyle(RexColor.primary)
             }
 
             if category == .recipe {
@@ -468,7 +508,7 @@ struct AddRexView: View {
             // container's own rating, only its items'. So it gets its own
             // simple note field instead of the full rated/want picker below.
             if category == .list {
-                Text("Note (optional)").font(.system(size: 14, weight: .semibold)).foregroundStyle(RexColor.foreground)
+                Text("Why are you Rex\u{2019}ing it?").font(.system(size: 14, weight: .semibold)).foregroundStyle(RexColor.foreground)
                 TextField("What's this list for?", text: $note, axis: .vertical)
                     .lineLimit(2...4)
                     .padding(12)
@@ -776,7 +816,11 @@ struct AddRexView: View {
                 .foregroundStyle(RexColor.foreground)
             ScrollView(.horizontal, showsIndicators: false) {
                 HStack(spacing: RexSpacing.sm) {
-                    ForEach(rexListKinds, id: \.self) { kind in
+                    // Sept 5 — "under 'what kind of list is this?' allow a
+                    // free text box". The stock kinds cover the common
+                    // cases; anything you've typed yourself joins them as a
+                    // chip so it can be selected and deselected like the rest.
+                    ForEach(offeredListKinds, id: \.self) { kind in
                         let isOn = listKind == kind
                         Button(kind) { listKind = kind }
                             .font(RexFont.text(13, weight: isOn ? .semibold : .regular))
@@ -787,9 +831,43 @@ struct AddRexView: View {
                             .clipShape(Capsule())
                             .overlay(Capsule().stroke(isOn ? RexColor.primary : RexColor.border, lineWidth: 1))
                     }
+                    Button("+ Add your own") { showingCustomListKind = true }
+                        .font(RexFont.text(13))
+                        .foregroundStyle(RexColor.primary)
+                        .padding(.horizontal, RexSpacing.md)
+                        .padding(.vertical, 7)
+                        .background(RexColor.card)
+                        .clipShape(Capsule())
+                        .overlay(Capsule().stroke(RexColor.border, lineWidth: 1))
+                }
+            }
+            if showingCustomListKind {
+                HStack(spacing: RexSpacing.sm) {
+                    TextField("e.g. Baby shower", text: $customListKind)
+                        .padding(10)
+                        .background(RexColor.card)
+                        .clipShape(RoundedRectangle(cornerRadius: RexRadius.input, style: .continuous))
+                        .overlay(
+                            RoundedRectangle(cornerRadius: RexRadius.input, style: .continuous)
+                                .stroke(RexColor.border, lineWidth: 1)
+                        )
+                    Button("Add") {
+                        let trimmed = customListKind.trimmingCharacters(in: .whitespaces)
+                        guard !trimmed.isEmpty else { return }
+                        listKind = trimmed
+                        customListKind = ""
+                        showingCustomListKind = false
+                    }
+                    .font(RexFont.text(14, weight: .semibold))
+                    .foregroundStyle(RexColor.primary)
                 }
             }
         }
+    }
+
+    /// The stock kinds, plus a custom one already chosen so it stays visible.
+    private var offeredListKinds: [String] {
+        rexListKinds.contains(listKind) ? rexListKinds : rexListKinds + [listKind]
     }
 
     private func field(_ label: String, text: Binding<String>, placeholder: String) -> some View {
@@ -1111,6 +1189,9 @@ struct AddRexView: View {
             // /trip_section (#118). Every item defaults to visible on the
             // feed, same as a fresh import; the toggle to hide one lives in
             // ListDetailView after the fact.
+            // Sept 5 — a list's items come from the ordered heading/item
+            // builder now, same as a trip's itinerary.
+            let listItems = listEntries.resolvedStops
             if category == .list, !listItems.isEmpty {
                 let listRecId = try await RexAPI.shared.createRecommendation(
                     itemId: itemId,
@@ -1129,9 +1210,10 @@ struct AddRexView: View {
                             subtitle: draftItem.subtitle,
                             address: draftItem.address,
                             genre: draftItem.genre,
+                            linkURL: draftItem.linkURL,
                             externalId: draftItem.externalId,
                             externalSource: draftItem.externalSource,
-                            imageURL: draftItem.imageURL,
+                            imageURL: draftItem.photoURL ?? draftItem.imageURL,
                             lat: draftItem.lat,
                             lng: draftItem.lng
                         )
@@ -1141,7 +1223,12 @@ struct AddRexView: View {
                             note: draftItem.note.isEmpty ? nil : draftItem.note,
                             listId: listRecId,
                             listSection: draftItem.section,
-                            showInFeed: true,
+                            // Sept 5 — "each item becomes its own Rex as well
+                            // as part of the list but only the list will be
+                            // visible in the feed". Was true, which is what
+                            // put every imported item on the feed as its own
+                            // card.
+                            showInFeed: false,
                             returningId: true
                         )
                         createdItemRecIds.append(childRecId)
@@ -1243,6 +1330,9 @@ struct AddRexView: View {
         tripMonth = nil
         tripYear = nil
         listItems = []
+        listEntries = []
+        customListKind = ""
+        showingCustomListKind = false
         recipeText = ""
     }
 

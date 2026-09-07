@@ -20,6 +20,17 @@ import UniformTypeIdentifiers
 struct TripItineraryBuilderView: View {
     @Binding var entries: [ItineraryEntry]
 
+    /// Sept 5 — Lists reuse this whole builder ("update the list inputs so
+    /// it's similar to trip input — headings and items in draggable boxes").
+    /// The structure is identical; what differs is the wording and which
+    /// sheet an entry opens, since a list item is a much shorter form than
+    /// a trip stop (no sub-category, rating or note — see ListItemSheet).
+    enum Mode { case trip, list }
+    var mode: Mode = .trip
+
+    private var noun: String { mode == .trip ? "stop" : "item" }
+    private var container: String { mode == .trip ? "trip" : "list" }
+
     /// Fires when a stop row is tapped, so the host can open the same
     /// editing sheet the "Add a stop" button uses — "if you click on each
     /// rex, should take you to the same style of 'add a stop' [sheet] as in
@@ -33,7 +44,7 @@ struct TripItineraryBuilderView: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: RexSpacing.sm) {
-            Text("Itinerary")
+            Text(mode == .trip ? "Itinerary" : "Items")
                 .font(RexFont.text(14, weight: .semibold))
                 .foregroundStyle(RexColor.foreground)
 
@@ -65,7 +76,9 @@ struct TripItineraryBuilderView: View {
                 Label(
                     entries.contains(where: { $0.headingText != nil })
                         ? "Add another heading (optional)"
-                        : "Add a heading e.g. 'Restaurants' or 'Day 1'",
+                        : (mode == .trip
+                           ? "Add a heading e.g. 'Restaurants' or 'Day 1'"
+                           : "Add a heading e.g. 'Under \u{00A3}20' or 'Books'"),
                     systemImage: "plus"
                 )
                 .font(RexFont.text(13.5, weight: .semibold))
@@ -76,7 +89,7 @@ struct TripItineraryBuilderView: View {
             Button {
                 showingAddStop = true
             } label: {
-                Label("Add a stop", systemImage: "plus")
+                Label("Add \(noun == "stop" ? "a stop" : "an item")", systemImage: "plus")
                     .font(RexFont.text(13.5, weight: .semibold))
                     .frame(maxWidth: .infinity)
             }
@@ -85,19 +98,25 @@ struct TripItineraryBuilderView: View {
             if entries.count > 1 {
                 HStack(spacing: 5) {
                     Image(systemName: "info.circle").font(.system(size: 10))
-                    Text("Press and hold to drag a stop or heading into a new position.")
+                    Text("Press and hold to drag \(noun == "stop" ? "a stop" : "an item") or heading into a new position.")
                 }
                 .font(RexFont.text(11.5))
                 .foregroundStyle(RexColor.mutedForeground)
             }
 
-            Text("Each stop becomes its own Rex as well as part of the trip.")
+            Text("Each \(noun) becomes its own Rex as well as part of the \(container) \u{2014} only the \(container) itself shows on the feed.")
                 .font(RexFont.text(11.5))
                 .foregroundStyle(RexColor.mutedForeground)
         }
         .sheet(isPresented: $showingAddStop) {
-            TripStopSheet(subcategories: rexSubcategories[.place] ?? []) { stop in
-                entries.append(ItineraryEntry(kind: .stop(stop)))
+            if mode == .trip {
+                TripStopSheet(subcategories: rexSubcategories[.place] ?? []) { stop in
+                    entries.append(ItineraryEntry(kind: .stop(stop)))
+                }
+            } else {
+                ListItemSheet { item in
+                    entries.append(ItineraryEntry(kind: .stop(item)))
+                }
             }
         }
         .alert("Heading", isPresented: Binding(

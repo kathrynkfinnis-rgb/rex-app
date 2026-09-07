@@ -23,6 +23,10 @@ struct DraftStop: Identifiable, Equatable {
     /// carousel built from its stops' photos, so a stop offering six of its
     /// own would swamp it.
     var photoURL: String?
+    /// Sept 5 — "add a 'Product link' where you can add a web link to the
+    /// item". List items especially: half the point of a gift list is the
+    /// link to the thing.
+    var linkURL: String?
     /// Sept 5 — set only when this stop is already saved, so editing a
     /// posted trip can tell an existing stop (update it, or delete it if
     /// it's been removed) from one added during this edit (create it).

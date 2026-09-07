@@ -12,6 +12,8 @@ struct ImportReviewView: View {
     /// that opened this importer, instead of posting it from here. See
     /// the .trip case in save().
     var onExtractedAsTrip: ((String, [ItineraryEntry]) -> Void)? = nil
+    /// Same hand-off for a List — see the .list case in save().
+    var onExtractedAsList: ((String, String, [ItineraryEntry]) -> Void)? = nil
 
     @State private var rows: [ImportStagingRow] = []
     @State private var isLoading = true
@@ -156,7 +158,10 @@ struct ImportReviewView: View {
                         .foregroundStyle(RexColor.primary)
                     }
 
-                    if destination == .list {
+                    // Sept 5 — gone for lists too: "only the list will be
+                    // visible in the feed", so a per-item feed toggle no
+                    // longer has anything to toggle.
+                    if false {
                         Divider().padding(.vertical, 2)
                         Toggle(isOn: showInFeedBinding(row.id)) {
                             Text("Show on feed").font(RexFont.text(12)).foregroundStyle(RexColor.mutedForeground)
@@ -313,6 +318,15 @@ struct ImportReviewView: View {
                 isSaving = false
                 return
             case .list:
+                // Sept 5 — same hand-off a trip gets: land on the real
+                // Add-a-list form, pre-filled, rather than posting from
+                // here, so headings, reordering and adding items the
+                // document missed all work identically.
+                if let onExtractedAsList {
+                    onExtractedAsList(destinationName, listKind, [ItineraryEntry].fromStagingRows(rows))
+                    isSaving = false
+                    return
+                }
                 let result = try await RexAPI.shared.approveStagingAsList(
                     rows: rows, listName: destinationName, kind: listKind, note: nil, showInFeedIds: showInFeedIds
                 )

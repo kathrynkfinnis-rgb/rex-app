@@ -8,6 +8,7 @@ struct ListsImportView: View {
     var onDone: () -> Void
     /// Passed straight through to ImportReviewView — see its own doc.
     var onExtractedAsTrip: ((String, [ItineraryEntry]) -> Void)? = nil
+    var onExtractedAsList: ((String, String, [ItineraryEntry]) -> Void)? = nil
 
     @Environment(\.dismiss) private var dismiss
 
@@ -70,6 +71,9 @@ struct ListsImportView: View {
                     onDone: { onDone(); dismiss() },
                     onExtractedAsTrip: onExtractedAsTrip.map { handler in
                         { name, entries in dismiss(); handler(name, entries) }
+                    },
+                    onExtractedAsList: onExtractedAsList.map { handler in
+                        { name, kind, entries in dismiss(); handler(name, kind, entries) }
                     }
                 )
             }
