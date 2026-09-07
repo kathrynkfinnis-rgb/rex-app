@@ -123,6 +123,7 @@ struct AskForRexView: View {
         }
         .background(RexColor.background.ignoresSafeArea())
         .navigationTitle("")
+        .rexDismissableKeyboard()
         .navigationBarTitleDisplayMode(.inline)
     }
 

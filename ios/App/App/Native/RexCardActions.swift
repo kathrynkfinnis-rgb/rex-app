@@ -67,14 +67,11 @@ struct RexCardActions: View {
             .disabled(rexCount == 0)
             .accessibilityLabel(rexCount > 0 ? "\(rexCount) people have Rex'd this — see who" : "Nobody else has Rex'd this yet")
 
-            // Both key off a real recommendation row (rec.id) — a want has
-            // no such row (it's a separate, simpler `wants` table keyed by
-            // item, not a recommendation), so there's nowhere to attach a
-            // like or a comment to one yet. Kathryn's call: hide these two
-            // rather than show an icon that does nothing when tapped: the
-            // dino-count and bookmark below both key off the item instead,
-            // so those stay fully functional either way.
-            if !rec.isWant {
+            // Sept 5 — these two used to be hidden on a want, because a
+            // want has no recommendation row for a like or comment to hang
+            // off. want_likes / want_comments (migration 20260905140000)
+            // give it one of its own, so they're back for everything.
+            do {
                 action(
                     // .destructive (the spec's Error red), not .accent — accent
                     // is gold now, reserved for premium/award/featured contexts,
@@ -177,16 +174,27 @@ struct RexCardActions: View {
 
     private func loadState() async {
         wanted = (try? await RexAPI.shared.isWanted(itemId: rec.item_id)) ?? false
-        // rec.id is a synthetic "want-<uuid>" for a want, not a real
-        // recommendations.id — these two are keyed to that real row, so
-        // there's nothing meaningful to fetch (see the `!rec.isWant` guards
-        // around their icons above).
-        guard !rec.isWant else { return }
+        // A want's likes and comments live in their own tables keyed by the
+        // real wants.id, which is rec.id minus its "want-" prefix.
+        if let wantId {
+            if let entry = try? await RexAPI.shared.fetchWantLikeState(wantIds: [wantId])[wantId] {
+                likeCount = entry.count
+                liked = entry.likedByMe
+            }
+            commentCount = (try? await RexAPI.shared.fetchWantCommentCounts(wantIds: [wantId])[wantId]) ?? 0
+            return
+        }
         if let entry = try? await RexAPI.shared.fetchLikeState(recommendationIds: [rec.id])[rec.id] {
             likeCount = entry.count
             liked = entry.likedByMe
         }
         commentCount = (try? await RexAPI.shared.fetchCommentCounts(recommendationIds: [rec.id])[rec.id]) ?? 0
+    }
+
+    /// The real `wants.id` behind a want card, or nil for a normal Rex.
+    private var wantId: String? {
+        guard rec.isWant else { return nil }
+        return String(rec.id.dropFirst("want-".count))
     }
 
     /// Optimistic, rolling back if the write fails.
@@ -195,7 +203,11 @@ struct RexCardActions: View {
         liked = next
         likeCount = max(0, likeCount + (next ? 1 : -1))
         do {
-            try await RexAPI.shared.setLike(recommendationId: rec.id, liked: next)
+            if let wantId {
+                try await RexAPI.shared.setWantLike(wantId: wantId, liked: next)
+            } else {
+                try await RexAPI.shared.setLike(recommendationId: rec.id, liked: next)
+            }
         } catch {
             liked = !next
             likeCount = max(0, likeCount + (next ? -1 : 1))

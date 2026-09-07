@@ -138,6 +138,7 @@ struct AddToTripView: View {
             }
             .background(RexColor.background.ignoresSafeArea())
             .navigationTitle("Add to trip")
+            .rexDismissableKeyboard()
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .topBarLeading) {

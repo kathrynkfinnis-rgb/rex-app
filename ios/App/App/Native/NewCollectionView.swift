@@ -114,6 +114,7 @@ struct NewCollectionView: View {
             }
             .background(RexColor.background.ignoresSafeArea())
             .navigationTitle("New collection")
+            .rexDismissableKeyboard()
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .topBarLeading) {

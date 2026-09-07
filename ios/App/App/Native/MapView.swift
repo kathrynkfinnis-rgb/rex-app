@@ -21,6 +21,10 @@ struct RexMapView: View {
     @State private var userCoordinate: CLLocationCoordinate2D?
     @State private var areaName: String?
     @State private var filter: RexCategory?
+    /// Sept 5 — sub-category ("Restaurant", "Bar", …) and person filters,
+    /// replacing/joining the old Places-vs-Events chips.
+    @State private var subFilter: String?
+    @State private var personFilter: String?
     /// Recommendation id of the trip we're following, if any.
     @State private var tripFilter: String?
     /// Set alongside tripFilter whenever we follow a trip, so the "Following
@@ -77,7 +81,60 @@ struct RexMapView: View {
         // sample (see focusedTripPlaces).
         var out = tripFilter != nil ? (focusedTripPlaces ?? []) : places
         if let filter { out = out.filter { RexCategory(rawType: $0.type) == filter } }
+        if let subFilter {
+            out = out.filter { place in
+                if subFilter == "Event" { return RexCategory(rawType: place.type) == .event }
+                return splitGenres(place.genre).contains { $0.caseInsensitiveCompare(subFilter) == .orderedSame }
+            }
+        }
+        // Sept 5 — "filter map by people". A place stays if anyone whose Rex
+        // put it on the map is the person picked; one pin can carry several
+        // people's Rex, so this is "contains", not "belongs to".
+        if let personFilter {
+            out = out.filter { $0.recommendations.contains { $0.user_id == personFilter } }
+        }
         return out
+    }
+
+    /// Everyone whose Rex appears on the map right now, for the people
+    /// filter — built from the pins themselves rather than the friends list,
+    /// so it only ever offers someone who actually has something to show.
+    private var peopleOnMap: [(id: String, name: String)] {
+        var byId: [String: String] = [:]
+        for place in places {
+            for rec in place.recommendations {
+                guard let profile = rec.profiles else { continue }
+                byId[rec.user_id] = profile.display_name ?? profile.username
+            }
+        }
+        return byId
+            .map { (id: $0.key, name: $0.value) }
+            .sorted { $0.name.localizedCaseInsensitiveCompare($1.name) == .orderedAscending }
+    }
+
+    /// A sub-category chip, tinted with the colour its pins use.
+    private func subcategoryChip(_ name: String) -> some View {
+        let color = rexSubcategoryColor(
+            genre: name == "Event" ? nil : name,
+            type: name == "Event" ? "event" : "place"
+        )
+        let active = subFilter == name
+        return Button {
+            subFilter = active ? nil : name
+            filter = nil
+        } label: {
+            HStack(spacing: 5) {
+                Circle().fill(color).frame(width: 7, height: 7)
+                Text(name)
+            }
+            .font(RexFont.text(12.5, weight: .medium))
+            .padding(.horizontal, 12).padding(.vertical, 6)
+            .background(active ? color.opacity(0.16) : RexColor.card)
+            .foregroundStyle(active ? color : RexColor.foreground)
+            .clipShape(Capsule())
+            .overlay(Capsule().stroke(active ? color : RexColor.border, lineWidth: 1))
+        }
+        .buttonStyle(.plain)
     }
 
     /// Centre on the user if we have them, otherwise the middle of the pins.
@@ -280,11 +337,33 @@ struct RexMapView: View {
                 .buttonStyle(.plain)
             }
 
+            // Sept 5 — sub-category chips replace Places/Events. They filter,
+            // and because each carries its pin's colour they double as the
+            // key for the colour-coding — a coloured map with no legend is
+            // a guessing game.
             ScrollView(.horizontal, showsIndicators: false) {
                 HStack(spacing: RexSpacing.sm) {
-                    chip("All", active: filter == nil) { filter = nil }
-                    chip("Places", active: filter == .place) { filter = filter == .place ? nil : .place }
-                    chip("Events", active: filter == .event) { filter = filter == .event ? nil : .event }
+                    chip("All", active: subFilter == nil && filter == nil) {
+                        subFilter = nil
+                        filter = nil
+                    }
+                    ForEach(rexMapSubcategories, id: \.self) { name in
+                        subcategoryChip(name)
+                    }
+                }
+            }
+
+            // Sept 5 — "should be able to filter map by people".
+            if !peopleOnMap.isEmpty {
+                ScrollView(.horizontal, showsIndicators: false) {
+                    HStack(spacing: RexSpacing.sm) {
+                        chip("Everyone", active: personFilter == nil) { personFilter = nil }
+                        ForEach(peopleOnMap, id: \.id) { person in
+                            chip(person.name, active: personFilter == person.id) {
+                                personFilter = personFilter == person.id ? nil : person.id
+                            }
+                        }
+                    }
                 }
             }
 

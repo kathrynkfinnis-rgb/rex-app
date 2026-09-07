@@ -254,7 +254,7 @@ struct ItemDetailView: View {
                     .font(RexFont.text(13, weight: .semibold))
                     .foregroundStyle(RexColor.mutedForeground)
                     .padding(.horizontal, 16)
-                PhotoCarouselView(urls: communityPhotoURLs, height: 280, cornerRadius: RexRadius.card)
+                PhotoCarouselView(urls: communityPhotoURLs, cornerRadius: RexRadius.card)
                     .padding(.horizontal, 16)
             }
             .padding(.top, RexSpacing.sm)

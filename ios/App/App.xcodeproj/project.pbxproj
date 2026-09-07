@@ -59,7 +59,10 @@
 		FEED062B0000000000000000 /* LegalContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = FEED062A0000000000000000 /* LegalContentView.swift */; };
 		FEED063B0000000000000000 /* BuildTripFromRexView.swift in Sources */ = {isa = PBXBuildFile; fileRef = FEED063A0000000000000000 /* BuildTripFromRexView.swift */; };
 		FEED061B0000000000000000 /* RexPushNotifications.swift in Sources */ = {isa = PBXBuildFile; fileRef = FEED061A0000000000000000 /* RexPushNotifications.swift */; };
+		FEED066B0000000000000000 /* TripItineraryBuilderView.swift in Sources */ = {isa = PBXBuildFile; fileRef = FEED066A0000000000000000 /* TripItineraryBuilderView.swift */; };
+		FEED067B0000000000000000 /* TripStopSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = FEED067A0000000000000000 /* TripStopSheet.swift */; };
 		FEED064B0000000000000000 /* RexersSheetView.swift in Sources */ = {isa = PBXBuildFile; fileRef = FEED064A0000000000000000 /* RexersSheetView.swift */; };
+		FEED065B0000000000000000 /* PhotoFullScreenView.swift in Sources */ = {isa = PBXBuildFile; fileRef = FEED065A0000000000000000 /* PhotoFullScreenView.swift */; };
 		FEED031B0000000000000000 /* AskForRexView.swift in Sources */ = {isa = PBXBuildFile; fileRef = FEED031A0000000000000000 /* AskForRexView.swift */; };
 		FEED030B0000000000000000 /* FeedbackView.swift in Sources */ = {isa = PBXBuildFile; fileRef = FEED030A0000000000000000 /* FeedbackView.swift */; };
 		FEED029B0000000000000000 /* RecipeEditorView.swift in Sources */ = {isa = PBXBuildFile; fileRef = FEED029A0000000000000000 /* RecipeEditorView.swift */; };
@@ -136,7 +139,10 @@
 		FEED061A0000000000000000 /* RexPushNotifications.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RexPushNotifications.swift; sourceTree = "<group>"; };
 		FEED062A0000000000000000 /* LegalContentView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LegalContentView.swift; sourceTree = "<group>"; };
 		FEED063A0000000000000000 /* BuildTripFromRexView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BuildTripFromRexView.swift; sourceTree = "<group>"; };
+		FEED066A0000000000000000 /* TripItineraryBuilderView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TripItineraryBuilderView.swift; sourceTree = "<group>"; };
+		FEED067A0000000000000000 /* TripStopSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TripStopSheet.swift; sourceTree = "<group>"; };
 		FEED064A0000000000000000 /* RexersSheetView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RexersSheetView.swift; sourceTree = "<group>"; };
+		FEED065A0000000000000000 /* PhotoFullScreenView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PhotoFullScreenView.swift; sourceTree = "<group>"; };
 		FEED029A0000000000000000 /* RecipeEditorView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RecipeEditorView.swift; sourceTree = "<group>"; };
 		FEED028A0000000000000000 /* EditProfileView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EditProfileView.swift; sourceTree = "<group>"; };
 		FEED027A0000000000000000 /* UserProfileView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UserProfileView.swift; sourceTree = "<group>"; };
@@ -251,7 +257,10 @@
 				FEED061A0000000000000000 /* RexPushNotifications.swift */,
 				FEED062A0000000000000000 /* LegalContentView.swift */,
 				FEED063A0000000000000000 /* BuildTripFromRexView.swift */,
+				FEED066A0000000000000000 /* TripItineraryBuilderView.swift */,
+				FEED067A0000000000000000 /* TripStopSheet.swift */,
 				FEED064A0000000000000000 /* RexersSheetView.swift */,
+				FEED065A0000000000000000 /* PhotoFullScreenView.swift */,
 				FEED025A0000000000000000 /* PhotoCarouselView.swift */,
 				FEED024A0000000000000000 /* RexCardActions.swift */,
 				FEED023A0000000000000000 /* EditRexView.swift */,
@@ -399,7 +408,10 @@
 				FEED060B0000000000000000 /* NotificationPreferencesView.swift in Sources */,
 				FEED061B0000000000000000 /* RexPushNotifications.swift in Sources */,
 				FEED062B0000000000000000 /* LegalContentView.swift in Sources */,
+				FEED066B0000000000000000 /* TripItineraryBuilderView.swift in Sources */,
+				FEED067B0000000000000000 /* TripStopSheet.swift in Sources */,
 				FEED064B0000000000000000 /* RexersSheetView.swift in Sources */,
+				FEED065B0000000000000000 /* PhotoFullScreenView.swift in Sources */,
 				FEED063B0000000000000000 /* BuildTripFromRexView.swift in Sources */,
 				FEED025B0000000000000000 /* PhotoCarouselView.swift in Sources */,
 				FEED024B0000000000000000 /* RexCardActions.swift in Sources */,

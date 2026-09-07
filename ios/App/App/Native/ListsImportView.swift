@@ -6,6 +6,8 @@ import SwiftUI
 /// Nothing becomes a real Rex until ImportReviewView is confirmed.
 struct ListsImportView: View {
     var onDone: () -> Void
+    /// Passed straight through to ImportReviewView — see its own doc.
+    var onExtractedAsTrip: ((String, [ItineraryEntry]) -> Void)? = nil
 
     @Environment(\.dismiss) private var dismiss
 
@@ -55,6 +57,7 @@ struct ListsImportView: View {
             }
             .background(RexColor.background.ignoresSafeArea())
             .navigationTitle("Import from doc")
+            .rexDismissableKeyboard()
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .topBarLeading) {
@@ -62,7 +65,13 @@ struct ListsImportView: View {
                 }
             }
             .navigationDestination(item: $reviewSource) { source in
-                ImportReviewView(source: source, onDone: { onDone(); dismiss() })
+                ImportReviewView(
+                    source: source,
+                    onDone: { onDone(); dismiss() },
+                    onExtractedAsTrip: onExtractedAsTrip.map { handler in
+                        { name, entries in dismiss(); handler(name, entries) }
+                    }
+                )
             }
         }
         .tint(RexColor.primary)

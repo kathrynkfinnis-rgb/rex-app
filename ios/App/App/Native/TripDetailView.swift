@@ -27,6 +27,10 @@ struct TripDetailView: View {
     @State private var publishError: String?
 
     @State private var isOwner = false
+    /// The trip's own Rex row, kept so "Edit" can open the same
+    /// Add-a-trip form the trip was built in (Sept 5 rebuild).
+    @State private var tripRec: FeedRecommendation?
+    @State private var showingTripEditor = false
     @State private var isEditing = false
     @State private var isMutating = false
     @State private var mutationError: String?
@@ -185,10 +189,25 @@ struct TripDetailView: View {
         .toolbar {
             if isOwner {
                 ToolbarItem(placement: .topBarTrailing) {
-                    Button(isEditing ? "Done" : "Edit") {
-                        withAnimation { isEditing.toggle() }
-                    }
+                    // Sept 5 — "when it comes to editing a trip after
+                    // submission, it should take you to the same page as
+                    // the input page", rather than this screen's own
+                    // in-place edit mode.
+                    Button("Edit") { showingTripEditor = true }
+                        .disabled(tripRec == nil)
                 }
+            }
+        }
+        .fullScreenCover(isPresented: $showingTripEditor) {
+            if let tripRec {
+                AddRexView(
+                    onDone: {
+                        showingTripEditor = false
+                        Task { await load() }
+                    },
+                    editingTrip: tripRec,
+                    stops: stops
+                )
             }
         }
         .task { await load() }
@@ -389,6 +408,9 @@ struct TripDetailView: View {
             isOwner = tripRec?.user_id == RexAPI.shared.currentUserId
             tripNote = tripRec?.note
             tripItemId = tripRec?.item_id
+            // Kept whole so "Edit" can hand the trip straight to the
+            // Add-a-trip form — see the toolbar.
+            self.tripRec = tripRec
             if let title = tripRec?.items?.title { displayTitle = title }
         } catch {
             errorMessage = error.localizedDescription

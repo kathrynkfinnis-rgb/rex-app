@@ -118,6 +118,7 @@ struct AddToCollectionView: View {
             }
             .background(RexColor.background.ignoresSafeArea())
             .navigationTitle("Add to collection")
+            .rexDismissableKeyboard()
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .topBarLeading) {

@@ -94,6 +94,7 @@ struct EditProfileView: View {
             }
             .background(RexColor.background.ignoresSafeArea())
             .navigationTitle("Edit profile")
+            .rexDismissableKeyboard()
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .topBarLeading) {

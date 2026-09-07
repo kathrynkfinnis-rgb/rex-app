@@ -326,7 +326,8 @@ final class RexAPI {
         )
     }
 
-    func fetchFeed(category: String? = nil, searchText: String? = nil) async throws -> [FeedRecommendation] {
+    /// `offset` pages the unfiltered feed — see FeedView.loadMore.
+    func fetchFeed(category: String? = nil, searchText: String? = nil, offset: Int = 0) async throws -> [FeedRecommendation] {
         let token = try await validToken()
         let useView = await useRecommendationsDisplayView()
         let resourcePath = useView ? "/rest/v1/recommendations_display" : "/rest/v1/recommendations"
@@ -356,11 +357,16 @@ final class RexAPI {
 
         let trimmedSearch = searchText?.trimmingCharacters(in: .whitespaces)
         let isFiltered = category != nil || !(trimmedSearch ?? "").isEmpty
-        // The default view stays capped at 50 — fast, and everything on
-        // screen is recent enough that it's never actually been an issue.
-        // A filter or search means the match could be anywhere in your
-        // history, so it needs real range to find it.
-        let limit = isFiltered ? 300 : 50
+        // The default view loads a page at a time — 50, then another 50 as
+        // you reach the bottom (see `offset` and FeedView.loadMore).
+        //
+        // Sept 5 — "the search bar on the feed should search the full
+        // database, not just what is automatically loaded". It already
+        // queried the server rather than re-slicing the loaded page, but
+        // 300 was still a cap someone with a lot of history could hit, so
+        // it's 1000 now: a search is deliberate, runs once, and finding
+        // the thing matters more than shaving a few hundred milliseconds.
+        let limit = isFiltered ? 1000 : 50
 
         // Trip stops are unconditionally hidden (trip_id.is.null). Anything
         // else defaults visible but can be toggled off individually — #134
@@ -387,10 +393,21 @@ final class RexAPI {
             var components = URLComponents(url: baseURL.appendingPathComponent(resourcePath), resolvingAgainstBaseURL: false)!
             var queryItems = [
                 URLQueryItem(name: "select", value: select),
-                URLQueryItem(name: "trip_id", value: "is.null"),
                 URLQueryItem(name: "order", value: "created_at.desc"),
                 URLQueryItem(name: "limit", value: "\(limit)"),
+                URLQueryItem(name: "offset", value: "\(offset)"),
             ]
+            // Sept 2 — "individual Rex should still be searchable in the
+            // feed though". trip_id.is.null used to be unconditional here,
+            // which correctly keeps a trip's stops out of the browse feed
+            // (you want the trip, not fifteen cards for its stops) but also
+            // meant searching for a restaurant you'd Rex'd *as a stop on a
+            // trip* found nothing at all. Browsing still hides them; an
+            // active search or category filter now reaches them, which is
+            // the only time you've actually asked for something specific.
+            if !isFiltered {
+                queryItems.append(URLQueryItem(name: "trip_id", value: "is.null"))
+            }
             for filter in extraFilters { queryItems.append(URLQueryItem(name: filter.0, value: filter.1)) }
             if includeListFilter {
                 queryItems.append(URLQueryItem(name: "or", value: "(show_in_feed.is.null,show_in_feed.eq.true)"))
@@ -649,6 +666,70 @@ final class RexAPI {
     /// created_at.asc, so keeping this fetch in the same order means
     /// whatever you tick becomes the itinerary order with no reordering
     /// step at all.
+    /// Sept 2 — "when you type in the 'name' it allows you to search the
+    /// general internet but also your own rexes if it has already been
+    /// rex'd". Your own Rex only, matched on the item's title, so adding a
+    /// trip stop somewhere you've already been reuses that catalogue item
+    /// (and its photo, address and coordinates) instead of creating a
+    /// near-duplicate of it.
+    func searchMyRexItems(query: String) async throws -> [RexSearchHit] {
+        let trimmed = query.trimmingCharacters(in: .whitespaces)
+        guard trimmed.count >= 2, let userId = currentUserId else { return [] }
+        let token = try await validToken()
+        var components = URLComponents(url: baseURL.appendingPathComponent("/rest/v1/recommendations"), resolvingAgainstBaseURL: false)!
+        components.queryItems = [
+            URLQueryItem(name: "select", value: "item_id,rating,items!inner(id,type,title,subtitle,image_url,genre,address,lat,lng,external_id,external_source)"),
+            URLQueryItem(name: "user_id", value: "eq.\(userId)"),
+            URLQueryItem(name: "items.title", value: "ilike.*\(trimmed)*"),
+            URLQueryItem(name: "order", value: "created_at.desc"),
+            URLQueryItem(name: "limit", value: "8"),
+        ]
+        var request = URLRequest(url: components.url!)
+        request.setValue(anonKey, forHTTPHeaderField: "apikey")
+        request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+
+        let (data, response) = try await URLSession.shared.data(for: request)
+        guard let http = response as? HTTPURLResponse, http.statusCode < 400 else { return [] }
+        struct Row: Codable {
+            struct Item: Codable {
+                let id: String
+                let type: String
+                let title: String
+                let subtitle: String?
+                let image_url: String?
+                let genre: String?
+                let address: String?
+                let lat: Double?
+                let lng: Double?
+                let external_id: String?
+                let external_source: String?
+            }
+            let items: Item
+        }
+        let rows = (try? JSONDecoder().decode([Row].self, from: data)) ?? []
+        // Same item Rex'd more than once (standalone and as a trip stop, say)
+        // should offer itself once.
+        var seen = Set<String>()
+        return rows.compactMap { row -> RexSearchHit? in
+            guard seen.insert(row.items.id).inserted else { return nil }
+            return RexSearchHit(
+                // A Rex of your own that came from a manual entry has no
+                // external id at all; keying it by the catalogue item id
+                // keeps RexSearchHit.id unique either way, and "rex" as the
+                // source is what marks it as already-yours in the picker.
+                externalId: row.items.external_id ?? row.items.id,
+                externalSource: row.items.external_source ?? "rex",
+                title: row.items.title,
+                subtitle: row.items.subtitle,
+                imageURL: row.items.image_url,
+                genre: row.items.genre,
+                address: row.items.address,
+                lat: row.items.lat,
+                lng: row.items.lng
+            )
+        }
+    }
+
     func fetchStandalonePlaceRex() async throws -> [FeedRecommendation] {
         let token = try await validToken()
         guard let userId = currentUserId else { throw RexAPIError.notSignedIn }
@@ -2113,6 +2194,30 @@ final class RexAPI {
     /// of inventing a new one — that way both stops stay inside the same
     /// heading's original time range, so this can never accidentally bleed
     /// a stop into a different heading's position in the overall itinerary.
+    /// Sept 5 — sets one stop's heading directly, which editing a posted
+    /// trip needs and renameTripSection can't do: that one renames a
+    /// heading across every stop under it, whereas dragging a single stop
+    /// from "Day 1" to "Day 2" changes only that stop.
+    func setTripSection(recommendationId: String, section: String?) async throws {
+        let token = try await validToken()
+        var components = URLComponents(url: baseURL.appendingPathComponent("/rest/v1/recommendations"), resolvingAgainstBaseURL: false)!
+        components.queryItems = [URLQueryItem(name: "id", value: "eq.\(recommendationId)")]
+        var request = URLRequest(url: components.url!)
+        request.httpMethod = "PATCH"
+        request.setValue(anonKey, forHTTPHeaderField: "apikey")
+        request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        let trimmed = section?.trimmingCharacters(in: .whitespaces)
+        request.httpBody = try JSONSerialization.data(withJSONObject: [
+            "trip_section": (trimmed?.isEmpty ?? true) ? (NSNull() as Any) : trimmed!,
+        ])
+
+        let (data, response) = try await URLSession.shared.data(for: request)
+        guard let http = response as? HTTPURLResponse, http.statusCode < 400 else {
+            throw RexAPIError.server(friendlyError(data, fallback: "Couldn't move that stop."))
+        }
+    }
+
     func setRecommendationCreatedAt(id: String, createdAt: String) async throws {
         let token = try await validToken()
         var components = URLComponents(url: baseURL.appendingPathComponent("/rest/v1/recommendations"), resolvingAgainstBaseURL: false)!
@@ -2234,6 +2339,149 @@ final class RexAPI {
 
     /// Like counts plus whether the current user has liked each one, for a page
     /// of recommendations. Fetched in one round trip rather than per card.
+    // MARK: - Wants: likes and comments
+    //
+    // Sept 5 — "for 'want to's, we still need to be able to like and
+    // comment". A want has no recommendation row, so it can't use the
+    // functions below; these four are the same shapes against want_likes /
+    // want_comments (migration 20260905140000). `wantId` throughout is the
+    // real `wants.id` — FeedRecommendation.id carries a "want-" prefix for
+    // its own Identifiable purposes, which callers strip first.
+
+    func fetchWantLikeState(wantIds: [String]) async throws -> [String: (count: Int, likedByMe: Bool)] {
+        guard !wantIds.isEmpty else { return [:] }
+        let token = try await validToken()
+        var components = URLComponents(url: baseURL.appendingPathComponent("/rest/v1/want_likes"), resolvingAgainstBaseURL: false)!
+        components.queryItems = [
+            URLQueryItem(name: "select", value: "want_id,user_id"),
+            URLQueryItem(name: "want_id", value: "in.(\(wantIds.joined(separator: ",")))"),
+        ]
+        var request = URLRequest(url: components.url!)
+        request.setValue(anonKey, forHTTPHeaderField: "apikey")
+        request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+
+        let (data, response) = try await URLSession.shared.data(for: request)
+        guard let http = response as? HTTPURLResponse, http.statusCode < 400 else { return [:] }
+        struct Row: Codable { let want_id: String; let user_id: String }
+        let rows = (try? JSONDecoder().decode([Row].self, from: data)) ?? []
+        let me = currentUserId
+        var result: [String: (count: Int, likedByMe: Bool)] = [:]
+        for row in rows {
+            var entry = result[row.want_id] ?? (0, false)
+            entry.count += 1
+            if row.user_id == me { entry.likedByMe = true }
+            result[row.want_id] = entry
+        }
+        return result
+    }
+
+    func setWantLike(wantId: String, liked: Bool) async throws {
+        let token = try await validToken()
+        guard let userId = currentUserId else { throw RexAPIError.notSignedIn }
+        var components = URLComponents(url: baseURL.appendingPathComponent("/rest/v1/want_likes"), resolvingAgainstBaseURL: false)!
+        var request: URLRequest
+        if liked {
+            request = URLRequest(url: components.url!)
+            request.httpMethod = "POST"
+            request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+            request.httpBody = try JSONSerialization.data(withJSONObject: ["want_id": wantId, "user_id": userId])
+        } else {
+            components.queryItems = [
+                URLQueryItem(name: "want_id", value: "eq.\(wantId)"),
+                URLQueryItem(name: "user_id", value: "eq.\(userId)"),
+            ]
+            request = URLRequest(url: components.url!)
+            request.httpMethod = "DELETE"
+        }
+        request.setValue(anonKey, forHTTPHeaderField: "apikey")
+        request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+
+        let (data, response) = try await URLSession.shared.data(for: request)
+        guard let http = response as? HTTPURLResponse, http.statusCode < 400 else {
+            throw RexAPIError.server(friendlyError(data, fallback: "Couldn't save that like."))
+        }
+    }
+
+    func fetchWantCommentCounts(wantIds: [String]) async throws -> [String: Int] {
+        guard !wantIds.isEmpty else { return [:] }
+        let token = try await validToken()
+        var components = URLComponents(url: baseURL.appendingPathComponent("/rest/v1/want_comments"), resolvingAgainstBaseURL: false)!
+        components.queryItems = [
+            URLQueryItem(name: "select", value: "want_id"),
+            URLQueryItem(name: "want_id", value: "in.(\(wantIds.joined(separator: ",")))"),
+        ]
+        var request = URLRequest(url: components.url!)
+        request.setValue(anonKey, forHTTPHeaderField: "apikey")
+        request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+
+        let (data, response) = try await URLSession.shared.data(for: request)
+        guard let http = response as? HTTPURLResponse, http.statusCode < 400 else { return [:] }
+        struct Row: Codable { let want_id: String }
+        let rows = (try? JSONDecoder().decode([Row].self, from: data)) ?? []
+        return rows.reduce(into: [:]) { out, row in out[row.want_id, default: 0] += 1 }
+    }
+
+    /// Same client-side profile merge as fetchRequestComments — see its own
+    /// note on why these don't embed profiles by FK name any more.
+    func fetchWantComments(wantId: String) async throws -> [RexComment] {
+        let token = try await validToken()
+        var components = URLComponents(url: baseURL.appendingPathComponent("/rest/v1/want_comments"), resolvingAgainstBaseURL: false)!
+        components.queryItems = [
+            URLQueryItem(name: "select", value: "id,want_id,user_id,body,created_at"),
+            URLQueryItem(name: "want_id", value: "eq.\(wantId)"),
+            URLQueryItem(name: "order", value: "created_at.asc"),
+        ]
+        var request = URLRequest(url: components.url!)
+        request.setValue(anonKey, forHTTPHeaderField: "apikey")
+        request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+
+        let (data, response) = try await URLSession.shared.data(for: request)
+        guard let http = response as? HTTPURLResponse, http.statusCode < 400 else {
+            throw RexAPIError.server(friendlyError(data, fallback: "Couldn't load comments."))
+        }
+        struct Row: Codable {
+            let id: String
+            let user_id: String
+            let body: String
+            let created_at: String
+        }
+        let rows = (try? JSONDecoder().decode([Row].self, from: data)) ?? []
+        guard !rows.isEmpty else { return [] }
+
+        let profilesById: [String: RexProfile] = await {
+            let ids = Array(Set(rows.map { $0.user_id }))
+            guard let people = try? await fetchProfiles(ids: ids) else { return [:] }
+            return people.reduce(into: [:]) { out, p in
+                out[p.id] = RexProfile(username: p.username, display_name: p.display_name, avatar_url: p.avatar_url)
+            }
+        }()
+
+        return rows.map { row in
+            RexComment(
+                id: row.id, body: row.body, created_at: row.created_at,
+                user_id: row.user_id, profiles: profilesById[row.user_id]
+            )
+        }
+    }
+
+    func addWantComment(wantId: String, body text: String) async throws {
+        let token = try await validToken()
+        guard let userId = currentUserId else { throw RexAPIError.notSignedIn }
+        var request = URLRequest(url: baseURL.appendingPathComponent("/rest/v1/want_comments"))
+        request.httpMethod = "POST"
+        request.setValue(anonKey, forHTTPHeaderField: "apikey")
+        request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        request.httpBody = try JSONSerialization.data(withJSONObject: [
+            "want_id": wantId, "user_id": userId, "body": text,
+        ])
+
+        let (data, response) = try await URLSession.shared.data(for: request)
+        guard let http = response as? HTTPURLResponse, http.statusCode < 400 else {
+            throw RexAPIError.server(friendlyError(data, fallback: "Couldn't post that comment."))
+        }
+    }
+
     func fetchLikeState(recommendationIds: [String]) async throws -> [String: (count: Int, likedByMe: Bool)] {
         guard !recommendationIds.isEmpty else { return [:] }
         let token = try await validToken()
@@ -2525,9 +2773,20 @@ final class RexAPI {
 
     /// #132 — every response to one blast, oldest first (a conversation
     /// reads top-to-bottom, unlike the feed itself).
+    /// Sept 2 — "the blast request has broken somehow": every response on a
+    /// blast came back as "Couldn't load responses." This embedded
+    /// `profiles!request_comments_user_id_fkey(...)`, naming an FK
+    /// constraint by hand — the third time that exact pattern has bitten
+    /// this app (see fetchWantsFeed/fetchMapWants, where wants_user_id_fkey
+    /// actually points at auth.users rather than public.profiles, and the
+    /// PGRST201 ambiguity on recommendations). Rather than guess at the
+    /// right constraint name again, this drops the embed entirely and
+    /// batch-fetches the profiles in one flat query alongside, merging
+    /// client-side — the same shape those two fixes settled on, and immune
+    /// to whatever the underlying constraint happens to be called.
     func fetchRequestComments(requestId: String) async throws -> [RequestComment] {
         let token = try await validToken()
-        let select = "id,request_id,user_id,body,created_at,profiles!request_comments_user_id_fkey(username,display_name,avatar_url)"
+        let select = "id,request_id,user_id,body,created_at"
         var components = URLComponents(url: baseURL.appendingPathComponent("/rest/v1/request_comments"), resolvingAgainstBaseURL: false)!
         components.queryItems = [
             URLQueryItem(name: "select", value: select),
@@ -2542,7 +2801,33 @@ final class RexAPI {
         guard let http = response as? HTTPURLResponse, http.statusCode < 400 else {
             throw RexAPIError.server(friendlyError(data, fallback: "Couldn't load responses."))
         }
-        return try JSONDecoder().decode([RequestComment].self, from: data)
+        struct Row: Codable {
+            let id: String
+            let request_id: String
+            let user_id: String
+            let body: String
+            let created_at: String
+        }
+        let rows = try JSONDecoder().decode([Row].self, from: data)
+        guard !rows.isEmpty else { return [] }
+
+        // Best-effort: a response with no profile still shows, just without
+        // a name attached — better than the whole screen erroring out.
+        let profilesById: [String: RexProfile] = await {
+            let ids = Array(Set(rows.map { $0.user_id }))
+            guard let people = try? await fetchProfiles(ids: ids) else { return [:] }
+            return people.reduce(into: [:]) { out, p in
+                out[p.id] = RexProfile(username: p.username, display_name: p.display_name, avatar_url: p.avatar_url)
+            }
+        }()
+
+        return rows.map { row in
+            RequestComment(
+                id: row.id, request_id: row.request_id, user_id: row.user_id,
+                body: row.body, created_at: row.created_at,
+                profiles: profilesById[row.user_id]
+            )
+        }
     }
 
     /// #132 — reply to a blast. suggested_item_id is left null; the compose
@@ -3510,12 +3795,15 @@ final class RexAPI {
     func insertStagingRows(_ items: [ExtractedRec], source: String) async throws -> Int {
         let token = try await validToken()
         guard let userId = currentUserId else { throw RexAPIError.notSignedIn }
-        let rows: [[String: Any]] = items.prefix(200).map { item in
+        let rows: [[String: Any]] = items.prefix(200).enumerated().map { index, item in
             var row: [String: Any] = [
                 "user_id": userId,
                 "source": source,
                 "raw_title": String(item.title.prefix(300)),
                 "status": "pending",
+                // The document's own order, which nothing else preserves —
+                // see fetchStagingRows.
+                "sort_order": index,
             ]
             row["raw_creator"] = item.creator.map { String($0.prefix(200)) } ?? NSNull()
             row["raw_note"] = item.note.map { String($0.prefix(2000)) } ?? NSNull()
@@ -3529,37 +3817,70 @@ final class RexAPI {
         }
         guard !rows.isEmpty else { return 0 }
 
-        var request = URLRequest(url: baseURL.appendingPathComponent("/rest/v1/import_staging"))
-        request.httpMethod = "POST"
-        request.setValue(anonKey, forHTTPHeaderField: "apikey")
-        request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
-        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
-        request.httpBody = try JSONSerialization.data(withJSONObject: rows)
+        func post(_ body: [[String: Any]]) async throws -> (Data, HTTPURLResponse) {
+            var request = URLRequest(url: baseURL.appendingPathComponent("/rest/v1/import_staging"))
+            request.httpMethod = "POST"
+            request.setValue(anonKey, forHTTPHeaderField: "apikey")
+            request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+            request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+            request.httpBody = try JSONSerialization.data(withJSONObject: body)
+            let (data, response) = try await URLSession.shared.data(for: request)
+            return (data, response as? HTTPURLResponse ?? HTTPURLResponse())
+        }
 
-        let (data, response) = try await URLSession.shared.data(for: request)
-        guard let http = response as? HTTPURLResponse, http.statusCode < 400 else {
+        var (data, http) = try await post(rows)
+        // Same one-shot fallback as fetchStagingRows: sort_order doesn't
+        // exist until migration 20260905090000 has been run, and an import
+        // that refuses to save is much worse than one that saves without
+        // its ordinal.
+        if http.statusCode == 400 {
+            let withoutOrder = rows.map { row -> [String: Any] in
+                var copy = row
+                copy.removeValue(forKey: "sort_order")
+                return copy
+            }
+            (data, http) = try await post(withoutOrder)
+        }
+        guard http.statusCode < 400 else {
             throw RexAPIError.server(friendlyError(data, fallback: "Couldn't save the extracted items."))
         }
         return rows.count
     }
 
+    /// Sept 5 — every row of one import is POSTed in a single request, so
+    /// they share an identical created_at (Postgres holds now() constant
+    /// for a transaction) and ordering by it ordered by nothing at all,
+    /// which is why the review screen read as reversed. sort_order (see
+    /// migration 20260905090000) is the real ordinal. Tried first and
+    /// falling back once on a 400, the same shape as show_in_feed above —
+    /// the column doesn't exist until that migration is run, and an import
+    /// that can't be reviewed at all would be far worse than one in the
+    /// old arbitrary order.
     func fetchStagingRows(source: String) async throws -> [ImportStagingRow] {
         let token = try await validToken()
         guard let userId = currentUserId else { throw RexAPIError.notSignedIn }
-        var components = URLComponents(url: baseURL.appendingPathComponent("/rest/v1/import_staging"), resolvingAgainstBaseURL: false)!
-        components.queryItems = [
-            URLQueryItem(name: "select", value: "*"),
-            URLQueryItem(name: "user_id", value: "eq.\(userId)"),
-            URLQueryItem(name: "source", value: "eq.\(source)"),
-            URLQueryItem(name: "status", value: "eq.pending"),
-            URLQueryItem(name: "order", value: "created_at.asc"),
-        ]
-        var request = URLRequest(url: components.url!)
-        request.setValue(anonKey, forHTTPHeaderField: "apikey")
-        request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
 
-        let (data, response) = try await URLSession.shared.data(for: request)
-        guard let http = response as? HTTPURLResponse, http.statusCode < 400 else {
+        func fetch(orderBy: String) async throws -> (Data, HTTPURLResponse) {
+            var components = URLComponents(url: baseURL.appendingPathComponent("/rest/v1/import_staging"), resolvingAgainstBaseURL: false)!
+            components.queryItems = [
+                URLQueryItem(name: "select", value: "*"),
+                URLQueryItem(name: "user_id", value: "eq.\(userId)"),
+                URLQueryItem(name: "source", value: "eq.\(source)"),
+                URLQueryItem(name: "status", value: "eq.pending"),
+                URLQueryItem(name: "order", value: orderBy),
+            ]
+            var request = URLRequest(url: components.url!)
+            request.setValue(anonKey, forHTTPHeaderField: "apikey")
+            request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+            let (data, response) = try await URLSession.shared.data(for: request)
+            return (data, response as? HTTPURLResponse ?? HTTPURLResponse())
+        }
+
+        var (data, http) = try await fetch(orderBy: "sort_order.asc.nullslast,created_at.asc")
+        if http.statusCode == 400 {
+            (data, http) = try await fetch(orderBy: "created_at.asc")
+        }
+        guard http.statusCode < 400 else {
             throw RexAPIError.server(friendlyError(data, fallback: "Couldn't load what was extracted."))
         }
         return try JSONDecoder().decode([ImportStagingRow].self, from: data)

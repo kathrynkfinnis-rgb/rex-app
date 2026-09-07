@@ -8,6 +8,10 @@ import SwiftUI
 struct ImportReviewView: View {
     let source: String
     var onDone: () -> Void
+    /// Sept 5 — hands an extracted trip back up to the Add-a-trip form
+    /// that opened this importer, instead of posting it from here. See
+    /// the .trip case in save().
+    var onExtractedAsTrip: ((String, [ItineraryEntry]) -> Void)? = nil
 
     @State private var rows: [ImportStagingRow] = []
     @State private var isLoading = true
@@ -75,6 +79,7 @@ struct ImportReviewView: View {
         }
         .background(RexColor.background.ignoresSafeArea())
         .navigationTitle("Review")
+        .rexDismissableKeyboard()
         .navigationBarTitleDisplayMode(.inline)
         .task { await load() }
         .sheet(item: $editingRow) { row in
@@ -290,12 +295,23 @@ struct ImportReviewView: View {
         do {
             switch destination {
             case .trip:
-                let result = try await RexAPI.shared.approveStagingAsTrip(
-                    rows: rows, tripName: destinationName, note: nil
-                )
-                resultMessage = result.failed.isEmpty
-                    ? "Added \(result.added) stops to \u{201C}\(destinationName)\u{201D}."
-                    : "Added \(result.added) of \(rows.count) \u{2014} \(result.failed.count) couldn't be saved."
+                // Sept 5 — a trip no longer posts straight from here. It
+                // hands the extracted rows back up to the Add-a-trip form
+                // that opened this importer, pre-filled, so the document
+                // import ends up in exactly the screen a hand-built trip
+                // does: add a stop the document missed, add a heading, drag
+                // things around, set a cover photo, save as a draft.
+                //
+                // Handed *up* rather than presented from here on purpose.
+                // This screen is already three presentations deep (the
+                // add sheet, then the importer sheet, then this), and
+                // presenting AddRexView again from inside it meant
+                // presenting that view within itself — which crashed on the
+                // first real run. The form we want is already on screen
+                // underneath; filling it in beats stacking another copy.
+                onExtractedAsTrip?(destinationName, [ItineraryEntry].fromStagingRows(rows))
+                isSaving = false
+                return
             case .list:
                 let result = try await RexAPI.shared.approveStagingAsList(
                     rows: rows, listName: destinationName, kind: listKind, note: nil, showInFeedIds: showInFeedIds

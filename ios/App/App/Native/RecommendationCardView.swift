@@ -55,15 +55,12 @@ struct RecommendationCardView: View {
     var body: some View {
         guard let item = rec.items else { return AnyView(EmptyView()) }
         return AnyView(
-            HStack(spacing: 0) {
-                // "A similar bar down the left of the cards on the feed to
-                // show which category it's in" — same tintColor/treatment
-                // as the Add-a-Rex category picker, just along the whole
-                // card's edge instead of one grid tile's.
-                Rectangle()
-                    .fill(category.tintColor)
-                    .frame(width: 5)
-
+            // Sept 5 — the category's colour was a 5px rail down the left
+            // edge; "the colours on the cards [should be] more visible", and
+            // of the five treatments mocked up, the full border (option B)
+            // is the one Kathryn picked. Nothing else about the card
+            // changes — white ground, so photos and text are untouched.
+            Group {
                 VStack(alignment: .leading, spacing: 0) {
                     HStack(alignment: .top, spacing: RexSpacing.md) {
                         thumbnail(item: item)
@@ -72,7 +69,13 @@ struct RecommendationCardView: View {
                             Text(item.title)
                                 .font(RexFont.display(17, weight: .semibold))
                                 .foregroundStyle(RexColor.foreground)
-                                .lineLimit(1)
+                                // Sept 5 — "the titles on the feed should be
+                                // full unless it goes over 3 lines, in which
+                                // case can '...' them". Was a hard one line,
+                                // which truncated plenty of ordinary titles
+                                // ("Cumin roasted carrots,…") that had room
+                                // to breathe.
+                                .lineLimit(3)
                                 .truncationMode(.tail)
                                 // Room for the floating blast/want/rating badge
                                 // sharing this same corner now that it's an
@@ -255,7 +258,7 @@ struct RecommendationCardView: View {
                     .padding(RexSpacing.cardPadding)
 
                     if let photos = rec.photo_urls, !photos.isEmpty {
-                        PhotoCarouselView(urls: photos, height: 280, cornerRadius: 0)
+                        PhotoCarouselView(urls: photos, cornerRadius: 0)
                             .padding(.bottom, RexSpacing.sm)
                             // #120: without this, a swipe started on the photo
                             // itself was captured by the enclosing
@@ -297,7 +300,7 @@ struct RecommendationCardView: View {
                     .padding(.vertical, RexSpacing.md)
                 }
             }
-            .rexCard()
+            .rexCard(borderColor: category.tintColor)
         )
     }
 

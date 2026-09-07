@@ -58,6 +58,12 @@ struct FeedView: View {
     @State private var isLoadingFiltered = false
     @State private var filterFetchTask: Task<Void, Never>?
 
+    /// Paging for the unfiltered feed — see loadMore().
+    private let feedPageSize = 50
+    @State private var feedOffset = 0
+    @State private var hasMoreFeed = true
+    @State private var isLoadingMore = false
+
     /// Every category, always offered — not just the ones present in the
     /// currently-loaded page.
     ///
@@ -158,8 +164,19 @@ struct FeedView: View {
     /// item now: your own take if you have one, else whichever is most
     /// recent — everyone else still surfaces via the "Also Rex'd by"
     /// footer (rexCounts), so nothing's actually lost, just not repeated.
-    /// Wants/blasts are left alone — a want and an actually-done Rex for
-    /// the same item are different facts, not duplicates of each other.
+    /// Blasts are left alone — a question isn't a duplicate of anything.
+    ///
+    /// Wants used to be left alone too, on the reasoning that "wants to
+    /// try" and "actually Rex'd it" are different facts. Sept 1 — "if
+    /// someone makes a card as a want to try, it shouldn't appear the feed
+    /// twice (mine or theirs)": in practice a want sitting right next to a
+    /// real Rex of the same item (anyone's, not just the same person's)
+    /// just reads as the same thing posted twice, not two facts worth
+    /// separate cards. A real Rex is strictly more informative than "wants
+    /// to try" it, so once one exists for an item, every want for that
+    /// same item folds away — same "nothing's lost, just not repeated"
+    /// reasoning as above, since isOnMyList/rexCounts already carry the
+    /// want signal for your own card.
     private func collapseDuplicateItems(_ rows: [FeedRecommendation]) -> [FeedRecommendation] {
         let myId = RexAPI.shared.currentUserId
         var primaryIdByItem: [String: String] = [:]
@@ -178,8 +195,10 @@ struct FeedView: View {
                 primaryIdByItem[rec.item_id] = rec.id
             }
         }
+        let itemsWithARealRex = Set(primaryIdByItem.keys)
         return rows.filter { rec in
-            if rec.isWant || rec.isBlast { return true }
+            if rec.isBlast { return true }
+            if rec.isWant { return !itemsWithARealRex.contains(rec.item_id) }
             return primaryIdByItem[rec.item_id] == rec.id
         }
     }
@@ -221,12 +240,32 @@ struct FeedView: View {
         let noActiveFilter = selectedCategories.isEmpty && subFilter == nil && !blastsOnly
             && query.trimmingCharacters(in: .whitespaces).isEmpty
         let deduped = noActiveFilter ? collapseDuplicateItems(base) : base
+
+        // Sept 5 — "see friends' recent blasts at the top of the feed". A
+        // blast is a question someone's waiting on an answer to, so it goes
+        // stale in a way a Rex doesn't: useful today, pointless by the time
+        // it's scrolled past. Same bounded-boost shape as the tagged-me one
+        // above rather than a permanent pin — after a few days it drops
+        // back into chronological order with everything else.
+        var blasts: [FeedRecommendation] = []
         var tagged: [FeedRecommendation] = []
         var rest: [FeedRecommendation] = []
         for rec in deduped {
-            if isRecentlyTaggedMe(rec) { tagged.append(rec) } else { rest.append(rec) }
+            if rec.isBlast, isRecent(rec) {
+                blasts.append(rec)
+            } else if isRecentlyTaggedMe(rec) {
+                tagged.append(rec)
+            } else {
+                rest.append(rec)
+            }
         }
-        return tagged.isEmpty ? rest : tagged + rest
+        return blasts + tagged + rest
+    }
+
+    /// Within the same few days the tagged-me boost uses.
+    private func isRecent(_ rec: FeedRecommendation) -> Bool {
+        guard let created = rec.createdDate else { return false }
+        return created > taggedBoostThreshold
     }
 
     /// Like counts are fetched on demand, not on every feed load — most
@@ -378,6 +417,21 @@ struct FeedView: View {
                         } header: {
                             filterChipsBar
                         }
+
+                        // Sept 5 — infinite scroll. Reaching this marker is
+                        // what asks for the next page; it only exists while
+                        // there's more to fetch and no filter/search is
+                        // active (those already pull a much wider set in
+                        // one go, so there's nothing to page through).
+                        if hasMoreFeed, filteredRecommendations == nil, !visible.isEmpty {
+                            HStack {
+                                Spacer()
+                                ProgressView().controlSize(.small)
+                                Spacer()
+                            }
+                            .padding(.vertical, RexSpacing.lg)
+                            .onAppear { Task { await loadMore() } }
+                        }
                     }
                     .padding(.horizontal, RexSpacing.page)
                     .padding(.bottom, RexSpacing.xxl)
@@ -386,6 +440,7 @@ struct FeedView: View {
                 .refreshable { await loadFeed() }
             }
             .navigationBarTitleDisplayMode(.inline)
+            .rexDismissableKeyboard()
             .navigationDestination(for: String.self) { itemId in
                 ItemDetailView(itemId: itemId)
             }
@@ -462,11 +517,24 @@ struct FeedView: View {
             myProfile = try? await RexAPI.shared.fetchMyProfile()
         }
         .sheet(item: $editing) { rec in
-            EditRexView(
-                rec: rec,
-                onSaved: { Task { await refreshOneRex(id: rec.id) } },
-                onDeleted: { Task { await loadFeed() } }
-            )
+            // Sept 5 — "the edit button on the feed takes you to the old
+            // edit page". A trip is edited in the Add-a-trip form now, not
+            // EditRexView (which can only touch a single Rex's own fields
+            // and knows nothing about an itinerary). Branching here rather
+            // than at each pencil/context-menu call site so every route
+            // into editing gets it.
+            if RexCategory(rawType: rec.items?.type) == .trip {
+                TripEditorLoader(trip: rec) {
+                    editing = nil
+                    Task { await loadFeed() }
+                }
+            } else {
+                EditRexView(
+                    rec: rec,
+                    onSaved: { Task { await refreshOneRex(id: rec.id) } },
+                    onDeleted: { Task { await loadFeed() } }
+                )
+            }
         }
         .sheet(item: $addingToCollection) { rec in
             AddToCollectionView(rec: rec, onDone: {})
@@ -828,6 +896,7 @@ struct FeedView: View {
 
     /// Trips open their itinerary; everything else opens the item screen.
     private func open(_ rec: FeedRecommendation) {
+        print("DEBUG open() called for rec.id=\(rec.id) isBlast=\(rec.isBlast)")
         // #132 — a blast has no item, but it does now have somewhere to go:
         // its own screen, to read and add responses.
         if rec.isBlast {
@@ -951,6 +1020,11 @@ struct FeedView: View {
                 + ((try? await wantsFeed) ?? [])
                 + ((try? await blastsFeed) ?? [])
             recommendations = merged.sorted { $0.created_at > $1.created_at }
+            // A fresh load resets paging; a full page back means there's
+            // probably more behind it (see loadMore).
+            let rexRows = try await rex
+            feedOffset = rexRows.count
+            hasMoreFeed = rexRows.count >= feedPageSize
 
             let itemIds = Array(Set(recommendations.map { $0.item_id }))
             async let counts = RexAPI.shared.fetchRexCounts(itemIds: itemIds)
@@ -962,6 +1036,38 @@ struct FeedView: View {
             errorMessage = error.localizedDescription
         }
         isLoading = false
+    }
+
+    /// Sept 5 — "if you get to the bottom of the feed, you should be able to
+    /// keep loading more content". The feed loads 50 at a time and simply
+    /// stopped there; anything older than your last 50 was unreachable
+    /// except through search.
+    ///
+    /// Only the Rex query pages. Wants and blasts are both far smaller sets
+    /// that already load in full, so paging them too would mean three
+    /// cursors to keep in step for no practical gain.
+    private func loadMore() async {
+        guard hasMoreFeed, !isLoadingMore, filteredRecommendations == nil else { return }
+        isLoadingMore = true
+        defer { isLoadingMore = false }
+        guard let older = try? await RexAPI.shared.fetchFeed(offset: feedOffset) else {
+            hasMoreFeed = false
+            return
+        }
+        feedOffset += older.count
+        hasMoreFeed = older.count >= feedPageSize
+        guard !older.isEmpty else { return }
+
+        var seen = Set(recommendations.map { $0.id })
+        let fresh = older.filter { seen.insert($0.id).inserted }
+        guard !fresh.isEmpty else { return }
+        recommendations = (recommendations + fresh).sorted { $0.created_at > $1.created_at }
+
+        // Same two follow-up fetches loadFeed does, for the new rows only.
+        let newItemIds = Array(Set(fresh.map { $0.item_id }))
+        if let counts = try? await RexAPI.shared.fetchRexCounts(itemIds: newItemIds) {
+            for (id, count) in counts { rexCounts[id] = count }
+        }
     }
 
     /// #138 — splice one refreshed row back into the existing array instead

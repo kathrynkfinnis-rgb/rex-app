@@ -99,8 +99,31 @@ struct RexCardStyle: ViewModifier {
     }
 }
 
+/// Sept 5 — feed cards carry their category's colour as a full border
+/// ("option B"), rather than the thin left rail they had, which was too
+/// easy to miss on a busy screen. Same card otherwise: white ground, so
+/// text and photos are unaffected by whatever colour it's wearing.
+struct RexColoredCardStyle: ViewModifier {
+    let color: Color
+    var width: CGFloat = 2
+
+    func body(content: Content) -> some View {
+        content
+            .background(RexColor.card)
+            .clipShape(RoundedRectangle(cornerRadius: RexRadius.card, style: .continuous))
+            .overlay(
+                RoundedRectangle(cornerRadius: RexRadius.card, style: .continuous)
+                    .stroke(color, lineWidth: width)
+            )
+            .shadow(color: .black.opacity(0.04), radius: 6, y: 2)
+    }
+}
+
 extension View {
     func rexCard() -> some View { modifier(RexCardStyle()) }
+    func rexCard(borderColor: Color, width: CGFloat = 2) -> some View {
+        modifier(RexColoredCardStyle(color: borderColor, width: width))
+    }
 }
 
 /// Primary action: forest green, white text, 14pt radius.
@@ -227,18 +250,24 @@ enum RexCategory: String {
     /// the feed itself. Distinct enough to tell apart across a 2-column
     /// grid at a glance; picked to sit comfortably alongside the brand's
     /// own forest green rather than competing with it as a second accent.
+    /// Sept 5 — matched to Kathryn's own palette (the reference picker
+    /// screenshot), replacing the set I'd picked. Read off that image
+    /// rather than sampled from the file, so they're close rather than
+    /// provably identical.
     var tintColor: Color {
         switch self {
-        case .place: return Color(hex: "D2785A")   // terracotta
-        case .trip: return Color(hex: "3E7CB1")    // ocean blue
-        case .list: return Color(hex: "8A6D3B")    // warm brown
-        case .book: return Color(hex: "8457C9")    // plum violet
-        case .movie: return Color(hex: "C0473E")   // crimson
-        case .tv: return Color(hex: "5B5FC7")      // indigo
-        case .podcast: return Color(hex: "1F9A8D") // teal
-        case .recipe: return Color(hex: "C98A2E")  // amber
-        case .event: return Color(hex: "C43F82")   // magenta
-        case .other: return Color(hex: "78807A")   // neutral slate
+        case .place: return Color(hex: "4E9A94")   // sea green
+        case .trip: return Color(hex: "E2703A")    // orange
+        case .book: return Color(hex: "3B7DD8")    // blue
+        case .movie: return Color(hex: "C061C0")   // orchid
+        case .tv: return Color(hex: "E63329")      // red
+        case .podcast: return Color(hex: "1A3A6B") // navy
+        case .recipe: return Color(hex: "5A7233")  // olive
+        case .event: return Color(hex: "E0A020")   // gold
+        case .other: return Color(hex: "8C2340")   // maroon
+        // Not in the reference image, which has no List tile — picked to
+        // sit alongside the rest without colliding with any of them.
+        case .list: return Color(hex: "7A6A9E")    // muted violet
         }
     }
 
@@ -528,3 +557,64 @@ func downscaledJPEG(_ data: Data, maxDimension: CGFloat = 1600, quality: CGFloat
     let resized = renderer.image { _ in image.draw(in: CGRect(origin: .zero, size: targetSize)) }
     return resized.jpegData(compressionQuality: quality) ?? data
 }
+
+/// Sept 2 — "keyboard should be able to be dropped down". Text inputs are
+/// scattered across ~28 screens here, and only three of them (Login,
+/// ItemDetail, BlastDetail) had any way to dismiss the keyboard at all —
+/// everywhere else it came up and stayed up, covering whatever button you
+/// were trying to reach next. Rather than hand-wire a focus binding per
+/// screen, this pairs the two mechanisms people actually reach for:
+/// swipe-down over a scroll view, and an explicit Done button above the
+/// keyboard for the cases where there's nothing to scroll (a short sheet,
+/// a single field) or where the swipe isn't discoverable.
+extension View {
+    func rexDismissableKeyboard() -> some View {
+        self
+            .scrollDismissesKeyboard(.interactively)
+            .toolbar {
+                ToolbarItemGroup(placement: .keyboard) {
+                    Spacer()
+                    Button("Done") {
+                        UIApplication.shared.sendAction(
+                            #selector(UIResponder.resignFirstResponder), to: nil, from: nil, for: nil
+                        )
+                    }
+                    .font(RexFont.text(15, weight: .semibold))
+                    .foregroundStyle(RexColor.primary)
+                }
+            }
+    }
+}
+
+/// Sept 5 — "should colour code the map by sub-category (e.g. restaurant,
+/// bar, cafe) not category (place vs event)". Pins were forest green for
+/// everything except events, which told you almost nothing on a map where
+/// nearly every pin is a place: what you actually want to see at a glance
+/// is dinner vs drinks vs somewhere to stay.
+///
+/// Keyed off the sub-categories in `rexSubcategories[.place]`, plus event.
+/// Hues are spread widely rather than tastefully close together — these are
+/// 20pt map pins, so they have to be told apart at a glance, not admired.
+func rexSubcategoryColor(genre: String?, type: String?) -> Color {
+    if RexCategory(rawType: type) == .event { return Color(hex: "C43F82") }
+    // A place can carry several sub-categories ("Restaurant, Bar"); the
+    // first is what the pin goes by, so a wine bar filed under both reads
+    // as whichever the user themselves listed first.
+    switch splitGenres(genre).first?.lowercased() {
+    case "restaurant":       return Color(hex: "C0473E")   // red
+    case "private dining":   return Color(hex: "8457C9")   // plum
+    case "bar":              return Color(hex: "C98A2E")   // amber
+    case "café", "cafe":     return Color(hex: "8A6D3B")   // brown
+    case "beauty":           return Color(hex: "D2699A")   // pink
+    case "accommodation":    return Color(hex: "3E7CB1")   // blue
+    case "shop":             return Color(hex: "1F9A8D")   // teal
+    case "activity":         return Color(hex: "5B8C3A")   // green
+    case "town":             return Color(hex: "6B7A8F")   // slate
+    case "for kids":         return Color(hex: "5B5FC7")   // indigo
+    default:                 return Color(hex: "173626")   // forest, as before
+    }
+}
+
+/// The sub-categories the map offers as filters, in the order the legend
+/// and chip row show them.
+let rexMapSubcategories: [String] = (rexSubcategories[.place] ?? []) + ["Event"]

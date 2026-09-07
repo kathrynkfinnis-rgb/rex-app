@@ -407,6 +407,7 @@ struct EditRexView: View {
             }
             .background(RexColor.background.ignoresSafeArea())
             .navigationTitle("Edit Rex")
+            .rexDismissableKeyboard()
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .topBarLeading) {

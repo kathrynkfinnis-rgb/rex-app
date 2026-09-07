@@ -149,11 +149,20 @@ struct ProfileView: View {
             EditProfileView(profile: profile, onSaved: { Task { await load() } })
         }
         .sheet(item: $editing) { rec in
-            EditRexView(
-                rec: rec,
-                onSaved: { Task { await load() } },
-                onDeleted: { Task { await load() } }
-            )
+            // Same branch as FeedView's — a trip edits in the Add-a-trip
+            // form, everything else in EditRexView.
+            if RexCategory(rawType: rec.items?.type) == .trip {
+                TripEditorLoader(trip: rec) {
+                    editing = nil
+                    Task { await load() }
+                }
+            } else {
+                EditRexView(
+                    rec: rec,
+                    onSaved: { Task { await load() } },
+                    onDeleted: { Task { await load() } }
+                )
+            }
         }
         .sheet(item: $addingToCollection) { rec in
             AddToCollectionView(rec: rec) { addingToCollection = nil }
@@ -166,6 +175,32 @@ struct ProfileView: View {
         .navigationDestination(for: AuthorRoute.self) { AuthorBooksView(route: $0) }
         .navigationDestination(for: DraftsRoute.self) { _ in DraftsView() }
         .navigationDestination(for: NotificationPreferencesRoute.self) { _ in NotificationPreferencesView() }
+        // Sept 1 — "when you go to a trip on your profile ... it doesn't
+        // come up with the list of things on the trip. It comes up with
+        // the update your take page only": tapping a card here always
+        // pushed rec.item_id (plain ItemDetailView), same as tapping a
+        // trip's own take/rating page — FeedView's open(_:) already knew
+        // to route a trip/list to its own stop-list screen instead; this
+        // screen just never got the same branching, so these two
+        // destinations were unregistered here even though open(_:) below
+        // could push them.
+        .navigationDestination(for: TripRoute.self) { TripDetailView(route: $0) }
+        .navigationDestination(for: ListRoute.self) { ListDetailView(route: $0) }
+    }
+
+    /// Same category branching as FeedView's own open(_:) — a trip or list
+    /// opens its stop-list screen, everything else opens the plain item
+    /// screen. Profile's own rows are always real recommendations (never a
+    /// want or blast), so there's no need for open(_:)'s isBlast branch.
+    private func open(_ rec: FeedRecommendation) {
+        switch RexCategory(rawType: rec.items?.type) {
+        case .trip:
+            path.append(TripRoute(recommendationId: rec.id, title: rec.items?.title ?? "Trip"))
+        case .list:
+            path.append(ListRoute(recommendationId: rec.id, title: rec.items?.title ?? "List"))
+        default:
+            path.append(rec.item_id)
+        }
     }
 
     private func delete(_ rec: FeedRecommendation) async {
@@ -395,7 +430,7 @@ struct ProfileView: View {
                                 label: "Delete",
                                 systemImage: "trash",
                                 confirmMessage: "Delete this Rex? It'll disappear from your friends' feeds too.",
-                                onTap: { path.append(rec.item_id) },
+                                onTap: { open(rec) },
                                 action: { await delete(rec) }
                             ) {
                                 RecommendationCardView(

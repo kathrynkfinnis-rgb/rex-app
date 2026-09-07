@@ -1,9 +1,18 @@
 // #175 — sends an actual APNs push for a notification row, once one's
-// created. Deliberately NOT deployed/wired up automatically (same
-// constraint as extract-recipe-photo's deploy note): this needs an APNs
-// Auth Key that only Kathryn's own Apple Developer account can create.
+// created.
 //
-// Wiring, once the prerequisites below exist:
+// Deployed and wired up as of Sept 1 2026: APNs Auth Key created (Key ID
+// 7982WMVM9R), Push Notifications capability enabled on the App ID, this
+// function deployed with its four APNS_* secrets set, and a database
+// trigger (tg_send_push_on_notification, via pg_net — the dashboard's own
+// "Webhooks" UI wasn't available on this project, so the trigger was
+// written directly in SQL instead; see supabase/migrations for anything
+// checked in) calling this function on every insert into
+// public.notifications. Verified live: a direct invoke read
+// notification_preferences correctly and returned 200.
+//
+// Reference, if this ever needs rebuilding from scratch (a new Apple
+// Developer team, a revoked key, a fresh Supabase project):
 //   1. Apple Developer Portal (developer.apple.com) -> Certificates,
 //      Identifiers & Profiles -> Keys -> create a new key with "Apple Push
 //      Notifications service (APNs)" checked. Download the .p8 (only
@@ -21,13 +30,12 @@
 //        APNS_USE_SANDBOX   - "true" only for a locally-run Xcode debug
 //                              build; leave unset for TestFlight/App Store
 //                              (those use the production APNs endpoint)
-//   5. Supabase dashboard -> Database -> Webhooks -> create one on INSERT
-//      to public.notifications, calling this function's URL. This is what
-//      actually triggers a send — nothing calls this function on its own.
-//
-// Until all five are done this function will exist but nothing invokes it,
-// which is harmless — every other part of notifications (in-app bell,
-// preferences screen) works today regardless of push.
+//   5. A trigger on INSERT to public.notifications that calls this
+//      function's URL — via the dashboard's Webhooks/Triggers UI if it
+//      offers a "Supabase Edge Functions" trigger type, otherwise a plain
+//      SQL trigger using pg_net.http_post with an Authorization: Bearer
+//      <service role key> header (see git history around Sept 1 2026 for
+//      the exact statement used here).
 
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "jsr:@supabase/supabase-js@2";

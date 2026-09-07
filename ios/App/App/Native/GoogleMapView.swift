@@ -88,10 +88,12 @@ struct GoogleMapView: UIViewRepresentable {
 
     /// Events get the gold accent; everything else forest green, matching the
     /// "colour sparingly" rule.
+    /// Sept 5 — was forest green for everything bar events, which on a map
+    /// of mostly places distinguished almost nothing. Now keyed to the
+    /// place's own sub-category, so dinner, drinks and somewhere to stay
+    /// read apart at a glance. See rexSubcategoryColor.
     private func markerColor(for place: MapPlace) -> UIColor {
-        RexCategory(rawType: place.type) == .event
-            ? UIColor(RexColor.gold)
-            : UIColor(RexColor.primary)
+        UIColor(rexSubcategoryColor(genre: place.genre, type: place.type))
     }
 
     /// Rough conversion from a radius in metres to a Google zoom level.

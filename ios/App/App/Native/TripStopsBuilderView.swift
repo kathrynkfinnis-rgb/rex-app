@@ -18,8 +18,131 @@ struct DraftStop: Identifiable, Equatable {
     var note: String
     /// Optional heading, e.g. "Brunch".
     var section: String?
+    /// Sept 2 — "ability to add (1) photo to a stop (which should get added
+    /// to the trip carousel)". One, deliberately: the trip itself carries a
+    /// carousel built from its stops' photos, so a stop offering six of its
+    /// own would swamp it.
+    var photoURL: String?
+    /// Sept 5 — set only when this stop is already saved, so editing a
+    /// posted trip can tell an existing stop (update it, or delete it if
+    /// it's been removed) from one added during this edit (create it).
+    /// Nil for everything built in the add-a-trip flow.
+    var existingRecId: String?
+    var existingItemId: String?
 
     static func == (a: DraftStop, b: DraftStop) -> Bool { a.id == b.id }
+}
+
+/// Sept 2 — the trip itinerary is now one ordered list of two kinds of row
+/// rather than stops carrying a heading string each.
+///
+/// The old shape (`DraftStop.section`) couldn't express the things the
+/// rebuild asks for: a heading added before any stop sits under it, an
+/// empty heading, or dragging a heading itself to a new position. Order and
+/// grouping both live in this array instead — a stop belongs to whichever
+/// heading most recently precedes it, which is worked out once on save
+/// (see `resolvedStops`) rather than stored per row.
+struct ItineraryEntry: Identifiable, Equatable {
+    let id: UUID
+    var kind: Kind
+
+    enum Kind: Equatable {
+        case heading(String)
+        case stop(DraftStop)
+    }
+
+    init(id: UUID = UUID(), kind: Kind) {
+        self.id = id
+        self.kind = kind
+    }
+
+    var headingText: String? {
+        if case .heading(let text) = kind { return text }
+        return nil
+    }
+
+    var stop: DraftStop? {
+        if case .stop(let s) = kind { return s }
+        return nil
+    }
+
+    static func == (a: ItineraryEntry, b: ItineraryEntry) -> Bool { a.id == b.id }
+}
+
+extension Array where Element == ItineraryEntry {
+    /// Flattens back to the stored shape: every stop tagged with the
+    /// heading above it (nil when it sits before any heading, which is a
+    /// perfectly ordinary "just a list of stops" trip). Headings with no
+    /// stops under them simply don't survive the round trip — there's
+    /// nothing to hang them off in the database, and an empty heading isn't
+    /// worth its own row.
+    var resolvedStops: [DraftStop] {
+        var current: String?
+        var out: [DraftStop] = []
+        for entry in self {
+            switch entry.kind {
+            case .heading(let text):
+                let trimmed = text.trimmingCharacters(in: .whitespaces)
+                current = trimmed.isEmpty ? nil : trimmed
+            case .stop(var stop):
+                stop.section = current
+                out.append(stop)
+            }
+        }
+        return out
+    }
+
+    /// Sept 5 — turns a document import's extracted rows into the same
+    /// itinerary the manual builder edits, so importing and building by
+    /// hand converge on one screen. `raw_section` is the heading the
+    /// extractor found ("Day 1: Menton"); a new one starts a new heading
+    /// row, and rows before any section simply sit at the top.
+    static func fromStagingRows(_ rows: [ImportStagingRow]) -> [ItineraryEntry] {
+        var out: [ItineraryEntry] = []
+        var current: String?
+        for row in rows {
+            let heading = row.raw_section?.trimmingCharacters(in: .whitespaces)
+            if let heading, !heading.isEmpty, heading.caseInsensitiveCompare(current ?? "") != .orderedSame {
+                out.append(ItineraryEntry(kind: .heading(heading)))
+                current = heading
+            }
+            let stop = DraftStop(
+                type: RexCategory(rawType: row.suggested_type),
+                title: row.raw_title,
+                subtitle: row.resolved_subtitle ?? row.raw_creator,
+                address: nil,
+                lat: nil,
+                lng: nil,
+                genre: row.resolved_genre,
+                imageURL: row.resolved_image_url,
+                externalId: row.resolved_external_id,
+                externalSource: row.resolved_external_source,
+                rating: row.raw_rating ?? 0,
+                note: row.raw_note ?? "",
+                section: current,
+                photoURL: nil
+            )
+            out.append(ItineraryEntry(kind: .stop(stop)))
+        }
+        return out
+    }
+
+    /// Rebuilds the ordered entry list from stored stops — used when
+    /// reopening a trip to edit it, so the editor starts from exactly what
+    /// was saved.
+    static func fromStops(_ stops: [DraftStop]) -> [ItineraryEntry] {
+        var out: [ItineraryEntry] = []
+        var current: String?
+        for stop in stops {
+            let heading = stop.section?.trimmingCharacters(in: .whitespaces)
+            if let heading, !heading.isEmpty, heading.caseInsensitiveCompare(current ?? "") != .orderedSame {
+                out.append(ItineraryEntry(kind: .heading(heading)))
+                current = heading
+            }
+            out.append(ItineraryEntry(kind: .stop(stop)))
+        }
+        return out
+    }
 }
 
 let rexSectionSuggestions = [

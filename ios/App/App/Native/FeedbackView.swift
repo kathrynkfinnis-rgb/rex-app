@@ -91,6 +91,7 @@ struct FeedbackView: View {
         }
         .background(RexColor.background.ignoresSafeArea())
         .navigationTitle("Feedback")
+        .rexDismissableKeyboard()
         .navigationBarTitleDisplayMode(.inline)
     }
 

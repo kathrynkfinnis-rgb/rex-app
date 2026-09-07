@@ -76,7 +76,7 @@ struct PhotoPickerView: View {
                     .font(RexFont.text(12))
                     .foregroundStyle(RexColor.destructive)
             } else {
-                Text("Up to \(maxPhotos) photos")
+                Text(maxPhotos == 1 ? "One photo" : "Up to \(maxPhotos) photos")
                     .font(RexFont.text(11))
                     .foregroundStyle(RexColor.mutedForeground)
             }

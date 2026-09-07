@@ -100,6 +100,7 @@ struct BuildTripFromRexView: View {
             }
             .background(RexColor.background.ignoresSafeArea())
             .navigationTitle("Build a trip from your Rex")
+            .rexDismissableKeyboard()
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .topBarLeading) {

@@ -25,6 +25,82 @@ struct AddRexView: View {
         }
     }
 
+    /// Sept 5 — "ensure that the layout of the input page then mirrors
+    /// (exactly) the other input page". A document import used to end at
+    /// its own review screen, which could only toggle and delete rows; now
+    /// it lands here, on the identical Add-a-trip form, pre-filled — so
+    /// adding a stop the document never mentioned, adding a heading, and
+    /// dragging things around all work exactly as they do when building a
+    /// trip by hand, because it *is* the same screen.
+    ///
+    /// Same shape as initialPlaceHit above: open straight on one category's
+    /// form rather than the picker.
+    init(
+        onDone: @escaping () -> Void,
+        initialTripName: String,
+        initialTripEntries: [ItineraryEntry]
+    ) {
+        self.onDone = onDone
+        _category = State(initialValue: .trip)
+        _manualEntry = State(initialValue: true)
+        _title = State(initialValue: initialTripName)
+        _tripEntries = State(initialValue: initialTripEntries)
+    }
+
+    /// Sept 5 — "when it comes to editing a trip after submission, it
+    /// should take you to the same page as the input page". Same form,
+    /// pre-filled from what was posted; save updates in place rather than
+    /// creating a second trip (see saveTripEdits).
+    init(onDone: @escaping () -> Void, editingTrip trip: FeedRecommendation, stops: [FeedRecommendation]) {
+        self.onDone = onDone
+        _category = State(initialValue: .trip)
+        _manualEntry = State(initialValue: true)
+        _editingTripRecId = State(initialValue: trip.id)
+        _editingTripItemId = State(initialValue: trip.item_id)
+        _title = State(initialValue: trip.items?.title ?? "")
+        _note = State(initialValue: trip.note ?? "")
+        _rating = State(initialValue: trip.rating > 0 ? trip.rating : 10)
+        _photoURLs = State(initialValue: trip.photo_urls ?? [])
+        _subcategories = State(initialValue: Set(splitGenres(trip.items?.genre)))
+
+        let draftStops = stops.map { rec in
+            DraftStop(
+                type: RexCategory(rawType: rec.items?.type),
+                title: rec.items?.title ?? "",
+                subtitle: rec.items?.subtitle,
+                address: rec.items?.address,
+                lat: nil,
+                lng: nil,
+                genre: rec.items?.genre,
+                imageURL: rec.items?.image_url,
+                externalId: nil,
+                externalSource: nil,
+                rating: rec.rating,
+                note: rec.note ?? "",
+                section: rec.trip_section,
+                photoURL: rec.photo_urls?.first,
+                existingRecId: rec.id,
+                existingItemId: rec.item_id
+            )
+        }
+        _tripEntries = State(initialValue: .fromStops(draftStops))
+        _originalStopRecIds = State(initialValue: Set(stops.map { $0.id }))
+
+        // The date lives in the item's subtitle ("March 2026"); parse it
+        // back into the two wheels so editing doesn't silently drop it.
+        if let subtitle = trip.items?.subtitle, !subtitle.isEmpty {
+            let parts = subtitle.split(separator: " ").map(String.init)
+            let months = Calendar.current.monthSymbols
+            for part in parts {
+                if let monthIndex = months.firstIndex(where: { $0.caseInsensitiveCompare(part) == .orderedSame }) {
+                    _tripMonth = State(initialValue: monthIndex + 1)
+                } else if let year = Int(part), year > 1900, year < 2200 {
+                    _tripYear = State(initialValue: year)
+                }
+            }
+        }
+    }
+
     // Trip sits second, as on the web. A trip is created as a normal Rex here
     // and stops get added to it afterwards from the trip screen. List sits
     // right after — same "container + its own items" shape as Trip — for
@@ -76,7 +152,21 @@ struct AddRexView: View {
     @State private var taggedFriendIds: Set<String> = []
     @State private var subcategories: Set<String> = []
     @State private var productLink = ""
-    @State private var tripStops: [DraftStop] = []
+    /// Sept 2 trips rebuild — a trip's itinerary is an ordered list of
+    /// headings and stops now (see ItineraryEntry), not a flat [DraftStop]
+    /// with a heading string on each. It flattens back to that shape on
+    /// save (resolvedTripStops), which is what actually gets posted.
+    @State private var tripEntries: [ItineraryEntry] = []
+    @State private var editingEntry: ItineraryEntry?
+    @State private var tripMonth: Int?
+    @State private var tripYear: Int?
+    /// Non-nil when this form is editing an already-posted trip rather than
+    /// building a new one — see init(onDone:editingTrip:stops:).
+    @State private var editingTripRecId: String?
+    @State private var editingTripItemId: String?
+    /// What the trip had when the editor opened, so stops deleted during
+    /// the edit can be told from ones that were never there.
+    @State private var originalStopRecIds: Set<String> = []
     @State private var listItems: [DraftStop] = []
     @State private var listKind = rexListKinds.first ?? "Other"
     @State private var recipeText = ""
@@ -84,6 +174,7 @@ struct AddRexView: View {
     /// appears once something's picked or you choose to type it in manually.
     @State private var manualEntry = false
     @State private var showingListsImport = false
+    @State private var showingBuildTripFromRex = false
 
     var body: some View {
         NavigationStack {
@@ -100,6 +191,7 @@ struct AddRexView: View {
                 }
             }
             .navigationTitle(category == nil ? "What are you Rexing?" : "Add a \(category!.label.lowercased())")
+            .rexDismissableKeyboard()
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 if category != nil && !didPost {
@@ -191,8 +283,36 @@ struct AddRexView: View {
             .buttonStyle(.plain)
         }
         .padding(16)
+        // "If you click on each rex, [it] should take you to the same style
+        // of 'add a stop' [sheet] as in the manual add a trip process."
+        .sheet(item: $editingEntry) { entry in
+            TripStopSheet(
+                subcategories: rexSubcategories[.place] ?? [],
+                existing: entry.stop
+            ) { updated in
+                guard let index = tripEntries.firstIndex(where: { $0.id == entry.id }) else { return }
+                tripEntries[index].kind = .stop(updated)
+            }
+        }
         .sheet(isPresented: $showingListsImport) {
-            ListsImportView(onDone: { showingListsImport = false; onDone() })
+            ListsImportView(
+                onDone: { showingListsImport = false; onDone() },
+                // A document imported as a trip fills in this form rather
+                // than posting itself — see ImportReviewView's .trip case.
+                onExtractedAsTrip: { name, entries in
+                    showingListsImport = false
+                    category = .trip
+                    manualEntry = true
+                    if title.trimmingCharacters(in: .whitespaces).isEmpty { title = name }
+                    tripEntries = entries
+                }
+            )
+        }
+        .sheet(isPresented: $showingBuildTripFromRex) {
+            BuildTripFromRexView(onDone: {
+                showingBuildTripFromRex = false
+                onDone()
+            })
         }
     }
 
@@ -202,7 +322,11 @@ struct AddRexView: View {
             let searchable: Set<RexCategory> = [.place, .event, .book, .movie, .tv, .podcast, .other]
             let searchFirst = searchable.contains(category) && picked == nil && !manualEntry
 
-            field(searchFirst ? "Search" : "Title", text: $title,
+            // Sept 2 — "rename title → 'Name your trip'". Only trips: for
+            // everything else "Title" is still the right word, since you're
+            // naming a thing that already exists rather than christening
+            // something of your own.
+            field(searchFirst ? "Search" : (category == .trip ? "Name your trip" : "Title"), text: $title,
                   placeholder: searchFirst
                       ? "Search \(category.label.lowercased())s…"
                       : "e.g. \(placeholderTitle(for: category))")
@@ -232,8 +356,10 @@ struct AddRexView: View {
             if !searchFirst {
             // A list's "kind" chip already says what it's about — a second,
             // generic "Subtitle" box under the name would just be a blank
-            // field nobody knows what to put in.
-            if category != .list {
+            // field nobody knows what to put in. Sept 2: a trip drops it
+            // too — "Remove Subtitle" — since the date and the itinerary
+            // now say everything the subtitle used to.
+            if category != .list && category != .trip {
                 field(subtitleLabel(for: category), text: $subtitle, placeholder: "Optional")
             }
 
@@ -246,10 +372,57 @@ struct AddRexView: View {
             }
 
             if category == .trip {
-                TripStopsBuilderView(
-                    stops: $tripStops,
-                    onImportedAsTrip: { withAnimation { didPost = true } }
+                // Sept 2 — "add an optional 'date travelled' field", to the
+                // month rather than the day: nobody remembers (or wants to
+                // pick) the exact date they got back from Rome, and "March
+                // 2026" is what a trip is actually filed under.
+                TripDateTravelledField(month: $tripMonth, year: $tripYear)
+
+                VStack(alignment: .leading, spacing: RexSpacing.xs) {
+                    Text("Cover photo").font(.system(size: 14, weight: .semibold))
+                        .foregroundStyle(RexColor.foreground)
+                    PhotoPickerView(photoURLs: $photoURLs, maxPhotos: 1)
+                    Text("Just a thumbnail — the trip's card leads with its map.")
+                        .font(RexFont.text(11.5))
+                        .foregroundStyle(RexColor.mutedForeground)
+                }
+
+                TripItineraryBuilderView(
+                    entries: $tripEntries,
+                    onEditStop: { entry in editingEntry = entry }
                 )
+
+                // The old stops builder carried these two entry points and
+                // the new one doesn't, which quietly removed the only way
+                // into a document import from the Trip form itself. Same
+                // two buttons, moved out here — and the import one now
+                // lands back on this very screen, pre-filled, rather than
+                // posting a trip behind your back.
+                Button {
+                    showingListsImport = true
+                } label: {
+                    Label("Import a trip from a document", systemImage: "doc.text")
+                        .font(RexFont.text(13, weight: .medium))
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, RexSpacing.md)
+                        .background(RexColor.badgeBackground)
+                        .clipShape(RoundedRectangle(cornerRadius: RexRadius.input, style: .continuous))
+                }
+                .buttonStyle(.plain)
+                .foregroundStyle(RexColor.primary)
+
+                Button {
+                    showingBuildTripFromRex = true
+                } label: {
+                    Label("Build a trip from your Rex", systemImage: "square.stack")
+                        .font(RexFont.text(13, weight: .medium))
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, RexSpacing.md)
+                        .background(RexColor.badgeBackground)
+                        .clipShape(RoundedRectangle(cornerRadius: RexRadius.input, style: .continuous))
+                }
+                .buttonStyle(.plain)
+                .foregroundStyle(RexColor.primary)
             }
 
             if category == .list {
@@ -283,7 +456,9 @@ struct AddRexView: View {
             // podcasts come from a catalogue with their own page, so a link
             // field there is just another box to ignore. A list isn't a single
             // thing to link to either.
-            if ![.book, .movie, .tv, .podcast, .list].contains(category) {
+            // Sept 2: a trip drops it as well — "remove link (that can be
+            // inputted through notes)".
+            if ![.book, .movie, .tv, .podcast, .list, .trip].contains(category) {
                 field("Link (optional)", text: $productLink, placeholder: "https://…")
                     .textInputAutocapitalization(.never)
             }
@@ -329,8 +504,13 @@ struct AddRexView: View {
                     .clipShape(RoundedRectangle(cornerRadius: 14))
                     .overlay(RoundedRectangle(cornerRadius: 14).stroke(RexColor.border, lineWidth: 1))
 
-                Text("Photos").font(.system(size: 14, weight: .semibold)).foregroundStyle(RexColor.foreground)
-                PhotoPickerView(photoURLs: $photoURLs)
+                // A trip already set its single cover photo up top, and its
+                // carousel is built from its stops' photos — so no second,
+                // contradictory multi-photo picker down here.
+                if category != .trip {
+                    Text("Photos").font(.system(size: 14, weight: .semibold)).foregroundStyle(RexColor.foreground)
+                    PhotoPickerView(photoURLs: $photoURLs)
+                }
 
                 Text("Tag friends (optional)").font(.system(size: 14, weight: .semibold)).foregroundStyle(RexColor.foreground)
                 FriendTagPickerView(selectedIds: $taggedFriendIds)
@@ -361,7 +541,9 @@ struct AddRexView: View {
                 if isSaving {
                     ProgressView().tint(RexColor.primaryForeground).frame(maxWidth: .infinity)
                 } else {
-                    Text(mode == .rated ? "Post" : addToWantLabel(for: category))
+                    Text(editingTripRecId != nil
+                         ? "Save changes"
+                         : (mode == .rated ? "Post" : addToWantLabel(for: category)))
                         .fontWeight(.semibold).frame(maxWidth: .infinity)
                 }
             }
@@ -640,6 +822,71 @@ struct AddRexView: View {
         }
     }
 
+    /// Sept 2 — "add an optional 'date travelled' field ... (but perhaps to
+    /// the month / year)". Two wheels rather than a full date picker: a
+    /// trip is remembered as "March 2026", and asking for a day you'd have
+    /// to look up is friction for no gain. Clears back to nothing, since
+    /// the whole field is optional.
+    private struct TripDateTravelledField: View {
+        @Binding var month: Int?
+        @Binding var year: Int?
+
+        private static let monthNames = Calendar.current.monthSymbols
+        private var years: [Int] {
+            let thisYear = Calendar.current.component(.year, from: Date())
+            return Array((thisYear - 30)...(thisYear + 2)).reversed()
+        }
+
+        var body: some View {
+            VStack(alignment: .leading, spacing: RexSpacing.xs) {
+                HStack {
+                    Text("Date travelled").font(.system(size: 14, weight: .semibold))
+                        .foregroundStyle(RexColor.foreground)
+                    Text("optional").font(RexFont.text(13)).foregroundStyle(RexColor.placeholder)
+                    Spacer()
+                    if month != nil || year != nil {
+                        Button("Clear") { month = nil; year = nil }
+                            .font(RexFont.text(13, weight: .medium))
+                            .foregroundStyle(RexColor.primary)
+                    }
+                }
+                HStack(spacing: RexSpacing.sm) {
+                    Menu {
+                        ForEach(Array(Self.monthNames.enumerated()), id: \.offset) { index, name in
+                            Button(name) { month = index + 1 }
+                        }
+                    } label: {
+                        pickerLabel(month.map { Self.monthNames[$0 - 1] } ?? "Month")
+                    }
+                    Menu {
+                        ForEach(years, id: \.self) { y in
+                            Button(String(y)) { year = y }
+                        }
+                    } label: {
+                        pickerLabel(year.map(String.init) ?? "Year")
+                    }
+                }
+            }
+        }
+
+        private func pickerLabel(_ text: String) -> some View {
+            HStack {
+                Text(text)
+                    .font(RexFont.text(15))
+                    .foregroundStyle(text == "Month" || text == "Year" ? RexColor.placeholder : RexColor.foreground)
+                Spacer()
+                Image(systemName: "chevron.down").font(.system(size: 11)).foregroundStyle(RexColor.mutedForeground)
+            }
+            .padding(12)
+            .background(RexColor.card)
+            .clipShape(RoundedRectangle(cornerRadius: RexRadius.input, style: .continuous))
+            .overlay(
+                RoundedRectangle(cornerRadius: RexRadius.input, style: .continuous)
+                    .stroke(RexColor.border, lineWidth: 1)
+            )
+        }
+    }
+
     private func placeholderTitle(for category: RexCategory) -> String {
         switch category {
         case .place: return "Dishoom"
@@ -649,11 +896,124 @@ struct AddRexView: View {
         case .podcast: return "This American Life"
         case .recipe: return "Koshari"
         case .event: return "Glastonbury"
+        case .trip: return "Rome Weekend with the Girls"
         default: return "Title"
         }
     }
 
+    /// The itinerary flattened back to stops, each tagged with whichever
+    /// heading sits above it. Empty headings drop out here — see
+    /// ItineraryEntry.resolvedStops.
+    private var resolvedTripStops: [DraftStop] { tripEntries.resolvedStops }
+
+    /// Saves an edit to an already-posted trip: the trip's own fields, then
+    /// the itinerary as a diff against what it had when the editor opened.
+    ///
+    /// Deliberately not a delete-and-recreate: a stop is a real Rex with
+    /// its own likes, comments and saves attached, so rebuilding the trip
+    /// from scratch every save would quietly destroy all of that. Stops
+    /// that survived are updated in place, only genuinely removed ones are
+    /// deleted, and order is re-stamped across the lot (created_at is what
+    /// orders stops — see TripDetailView.moveStop, which has always worked
+    /// this way).
+    private func saveTripEdits() async {
+        guard let tripRecId = editingTripRecId, let tripItemId = editingTripItemId else { return }
+        isSaving = true
+        errorMessage = nil
+        do {
+            postingProgress = "Saving trip…"
+            let trimmedTitle = title.trimmingCharacters(in: .whitespaces)
+            try await RexAPI.shared.updateItemTitle(itemId: tripItemId, title: trimmedTitle)
+            try await RexAPI.shared.updateItemSubtitle(itemId: tripItemId, subtitle: tripDateText)
+            try await RexAPI.shared.updateItemGenre(
+                itemId: tripItemId,
+                genre: subcategories.isEmpty ? nil : subcategories.sorted().joined(separator: ", ")
+            )
+            try await RexAPI.shared.updateRecommendation(
+                id: tripRecId,
+                rating: rating,
+                note: note.isEmpty ? nil : note,
+                photoURLs: photoURLs,
+                tags: []
+            )
+
+            let stops = resolvedTripStops
+            let keptIds = Set(stops.compactMap { $0.existingRecId })
+            for removed in originalStopRecIds.subtracting(keptIds) {
+                try? await RexAPI.shared.deleteRecommendation(id: removed)
+            }
+
+            // created_at drives stop order, so re-stamp every stop onto an
+            // increasing sequence matching the order on screen.
+            let base = Date().addingTimeInterval(-Double(stops.count))
+            let formatter = ISO8601DateFormatter()
+            for (index, stop) in stops.enumerated() {
+                postingProgress = "Saving stop \(index + 1) of \(stops.count)…"
+                let stamp = formatter.string(from: base.addingTimeInterval(Double(index)))
+                if let recId = stop.existingRecId, let itemId = stop.existingItemId {
+                    try? await RexAPI.shared.updateItemTitle(itemId: itemId, title: stop.title)
+                    try? await RexAPI.shared.updateItemGenre(itemId: itemId, genre: stop.genre)
+                    try? await RexAPI.shared.updateRecommendation(
+                        id: recId,
+                        rating: stop.rating,
+                        note: stop.note.isEmpty ? nil : stop.note,
+                        photoURLs: [stop.photoURL].compactMap { $0 },
+                        tags: []
+                    )
+                    try? await RexAPI.shared.setTripSection(recommendationId: recId, section: stop.section)
+                    try? await RexAPI.shared.setRecommendationCreatedAt(id: recId, createdAt: stamp)
+                } else {
+                    let newItemId = try await RexAPI.shared.createItem(
+                        type: stop.type.rawValue,
+                        title: stop.title,
+                        subtitle: stop.subtitle,
+                        address: stop.address,
+                        genre: stop.genre,
+                        externalId: stop.externalId,
+                        externalSource: stop.externalSource,
+                        imageURL: stop.imageURL,
+                        lat: stop.lat,
+                        lng: stop.lng
+                    )
+                    let newRecId = try await RexAPI.shared.createRecommendation(
+                        itemId: newItemId,
+                        rating: stop.rating,
+                        note: stop.note.isEmpty ? nil : stop.note,
+                        photoURLs: [stop.photoURL].compactMap { $0 },
+                        tripId: tripRecId,
+                        tripSection: stop.section,
+                        returningId: true
+                    )
+                    try? await RexAPI.shared.setRecommendationCreatedAt(id: newRecId, createdAt: stamp)
+                }
+            }
+            postingProgress = nil
+            onDone()
+        } catch {
+            postingProgress = nil
+            errorMessage = error.localizedDescription
+        }
+        isSaving = false
+    }
+
+    /// "March 2026", "2026", or nothing — every combination the two
+    /// optional wheels can be left in.
+    private var tripDateText: String? {
+        switch (tripMonth, tripYear) {
+        case let (month?, year?): return "\(Calendar.current.monthSymbols[month - 1]) \(year)"
+        case let (month?, nil): return Calendar.current.monthSymbols[month - 1]
+        case let (nil, year?): return String(year)
+        case (nil, nil): return nil
+        }
+    }
+
     private func post(category: RexCategory, asDraft: Bool = false) async {
+        // Editing an already-posted trip updates it in place instead of
+        // creating a second one.
+        if editingTripRecId != nil {
+            await saveTripEdits()
+            return
+        }
         isSaving = true
         errorMessage = nil
         postingProgress = nil
@@ -661,7 +1021,10 @@ struct AddRexView: View {
             let itemId = try await RexAPI.shared.createItem(
                 type: category.rawValue,
                 title: title.trimmingCharacters(in: .whitespaces),
-                subtitle: subtitle.isEmpty ? nil : subtitle,
+                // A trip has no subtitle field any more; the date travelled
+                // takes that slot instead, which is also exactly where the
+                // card already renders a line under the title.
+                subtitle: category == .trip ? tripDateText : (subtitle.isEmpty ? nil : subtitle),
                 address: (category == .place || category == .event) && !address.isEmpty ? address : nil,
                 hit: picked,
                 // The "genre" column is where approveStagingAsList already
@@ -680,7 +1043,8 @@ struct AddRexView: View {
                 recipeText: category == .recipe && !recipeText.isEmpty ? recipeText : nil
             )
             // Trip stops become their own Rex, linked to the trip.
-            if category == .trip, !tripStops.isEmpty {
+            if category == .trip, !resolvedTripStops.isEmpty {
+                let tripStops = resolvedTripStops
                 let tripRecId = try await RexAPI.shared.createRecommendation(
                     itemId: itemId,
                     rating: rating,
@@ -714,6 +1078,9 @@ struct AddRexView: View {
                             itemId: stopItemId,
                             rating: stop.rating,
                             note: stop.note.isEmpty ? nil : stop.note,
+                            // A stop's one photo rides along on its own Rex,
+                            // which is what feeds the trip's carousel.
+                            photoURLs: [stop.photoURL].compactMap { $0 },
                             tripId: tripRecId,
                             tripSection: stop.section,
                             returningId: true,
@@ -872,7 +1239,9 @@ struct AddRexView: View {
         errorMessage = nil
         subtitle = ""
         address = ""
-        tripStops = []
+        tripEntries = []
+        tripMonth = nil
+        tripYear = nil
         listItems = []
         recipeText = ""
     }

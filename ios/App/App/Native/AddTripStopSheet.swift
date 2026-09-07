@@ -156,6 +156,7 @@ struct AddTripStopSheet: View {
             }
             .background(RexColor.background.ignoresSafeArea())
             .navigationTitle("Add \(noun == "stop" ? "a" : "an") \(noun)")
+            .rexDismissableKeyboard()
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .topBarLeading) {
