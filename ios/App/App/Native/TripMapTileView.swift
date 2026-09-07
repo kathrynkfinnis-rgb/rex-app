@@ -103,3 +103,57 @@ struct TripMapTileView: View {
         isLoading = false
     }
 }
+
+/// Sept 5 — "a small map thumbnail on a place's card". A trip already gets
+/// one built from its stops (above); this is the single-pin equivalent for
+/// a place or event, shown in the same slot — which is otherwise empty when
+/// the Rex has no photo of its own.
+///
+/// Deliberately only used when there's no photo: someone's own picture of
+/// the place beats a map of it, and stacking both would make the card twice
+/// as tall for no gain.
+struct PlaceMapTileView: View {
+    let lat: Double
+    let lng: Double
+    var height: CGFloat = 140
+
+    private var googleKey: String {
+        Bundle.main.object(forInfoDictionaryKey: "GMSApiKey") as? String ?? ""
+    }
+
+    private var staticMapURL: URL? {
+        var components = URLComponents(string: "https://maps.googleapis.com/maps/api/staticmap")!
+        components.queryItems = [
+            URLQueryItem(name: "size", value: "640x280"),
+            URLQueryItem(name: "scale", value: "\(min(Int(UIScreen.main.scale), 2))"),
+            URLQueryItem(name: "zoom", value: "14"),
+            URLQueryItem(name: "center", value: "\(lat),\(lng)"),
+            URLQueryItem(name: "markers", value: "color:0x173626|\(lat),\(lng)"),
+            URLQueryItem(name: "key", value: googleKey),
+        ]
+        return components.url
+    }
+
+    var body: some View {
+        Group {
+            if let url = staticMapURL {
+                AsyncImage(url: url) { phase in
+                    if let image = phase.image {
+                        image.resizable().aspectRatio(contentMode: .fill)
+                    } else {
+                        RexColor.muted.overlay(
+                            Image(systemName: "map")
+                                .font(.system(size: 20))
+                                .foregroundStyle(RexColor.mutedForeground)
+                        )
+                    }
+                }
+            } else {
+                RexColor.muted
+            }
+        }
+        .frame(height: height)
+        .frame(maxWidth: .infinity)
+        .clipped()
+    }
+}

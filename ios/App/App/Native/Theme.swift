@@ -261,10 +261,16 @@ enum RexCategory: String {
         case .book: return Color(hex: "3B7DD8")    // blue
         case .movie: return Color(hex: "C061C0")   // orchid
         case .tv: return Color(hex: "E63329")      // red
-        case .podcast: return Color(hex: "1A3A6B") // navy
+        // Sept 5 — these two were the navy and maroon straight off the
+        // reference image. At 2px on a white card (the full-border card
+        // treatment) both read as "just a dark border" rather than as a
+        // colour, so they're lifted a couple of steps. Same hue, more
+        // light — they still sit as the dark blue and the dark red of the
+        // set, they just carry now.
+        case .podcast: return Color(hex: "2E5AA8") // navy, lifted
         case .recipe: return Color(hex: "5A7233")  // olive
         case .event: return Color(hex: "E0A020")   // gold
-        case .other: return Color(hex: "8C2340")   // maroon
+        case .other: return Color(hex: "B03050")   // maroon, lifted
         // Not in the reference image, which has no List tile — picked to
         // sit alongside the rest without colliding with any of them.
         case .list: return Color(hex: "7A6A9E")    // muted violet

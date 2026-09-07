@@ -157,6 +157,18 @@ struct ListDetailView: View {
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
             if isOwner {
+                // Sept 5 — "a dedicated 'add a Rex' button inside a list".
+                // Adding an item used to mean entering Edit mode first and
+                // finding the inline button under a heading; this is the
+                // same action, always one tap away.
+                ToolbarItem(placement: .topBarTrailing) {
+                    Button {
+                        addItemSection = ""
+                        showingAddItem = true
+                    } label: {
+                        Image(systemName: "plus")
+                    }
+                }
                 ToolbarItem(placement: .topBarTrailing) {
                     Button(isEditing ? "Done" : "Edit") {
                         withAnimation { isEditing.toggle() }

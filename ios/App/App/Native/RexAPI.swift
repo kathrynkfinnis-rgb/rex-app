@@ -350,7 +350,7 @@ final class RexAPI {
         // select shape in the file, not just this one.
         let profilesSelect = useView ? "profiles" : "profiles!recommendations_user_id_fkey(username,display_name,avatar_url)"
         let select = "id,rating,note,created_at,photo_url,photo_urls,tags\(await anonymousField()),user_id,item_id,trip_id," +
-            "items!inner(id,type,title,subtitle,image_url,genre,address,link_url,recipe_text)," +
+            "items!inner(id,type,title,subtitle,image_url,genre,address,link_url,recipe_text,lat,lng)," +
             "\(profilesSelect)," +
             "creators(slug,name,color,emoji)," +
             "recommendation_tags(profiles(id,username,display_name,avatar_url))"
@@ -491,7 +491,7 @@ final class RexAPI {
         let token = try await validToken()
         let (resourcePath, profilesSelect) = await recommendationsReadPath()
         let select = "id,rating,note,created_at,photo_url,photo_urls,tags\(await anonymousField()),user_id,item_id,trip_id," +
-            "items!inner(id,type,title,subtitle,image_url,genre,address,link_url,recipe_text)," +
+            "items!inner(id,type,title,subtitle,image_url,genre,address,link_url,recipe_text,lat,lng)," +
             "\(profilesSelect)," +
             "creators(slug,name,color,emoji)," +
             "recommendation_tags(profiles(id,username,display_name,avatar_url))"
@@ -522,7 +522,7 @@ final class RexAPI {
         let token = try await validToken()
         let (resourcePath, profilesSelect) = await recommendationsReadPath()
         let select = "id,rating,note,created_at,photo_url,photo_urls,tags\(await anonymousField()),user_id,item_id,trip_id," +
-            "items!inner(id,type,title,subtitle,image_url,genre,address,link_url,recipe_text)," +
+            "items!inner(id,type,title,subtitle,image_url,genre,address,link_url,recipe_text,lat,lng)," +
             "\(profilesSelect)," +
             "recommendation_tags(profiles(id,username,display_name,avatar_url))"
         var components = URLComponents(url: baseURL.appendingPathComponent(resourcePath), resolvingAgainstBaseURL: false)!
@@ -636,7 +636,7 @@ final class RexAPI {
         let token = try await validToken()
         guard let userId = currentUserId else { throw RexAPIError.notSignedIn }
         let select = "id,rating,note,created_at,photo_url,photo_urls,tags,user_id,item_id,trip_id," +
-            "items!inner(id,type,title,subtitle,image_url,genre,address,link_url,recipe_text)," +
+            "items!inner(id,type,title,subtitle,image_url,genre,address,link_url,recipe_text,lat,lng)," +
             "profiles!recommendations_user_id_fkey(username,display_name,avatar_url)," +
             "recommendation_tags(profiles(id,username,display_name,avatar_url))"
         var components = URLComponents(url: baseURL.appendingPathComponent("/rest/v1/recommendations"), resolvingAgainstBaseURL: false)!
@@ -734,7 +734,7 @@ final class RexAPI {
         let token = try await validToken()
         guard let userId = currentUserId else { throw RexAPIError.notSignedIn }
         let select = "id,rating,note,created_at,photo_url,photo_urls,tags,user_id,item_id,trip_id,list_id," +
-            "items!inner(id,type,title,subtitle,image_url,genre,address,link_url,recipe_text)," +
+            "items!inner(id,type,title,subtitle,image_url,genre,address,link_url,recipe_text,lat,lng)," +
             "profiles!recommendations_user_id_fkey(username,display_name,avatar_url)"
         var components = URLComponents(url: baseURL.appendingPathComponent("/rest/v1/recommendations"), resolvingAgainstBaseURL: false)!
         components.queryItems = [
@@ -789,7 +789,7 @@ final class RexAPI {
         let token = try await validToken()
         guard let userId = currentUserId else { throw RexAPIError.notSignedIn }
         let select = "id,rating,note,created_at,photo_url,photo_urls,tags,user_id,item_id,trip_id," +
-            "items!inner(id,type,title,subtitle,image_url,genre,address,link_url,recipe_text)," +
+            "items!inner(id,type,title,subtitle,image_url,genre,address,link_url,recipe_text,lat,lng)," +
             "profiles!recommendations_user_id_fkey(username,display_name,avatar_url)," +
             "recommendation_tags(profiles(id,username,display_name,avatar_url))"
         var components = URLComponents(url: baseURL.appendingPathComponent("/rest/v1/recommendations"), resolvingAgainstBaseURL: false)!
@@ -845,7 +845,7 @@ final class RexAPI {
         let token = try await validToken()
         let (resourcePath, profilesSelect) = await recommendationsReadPath()
         let select = "id,rating,note,created_at,photo_url,photo_urls,tags\(await anonymousField()),user_id,item_id,list_id,list_section,show_in_feed," +
-            "items!inner(id,type,title,subtitle,image_url,genre,address,link_url,recipe_text)," +
+            "items!inner(id,type,title,subtitle,image_url,genre,address,link_url,recipe_text,lat,lng)," +
             "\(profilesSelect)," +
             "recommendation_tags(profiles(id,username,display_name,avatar_url))"
         var components = URLComponents(url: baseURL.appendingPathComponent(resourcePath), resolvingAgainstBaseURL: false)!
@@ -1322,7 +1322,7 @@ final class RexAPI {
         let token = try await validToken()
         let (resourcePath, profilesSelect) = await recommendationsReadPath()
         let select = "id,rating,note,created_at,photo_url,photo_urls,tags\(await anonymousField()),user_id,item_id," +
-            "items!inner(id,type,title,subtitle,image_url,genre,address,link_url,recipe_text)," +
+            "items!inner(id,type,title,subtitle,image_url,genre,address,link_url,recipe_text,lat,lng)," +
             "\(profilesSelect)," +
             "creators(slug,name,color,emoji)," +
             "recommendation_tags(profiles(id,username,display_name,avatar_url))"
@@ -3275,7 +3275,7 @@ final class RexAPI {
         guard currentUserId != nil else { return [] }
         let noteField = await wantNoteField()
         let select = "id,created_at,item_id,user_id\(noteField)," +
-            "items(id,type,title,subtitle,image_url,genre,address,link_url,recipe_text)"
+            "items(id,type,title,subtitle,image_url,genre,address,link_url,recipe_text,lat,lng)"
         struct Row: Codable {
             let id: String
             let created_at: String

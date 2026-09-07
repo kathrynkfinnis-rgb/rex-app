@@ -274,6 +274,15 @@ struct RecommendationCardView: View {
                         TripMapTileView(tripRecommendationId: rec.id)
                             .padding(.bottom, RexSpacing.sm)
                             .swipeToRemoveExclusionZone()
+                    } else if category == .place || category == .event,
+                              let lat = item.lat, let lng = item.lng {
+                        // Sept 5 — "a small map thumbnail on a place's card".
+                        // Same slot, same reasoning as the trip tile above:
+                        // only when there's no photo, because someone's own
+                        // picture of the place beats a map of it.
+                        PlaceMapTileView(lat: lat, lng: lng)
+                            .padding(.bottom, RexSpacing.sm)
+                            .swipeToRemoveExclusionZone()
                     }
 
                     Rectangle()
@@ -300,6 +309,12 @@ struct RecommendationCardView: View {
                     .padding(.vertical, RexSpacing.md)
                 }
             }
+            // Sept 5 — "make the trips card the same width as all the
+            // other cards in the feed". A card sized to its own content,
+            // and a trip's map tile is greedy where a plain card's text
+            // isn't, so trips came out wider than their neighbours. Pinning
+            // the width here makes every card identical regardless.
+            .frame(maxWidth: .infinity)
             .rexCard(borderColor: category.tintColor)
         )
     }
