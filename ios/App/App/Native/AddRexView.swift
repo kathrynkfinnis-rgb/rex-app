@@ -157,7 +157,6 @@ struct AddRexView: View {
     /// with a heading string on each. It flattens back to that shape on
     /// save (resolvedTripStops), which is what actually gets posted.
     @State private var tripEntries: [ItineraryEntry] = []
-    @State private var editingEntry: ItineraryEntry?
     @State private var tripMonth: Int?
     @State private var tripYear: Int?
     /// Non-nil when this form is editing an already-posted trip rather than
@@ -172,7 +171,6 @@ struct AddRexView: View {
     /// same shape a trip's itinerary uses. listItems above is still what
     /// gets posted; this flattens into it on save.
     @State private var listEntries: [ItineraryEntry] = []
-    @State private var editingListEntry: ItineraryEntry?
     @State private var customListKind = ""
     @State private var showingCustomListKind = false
     @State private var listKind = rexListKinds.first ?? "Other"
@@ -180,8 +178,25 @@ struct AddRexView: View {
     /// Searchable categories open on a search field; the full form only
     /// appears once something's picked or you choose to type it in manually.
     @State private var manualEntry = false
-    @State private var showingListsImport = false
-    @State private var showingBuildTripFromRex = false
+    /// Every sheet this screen can present, as one value — see the single
+    /// .sheet modifier in `body` for why they can't be separate modifiers.
+    private enum ActiveSheet: Identifiable {
+        case editListItem(ItineraryEntry)
+        case editTripStop(ItineraryEntry)
+        case documentImport
+        case buildTripFromRex
+
+        var id: String {
+            switch self {
+            case .editListItem(let e): return "listItem-\(e.id)"
+            case .editTripStop(let e): return "tripStop-\(e.id)"
+            case .documentImport: return "documentImport"
+            case .buildTripFromRex: return "buildTripFromRex"
+            }
+        }
+    }
+
+    @State private var activeSheet: ActiveSheet?
 
     var body: some View {
         NavigationStack {
@@ -262,7 +277,7 @@ struct AddRexView: View {
             // -linking to the web importer: paste text in, review what came
             // out, save as a Trip or a Collection.
             Button {
-                showingListsImport = true
+                activeSheet = .documentImport
             } label: {
                 HStack(spacing: RexSpacing.md) {
                     ZStack {
@@ -292,51 +307,62 @@ struct AddRexView: View {
         .padding(16)
         // "If you click on each rex, [it] should take you to the same style
         // of 'add a stop' [sheet] as in the manual add a trip process."
-        .sheet(item: $editingListEntry) { entry in
-            if let item = entry.stop {
-                ListItemSheet(existing: item) { updated in
-                    if let index = listEntries.firstIndex(where: { $0.id == entry.id }) {
-                        listEntries[index].kind = .stop(updated)
+        // Sept 7 — one sheet modifier, not four.
+        //
+        // "The import from doc button on the list page isn't working" was
+        // this: SwiftUI does not reliably support several .sheet modifiers
+        // stacked on the same view. There were four here (edit a list item,
+        // edit a trip stop, import a document, build from your Rex) and in
+        // practice one of them wins — the document importer was the one
+        // losing, so its button set a flag that nothing was listening to.
+        // Routing every sheet through a single enum-driven presentation is
+        // the documented way to have more than one.
+        .sheet(item: $activeSheet) { sheet in
+            switch sheet {
+            case .editListItem(let entry):
+                if let item = entry.stop {
+                    ListItemSheet(existing: item) { updated in
+                        if let index = listEntries.firstIndex(where: { $0.id == entry.id }) {
+                            listEntries[index].kind = .stop(updated)
+                        }
                     }
                 }
-            }
-        }
-        .sheet(item: $editingEntry) { entry in
-            TripStopSheet(
-                subcategories: rexSubcategories[.place] ?? [],
-                existing: entry.stop
-            ) { updated in
-                guard let index = tripEntries.firstIndex(where: { $0.id == entry.id }) else { return }
-                tripEntries[index].kind = .stop(updated)
-            }
-        }
-        .sheet(isPresented: $showingListsImport) {
-            ListsImportView(
-                onDone: { showingListsImport = false; onDone() },
-                // A document imported as a trip fills in this form rather
-                // than posting itself — see ImportReviewView's .trip case.
-                onExtractedAsTrip: { name, entries in
-                    showingListsImport = false
-                    category = .trip
-                    manualEntry = true
-                    if title.trimmingCharacters(in: .whitespaces).isEmpty { title = name }
-                    tripEntries = entries
-                },
-                onExtractedAsList: { name, kind, entries in
-                    showingListsImport = false
-                    category = .list
-                    manualEntry = true
-                    if title.trimmingCharacters(in: .whitespaces).isEmpty { title = name }
-                    if !kind.isEmpty { listKind = kind }
-                    listEntries = entries
+            case .editTripStop(let entry):
+                TripStopSheet(
+                    subcategories: rexSubcategories[.place] ?? [],
+                    existing: entry.stop
+                ) { updated in
+                    guard let index = tripEntries.firstIndex(where: { $0.id == entry.id }) else { return }
+                    tripEntries[index].kind = .stop(updated)
                 }
-            )
-        }
-        .sheet(isPresented: $showingBuildTripFromRex) {
-            BuildTripFromRexView(onDone: {
-                showingBuildTripFromRex = false
-                onDone()
-            })
+            case .documentImport:
+                ListsImportView(
+                    onDone: { activeSheet = nil; onDone() },
+                    // A document imported as a trip or a list fills in this
+                    // form rather than posting itself — see the .trip and
+                    // .list cases in ImportReviewView.save().
+                    onExtractedAsTrip: { name, entries in
+                        activeSheet = nil
+                        category = .trip
+                        manualEntry = true
+                        if title.trimmingCharacters(in: .whitespaces).isEmpty { title = name }
+                        tripEntries = entries
+                    },
+                    onExtractedAsList: { name, kind, entries in
+                        activeSheet = nil
+                        category = .list
+                        manualEntry = true
+                        if title.trimmingCharacters(in: .whitespaces).isEmpty { title = name }
+                        if !kind.isEmpty { listKind = kind }
+                        listEntries = entries
+                    }
+                )
+            case .buildTripFromRex:
+                BuildTripFromRexView(onDone: {
+                    activeSheet = nil
+                    onDone()
+                })
+            }
         }
     }
 
@@ -413,7 +439,7 @@ struct AddRexView: View {
 
                 TripItineraryBuilderView(
                     entries: $tripEntries,
-                    onEditStop: { entry in editingEntry = entry }
+                    onEditStop: { entry in activeSheet = .editTripStop(entry) }
                 )
 
                 // The old stops builder carried these two entry points and
@@ -423,7 +449,7 @@ struct AddRexView: View {
                 // lands back on this very screen, pre-filled, rather than
                 // posting a trip behind your back.
                 Button {
-                    showingListsImport = true
+                    activeSheet = .documentImport
                 } label: {
                     Label("Import a trip from a document", systemImage: "doc.text")
                         .font(RexFont.text(13, weight: .medium))
@@ -436,7 +462,7 @@ struct AddRexView: View {
                 .foregroundStyle(RexColor.primary)
 
                 Button {
-                    showingBuildTripFromRex = true
+                    activeSheet = .buildTripFromRex
                 } label: {
                     Label("Build a trip from your Rex", systemImage: "square.stack")
                         .font(RexFont.text(13, weight: .medium))
@@ -463,11 +489,11 @@ struct AddRexView: View {
                 TripItineraryBuilderView(
                     entries: $listEntries,
                     mode: .list,
-                    onEditStop: { entry in editingListEntry = entry }
+                    onEditStop: { entry in activeSheet = .editListItem(entry) }
                 )
 
                 Button {
-                    showingListsImport = true
+                    activeSheet = .documentImport
                 } label: {
                     Label("Import a list from a document", systemImage: "doc.text")
                         .font(RexFont.text(13, weight: .medium))

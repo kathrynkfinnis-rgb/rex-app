@@ -55,13 +55,18 @@ struct RecommendationCardView: View {
     var body: some View {
         guard let item = rec.items else { return AnyView(EmptyView()) }
         return AnyView(
-            // Sept 5 — the category's colour was a 5px rail down the left
-            // edge; "the colours on the cards [should be] more visible", and
-            // of the five treatments mocked up, the full border (option B)
-            // is the one Kathryn picked. Nothing else about the card
-            // changes — white ground, so photos and text are untouched.
+            // Sept 7 — the category's colour, take three. It was a 5px left
+            // rail (too easy to miss), then a full border (option B), and now
+            // option D: a 3px cap along the top plus a wash behind the title
+            // block, with everything below the divider left white. Seeing all
+            // five as full feeds is what settled it — D is the one you can
+            // read without looking directly at it.
             Group {
                 VStack(alignment: .leading, spacing: 0) {
+                    Rectangle()
+                        .fill(category.tintColor)
+                        .frame(height: 3)
+
                     HStack(alignment: .top, spacing: RexSpacing.md) {
                         thumbnail(item: item)
 
@@ -256,6 +261,11 @@ struct RecommendationCardView: View {
                         .padding(.trailing, 26)
                     }
                     .padding(RexSpacing.cardPadding)
+                    // The wash sits behind the title, badges and note only.
+                    // Photos, the map tile and the author row all stay on
+                    // plain white — a tinted strip behind a photo just looks
+                    // like a rendering mistake.
+                    .background(category.tintColor.opacity(0.11))
 
                     if let photos = rec.photo_urls, !photos.isEmpty {
                         PhotoCarouselView(urls: photos, cornerRadius: 0)
@@ -315,7 +325,7 @@ struct RecommendationCardView: View {
             // isn't, so trips came out wider than their neighbours. Pinning
             // the width here makes every card identical regardless.
             .frame(maxWidth: .infinity)
-            .rexCard(borderColor: category.tintColor)
+            .rexCard()
         )
     }
 
@@ -387,10 +397,16 @@ struct RecommendationCardView: View {
                 .font(.system(size: 10, weight: .semibold))
                 .tracking(0.6)
         }
-        .foregroundStyle(RexColor.badgeForeground)
+        // Sept 7 — "please can we also colour the tag for the category".
+        // The badge names the category, so it wearing the category's own
+        // colour is the one place on the card where the colour is doing
+        // something literal rather than decorative. Kept as tinted-on-tint
+        // rather than solid: the card's top block is already washed in this
+        // colour, and a solid capsule on top of that shouts.
+        .foregroundStyle(category.tintColor)
         .padding(.horizontal, RexSpacing.sm)
         .padding(.vertical, 3)
-        .background(RexColor.badgeBackground)
+        .background(category.tintColor.opacity(0.15))
         .clipShape(Capsule())
     }
 
