@@ -344,6 +344,12 @@ struct SavedPost: Codable, Identifiable {
     let list_id: String?
     let recommendation_id: String
     let recommendations: FeedRecommendation?
+    /// Sept 8 — a collection can group under headings and hold a
+    /// deliberate order, the same way a trip and a list already could.
+    /// Both null for anything saved before that, and for anything saved
+    /// from the feed's own bookmark button, which has no heading in mind.
+    var section: String? = nil
+    var sort_order: Int? = nil
 }
 
 struct RexComment: Codable, Identifiable {

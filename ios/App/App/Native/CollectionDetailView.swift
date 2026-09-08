@@ -43,6 +43,36 @@ struct CollectionDetailView: View {
     @State private var confirmingDelete = false
     @State private var pushedItemId: String?
 
+    /// Sept 8 — collections gained headings and a real order, so they need
+    /// the two things trips already have: somewhere to put a heading, and
+    /// a way to move something up.
+    ///
+    /// Chevrons rather than drag, deliberately, and the same choice
+    /// TripDetailView made: a card in here is already draggable — that's
+    /// how you copy it into another collection — and already carries a
+    /// horizontal swipe to remove. A third gesture on the same card would
+    /// be fighting the other two for every touch. The drag-and-drop
+    /// arranging lives in the importer, where a row is only a row.
+    @State private var isArranging = false
+    @State private var isMutating = false
+    @State private var mutationError: String?
+    @State private var renamingSection: String?
+    @State private var sectionDraft = ""
+
+    /// Rows in stored order, grouped under their headings. Sections come
+    /// out in the order they're first encountered rather than
+    /// alphabetically, so the arrangement you saved is the one you see.
+    private var groups: [(heading: String, rows: [SavedPost])] {
+        var order: [String] = []
+        var byHeading: [String: [SavedPost]] = [:]
+        for row in rows {
+            let heading = row.section?.trimmingCharacters(in: .whitespaces) ?? ""
+            if byHeading[heading] == nil { order.append(heading) }
+            byHeading[heading, default: []].append(row)
+        }
+        return order.map { ($0, byHeading[$0] ?? []) }
+    }
+
     init(route: CollectionRoute) {
         self.route = route
         _name = State(initialValue: route.name)
@@ -87,8 +117,60 @@ struct CollectionDetailView: View {
                     .padding(RexSpacing.xxl)
                     .frame(maxWidth: .infinity)
                 } else {
-                    ForEach(rows) { row in
+                    if let mutationError {
+                        Text(mutationError)
+                            .font(RexFont.text(12))
+                            .foregroundStyle(RexColor.destructive)
+                    }
+                    ForEach(Array(groups.enumerated()), id: \.offset) { _, group in
+                      VStack(alignment: .leading, spacing: RexSpacing.md) {
+                        if !group.heading.isEmpty || isArranging {
+                            HStack(spacing: RexSpacing.sm) {
+                                Text(group.heading.isEmpty ? "No heading" : group.heading)
+                                    .font(.system(size: 18, weight: .semibold, design: .rounded))
+                                    .foregroundStyle(group.heading.isEmpty ? RexColor.mutedForeground : RexColor.foreground)
+                                if isArranging {
+                                    // Naming the "No heading" group is also
+                                    // how you create the first one — there's
+                                    // no separate "add a heading" step,
+                                    // because there's nothing to add it to
+                                    // until something sits under it.
+                                    Button {
+                                        renamingSection = group.heading
+                                        sectionDraft = group.heading
+                                    } label: {
+                                        Image(systemName: "pencil")
+                                            .font(.system(size: 12))
+                                            .foregroundStyle(RexColor.mutedForeground)
+                                    }
+                                }
+                                Spacer()
+                            }
+                            .padding(.top, RexSpacing.xs)
+                        }
+                        ForEach(Array(group.rows.enumerated()), id: \.element.id) { index, row in
                         if let rec = row.recommendations {
+                            if isArranging {
+                                HStack(spacing: RexSpacing.lg) {
+                                    Button {
+                                        Task { await move(row, by: -1) }
+                                    } label: { Image(systemName: "chevron.up") }
+                                    .disabled(isMutating || rows.first?.id == row.id)
+                                    Button {
+                                        Task { await move(row, by: 1) }
+                                    } label: { Image(systemName: "chevron.down") }
+                                    .disabled(isMutating || rows.last?.id == row.id)
+                                    Spacer()
+                                    Text(rec.items?.title ?? "Untitled")
+                                        .font(RexFont.text(13, weight: .medium))
+                                        .foregroundStyle(RexColor.mutedForeground)
+                                        .lineLimit(1)
+                                }
+                                .font(.system(size: 14))
+                                .foregroundStyle(RexColor.mutedForeground)
+                                .padding(.horizontal, RexSpacing.sm)
+                                .padding(.top, index == 0 ? 0 : RexSpacing.sm)
+                            }
                             SwipeToRemove(
                                 label: "Remove",
                                 systemImage: "minus.circle",
@@ -153,6 +235,8 @@ struct CollectionDetailView: View {
                                     }
                             }
                         }
+                        }
+                      }
                     }
                 }
             }
@@ -198,6 +282,13 @@ struct CollectionDetailView: View {
                             Label("Import from doc", systemImage: "doc.text")
                         }
 
+                        Button {
+                            withAnimation(.snappy) { isArranging.toggle() }
+                        } label: {
+                            Label(isArranging ? "Done arranging" : "Add headings & reorder",
+                                  systemImage: isArranging ? "checkmark" : "arrow.up.arrow.down")
+                        }
+
                         Menu("Who can see it") {
                             visibilityButton("draft", "Only me", "lock")
                             visibilityButton("friends", "Friends", "person.2")
@@ -218,6 +309,16 @@ struct CollectionDetailView: View {
                     Image(systemName: "ellipsis.circle")
                 }
             }
+        }
+        .alert("Heading", isPresented: Binding(
+            get: { renamingSection != nil },
+            set: { if !$0 { renamingSection = nil } }
+        )) {
+            TextField("Heading", text: $sectionDraft)
+            Button("Cancel", role: .cancel) { renamingSection = nil }
+            Button("Save") { Task { await renameSection() } }
+        } message: {
+            Text("Applies to everything under this heading. Leave it empty to remove it.")
         }
         .alert("Rename collection", isPresented: $renaming) {
             TextField("Name", text: $draftName)
@@ -331,6 +432,58 @@ struct CollectionDetailView: View {
             visibility = previous
             errorMessage = error.localizedDescription
         }
+    }
+
+    /// Moves one row one place through the collection's flat order,
+    /// crossing a heading boundary if that's where the next slot is —
+    /// which is also how you move something into a heading, without a
+    /// separate "change section" control for it.
+    private func move(_ row: SavedPost, by direction: Int) async {
+        guard let from = rows.firstIndex(where: { $0.id == row.id }) else { return }
+        let to = from + direction
+        guard rows.indices.contains(to) else { return }
+
+        var reordered = rows
+        let moved = reordered.remove(at: from)
+        // Crossing into the neighbour's group takes its heading; staying
+        // put keeps your own.
+        let neighbourSection = rows[to].section
+        var landed = moved
+        if neighbourSection != moved.section { landed.section = neighbourSection }
+        reordered.insert(landed, at: to)
+        for index in reordered.indices { reordered[index].sort_order = index }
+
+        let previous = rows
+        withAnimation(.snappy) { rows = reordered }
+        isMutating = true
+        mutationError = nil
+        do {
+            try await RexAPI.shared.setCollectionOrder(
+                reordered.map { (savedPostId: $0.id, section: $0.section, sortOrder: $0.sort_order ?? 0) }
+            )
+        } catch {
+            // Put it back rather than showing an order that isn't saved.
+            rows = previous
+            mutationError = error.localizedDescription
+        }
+        isMutating = false
+    }
+
+    private func renameSection() async {
+        guard let renamingSection else { return }
+        let to = sectionDraft.trimmingCharacters(in: .whitespaces)
+        self.renamingSection = nil
+        isMutating = true
+        mutationError = nil
+        do {
+            try await RexAPI.shared.renameCollectionSection(
+                listId: route.id, from: renamingSection, to: to
+            )
+            await load()
+        } catch {
+            mutationError = error.localizedDescription
+        }
+        isMutating = false
     }
 
     private func remove(_ recommendationId: String) async {

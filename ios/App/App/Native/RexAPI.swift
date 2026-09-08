@@ -2596,7 +2596,15 @@ final class RexAPI {
 
     /// Puts a Rex into one of your collections. This is the only path that
     /// writes saved_posts.list_id, which is how a hitlist_list gets contents.
-    func addToCollection(recommendationId: String, listId: String) async throws {
+    /// Sept 8 — section/sortOrder arrived with the saved_posts migration of
+    /// the same date. Both optional: saving a Rex into a collection from
+    /// the feed still has no heading in mind and no position to claim, and
+    /// a row with a null sort_order sorts to the end (see
+    /// fetchCollectionItems), which is where a newly saved one belongs.
+    func addToCollection(
+        recommendationId: String, listId: String,
+        section: String? = nil, sortOrder: Int? = nil
+    ) async throws {
         let token = try await validToken()
         guard let userId = currentUserId else { throw RexAPIError.notSignedIn }
         var request = URLRequest(url: baseURL.appendingPathComponent("/rest/v1/saved_posts"))
@@ -2605,9 +2613,12 @@ final class RexAPI {
         request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
         request.setValue("resolution=merge-duplicates", forHTTPHeaderField: "Prefer")
-        request.httpBody = try JSONSerialization.data(withJSONObject: [
+        var body: [String: Any] = [
             "user_id": userId, "recommendation_id": recommendationId, "list_id": listId,
-        ])
+        ]
+        if let section, !section.isEmpty { body["section"] = section }
+        if let sortOrder { body["sort_order"] = sortOrder }
+        request.httpBody = try JSONSerialization.data(withJSONObject: body)
         let (data, response) = try await URLSession.shared.data(for: request)
         guard let http = response as? HTTPURLResponse, http.statusCode < 400 else {
             throw RexAPIError.server(friendlyError(data, fallback: "Couldn't add that to your collection."))
@@ -3256,12 +3267,16 @@ final class RexAPI {
         guard let http = response as? HTTPURLResponse, http.statusCode < 400 else {
             throw RexAPIError.server(friendlyError(data, fallback: "Couldn't load your saved posts."))
         }
-        struct Row: Codable { let id: String; let created_at: String?; let list_id: String?; let recommendation_id: String }
+        struct Row: Codable {
+            let id: String; let created_at: String?; let list_id: String?
+            let recommendation_id: String; let section: String?; let sort_order: Int?
+        }
         let rows = (try? JSONDecoder().decode([Row].self, from: data)) ?? []
         let recsById = await fetchRecommendationsByIds(rows.map { $0.recommendation_id })
         return rows.map {
             SavedPost(id: $0.id, created_at: $0.created_at, list_id: $0.list_id,
-                       recommendation_id: $0.recommendation_id, recommendations: recsById[$0.recommendation_id])
+                       recommendation_id: $0.recommendation_id, recommendations: recsById[$0.recommendation_id],
+                       section: $0.section, sort_order: $0.sort_order)
         }
     }
 
@@ -3270,12 +3285,17 @@ final class RexAPI {
     /// hitlist_lists is what decides whether you can see it.
     func fetchCollectionItems(listId: String) async throws -> [SavedPost] {
         let token = try await validToken()
-        let select = "id,created_at,list_id,recommendation_id"
+        let select = "id,created_at,list_id,recommendation_id,section,sort_order"
         var components = URLComponents(url: baseURL.appendingPathComponent("/rest/v1/saved_posts"), resolvingAgainstBaseURL: false)!
         components.queryItems = [
             URLQueryItem(name: "select", value: select),
             URLQueryItem(name: "list_id", value: "eq.\(listId)"),
-            URLQueryItem(name: "order", value: "created_at.desc"),
+            // Sept 8 — an explicit position, with created_at.desc left as
+            // the tiebreak so a row saved before the migration (or from
+            // the feed's save button, which claims no position) still
+            // lands where it always did: newest of the unplaced ones
+            // first, all of them after anything deliberately ordered.
+            URLQueryItem(name: "order", value: "sort_order.asc.nullslast,created_at.desc"),
         ]
         var request = URLRequest(url: components.url!)
         request.setValue(anonKey, forHTTPHeaderField: "apikey")
@@ -4163,7 +4183,12 @@ final class RexAPI {
         // destination (Kathryn's own: "St Mawes trip", "Loire - Les Sables
         // d'Olonne - Brittany") — a second, usually-present disambiguator
         // costs nothing to append and fixes the common case outright.
-        locationHint: String? = nil
+        locationHint: String? = nil,
+        // Sept 8 — where this row lands inside the collection named by
+        // `listId`. Only the collection importer sets these; every other
+        // caller adds to a collection without a heading or a position.
+        collectionSection: String? = nil,
+        collectionSortOrder: Int? = nil
     ) async throws -> String {
         guard let type = row.suggested_type, !type.isEmpty else {
             throw RexAPIError.server("Set a type before approving.")
@@ -4219,7 +4244,10 @@ final class RexAPI {
         )
 
         if let listId {
-            try await addToCollection(recommendationId: recId, listId: listId)
+            try await addToCollection(
+                recommendationId: recId, listId: listId,
+                section: collectionSection, sortOrder: collectionSortOrder
+            )
         }
 
         let token = try await validToken()
@@ -4309,24 +4337,34 @@ final class RexAPI {
     /// to one that already exists, which is what you want standing inside
     /// it looking at the twelve places you've already saved by hand.
     ///
-    /// Rows go in back-to-front on purpose. A collection has no order
-    /// column — fetchCollectionItems reads `created_at.desc`, newest
-    /// first — so inserting in document order would show the document
-    /// upside down, which is exactly the complaint trip imports got on
-    /// 5 Sept. Reversing here is the whole fix; unlike the batch insert
-    /// that caused that bug, these are separate requests milliseconds
-    /// apart, so their timestamps genuinely differ.
+    /// Rows keep the document's own order and its headings. This used to
+    /// insert back-to-front, because a collection had no order column and
+    /// read newest-first, so going forwards showed the document upside
+    /// down. saved_posts carries a real position now, so the reversal is
+    /// gone — and the reversal was always a trick that broke the moment
+    /// anything else was added to the collection afterwards.
+    ///
+    /// Numbering continues past whatever is already in the collection, so
+    /// importing a second document appends rather than interleaving with
+    /// the first. Worked out here rather than asked of the caller — the
+    /// review screen has no business knowing how the collection it's
+    /// filling is ordered.
     func approveStagingIntoCollection(
         rows: [ImportStagingRow], listId: String
     ) async throws -> (added: Int, failed: [ImportFailure]) {
         guard !rows.isEmpty else { throw RexAPIError.server("Nothing to import.") }
+        let startingAt = ((try? await fetchCollectionItems(listId: listId)) ?? [])
+            .compactMap { $0.sort_order }.max().map { $0 + 1 } ?? 0
         var added = 0
         var failed: [ImportFailure] = []
-        for row in rows.reversed() {
+        for (index, row) in rows.enumerated() {
             do {
+                let section = row.raw_section?.trimmingCharacters(in: .whitespaces)
                 try await approveOneStagingRow(
                     row, rating: nil, note: nil, tripId: nil, tripSection: nil, listId: listId,
-                    locationHint: row.raw_section
+                    locationHint: row.raw_section,
+                    collectionSection: (section?.isEmpty == false) ? section : nil,
+                    collectionSortOrder: startingAt + index
                 )
                 added += 1
             } catch {
@@ -4334,6 +4372,55 @@ final class RexAPI {
             }
         }
         return (added, failed)
+    }
+
+    /// Persists a whole collection's order and headings in one request per
+    /// row. Same approach TripDetailView's reorder takes: the client owns
+    /// the arrangement and writes the result, rather than trying to
+    /// express a move as a relative operation the server has to resolve.
+    func setCollectionOrder(_ entries: [(savedPostId: String, section: String?, sortOrder: Int)]) async throws {
+        let token = try await validToken()
+        for entry in entries {
+            var components = URLComponents(url: baseURL.appendingPathComponent("/rest/v1/saved_posts"), resolvingAgainstBaseURL: false)!
+            components.queryItems = [URLQueryItem(name: "id", value: "eq.\(entry.savedPostId)")]
+            var request = URLRequest(url: components.url!)
+            request.httpMethod = "PATCH"
+            request.setValue(anonKey, forHTTPHeaderField: "apikey")
+            request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+            request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+            request.httpBody = try JSONSerialization.data(withJSONObject: [
+                "sort_order": entry.sortOrder,
+                "section": (entry.section?.isEmpty ?? true) ? (NSNull() as Any) : entry.section!,
+            ])
+            let (data, response) = try await URLSession.shared.data(for: request)
+            guard let http = response as? HTTPURLResponse, http.statusCode < 400 else {
+                throw RexAPIError.server(friendlyError(data, fallback: "Couldn't save the new order."))
+            }
+        }
+    }
+
+    /// A heading is a repeated string, not a row — renaming one means
+    /// patching every saved post that carries it, exactly as
+    /// renameTripSection does for a trip.
+    func renameCollectionSection(listId: String, from: String?, to: String?) async throws {
+        let token = try await validToken()
+        var components = URLComponents(url: baseURL.appendingPathComponent("/rest/v1/saved_posts"), resolvingAgainstBaseURL: false)!
+        components.queryItems = [
+            URLQueryItem(name: "list_id", value: "eq.\(listId)"),
+            URLQueryItem(name: "section", value: (from?.isEmpty ?? true) ? "is.null" : "eq.\(from!)"),
+        ]
+        var request = URLRequest(url: components.url!)
+        request.httpMethod = "PATCH"
+        request.setValue(anonKey, forHTTPHeaderField: "apikey")
+        request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        request.httpBody = try JSONSerialization.data(withJSONObject: [
+            "section": (to?.isEmpty ?? true) ? (NSNull() as Any) : to!,
+        ])
+        let (data, response) = try await URLSession.shared.data(for: request)
+        guard let http = response as? HTTPURLResponse, http.statusCode < 400 else {
+            throw RexAPIError.server(friendlyError(data, fallback: "Couldn't rename that heading."))
+        }
     }
 
     /// Turns a batch of staged rows into one or more Collections. With
