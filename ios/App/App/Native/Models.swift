@@ -429,3 +429,14 @@ struct ImportStagingRow: Codable, Identifiable, Hashable {
     let resolved_genre: String?
     let status: String
 }
+
+/// Sept 7 — one of your own existing Rex, offered when naming a trip stop or
+/// a list item. Wraps the catalogue hit with what *you* said about it, so
+/// picking it brings your rating and note across rather than just the name.
+struct MyRexHit: Identifiable {
+    let hit: RexSearchHit
+    let rating: Double
+    let note: String?
+
+    var id: String { hit.id }
+}

@@ -26,7 +26,7 @@ struct ListItemSheet: View {
     @State private var linkURL = ""
     @State private var photoURLs: [String] = []
 
-    @State private var myHits: [RexSearchHit] = []
+    @State private var myHits: [MyRexHit] = []
     @State private var webHits: [RexSearchHit] = []
     @State private var isSearching = false
     @State private var searchTask: Task<Void, Never>?
@@ -105,11 +105,11 @@ struct ListItemSheet: View {
             VStack(spacing: 0) {
                 if !myHits.isEmpty {
                     resultHeader("Your Rex")
-                    ForEach(myHits) { hit in resultRow(hit, mine: true) }
+                    ForEach(myHits) { mine in resultRow(mine.hit, mine: true) { apply(mine) } }
                 }
                 if !webHits.isEmpty {
                     resultHeader("Search results")
-                    ForEach(webHits) { hit in resultRow(hit, mine: false) }
+                    ForEach(webHits) { hit in resultRow(hit, mine: false) { apply(hit) } }
                 }
             }
             .background(RexColor.card)
@@ -137,9 +137,9 @@ struct ListItemSheet: View {
             .background(RexColor.secondary)
     }
 
-    private func resultRow(_ hit: RexSearchHit, mine: Bool) -> some View {
+    private func resultRow(_ hit: RexSearchHit, mine: Bool, onPick: @escaping () -> Void) -> some View {
         Button {
-            apply(hit)
+            onPick()
         } label: {
             HStack(spacing: RexSpacing.sm) {
                 VStack(alignment: .leading, spacing: 1) {
@@ -193,10 +193,16 @@ struct ListItemSheet: View {
             let (m, w) = await (mine, web)
             guard !Task.isCancelled else { return }
             myHits = m
-            let mineTitles = Set(m.map { $0.title.lowercased() })
+            let mineTitles = Set(m.map { $0.hit.title.lowercased() })
             webHits = w.filter { !mineTitles.contains($0.title.lowercased()) }.prefix(6).map { $0 }
             isSearching = false
         }
+    }
+
+    /// Picking one of your own Rex reuses that catalogue entry — see
+    /// TripStopSheet.apply for the same behaviour on a trip stop.
+    private func apply(_ mine: MyRexHit) {
+        apply(mine.hit)
     }
 
     private func apply(_ hit: RexSearchHit) {

@@ -672,13 +672,13 @@ final class RexAPI {
     /// trip stop somewhere you've already been reuses that catalogue item
     /// (and its photo, address and coordinates) instead of creating a
     /// near-duplicate of it.
-    func searchMyRexItems(query: String) async throws -> [RexSearchHit] {
+    func searchMyRexItems(query: String) async throws -> [MyRexHit] {
         let trimmed = query.trimmingCharacters(in: .whitespaces)
         guard trimmed.count >= 2, let userId = currentUserId else { return [] }
         let token = try await validToken()
         var components = URLComponents(url: baseURL.appendingPathComponent("/rest/v1/recommendations"), resolvingAgainstBaseURL: false)!
         components.queryItems = [
-            URLQueryItem(name: "select", value: "item_id,rating,items!inner(id,type,title,subtitle,image_url,genre,address,lat,lng,external_id,external_source)"),
+            URLQueryItem(name: "select", value: "item_id,rating,note,items!inner(id,type,title,subtitle,image_url,genre,address,lat,lng,external_id,external_source)"),
             URLQueryItem(name: "user_id", value: "eq.\(userId)"),
             URLQueryItem(name: "items.title", value: "ilike.*\(trimmed)*"),
             URLQueryItem(name: "order", value: "created_at.desc"),
@@ -705,14 +705,21 @@ final class RexAPI {
                 let external_source: String?
             }
             let items: Item
+            // Sept 7 — "comes up with my Rex but when I click on it it
+            // doesn't auto populate with the previous Rex". The search only
+            // ever returned the catalogue entry, so picking your own Rex
+            // filled in a name and nothing else. Carrying your rating and
+            // note across is the whole point of recognising it as yours.
+            let rating: Double?
+            let note: String?
         }
         let rows = (try? JSONDecoder().decode([Row].self, from: data)) ?? []
         // Same item Rex'd more than once (standalone and as a trip stop, say)
         // should offer itself once.
         var seen = Set<String>()
-        return rows.compactMap { row -> RexSearchHit? in
+        return rows.compactMap { row -> MyRexHit? in
             guard seen.insert(row.items.id).inserted else { return nil }
-            return RexSearchHit(
+            let hit = RexSearchHit(
                 // A Rex of your own that came from a manual entry has no
                 // external id at all; keying it by the catalogue item id
                 // keeps RexSearchHit.id unique either way, and "rex" as the
@@ -727,6 +734,7 @@ final class RexAPI {
                 lat: row.items.lat,
                 lng: row.items.lng
             )
+            return MyRexHit(hit: hit, rating: row.rating ?? 0, note: row.note)
         }
     }
 

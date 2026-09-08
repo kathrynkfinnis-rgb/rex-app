@@ -197,6 +197,10 @@ struct AddRexView: View {
     }
 
     @State private var activeSheet: ActiveSheet?
+    /// Sept 7 — an in-progress trip or list is written to disk as you build
+    /// it, and offered back if the app was killed mid-way. See TripDraftStore.
+    @State private var restorableDraft: TripDraft?
+    @State private var showingRestorePrompt = false
 
     var body: some View {
         NavigationStack {
@@ -317,6 +321,34 @@ struct AddRexView: View {
         // losing, so its button set a flag that nothing was listening to.
         // Routing every sheet through a single enum-driven presentation is
         // the documented way to have more than one.
+        .onChange(of: tripEntries) { _, _ in persistDraft() }
+        .onChange(of: listEntries) { _, _ in persistDraft() }
+        .onChange(of: title) { _, _ in persistDraft() }
+        .onChange(of: note) { _, _ in persistDraft() }
+        .onAppear {
+            // Only offered when this is a fresh compose — an edit of a
+            // posted trip, or a form already pre-filled from an import, has
+            // its own content and shouldn't be talked out of it.
+            guard editingTripRecId == nil, tripEntries.isEmpty, listEntries.isEmpty,
+                  title.trimmingCharacters(in: .whitespaces).isEmpty,
+                  let draft = TripDraftStore.load()
+            else { return }
+            restorableDraft = draft
+            showingRestorePrompt = true
+        }
+        .alert("Pick up where you left off?", isPresented: $showingRestorePrompt, presenting: restorableDraft) { draft in
+            Button("Discard", role: .destructive) {
+                TripDraftStore.clear()
+                restorableDraft = nil
+            }
+            Button("Restore") { restore(draft) }
+        } message: { draft in
+            let what = draft.isList ? "list" : "trip"
+            let name = draft.title.trimmingCharacters(in: .whitespaces)
+            Text(name.isEmpty
+                 ? "You have an unfinished \(what) with \(draft.entries.count) items."
+                 : "\u{201C}\(name)\u{201D} was left unfinished.")
+        }
         .sheet(item: $activeSheet) { sheet in
             switch sheet {
             case .editListItem(let entry):
@@ -1114,6 +1146,38 @@ struct AddRexView: View {
         }
     }
 
+    /// Writes whatever's on the form to disk, so a backgrounded app that
+    /// iOS then terminates doesn't take the work with it.
+    private func persistDraft() {
+        guard editingTripRecId == nil, category == .trip || category == .list else { return }
+        TripDraftStore.save(TripDraft(
+            isList: category == .list,
+            title: title,
+            note: note,
+            rating: rating,
+            listKind: listKind,
+            tripMonth: tripMonth,
+            tripYear: tripYear,
+            photoURLs: photoURLs,
+            entries: category == .list ? listEntries : tripEntries,
+            savedAt: Date()
+        ))
+    }
+
+    private func restore(_ draft: TripDraft) {
+        category = draft.isList ? .list : .trip
+        manualEntry = true
+        title = draft.title
+        note = draft.note
+        rating = draft.rating
+        listKind = draft.listKind
+        tripMonth = draft.tripMonth
+        tripYear = draft.tripYear
+        photoURLs = draft.photoURLs
+        if draft.isList { listEntries = draft.entries } else { tripEntries = draft.entries }
+        restorableDraft = nil
+    }
+
     private func post(category: RexCategory, asDraft: Bool = false) async {
         // Editing an already-posted trip updates it in place instead of
         // creating a second one.
@@ -1369,6 +1433,7 @@ struct AddRexView: View {
         tripYear = nil
         listItems = []
         listEntries = []
+        TripDraftStore.clear()
         customListKind = ""
         showingCustomListKind = false
         recipeText = ""

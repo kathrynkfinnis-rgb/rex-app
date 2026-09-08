@@ -1,8 +1,11 @@
 import SwiftUI
 
 /// A stop being added to a trip before the trip is posted.
-struct DraftStop: Identifiable, Equatable {
-    let id = UUID()
+///
+/// Codable since Sept 7: an in-progress trip is now written to disk as you
+/// build it, so switching apps can't lose it — see TripDraftStore.
+struct DraftStop: Identifiable, Equatable, Codable {
+    var id = UUID()
     var type: RexCategory
     var title: String
     var subtitle: String?
@@ -46,11 +49,11 @@ struct DraftStop: Identifiable, Equatable {
 /// grouping both live in this array instead — a stop belongs to whichever
 /// heading most recently precedes it, which is worked out once on save
 /// (see `resolvedStops`) rather than stored per row.
-struct ItineraryEntry: Identifiable, Equatable {
+struct ItineraryEntry: Identifiable, Equatable, Codable {
     let id: UUID
     var kind: Kind
 
-    enum Kind: Equatable {
+    enum Kind: Equatable, Codable {
         case heading(String)
         case stop(DraftStop)
     }

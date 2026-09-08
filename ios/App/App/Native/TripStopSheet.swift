@@ -36,7 +36,7 @@ struct TripStopSheet: View {
     @State private var rating: Double = 0
     @State private var photoURLs: [String] = []
 
-    @State private var myHits: [RexSearchHit] = []
+    @State private var myHits: [MyRexHit] = []
     @State private var webHits: [RexSearchHit] = []
     @State private var isSearching = false
     @State private var searchTask: Task<Void, Never>?
@@ -192,11 +192,11 @@ struct TripStopSheet: View {
             VStack(spacing: 0) {
                 if !myHits.isEmpty {
                     resultHeader("Your Rex")
-                    ForEach(myHits) { hit in resultRow(hit, mine: true) }
+                    ForEach(myHits) { mine in resultRow(mine.hit, mine: true) { apply(mine) } }
                 }
                 if !webHits.isEmpty {
                     resultHeader("Search results")
-                    ForEach(webHits) { hit in resultRow(hit, mine: false) }
+                    ForEach(webHits) { hit in resultRow(hit, mine: false) { apply(hit) } }
                 }
             }
             .background(RexColor.card)
@@ -224,9 +224,9 @@ struct TripStopSheet: View {
             .background(RexColor.secondary)
     }
 
-    private func resultRow(_ hit: RexSearchHit, mine: Bool) -> some View {
+    private func resultRow(_ hit: RexSearchHit, mine: Bool, onPick: @escaping () -> Void) -> some View {
         Button {
-            apply(hit)
+            onPick()
         } label: {
             HStack(spacing: RexSpacing.sm) {
                 VStack(alignment: .leading, spacing: 1) {
@@ -287,10 +287,20 @@ struct TripStopSheet: View {
             myHits = m
             // Anything already in your own list shouldn't also appear as a
             // fresh search result underneath it.
-            let mineTitles = Set(m.map { $0.title.lowercased() })
+            let mineTitles = Set(m.map { $0.hit.title.lowercased() })
             webHits = w.filter { !mineTitles.contains($0.title.lowercased()) }.prefix(6).map { $0 }
             isSearching = false
         }
+    }
+
+    /// Sept 7 — "comes up with my Rex but when I click on it it doesn't
+    /// auto populate with the previous Rex". Picking one of your own now
+    /// brings your rating and your note over too, not just the name — the
+    /// point of recognising it as already yours.
+    private func apply(_ mine: MyRexHit) {
+        apply(mine.hit)
+        if mine.rating > 0 { rating = mine.rating }
+        if let previous = mine.note, !previous.isEmpty, note.isEmpty { note = previous }
     }
 
     private func apply(_ hit: RexSearchHit) {

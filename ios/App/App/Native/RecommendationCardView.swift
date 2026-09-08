@@ -36,7 +36,9 @@ struct RecommendationCardView: View {
     /// try" carry a text label and need real room; a rating is just one
     /// small emoji; a plain Rex with none of the three needs nothing.
     private var titleTrailingReserve: CGFloat {
-        if rec.isBlast || rec.isWant { return 110 }
+        // Sept 7 — was 110 when these carried a text label; they're a bare
+        // icon now, so the title gets that width back.
+        if rec.isBlast || rec.isWant { return 34 }
         if rec.rating > 0 { return 40 }
         return 0
     }
@@ -109,6 +111,15 @@ struct RecommendationCardView: View {
                             // already relocated here for the same "under the
                             // title" reason (#136 → reference design).
                             HStack(spacing: RexSpacing.xs) {
+                                // Sept 7 — "want to try headings are still not
+                                // looking perfect... perhaps just the bookmark
+                                // at the top, and a 'wants to try' text
+                                // somewhere else". The words moved down here
+                                // beside the category, where the card already
+                                // keeps its other labels; the corner keeps
+                                // just the icon. Same for a blast's "Asking".
+                                if rec.isWant { statusPill("Wants to try", icon: "bookmark") }
+                                if rec.isBlast { statusPill("Asking", icon: "sparkles", tint: RexColor.accent) }
                                 categoryBadge
                                 ForEach(splitGenres(item.genre).prefix(3), id: \.self) { genre in
                                     Text(genre)
@@ -390,6 +401,22 @@ struct RecommendationCardView: View {
         }
     }
 
+    /// "Wants to try" / "Asking", sitting with the category chip rather
+    /// than crowding the title.
+    private func statusPill(_ label: String, icon: String, tint: Color = RexColor.mutedForeground) -> some View {
+        HStack(spacing: 3) {
+            Image(systemName: icon).font(.system(size: 9))
+            Text(label)
+                .font(.system(size: 10, weight: .semibold))
+                .tracking(0.4)
+        }
+        .foregroundStyle(tint)
+        .padding(.horizontal, RexSpacing.sm)
+        .padding(.vertical, 3)
+        .background(tint.opacity(0.12))
+        .clipShape(Capsule())
+    }
+
     private var categoryBadge: some View {
         HStack(spacing: 4) {
             Image(systemName: category.symbol).font(.system(size: 9))
@@ -417,8 +444,18 @@ struct RecommendationCardView: View {
                 AsyncImage(url: url) { phase in
                     if let image = phase.image {
                         image.resizable().aspectRatio(contentMode: .fill)
+                    } else if phase.error != nil {
+                        // Sept 7 — "thumbnails aren't loading well on the
+                        // feed". A dead or slow image URL left a plain grey
+                        // square; the category's own illustration is a much
+                        // better answer than a blank tile, and it's what a
+                        // Rex with no image at all already shows.
+                        Image(category.placeholderImageName)
+                            .resizable()
+                            .aspectRatio(contentMode: .fill)
+                            .background(RexColor.muted)
                     } else {
-                        RexColor.muted
+                        RexColor.muted.overlay(ProgressView().controlSize(.mini))
                     }
                 }
                 // Places added before the URL fix never render — whichever

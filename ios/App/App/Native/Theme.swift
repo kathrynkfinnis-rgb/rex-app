@@ -190,7 +190,7 @@ enum RexFont {
     static let metadata     = text(12)                         // 12-13
 }
 
-enum RexCategory: String {
+enum RexCategory: String, Codable {
     case place, trip, book, movie, tv, podcast, recipe, event, other, list
 
     var label: String {
