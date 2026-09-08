@@ -24,6 +24,7 @@ struct ImportReviewView: View {
     @State private var listKind = rexListKinds.first ?? "Other"
     @State private var splitBySection = false
     @State private var isSaving = false
+    @State private var isRetyping = false
     @State private var editingRow: ImportStagingRow?
     /// Which rows default to visible on the main feed on their own —
     /// List-only, meaningless for Trip/Collection. Every row starts in
@@ -49,6 +50,8 @@ struct ImportReviewView: View {
                     Text("\(rows.count) found \u{2014} tap the trash icon on anything that shouldn't be here")
                         .font(RexFont.text(13, weight: .medium))
                         .foregroundStyle(RexColor.mutedForeground)
+
+                    bulkTypePicker
 
                     ForEach(rows) { row in
                         rowCard(row)
@@ -200,6 +203,64 @@ struct ImportReviewView: View {
                 if on { showInFeedIds.insert(id) } else { showInFeedIds.remove(id) }
             }
         )
+    }
+
+    /// Sept 7 — "when you import from doc they shouldn't be automatically
+    /// tagged as a place". The type is the extractor's guess, and on a
+    /// homogeneous document (a gift list, a reading list) one wrong guess is
+    /// usually the same wrong guess on every row. The prompt now judges the
+    /// document as a whole, but that's a probability, not a guarantee — this
+    /// is the deterministic escape hatch: set the lot in one tap.
+    private var bulkTypePicker: some View {
+        VStack(alignment: .leading, spacing: RexSpacing.sm) {
+            HStack(spacing: 6) {
+                Text("These are all")
+                    .font(RexFont.text(13, weight: .semibold))
+                    .foregroundStyle(RexColor.foreground)
+                if let mixed = dominantType {
+                    Text("\u{2014} currently mostly \(mixed.pluralLabel.lowercased())")
+                        .font(RexFont.text(12))
+                        .foregroundStyle(RexColor.mutedForeground)
+                }
+            }
+            ScrollView(.horizontal, showsIndicators: false) {
+                HStack(spacing: RexSpacing.sm) {
+                    ForEach([RexCategory.place, .book, .movie, .tv, .podcast, .recipe, .event, .other], id: \.self) { type in
+                        Button {
+                            Task { await applyTypeToAll(type) }
+                        } label: {
+                            Text(type.pluralLabel)
+                                .font(RexFont.text(12.5, weight: .medium))
+                                .padding(.horizontal, 12).padding(.vertical, 6)
+                                .background(RexColor.card)
+                                .foregroundStyle(RexColor.foreground)
+                                .clipShape(Capsule())
+                                .overlay(Capsule().stroke(RexColor.border, lineWidth: 1))
+                        }
+                        .buttonStyle(.plain)
+                        .disabled(isRetyping)
+                    }
+                }
+                .padding(.horizontal, 1)
+            }
+        }
+    }
+
+    /// Whatever the extractor guessed most often, for the hint above.
+    private var dominantType: RexCategory? {
+        var counts: [String: Int] = [:]
+        for row in rows { if let t = row.suggested_type { counts[t, default: 0] += 1 } }
+        guard let top = counts.max(by: { $0.value < $1.value })?.key else { return nil }
+        return RexCategory(rawValue: top)
+    }
+
+    private func applyTypeToAll(_ type: RexCategory) async {
+        isRetyping = true
+        for row in rows {
+            try? await RexAPI.shared.updateStagingRowType(id: row.id, type: type.rawValue)
+        }
+        await load()
+        isRetyping = false
     }
 
     private var destinationPicker: some View {

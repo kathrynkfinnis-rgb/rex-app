@@ -317,6 +317,12 @@ struct RequestComment: Codable, Identifiable {
     let body: String
     let created_at: String
     let profiles: RexProfile?
+    /// Sept 7 — set when this is a reply to another suggestion rather than
+    /// a suggestion of its own. One level only; see the migration.
+    var parent_id: String?
+    /// Filled in after fetch, the same way notifications fill in their actor.
+    var likeCount: Int = 0
+    var likedByMe: Bool = false
 }
 
 /// One of the user's own curated lists (hitlist_lists) — e.g. "Baby Recs".

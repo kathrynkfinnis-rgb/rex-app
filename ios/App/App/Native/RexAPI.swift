@@ -2794,7 +2794,7 @@ final class RexAPI {
     /// to whatever the underlying constraint happens to be called.
     func fetchRequestComments(requestId: String) async throws -> [RequestComment] {
         let token = try await validToken()
-        let select = "id,request_id,user_id,body,created_at"
+        let select = "id,request_id,user_id,body,created_at\(await blastReplyField())"
         var components = URLComponents(url: baseURL.appendingPathComponent("/rest/v1/request_comments"), resolvingAgainstBaseURL: false)!
         components.queryItems = [
             URLQueryItem(name: "select", value: select),
@@ -2815,6 +2815,7 @@ final class RexAPI {
             let user_id: String
             let body: String
             let created_at: String
+            let parent_id: String?
         }
         let rows = try JSONDecoder().decode([Row].self, from: data)
         guard !rows.isEmpty else { return [] }
@@ -2829,18 +2830,99 @@ final class RexAPI {
             }
         }()
 
+        let likes = (try? await fetchRequestCommentLikes(commentIds: rows.map { $0.id })) ?? [:]
         return rows.map { row in
-            RequestComment(
+            let like = likes[row.id]
+            return RequestComment(
                 id: row.id, request_id: row.request_id, user_id: row.user_id,
                 body: row.body, created_at: row.created_at,
-                profiles: profilesById[row.user_id]
+                profiles: profilesById[row.user_id],
+                parent_id: row.parent_id,
+                likeCount: like?.count ?? 0,
+                likedByMe: like?.likedByMe ?? false
             )
+        }
+    }
+
+    /// parent_id doesn't exist until migration 20260907160000 has been run,
+    /// and selecting a missing column fails the whole query — same probe
+    /// pattern as anonymousField() above.
+    private var blastReplyColumn: Bool?
+    private func blastReplyField() async -> String {
+        if let blastReplyColumn { return blastReplyColumn ? ",parent_id" : "" }
+        guard let token = try? await validToken() else { return "" }
+        var components = URLComponents(url: baseURL.appendingPathComponent("/rest/v1/request_comments"), resolvingAgainstBaseURL: false)!
+        components.queryItems = [
+            URLQueryItem(name: "select", value: "parent_id"),
+            URLQueryItem(name: "limit", value: "1"),
+        ]
+        var request = URLRequest(url: components.url!)
+        request.setValue(anonKey, forHTTPHeaderField: "apikey")
+        request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+        let ok = (try? await URLSession.shared.data(for: request))
+            .flatMap { ($0.1 as? HTTPURLResponse)?.statusCode }
+            .map { $0 < 400 } ?? false
+        blastReplyColumn = ok
+        return ok ? ",parent_id" : ""
+    }
+
+    func fetchRequestCommentLikes(commentIds: [String]) async throws -> [String: (count: Int, likedByMe: Bool)] {
+        guard !commentIds.isEmpty else { return [:] }
+        let token = try await validToken()
+        var components = URLComponents(url: baseURL.appendingPathComponent("/rest/v1/request_comment_likes"), resolvingAgainstBaseURL: false)!
+        components.queryItems = [
+            URLQueryItem(name: "select", value: "comment_id,user_id"),
+            URLQueryItem(name: "comment_id", value: "in.(\(commentIds.joined(separator: ",")))"),
+        ]
+        var request = URLRequest(url: components.url!)
+        request.setValue(anonKey, forHTTPHeaderField: "apikey")
+        request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+
+        let (data, response) = try await URLSession.shared.data(for: request)
+        guard let http = response as? HTTPURLResponse, http.statusCode < 400 else { return [:] }
+        struct Row: Codable { let comment_id: String; let user_id: String }
+        let rows = (try? JSONDecoder().decode([Row].self, from: data)) ?? []
+        let me = currentUserId
+        var out: [String: (count: Int, likedByMe: Bool)] = [:]
+        for row in rows {
+            var entry = out[row.comment_id] ?? (0, false)
+            entry.count += 1
+            if row.user_id == me { entry.likedByMe = true }
+            out[row.comment_id] = entry
+        }
+        return out
+    }
+
+    func setRequestCommentLike(commentId: String, liked: Bool) async throws {
+        let token = try await validToken()
+        guard let userId = currentUserId else { throw RexAPIError.notSignedIn }
+        var components = URLComponents(url: baseURL.appendingPathComponent("/rest/v1/request_comment_likes"), resolvingAgainstBaseURL: false)!
+        var request: URLRequest
+        if liked {
+            request = URLRequest(url: components.url!)
+            request.httpMethod = "POST"
+            request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+            request.httpBody = try JSONSerialization.data(withJSONObject: ["comment_id": commentId, "user_id": userId])
+        } else {
+            components.queryItems = [
+                URLQueryItem(name: "comment_id", value: "eq.\(commentId)"),
+                URLQueryItem(name: "user_id", value: "eq.\(userId)"),
+            ]
+            request = URLRequest(url: components.url!)
+            request.httpMethod = "DELETE"
+        }
+        request.setValue(anonKey, forHTTPHeaderField: "apikey")
+        request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+
+        let (data, response) = try await URLSession.shared.data(for: request)
+        guard let http = response as? HTTPURLResponse, http.statusCode < 400 else {
+            throw RexAPIError.server(friendlyError(data, fallback: "Couldn't save that like."))
         }
     }
 
     /// #132 — reply to a blast. suggested_item_id is left null; the compose
     /// UI is plain text only for now (see RequestComment's doc comment).
-    func createRequestComment(requestId: String, body text: String) async throws {
+    func createRequestComment(requestId: String, body text: String, parentId: String? = nil) async throws {
         let token = try await validToken()
         guard let userId = currentUserId else { throw RexAPIError.notSignedIn }
         var request = URLRequest(url: baseURL.appendingPathComponent("/rest/v1/request_comments"))
@@ -2848,7 +2930,8 @@ final class RexAPI {
         request.setValue(anonKey, forHTTPHeaderField: "apikey")
         request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
-        let body: [String: Any] = ["request_id": requestId, "user_id": userId, "body": text]
+        var body: [String: Any] = ["request_id": requestId, "user_id": userId, "body": text]
+        if let parentId { body["parent_id"] = parentId }
         request.httpBody = try JSONSerialization.data(withJSONObject: body)
 
         let (data, response) = try await URLSession.shared.data(for: request)
@@ -3920,6 +4003,28 @@ final class RexAPI {
     /// approveOneStagingRow to create a fresh item on next approval rather
     /// than reusing whatever resolveStagingRow matched against the old
     /// (now-edited) title.
+    /// Sept 7 — retypes one staged row and nothing else, for the review
+    /// screen's "these are all…" control. updateStagingRow below rewrites
+    /// the title, creator and note too, which a bulk retype has no business
+    /// touching — and it deliberately clears the resolved_* columns, which
+    /// would throw away every thumbnail the background resolver had found.
+    func updateStagingRowType(id: String, type: String) async throws {
+        let token = try await validToken()
+        var components = URLComponents(url: baseURL.appendingPathComponent("/rest/v1/import_staging"), resolvingAgainstBaseURL: false)!
+        components.queryItems = [URLQueryItem(name: "id", value: "eq.\(id)")]
+        var request = URLRequest(url: components.url!)
+        request.httpMethod = "PATCH"
+        request.setValue(anonKey, forHTTPHeaderField: "apikey")
+        request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        request.httpBody = try JSONSerialization.data(withJSONObject: ["suggested_type": type])
+
+        let (data, response) = try await URLSession.shared.data(for: request)
+        guard let http = response as? HTTPURLResponse, http.statusCode < 400 else {
+            throw RexAPIError.server(friendlyError(data, fallback: "Couldn't change the type."))
+        }
+    }
+
     func updateStagingRow(
         id: String, title: String, creator: String?, note: String?, rating: Double?, type: String
     ) async throws {

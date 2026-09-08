@@ -13,6 +13,13 @@ struct WishListCategoryView: View {
     @State private var isLoading = true
     @State private var pushedItemId: String?
     @State private var addingToCollection: WantRow?
+    /// Sept 7 — "need to be able to edit from want to try to rating once the
+    /// book has been read". This screen had no edit path at all: you could
+    /// remove a want or open the item, and that was it — so there was
+    /// nowhere to say you'd actually done the thing. EditRexView already
+    /// knows how to convert a want into a rated Rex (see its wantRowId), it
+    /// just needed reaching from here.
+    @State private var rating: FeedRecommendation?
     /// Sub-category filter (genre) within this one category — same idea as
     /// the feed's own subcategory row, just scoped to what's actually saved
     /// here rather than the whole feed.
@@ -104,6 +111,18 @@ struct WishListCategoryView: View {
                                         }
                                     }
                                     Spacer()
+
+                                    Button {
+                                        rating = asRecommendation(want)
+                                    } label: {
+                                        Text("Rate it")
+                                            .font(RexFont.text(12, weight: .semibold))
+                                            .foregroundStyle(RexColor.primary)
+                                            .padding(.horizontal, RexSpacing.md)
+                                            .padding(.vertical, 7)
+                                            .overlay(Capsule().stroke(RexColor.primary, lineWidth: 1))
+                                    }
+                                    .buttonStyle(.plain)
                                 }
                                 .padding(RexSpacing.md)
                                 .rexCard()
@@ -143,6 +162,13 @@ struct WishListCategoryView: View {
         .navigationTitle(title)
         .navigationBarTitleDisplayMode(.inline)
         .navigationDestination(item: $pushedItemId) { ItemDetailView(itemId: $0) }
+        .sheet(item: $rating) { rec in
+            EditRexView(
+                rec: rec,
+                onSaved: { Task { await load() } },
+                onDeleted: { Task { await load() } }
+            )
+        }
         .sheet(item: $addingToCollection) { want in
             AddWantToListView(want: want) { newListId in
                 if let index = wants.firstIndex(where: { $0.id == want.id }) {
@@ -198,6 +224,31 @@ struct WishListCategoryView: View {
         }
         .padding(RexSpacing.xxl)
         .frame(maxWidth: .infinity)
+    }
+
+    /// The same synthetic shape fetchWantsFeed produces for a want, so
+    /// EditRexView recognises it as one (it keys off the "want-" prefix) and
+    /// offers the want/rated switch.
+    private func asRecommendation(_ want: WantRow) -> FeedRecommendation {
+        FeedRecommendation(
+            id: "want-\(want.id)",
+            rating: 0,
+            note: nil,
+            created_at: want.created_at,
+            photo_url: nil,
+            photo_urls: nil,
+            tags: nil,
+            user_id: RexAPI.shared.currentUserId ?? "",
+            item_id: want.item_id,
+            items: want.items,
+            profiles: nil,
+            creators: nil,
+            trip_section: nil,
+            is_anonymous: false,
+            list_section: nil,
+            show_in_feed: nil,
+            recommendation_tags: nil
+        )
     }
 
     private func remove(_ want: WantRow) async {

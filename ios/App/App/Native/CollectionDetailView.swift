@@ -23,6 +23,7 @@ struct CollectionDetailView: View {
     @State private var isLoading = true
     @State private var errorMessage: String?
     @State private var renaming = false
+    @State private var editing: FeedRecommendation?
     @State private var draftName = ""
     @State private var draftEmoji = ""
     @State private var confirmingDelete = false
@@ -91,12 +92,49 @@ struct CollectionDetailView: View {
                                         dragPreview(rec)
                                     }
                                     .contextMenu {
+                                        // Sept 7 — "if I open my own collection
+                                        // I can't update the location, so some
+                                        // don't appear on the map". A card in a
+                                        // collection had no way into the editor
+                                        // at all; a wrong address could only be
+                                        // fixed by finding the Rex somewhere
+                                        // else. Only your own Rex — a
+                                        // collection can hold other people's.
+                                        if rec.user_id == RexAPI.shared.currentUserId {
+                                            Button {
+                                                editing = rec
+                                            } label: {
+                                                Label("Edit", systemImage: "pencil")
+                                            }
+                                        }
                                         if route.isMine {
                                             Button(role: .destructive) {
                                                 Task { await remove(rec.id) }
                                             } label: {
                                                 Label("Remove from collection", systemImage: "minus.circle")
                                             }
+                                        }
+                                    }
+                                    // The same affordance the feed and profile
+                                    // use, so it's discoverable without
+                                    // knowing to long-press.
+                                    .overlay(alignment: .topTrailing) {
+                                        if rec.user_id == RexAPI.shared.currentUserId {
+                                            Button {
+                                                editing = rec
+                                            } label: {
+                                                Image(systemName: "pencil")
+                                                    .font(.system(size: 13, weight: .semibold))
+                                                    .foregroundStyle(RexColor.mutedForeground)
+                                                    .padding(8)
+                                                    .background(RexColor.card)
+                                                    .clipShape(Circle())
+                                                    .overlay(Circle().stroke(RexColor.border, lineWidth: 1))
+                                                    .frame(width: 44, height: 44)
+                                                    .contentShape(Rectangle())
+                                            }
+                                            .buttonStyle(.plain)
+                                            .padding(2)
                                         }
                                     }
                             }
@@ -111,6 +149,13 @@ struct CollectionDetailView: View {
         .navigationTitle(name)
         .navigationBarTitleDisplayMode(.inline)
         .navigationDestination(item: $pushedItemId) { ItemDetailView(itemId: $0) }
+        .sheet(item: $editing) { rec in
+            EditRexView(
+                rec: rec,
+                onSaved: { Task { await load() } },
+                onDeleted: { Task { await load() } }
+            )
+        }
         .toolbar {
             // Shown for any collection, not just your own — there's no
             // public web page for a collection yet (task #108), so this is

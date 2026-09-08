@@ -64,6 +64,15 @@ For each distinct recommendation, output:
 - note: the person's comment about it, cleaned up (null if none)
 - rating: if a numeric rating is present, normalize to a 1-10 scale (e.g. 4/5 -> 8, 9/10 -> 9). null if none.
 - type: one of "book", "movie", "tv", "place", "recipe", "event", "podcast" — your best guess
+
+  Judge this from the document as a whole, not line by line. Most documents
+  are homogeneous: a gift list is products, a reading list is books, an
+  itinerary is places. Work out what kind of document this is first, then
+  type each item consistently with it, and only differ where an item is
+  obviously a different kind of thing. Do not default to "place" — that is
+  only right when the item really is somewhere you go. If an item is a
+  physical product, a gift, or anything bought rather than visited, and none
+  of the categories fit, use "other".
 - section: the heading this item appeared under, copied verbatim (e.g. "Brunch", "Museums", "Day 2"). Use the nearest heading above the item. null if the document has no headings.
 - url: a link written next to or attached to the item. null if none.
 

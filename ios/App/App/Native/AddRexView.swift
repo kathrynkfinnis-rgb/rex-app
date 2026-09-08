@@ -1102,6 +1102,7 @@ struct AddRexView: View {
                     try? await RexAPI.shared.setTripSection(recommendationId: recId, section: stop.section)
                     try? await RexAPI.shared.setRecommendationCreatedAt(id: recId, createdAt: stamp)
                 } else {
+                    let stop = await geocodedIfNeeded(stop)
                     let newItemId = try await RexAPI.shared.createItem(
                         type: stop.type.rawValue,
                         title: stop.title,
@@ -1178,6 +1179,30 @@ struct AddRexView: View {
         restorableDraft = nil
     }
 
+    /// Sept 7 — "I uploaded a list of places... none of the locations came
+    /// up", and the same for imported trips: nothing on the map.
+    ///
+    /// A stop typed into the stop sheet gets geocoded there, but one that
+    /// arrived from a document import never was — fromStagingRows has no
+    /// coordinates to give it — so imported stops were created with no
+    /// lat/lng at all and simply had no pin. Geocoding here, at save, is the
+    /// one place both routes pass through.
+    ///
+    /// Best-effort by design: somewhere that can't be found still saves, it
+    /// just doesn't get a pin, which is better than refusing the whole post.
+    private func geocodedIfNeeded(_ stop: DraftStop) async -> DraftStop {
+        guard stop.lat == nil || stop.lng == nil else { return stop }
+        let parts = [stop.title, stop.address, stop.subtitle]
+            .compactMap { $0?.trimmingCharacters(in: .whitespaces) }
+            .filter { !$0.isEmpty }
+        guard !parts.isEmpty else { return stop }
+        guard let coords = await RexSearch.geocode(parts.joined(separator: ", ")) else { return stop }
+        var located = stop
+        located.lat = coords.lat
+        located.lng = coords.lng
+        return located
+    }
+
     private func post(category: RexCategory, asDraft: Bool = false) async {
         // Editing an already-posted trip updates it in place instead of
         // creating a second one.
@@ -1240,6 +1265,7 @@ struct AddRexView: View {
                     for (index, stop) in tripStops.enumerated() {
                         postingProgress = tripStops.count > 1
                             ? "Adding stop \(index + 1) of \(tripStops.count)…" : "Adding stop…"
+                        let stop = await geocodedIfNeeded(stop)
                         let stopItemId = try await RexAPI.shared.createItem(
                             type: stop.type.rawValue,
                             title: stop.title,
@@ -1304,6 +1330,7 @@ struct AddRexView: View {
                     for (index, draftItem) in listItems.enumerated() {
                         postingProgress = listItems.count > 1
                             ? "Adding item \(index + 1) of \(listItems.count)…" : "Adding item…"
+                        let draftItem = await geocodedIfNeeded(draftItem)
                         let childItemId = try await RexAPI.shared.createItem(
                             type: draftItem.type.rawValue,
                             title: draftItem.title,
