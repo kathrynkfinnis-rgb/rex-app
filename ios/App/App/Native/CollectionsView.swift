@@ -389,7 +389,7 @@ struct CollectionsView: View {
         case .book: return "Books to read"
         case .movie: return "Films to watch"
         case .tv: return "TV to watch"
-        case .podcast: return "Podcasts to hear"
+        case .podcast: return "Podcasts to listen to"
         case .recipe: return "Recipes to cook"
         case .event: return "Events to attend"
         case .other: return "Other"

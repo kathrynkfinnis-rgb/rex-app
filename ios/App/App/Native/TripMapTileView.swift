@@ -66,25 +66,34 @@ struct TripMapTileView: View {
     }
 
     var body: some View {
-        Group {
-            if let url = staticMapURL {
-                AsyncImage(url: url) { phase in
-                    if let image = phase.image {
-                        image.resizable().aspectRatio(contentMode: .fill)
-                    } else {
-                        placeholder
+        // Sept 7 — "the trip cards in the feed are still wider than other
+        // cards". This used to be Group { image }.frame(height:) .frame(
+        // maxWidth: .infinity).clipped(), which lets the image drive the
+        // layout: a .fill image at a fixed height is intrinsically wider
+        // than its box, .clipped() only stops it being *drawn* outside, and
+        // the width it claimed had already widened the card. Sizing an
+        // empty box first and hanging the image off it as an overlay means
+        // the layout comes from the box, never the picture.
+        Color.clear
+            .frame(height: height)
+            .frame(maxWidth: .infinity)
+            .overlay {
+                if let url = staticMapURL {
+                    AsyncImage(url: url) { phase in
+                        if let image = phase.image {
+                            image.resizable().aspectRatio(contentMode: .fill)
+                        } else {
+                            placeholder
+                        }
                     }
+                } else if isLoading {
+                    placeholder.overlay(ProgressView())
+                } else {
+                    placeholder
                 }
-            } else if isLoading {
-                placeholder.overlay(ProgressView())
-            } else {
-                placeholder
             }
-        }
-        .frame(height: height)
-        .frame(maxWidth: .infinity)
-        .clipped()
-        .task { await load() }
+            .clipped()
+            .task { await load() }
     }
 
     private var placeholder: some View {
@@ -135,25 +144,27 @@ struct PlaceMapTileView: View {
     }
 
     var body: some View {
-        Group {
-            if let url = staticMapURL {
-                AsyncImage(url: url) { phase in
-                    if let image = phase.image {
-                        image.resizable().aspectRatio(contentMode: .fill)
-                    } else {
-                        RexColor.muted.overlay(
-                            Image(systemName: "map")
-                                .font(.system(size: 20))
-                                .foregroundStyle(RexColor.mutedForeground)
-                        )
+        // Same box-first layout as the trip tile above, for the same reason.
+        Color.clear
+            .frame(height: height)
+            .frame(maxWidth: .infinity)
+            .overlay {
+                if let url = staticMapURL {
+                    AsyncImage(url: url) { phase in
+                        if let image = phase.image {
+                            image.resizable().aspectRatio(contentMode: .fill)
+                        } else {
+                            RexColor.muted.overlay(
+                                Image(systemName: "map")
+                                    .font(.system(size: 20))
+                                    .foregroundStyle(RexColor.mutedForeground)
+                            )
+                        }
                     }
+                } else {
+                    RexColor.muted
                 }
-            } else {
-                RexColor.muted
             }
-        }
-        .frame(height: height)
-        .frame(maxWidth: .infinity)
-        .clipped()
+            .clipped()
     }
 }

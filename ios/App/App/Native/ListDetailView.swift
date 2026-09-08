@@ -266,32 +266,37 @@ struct ListDetailView: View {
             }
             .buttonStyle(.plain)
 
-            // Edit stays available forever, not just during the original
-            // import review — "need to be able to edit the Rex within the
-            // import once they are live" was explicit in the ask.
-            HStack {
-                Toggle(isOn: showInFeedBinding(item)) {
-                    Text("Show on feed").font(RexFont.text(12)).foregroundStyle(RexColor.mutedForeground)
-                }
-                .tint(RexColor.primary)
-                .frame(maxWidth: 160)
-
-                Spacer()
-
-                Button {
-                    editing = item
-                } label: {
-                    HStack(spacing: 4) {
-                        Image(systemName: "pencil")
-                        Text("Edit")
+            // Sept 7 — "I can still edit the individual items on someone
+            // else's list, there shouldn't be a pencil icon. There is also a
+            // 'show on feed' button — this should be removed."
+            //
+            // The row was drawn the same for everyone: the whole block had
+            // no isOwner check, so a friend's list offered you an Edit
+            // button on every item. The toggle is gone outright — list items
+            // no longer post to the feed individually, so it had nothing
+            // left to control.
+            //
+            // Edit stays available forever on your own list, not just during
+            // the original import review — "need to be able to edit the Rex
+            // within the import once they are live" was explicit in the ask.
+            if isOwner {
+                HStack {
+                    Spacer()
+                    Button {
+                        editing = item
+                    } label: {
+                        HStack(spacing: 4) {
+                            Image(systemName: "pencil")
+                            Text("Edit")
+                        }
+                        .font(RexFont.text(12, weight: .semibold))
+                        .foregroundStyle(RexColor.primary)
                     }
-                    .font(RexFont.text(12, weight: .semibold))
-                    .foregroundStyle(RexColor.primary)
+                    .buttonStyle(.plain)
                 }
-                .buttonStyle(.plain)
+                .padding(.horizontal, RexSpacing.cardPadding)
+                .padding(.vertical, RexSpacing.sm)
             }
-            .padding(.horizontal, RexSpacing.cardPadding)
-            .padding(.vertical, RexSpacing.sm)
         }
         .background(RexColor.card)
         .clipShape(RoundedRectangle(cornerRadius: RexRadius.card, style: .continuous))

@@ -1198,16 +1198,25 @@ struct EditableIfMine: ViewModifier {
             content
                 .overlay(alignment: .topTrailing) {
                     Button { editing = rec } label: {
+                        // Sept 7 — "the edit button is too small, I can't get
+                        // it to work 8/10 times". The visible circle is only
+                        // ~26pt and sat inside a 10pt margin, well under the
+                        // 44pt Apple asks for — and it's surrounded by the
+                        // card's own tap target, so every miss opened the Rex
+                        // instead. The circle looks the same; the tappable
+                        // area around it is now a full 44pt square.
                         Image(systemName: "pencil")
-                            .font(.system(size: 12, weight: .semibold))
+                            .font(.system(size: 13, weight: .semibold))
                             .foregroundStyle(RexColor.mutedForeground)
-                            .padding(7)
+                            .padding(8)
                             .background(RexColor.card)
                             .clipShape(Circle())
                             .overlay(Circle().stroke(RexColor.border, lineWidth: 1))
+                            .frame(width: 44, height: 44)
+                            .contentShape(Rectangle())
                     }
                     .buttonStyle(.plain)
-                    .padding(10)
+                    .padding(2)
                 }
         } else {
             content

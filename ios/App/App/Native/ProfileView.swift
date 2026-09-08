@@ -55,7 +55,10 @@ struct ProfileView: View {
 
     private var availableCategories: [RexCategory] {
         let present = Set(recommendations.compactMap { RexCategory(rawValue: $0.items?.type ?? "") })
-        return [.place, .trip, .book, .movie, .tv, .podcast, .recipe, .event, .other].filter { present.contains($0) }
+        // Sept 7 — "need lists as a filter on profile". List was the one
+        // category missing from this row, so a profile full of lists had no
+        // way to show just them.
+        return [.place, .trip, .list, .book, .movie, .tv, .podcast, .recipe, .event, .other].filter { present.contains($0) }
     }
 
     private var filteredRecommendations: [FeedRecommendation] {
@@ -474,16 +477,20 @@ struct ProfileView: View {
                         Button {
                             editing = rec
                         } label: {
+                            // Sept 7 — same 44pt hit area as the feed's copy
+                            // of this button; see EditableIfMine in FeedView.
                             Image(systemName: "pencil")
-                                .font(.system(size: 12, weight: .semibold))
+                                .font(.system(size: 13, weight: .semibold))
                                 .foregroundStyle(RexColor.mutedForeground)
-                                .padding(7)
+                                .padding(8)
                                 .background(RexColor.card)
                                 .clipShape(Circle())
                                 .overlay(Circle().stroke(RexColor.border, lineWidth: 1))
+                                .frame(width: 44, height: 44)
+                                .contentShape(Rectangle())
                         }
                         .buttonStyle(.plain)
-                        .padding(10)
+                        .padding(2)
                     }
                 }
             }

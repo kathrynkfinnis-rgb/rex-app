@@ -1033,11 +1033,14 @@ struct AddRexView: View {
                 itemId: tripItemId,
                 genre: subcategories.isEmpty ? nil : subcategories.sorted().joined(separator: ", ")
             )
+            // Cover photo lives on the item (the thumbnail), not on the
+            // recommendation — same rule as posting, see post().
+            try await RexAPI.shared.updateItemImageURL(itemId: tripItemId, imageURL: photoURLs.first)
             try await RexAPI.shared.updateRecommendation(
                 id: tripRecId,
                 rating: rating,
                 note: note.isEmpty ? nil : note,
-                photoURLs: photoURLs,
+                photoURLs: [],
                 tags: []
             )
 
@@ -1153,7 +1156,14 @@ struct AddRexView: View {
                     itemId: itemId,
                     rating: rating,
                     note: note.isEmpty ? nil : note,
-                    photoURLs: photoURLs,
+                    // Sept 7 — "uploaded a thumbnail for a trip but it became
+                    // the card pic". The cover photo was being written to both
+                    // the item (which draws the small thumbnail) and the
+                    // recommendation's photos (which draws the full-width
+                    // carousel), and the carousel won. A trip's card is meant
+                    // to lead with its map, so the cover photo stays on the
+                    // item only — see the imageURL argument to createItem.
+                    photoURLs: [],
                     returningId: true,
                     asDraft: asDraft
                 )
@@ -1278,7 +1288,9 @@ struct AddRexView: View {
                     itemId: itemId,
                     rating: rating,
                     note: note.isEmpty ? nil : note,
-                    photoURLs: photoURLs,
+                    // A trip's cover photo is a thumbnail, not a card photo —
+                    // see the trip branch above.
+                    photoURLs: category == .trip ? [] : photoURLs,
                     anonymous: anonymous,
                     returningId: !taggedFriendIds.isEmpty,
                     asDraft: category == .trip && asDraft
