@@ -14,6 +14,11 @@ struct ImportReviewView: View {
     var onExtractedAsTrip: ((String, [ItineraryEntry]) -> Void)? = nil
     /// Same hand-off for a List — see the .list case in save().
     var onExtractedAsList: ((String, String, [ItineraryEntry]) -> Void)? = nil
+    /// Sept 8 — "make sure we can upload a doc straight to a collection".
+    /// Set when this importer was opened from inside a collection rather
+    /// than from Add a Rex: there's no destination left to choose, so the
+    /// picker goes away and everything reviewed lands in that collection.
+    var intoCollection: (id: String, name: String)? = nil
 
     @State private var rows: [ImportStagingRow] = []
     @State private var isLoading = true
@@ -57,7 +62,13 @@ struct ImportReviewView: View {
                         rowCard(row)
                     }
 
-                    destinationPicker
+                    if let intoCollection {
+                        Text("Everything you keep goes into \u{201C}\(intoCollection.name)\u{201D}.")
+                            .font(RexFont.text(13))
+                            .foregroundStyle(RexColor.mutedForeground)
+                    } else {
+                        destinationPicker
+                    }
 
                     if let errorMessage {
                         Text(errorMessage).font(RexFont.text(13)).foregroundStyle(RexColor.destructive)
@@ -72,11 +83,14 @@ struct ImportReviewView: View {
                         if isSaving {
                             ProgressView().tint(RexColor.primaryForeground).frame(maxWidth: .infinity)
                         } else {
-                            Text("Save \(rows.count) as \(destination.rawValue)").frame(maxWidth: .infinity)
+                            Text(intoCollection.map { "Add \(rows.count) to \u{201C}\($0.name)\u{201D}" }
+                                 ?? "Save \(rows.count) as \(destination.rawValue)")
+                                .frame(maxWidth: .infinity)
                         }
                     }
                     .buttonStyle(RexPrimaryButtonStyle())
-                    .disabled(isSaving || rows.isEmpty || destinationName.trimmingCharacters(in: .whitespaces).isEmpty)
+                    .disabled(isSaving || rows.isEmpty
+                              || (intoCollection == nil && destinationName.trimmingCharacters(in: .whitespaces).isEmpty))
                     .padding(.bottom, RexSpacing.xxl)
                 }
             }
@@ -359,6 +373,18 @@ struct ImportReviewView: View {
         errorMessage = nil
         resultMessage = nil
         do {
+            if let intoCollection {
+                let result = try await RexAPI.shared.approveStagingIntoCollection(
+                    rows: rows, listId: intoCollection.id
+                )
+                resultMessage = result.failed.isEmpty
+                    ? "Added \(result.added) to \u{201C}\(intoCollection.name)\u{201D}."
+                    : "Added \(result.added) of \(rows.count) \u{2014} \(result.failed.count) couldn't be added."
+                try? await Task.sleep(for: .seconds(1.4))
+                onDone()
+                isSaving = false
+                return
+            }
             switch destination {
             case .trip:
                 // Sept 5 — a trip no longer posts straight from here. It

@@ -58,6 +58,19 @@ struct TripDetailView: View {
     /// reorder/remove, added by #122.
     @State private var editingStop: FeedRecommendation?
 
+    /// Sept 8 — "please can we give an option to show both the current
+    /// expanding view but also a view similar to the edit view which is
+    /// more compressed". A twelve-stop trip is twelve full feed cards, and
+    /// scrolling that far to remember whether you'd added the second
+    /// restaurant is the wrong shape of work — you want the itinerary at a
+    /// glance. Same stops either way; the compact rows just drop the note,
+    /// the photos and the author line.
+    ///
+    /// AppStorage, not State: whichever way you read trips is a habit, not
+    /// a per-trip decision, and re-picking it on every trip is the annoying
+    /// half of offering the choice at all.
+    @AppStorage("tripDetailCompact") private var compact = false
+
     init(route: TripRoute) {
         self.route = route
         _displayTitle = State(initialValue: route.title)
@@ -169,7 +182,11 @@ struct TripDetailView: View {
                                         .padding(.horizontal, RexSpacing.sm)
                                     }
                                     NavigationLink(value: stop.item_id) {
-                                        RecommendationCardView(rec: stop)
+                                        if compact {
+                                            compactStopRow(stop, number: index + 1)
+                                        } else {
+                                            RecommendationCardView(rec: stop)
+                                        }
                                     }
                                     .buttonStyle(.plain)
                                 }
@@ -187,6 +204,16 @@ struct TripDetailView: View {
         .navigationTitle("Trip")
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
+            ToolbarItem(placement: .topBarTrailing) {
+                Button {
+                    withAnimation(.snappy) { compact.toggle() }
+                } label: {
+                    // The icon shows what you'd get, not what you have —
+                    // the usual reading of a toolbar toggle.
+                    Image(systemName: compact ? "rectangle.grid.1x2" : "list.bullet")
+                }
+                .accessibilityLabel(compact ? "Show full cards" : "Show compact list")
+            }
             if isOwner {
                 ToolbarItem(placement: .topBarTrailing) {
                     // Sept 5 — "when it comes to editing a trip after
@@ -230,6 +257,77 @@ struct TripDetailView: View {
                 onSaved: { Task { await load() } },
                 onDeleted: { Task { await load() } }
             )
+        }
+    }
+
+    /// One line per stop: position, thumbnail, name, and where it is.
+    /// Deliberately close to the edit view's rows, which is the layout
+    /// Kathryn pointed at — the difference is that these are still links
+    /// through to the stop rather than handles for reordering it.
+    private func compactStopRow(_ stop: FeedRecommendation, number: Int) -> some View {
+        let category = RexCategory(rawType: stop.items?.type)
+        return HStack(spacing: RexSpacing.sm) {
+            Text("\(number)")
+                .font(RexFont.text(12, weight: .semibold))
+                .foregroundStyle(RexColor.mutedForeground)
+                .frame(width: 18, alignment: .trailing)
+
+            // A stop with no picture still gets a swatch rather than a
+            // hole, so the rows stay on one grid.
+            Group {
+                if let url = stop.items?.image_url, let parsed = URL(string: url) {
+                    AsyncImage(url: parsed) { phase in
+                        if let image = phase.image {
+                            Color.clear.overlay { image.resizable().scaledToFill() }
+                        } else {
+                            category.tintColor.opacity(0.18)
+                        }
+                    }
+                } else {
+                    category.tintColor.opacity(0.18)
+                }
+            }
+            .frame(width: 34, height: 34)
+            .clipShape(RoundedRectangle(cornerRadius: 7, style: .continuous))
+
+            VStack(alignment: .leading, spacing: 1) {
+                Text(stop.items?.title ?? "Untitled")
+                    .font(RexFont.text(14.5, weight: .medium))
+                    .foregroundStyle(RexColor.foreground)
+                    .lineLimit(1)
+                if let where_ = shortLocality(stop.items?.address) ?? stop.items?.subtitle, !where_.isEmpty {
+                    Text(where_)
+                        .font(RexFont.text(11.5))
+                        .foregroundStyle(RexColor.mutedForeground)
+                        .lineLimit(1)
+                }
+            }
+
+            Spacer(minLength: RexSpacing.xs)
+
+            if stop.rating > 0 {
+                RexRatingBadge(raw: stop.rating, compact: true)
+            }
+            Image(systemName: "chevron.right")
+                .font(.system(size: 11, weight: .semibold))
+                .foregroundStyle(RexColor.mutedForeground.opacity(0.7))
+        }
+        .padding(.horizontal, RexSpacing.md)
+        .padding(.vertical, RexSpacing.sm)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(RexColor.card)
+        .clipShape(RoundedRectangle(cornerRadius: RexRadius.card, style: .continuous))
+        .overlay(
+            RoundedRectangle(cornerRadius: RexRadius.card, style: .continuous)
+                .stroke(RexColor.border, lineWidth: 1)
+        )
+        .overlay(alignment: .leading) {
+            // The same category cap the feed cards carry, turned on its
+            // side — at this size a 3px edge is all there's room for.
+            RoundedRectangle(cornerRadius: 2)
+                .fill(category.tintColor)
+                .frame(width: 3)
+                .padding(.vertical, 8)
         }
     }
 

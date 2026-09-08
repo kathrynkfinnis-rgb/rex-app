@@ -23,7 +23,21 @@ struct CollectionDetailView: View {
     @State private var isLoading = true
     @State private var errorMessage: String?
     @State private var renaming = false
-    @State private var editing: FeedRecommendation?
+    /// One sheet modifier, not two — stacking `.sheet(item:)` and
+    /// `.sheet(isPresented:)` on the same view silently drops all but one
+    /// of them, which is what made the list page's own import button do
+    /// nothing on 5 Sept.
+    private enum ActiveSheet: Identifiable {
+        case edit(FeedRecommendation)
+        case documentImport
+        var id: String {
+            switch self {
+            case .edit(let rec): return "edit-\(rec.id)"
+            case .documentImport: return "documentImport"
+            }
+        }
+    }
+    @State private var activeSheet: ActiveSheet?
     @State private var draftName = ""
     @State private var draftEmoji = ""
     @State private var confirmingDelete = false
@@ -102,7 +116,7 @@ struct CollectionDetailView: View {
                                         // collection can hold other people's.
                                         if rec.user_id == RexAPI.shared.currentUserId {
                                             Button {
-                                                editing = rec
+                                                activeSheet = .edit(rec)
                                             } label: {
                                                 Label("Edit", systemImage: "pencil")
                                             }
@@ -121,7 +135,7 @@ struct CollectionDetailView: View {
                                     .overlay(alignment: .topTrailing) {
                                         if rec.user_id == RexAPI.shared.currentUserId {
                                             Button {
-                                                editing = rec
+                                                activeSheet = .edit(rec)
                                             } label: {
                                                 Image(systemName: "pencil")
                                                     .font(.system(size: 13, weight: .semibold))
@@ -149,12 +163,26 @@ struct CollectionDetailView: View {
         .navigationTitle(name)
         .navigationBarTitleDisplayMode(.inline)
         .navigationDestination(item: $pushedItemId) { ItemDetailView(itemId: $0) }
-        .sheet(item: $editing) { rec in
-            EditRexView(
-                rec: rec,
-                onSaved: { Task { await load() } },
-                onDeleted: { Task { await load() } }
-            )
+        .sheet(item: $activeSheet) { sheet in
+            switch sheet {
+            case .edit(let rec):
+                EditRexView(
+                    rec: rec,
+                    onSaved: { Task { await load() } },
+                    onDeleted: { Task { await load() } }
+                )
+            case .documentImport:
+                // Sept 8 — "make sure we can upload a doc straight to a
+                // collection, [with] the same import style that we have
+                // just built for trips and lists". Same two screens a trip
+                // or a list import goes through — paste, then review each
+                // row and fix whatever the extraction got wrong — with the
+                // destination already decided, since you're standing in it.
+                ListsImportView(
+                    onDone: { Task { await load() } },
+                    intoCollection: (id: route.id, name: name)
+                )
+            }
         }
         .toolbar {
             // Shown for any collection, not just your own — there's no
@@ -165,6 +193,10 @@ struct CollectionDetailView: View {
                 Menu {
                     if route.isMine {
                         Button { startRename() } label: { Label("Rename", systemImage: "pencil") }
+
+                        Button { activeSheet = .documentImport } label: {
+                            Label("Import from doc", systemImage: "doc.text")
+                        }
 
                         Menu("Who can see it") {
                             visibilityButton("draft", "Only me", "lock")

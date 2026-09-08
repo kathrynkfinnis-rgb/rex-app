@@ -4304,6 +4304,38 @@ final class RexAPI {
         return (listRecId, added, failed)
     }
 
+    /// Sept 8 — "make sure we can upload a doc straight to a collection".
+    /// approveStagingAsCollections always *creates* collections; this adds
+    /// to one that already exists, which is what you want standing inside
+    /// it looking at the twelve places you've already saved by hand.
+    ///
+    /// Rows go in back-to-front on purpose. A collection has no order
+    /// column — fetchCollectionItems reads `created_at.desc`, newest
+    /// first — so inserting in document order would show the document
+    /// upside down, which is exactly the complaint trip imports got on
+    /// 5 Sept. Reversing here is the whole fix; unlike the batch insert
+    /// that caused that bug, these are separate requests milliseconds
+    /// apart, so their timestamps genuinely differ.
+    func approveStagingIntoCollection(
+        rows: [ImportStagingRow], listId: String
+    ) async throws -> (added: Int, failed: [ImportFailure]) {
+        guard !rows.isEmpty else { throw RexAPIError.server("Nothing to import.") }
+        var added = 0
+        var failed: [ImportFailure] = []
+        for row in rows.reversed() {
+            do {
+                try await approveOneStagingRow(
+                    row, rating: nil, note: nil, tripId: nil, tripSection: nil, listId: listId,
+                    locationHint: row.raw_section
+                )
+                added += 1
+            } catch {
+                failed.append(ImportFailure(title: row.raw_title, reason: error.localizedDescription))
+            }
+        }
+        return (added, failed)
+    }
+
     /// Turns a batch of staged rows into one or more Collections. With
     /// splitBySection on, a document organised under headings ("Pubs",
     /// "Galleries") becomes one collection per heading instead of a single
