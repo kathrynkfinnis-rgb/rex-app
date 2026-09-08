@@ -34,6 +34,8 @@ struct TripDetailView: View {
     @State private var isEditing = false
     @State private var isMutating = false
     @State private var mutationError: String?
+    @State private var isRegeocoding = false
+    @State private var regeocodeResult: String?
     @State private var renamingHeading: String?
     @State private var renameDraft = ""
     @State private var showingAddStop = false
@@ -114,6 +116,19 @@ struct TripDetailView: View {
                         addStopButton(heading: "")
                     }
                 } else {
+                    if isRegeocoding {
+                        HStack(spacing: 6) {
+                            ProgressView().controlSize(.small)
+                            Text("Looking up each stop\u{2026}")
+                                .font(RexFont.text(12))
+                                .foregroundStyle(RexColor.mutedForeground)
+                        }
+                    }
+                    if let regeocodeResult {
+                        Text(regeocodeResult)
+                            .font(RexFont.text(12, weight: .medium))
+                            .foregroundStyle(RexColor.primary)
+                    }
                     if let mutationError {
                         Text(mutationError)
                             .font(RexFont.text(12))
@@ -216,12 +231,30 @@ struct TripDetailView: View {
             }
             if isOwner {
                 ToolbarItem(placement: .topBarTrailing) {
-                    // Sept 5 — "when it comes to editing a trip after
-                    // submission, it should take you to the same page as
-                    // the input page", rather than this screen's own
-                    // in-place edit mode.
-                    Button("Edit") { showingTripEditor = true }
+                    Menu {
+                        // Sept 5 — "when it comes to editing a trip after
+                        // submission, it should take you to the same page
+                        // as the input page", rather than this screen's own
+                        // in-place edit mode.
+                        Button { showingTripEditor = true } label: {
+                            Label("Edit trip", systemImage: "pencil")
+                        }
                         .disabled(tripRec == nil)
+
+                        // Sept 8 — for the stops sitting in the wrong
+                        // city. A bare name geocodes to a same-named place
+                        // anywhere in the world, and nothing about a
+                        // plausible wrong coordinate looks wrong to the
+                        // app, so this can only be something you ask for.
+                        Button {
+                            Task { await regeocode() }
+                        } label: {
+                            Label("Fix stop locations", systemImage: "mappin.and.ellipse")
+                        }
+                        .disabled(isRegeocoding)
+                    } label: {
+                        Image(systemName: "ellipsis.circle")
+                    }
                 }
             }
         }
@@ -554,6 +587,24 @@ struct TripDetailView: View {
             mutationError = error.localizedDescription
         }
         isMutating = false
+    }
+
+    private func regeocode() async {
+        isRegeocoding = true
+        regeocodeResult = nil
+        mutationError = nil
+        do {
+            let result = try await RexAPI.shared.regeocodeTripStops(
+                tripRecommendationId: route.recommendationId, tripName: displayTitle
+            )
+            regeocodeResult = result.fixed == result.total
+                ? "Placed all \(result.total) stops."
+                : "Placed \(result.fixed) of \(result.total) \u{2014} the rest couldn't be found by name."
+            await load()
+        } catch {
+            mutationError = error.localizedDescription
+        }
+        isRegeocoding = false
     }
 
     private func removeStop(_ stop: FeedRecommendation) async {

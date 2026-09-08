@@ -1361,6 +1361,48 @@ final class RexAPI {
         return try JSONDecoder().decode([FeedRecommendation].self, from: data)
     }
 
+    /// Sept 8 — backs the "Add a Rex" picker inside a collection. Until
+    /// now the only route into a collection was long-pressing a card in
+    /// the feed, which means the thing you want has to happen to be
+    /// scrolled past; filling a collection deliberately meant hunting for
+    /// each Rex in turn.
+    ///
+    /// Same shape and same trip_id filter as fetchRecommendations(
+    /// forUser:) — a bare trip-stop row isn't something you'd add to a
+    /// collection on its own. An empty query returns your most recent,
+    /// which is what you want the moment the sheet opens.
+    func searchMyRecommendations(query: String, limit: Int = 40) async throws -> [FeedRecommendation] {
+        guard let userId = currentUserId else { throw RexAPIError.notSignedIn }
+        let token = try await validToken()
+        let (resourcePath, profilesSelect) = await recommendationsReadPath()
+        let select = "id,rating,note,created_at,photo_url,photo_urls,tags\(await anonymousField()),user_id,item_id," +
+            "items!inner(id,type,title,subtitle,image_url,genre,address,link_url,recipe_text,lat,lng)," +
+            "\(profilesSelect)," +
+            "recommendation_tags(profiles(id,username,display_name,avatar_url))"
+        var components = URLComponents(url: baseURL.appendingPathComponent(resourcePath), resolvingAgainstBaseURL: false)!
+        var queryItems = [
+            URLQueryItem(name: "select", value: select),
+            URLQueryItem(name: "user_id", value: "eq.\(userId)"),
+            URLQueryItem(name: "trip_id", value: "is.null"),
+            URLQueryItem(name: "order", value: "created_at.desc"),
+            URLQueryItem(name: "limit", value: "\(limit)"),
+        ]
+        let trimmed = query.trimmingCharacters(in: .whitespaces)
+        if !trimmed.isEmpty {
+            queryItems.append(URLQueryItem(name: "items.title", value: "ilike.*\(trimmed)*"))
+        }
+        components.queryItems = queryItems
+        var request = URLRequest(url: components.url!)
+        request.setValue(anonKey, forHTTPHeaderField: "apikey")
+        request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+
+        let (data, response) = try await URLSession.shared.data(for: request)
+        guard let http = response as? HTTPURLResponse, http.statusCode < 400 else {
+            throw RexAPIError.server(friendlyError(data, fallback: "Couldn't load your Rex."))
+        }
+        return try JSONDecoder().decode([FeedRecommendation].self, from: data)
+    }
+
     // MARK: - Friends
     // friendships.requester_id/addressee_id reference auth.users(id) directly, not profiles,
     // so (same as the web app) there's no PostgREST embed available — fetch friendships and
@@ -1830,11 +1872,26 @@ final class RexAPI {
     /// Geocodes `address` and writes the result back onto the item if it
     /// resolves. Returns the coordinates so the caller can show the pin
     /// immediately rather than waiting for the next map load.
-    func repairPlaceCoordsIfNeeded(itemId: String, address: String) async -> (lat: Double, lng: Double)? {
+    ///
+    /// Sept 8 — `fallbackQuery` covers the case this repair could never
+    /// reach before: a stop imported from a document has no address, only
+    /// the coordinates the importer geocoded at the time, so a stop
+    /// imported before that geocoding existed has neither. There is
+    /// nothing to key off, and it has been invisible on every map since.
+    /// The fallback is the same query the importer itself builds — the
+    /// stop's own name plus whatever context is going ("The Ivy" alone
+    /// geocodes to a same-named place anywhere in the world) — and the
+    /// resolved address gets written back alongside the point, so the row
+    /// stops being a special case from then on.
+    func repairPlaceCoordsIfNeeded(
+        itemId: String, address: String, fallbackQuery: String? = nil
+    ) async -> (lat: Double, lng: Double)? {
+        let query = address.isEmpty ? (fallbackQuery ?? "") : address
+        guard !query.trimmingCharacters(in: .whitespaces).isEmpty else { return nil }
         guard !Self.geocodeRepairedItemIds.contains(itemId) else { return nil }
         Self.geocodeRepairedItemIds.insert(itemId)
 
-        guard let located = await RexSearch.geocode(address) else { return nil }
+        guard let located = await RexSearch.geocodeDetailed(query) else { return nil }
         guard let token = try? await validToken() else { return nil }
         var components = URLComponents(url: baseURL.appendingPathComponent("/rest/v1/items"), resolvingAgainstBaseURL: false)!
         components.queryItems = [URLQueryItem(name: "id", value: "eq.\(itemId)")]
@@ -1843,9 +1900,14 @@ final class RexAPI {
         request.setValue(anonKey, forHTTPHeaderField: "apikey")
         request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
-        request.httpBody = try? JSONSerialization.data(withJSONObject: ["lat": located.lat, "lng": located.lng])
+        var body: [String: Any] = ["lat": located.lat, "lng": located.lng]
+        // Only when we had none — never overwrite an address someone typed.
+        if address.isEmpty, let resolved = located.address, !resolved.isEmpty {
+            body["address"] = resolved
+        }
+        request.httpBody = try? JSONSerialization.data(withJSONObject: body)
         _ = try? await URLSession.shared.data(for: request)
-        return located
+        return (located.lat, located.lng)
     }
 
     func repairPlacePhotoIfNeeded(itemId: String, imageURL: String?) async {
@@ -3735,13 +3797,63 @@ final class RexAPI {
         }
     }
 
+    /// Sept 8 — re-geocodes every stop in a trip, using the trip's name as
+    /// context. Deliberate and owner-triggered, unlike the passive
+    /// self-heal in fetchMapPlaces(forTrip:), because it exists for the
+    /// stops that self-heal can never fix: ones that *did* geocode, but to
+    /// the wrong "The Ivy" in the wrong city. Nothing about a plausible
+    /// wrong coordinate looks wrong to a computer, so this can only ever
+    /// be a thing you ask for.
+    ///
+    /// Bypasses geocodeRepairedItemIds outright — that guard exists to
+    /// stop passive repair hammering the geocoder on every map load, and
+    /// asking for a re-run is exactly the case it shouldn't apply to.
+    /// Skips a stop whose address someone typed by hand: that's a
+    /// deliberate correction and worth more than a fresh guess.
+    func regeocodeTripStops(
+        tripRecommendationId: String, tripName: String
+    ) async throws -> (fixed: Int, total: Int) {
+        let stops = try await fetchTripStops(tripRecommendationId: tripRecommendationId)
+        let token = try await validToken()
+        var fixed = 0
+        var total = 0
+        for stop in stops {
+            guard let item = stop.items,
+                  item.type == "place" || item.type == "event" else { continue }
+            total += 1
+            let query = [item.title, item.subtitle, tripName]
+                .compactMap { $0 }.filter { !$0.isEmpty }.joined(separator: ", ")
+            guard let located = await RexSearch.geocodeDetailed(query) else { continue }
+
+            var components = URLComponents(url: baseURL.appendingPathComponent("/rest/v1/items"), resolvingAgainstBaseURL: false)!
+            components.queryItems = [URLQueryItem(name: "id", value: "eq.\(item.id)")]
+            var request = URLRequest(url: components.url!)
+            request.httpMethod = "PATCH"
+            request.setValue(anonKey, forHTTPHeaderField: "apikey")
+            request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+            request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+            var body: [String: Any] = ["lat": located.lat, "lng": located.lng]
+            if (item.address ?? "").isEmpty, let resolved = located.address, !resolved.isEmpty {
+                body["address"] = resolved
+            }
+            request.httpBody = try? JSONSerialization.data(withJSONObject: body)
+            guard let (_, response) = try? await URLSession.shared.data(for: request),
+                  let http = response as? HTTPURLResponse, http.statusCode < 400 else { continue }
+            // So the map picks the new point up this session rather than
+            // treating the stop as already repaired and skipping it.
+            Self.geocodeRepairedItemIds.remove(item.id)
+            fixed += 1
+        }
+        return (fixed, total)
+    }
+
     /// A specific trip's own stops, regardless of whether they're in
     /// fetchMapPlaces' most-recent-200 sample. "Following" a trip used to
     /// only work if its stops happened to already be loaded, which was fine
     /// when the only way to pick a trip was tapping a chip built from that
     /// same sample — TripSearchView breaks that assumption by letting you
     /// pick any trip, so following it needs its own fetch.
-    func fetchMapPlaces(forTrip tripRecommendationId: String) async throws -> [MapPlace] {
+    func fetchMapPlaces(forTrip tripRecommendationId: String, tripName: String? = nil) async throws -> [MapPlace] {
         let token = try await validToken()
         let select = "id,title,subtitle,type,genre,address,lat,lng,image_url," +
             "recommendations!inner(id,rating,user_id,trip_id,profiles!recommendations_user_id_fkey(username,display_name,avatar_url))"
@@ -3768,10 +3880,17 @@ final class RexAPI {
         let repaired = await withTaskGroup(of: MapPlace.self) { group in
             for place in places {
                 group.addTask {
-                    guard place.lat == nil || place.lng == nil,
-                          let address = place.address, !address.isEmpty,
-                          let located = await self.repairPlaceCoordsIfNeeded(itemId: place.id, address: address)
-                    else { return place }
+                    guard place.lat == nil || place.lng == nil else { return place }
+                    // Sept 8 — no longer gated on having an address. A stop
+                    // imported before the importer geocoded anything has
+                    // neither address nor coordinates, and was skipped here
+                    // every time; the trip's own name is the context that
+                    // makes its bare title resolvable.
+                    let fallback = [place.title, place.subtitle, tripName]
+                        .compactMap { $0 }.filter { !$0.isEmpty }.joined(separator: ", ")
+                    guard let located = await self.repairPlaceCoordsIfNeeded(
+                        itemId: place.id, address: place.address ?? "", fallbackQuery: fallback
+                    ) else { return place }
                     return MapPlace(
                         id: place.id, title: place.title, subtitle: place.subtitle, type: place.type,
                         genre: place.genre, address: place.address, lat: located.lat, lng: located.lng,

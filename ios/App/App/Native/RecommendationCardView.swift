@@ -303,7 +303,7 @@ struct RecommendationCardView: View {
                         // goes instead. rec.id is the trip's own recommendation
                         // row, which is exactly what every stop's trip_id points
                         // back to.
-                        TripMapTileView(tripRecommendationId: rec.id)
+                        TripMapTileView(tripRecommendationId: rec.id, tripName: item.title)
                             .padding(.bottom, RexSpacing.sm)
                             .swipeToRemoveExclusionZone()
                     } else if category == .place || category == .event,

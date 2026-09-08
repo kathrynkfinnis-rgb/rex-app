@@ -376,6 +376,31 @@ enum RexSearch {
     /// so a genuine non-European address still resolves correctly, this
     /// just stops Europe losing ties it should win. Same rough Europe +
     /// UK/Ireland + Scandinavia rectangle as places().
+    /// Sept 8 — the address as Google resolved it, alongside the point.
+    /// A trip stop imported from a document has no address at all (the
+    /// importer only ever wrote coordinates), which is why the existing
+    /// geocode self-heal could never repair one: it keys off the address
+    /// field, and there was nothing there to key off. Writing the resolved
+    /// address back fixes that for good, and gives the card a location
+    /// line it never had.
+    static func geocodeDetailed(_ query: String) async -> (lat: Double, lng: Double, address: String?)? {
+        let q = query.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !q.isEmpty, !googleKey.isEmpty else { return nil }
+        guard let url = URL(string: "https://maps.googleapis.com/maps/api/geocode/json?address=\(esc(q))&bounds=34.0,-12.0|71.0,40.0&key=\(googleKey)") else { return nil }
+        var request = URLRequest(url: url)
+        request.setValue(bundleId, forHTTPHeaderField: "X-Ios-Bundle-Identifier")
+        guard let (data, response) = try? await URLSession.shared.data(for: request),
+              let http = response as? HTTPURLResponse, http.statusCode < 400,
+              let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+              json["status"] as? String == "OK",
+              let results = json["results"] as? [[String: Any]], let first = results.first,
+              let geometry = first["geometry"] as? [String: Any],
+              let location = geometry["location"] as? [String: Any],
+              let lat = location["lat"] as? Double, let lng = location["lng"] as? Double
+        else { return nil }
+        return (lat, lng, first["formatted_address"] as? String)
+    }
+
     static func geocode(_ query: String) async -> (lat: Double, lng: Double)? {
         let q = query.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !q.isEmpty, !googleKey.isEmpty else { return nil }

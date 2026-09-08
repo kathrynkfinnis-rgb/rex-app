@@ -63,6 +63,7 @@
 		FEED067B0000000000000000 /* TripStopSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = FEED067A0000000000000000 /* TripStopSheet.swift */; };
 		FEED068B0000000000000000 /* ListItemSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = FEED068A0000000000000000 /* ListItemSheet.swift */; };
 		FEED069B0000000000000000 /* TripDraftStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = FEED069A0000000000000000 /* TripDraftStore.swift */; };
+		FEED070B0000000000000000 /* CollectionAddRexSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = FEED070A0000000000000000 /* CollectionAddRexSheet.swift */; };
 		FEED064B0000000000000000 /* RexersSheetView.swift in Sources */ = {isa = PBXBuildFile; fileRef = FEED064A0000000000000000 /* RexersSheetView.swift */; };
 		FEED065B0000000000000000 /* PhotoFullScreenView.swift in Sources */ = {isa = PBXBuildFile; fileRef = FEED065A0000000000000000 /* PhotoFullScreenView.swift */; };
 		FEED031B0000000000000000 /* AskForRexView.swift in Sources */ = {isa = PBXBuildFile; fileRef = FEED031A0000000000000000 /* AskForRexView.swift */; };
@@ -145,6 +146,7 @@
 		FEED067A0000000000000000 /* TripStopSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TripStopSheet.swift; sourceTree = "<group>"; };
 		FEED068A0000000000000000 /* ListItemSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ListItemSheet.swift; sourceTree = "<group>"; };
 		FEED069A0000000000000000 /* TripDraftStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TripDraftStore.swift; sourceTree = "<group>"; };
+		FEED070A0000000000000000 /* CollectionAddRexSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CollectionAddRexSheet.swift; sourceTree = "<group>"; };
 		FEED064A0000000000000000 /* RexersSheetView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RexersSheetView.swift; sourceTree = "<group>"; };
 		FEED065A0000000000000000 /* PhotoFullScreenView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PhotoFullScreenView.swift; sourceTree = "<group>"; };
 		FEED029A0000000000000000 /* RecipeEditorView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RecipeEditorView.swift; sourceTree = "<group>"; };
@@ -265,6 +267,7 @@
 				FEED067A0000000000000000 /* TripStopSheet.swift */,
 				FEED068A0000000000000000 /* ListItemSheet.swift */,
 				FEED069A0000000000000000 /* TripDraftStore.swift */,
+				FEED070A0000000000000000 /* CollectionAddRexSheet.swift */,
 				FEED064A0000000000000000 /* RexersSheetView.swift */,
 				FEED065A0000000000000000 /* PhotoFullScreenView.swift */,
 				FEED025A0000000000000000 /* PhotoCarouselView.swift */,
@@ -418,6 +421,7 @@
 				FEED067B0000000000000000 /* TripStopSheet.swift in Sources */,
 				FEED068B0000000000000000 /* ListItemSheet.swift in Sources */,
 				FEED069B0000000000000000 /* TripDraftStore.swift in Sources */,
+				FEED070B0000000000000000 /* CollectionAddRexSheet.swift in Sources */,
 				FEED064B0000000000000000 /* RexersSheetView.swift in Sources */,
 				FEED065B0000000000000000 /* PhotoFullScreenView.swift in Sources */,
 				FEED063B0000000000000000 /* BuildTripFromRexView.swift in Sources */,

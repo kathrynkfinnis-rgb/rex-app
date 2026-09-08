@@ -8,6 +8,11 @@ import SwiftUI
 /// gives the same "here's where this trip goes" glance without the cost.
 struct TripMapTileView: View {
     let tripRecommendationId: String
+    /// Context for the geocode self-heal — a stop imported before the
+    /// importer geocoded anything has no address and no coordinates, and
+    /// its bare title ("Le Comptoir") needs the trip's name to resolve to
+    /// the right city. See repairPlaceCoordsIfNeeded's fallbackQuery.
+    var tripName: String? = nil
     var height: CGFloat = 200
 
     @State private var stops: [MapPlace] = []
@@ -107,7 +112,7 @@ struct TripMapTileView: View {
     }
 
     private func load() async {
-        async let placesTask = RexAPI.shared.fetchMapPlaces(forTrip: tripRecommendationId)
+        async let placesTask = RexAPI.shared.fetchMapPlaces(forTrip: tripRecommendationId, tripName: tripName)
         async let orderTask = RexAPI.shared.fetchTripStops(tripRecommendationId: tripRecommendationId)
         stops = (try? await placesTask) ?? []
         orderedItemIds = ((try? await orderTask) ?? []).map { $0.item_id }

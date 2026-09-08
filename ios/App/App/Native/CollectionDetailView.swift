@@ -30,10 +30,12 @@ struct CollectionDetailView: View {
     private enum ActiveSheet: Identifiable {
         case edit(FeedRecommendation)
         case documentImport
+        case addRex
         var id: String {
             switch self {
             case .edit(let rec): return "edit-\(rec.id)"
             case .documentImport: return "documentImport"
+            case .addRex: return "addRex"
             }
         }
     }
@@ -109,10 +111,19 @@ struct CollectionDetailView: View {
                         Text("Nothing in here yet")
                             .font(RexFont.display(20, weight: .semibold))
                             .foregroundStyle(RexColor.foreground)
-                        Text("Long-press any Rex in your feed and choose \u{201C}Add to collection\u{201D}.")
+                        Text(route.isMine
+                             ? "Add one of your own, import a document, or long-press any Rex in your feed."
+                             : "Nothing's been added to this one yet.")
                             .font(RexFont.text(14))
                             .foregroundStyle(RexColor.mutedForeground)
                             .multilineTextAlignment(.center)
+                        if route.isMine {
+                            Button { activeSheet = .addRex } label: {
+                                Text("Add a Rex").frame(maxWidth: .infinity)
+                            }
+                            .buttonStyle(RexPrimaryButtonStyle())
+                            .padding(.top, RexSpacing.sm)
+                        }
                     }
                     .padding(RexSpacing.xxl)
                     .frame(maxWidth: .infinity)
@@ -266,6 +277,14 @@ struct CollectionDetailView: View {
                     onDone: { Task { await load() } },
                     intoCollection: (id: route.id, name: name)
                 )
+            case .addRex:
+                CollectionAddRexSheet(
+                    listId: route.id,
+                    collectionName: name,
+                    existingIds: Set(rows.map { $0.recommendation_id }),
+                    startingSortOrder: (rows.compactMap { $0.sort_order }.max() ?? -1) + 1,
+                    onAdded: { Task { await load() } }
+                )
             }
         }
         .toolbar {
@@ -277,6 +296,10 @@ struct CollectionDetailView: View {
                 Menu {
                     if route.isMine {
                         Button { startRename() } label: { Label("Rename", systemImage: "pencil") }
+
+                        Button { activeSheet = .addRex } label: {
+                            Label("Add a Rex", systemImage: "plus")
+                        }
 
                         Button { activeSheet = .documentImport } label: {
                             Label("Import from doc", systemImage: "doc.text")

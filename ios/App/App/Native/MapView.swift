@@ -237,7 +237,7 @@ struct RexMapView: View {
         followingTripTitle = title
         focusedTripPlaces = nil
         Task {
-            focusedTripPlaces = (try? await RexAPI.shared.fetchMapPlaces(forTrip: id)) ?? []
+            focusedTripPlaces = (try? await RexAPI.shared.fetchMapPlaces(forTrip: id, tripName: title)) ?? []
         }
     }
 
