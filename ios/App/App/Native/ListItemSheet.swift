@@ -21,6 +21,14 @@ struct ListItemSheet: View {
 
     @Environment(\.dismiss) private var dismiss
 
+    /// Sept 8 — "the items should be able to be any category e.g. if
+    /// people select film & tv adjust so that the item added is film & tv
+    /// rather than places". Every item was being saved with whatever
+    /// category the sheet was opened with, so a list of films came out as
+    /// a list of places: wrong badge, wrong colour, wrong catalogue
+    /// searched, and wrong place on the map. A list holds anything, so the
+    /// category belongs on the item, not on the list.
+    @State private var type: RexCategory = .other
     @State private var picked: RexSearchHit?
     @State private var title = ""
     @State private var linkURL = ""
@@ -37,6 +45,11 @@ struct ListItemSheet: View {
         NavigationStack {
             ScrollView {
                 VStack(alignment: .leading, spacing: RexSpacing.md) {
+                    VStack(alignment: .leading, spacing: RexSpacing.xs) {
+                        Text("Category").font(RexFont.text(13, weight: .semibold))
+                        categoryPicker
+                    }
+
                     field("Name") {
                         TextField("Search or type a name", text: $title)
                             .textFieldStyle(.plain)
@@ -84,6 +97,44 @@ struct ListItemSheet: View {
         .tint(RexColor.primary)
         .onAppear(perform: prefill)
     }
+
+    /// The same chips the "Add a Rex" picker uses, minus trip and list —
+    /// a list of trips or a list of lists is a nesting the rest of the app
+    /// has no screen for. Changing this re-runs the search against the new
+    /// category's catalogue, which is the point: pick Book and the field
+    /// starts finding books.
+    private var categoryPicker: some View {
+        ScrollView(.horizontal, showsIndicators: false) {
+            HStack(spacing: RexSpacing.xs) {
+                ForEach(Self.itemCategories, id: \.self) { option in
+                    let selected = option == type
+                    Button {
+                        guard option != type else { return }
+                        type = option
+                        picked = nil
+                        scheduleSearch()
+                    } label: {
+                        Text(option.label)
+                            .font(RexFont.text(12.5, weight: .semibold))
+                            .foregroundStyle(selected ? .white : RexColor.foreground)
+                            .padding(.horizontal, RexSpacing.md)
+                            .frame(height: 34)
+                            .background(selected ? option.tintColor : RexColor.card)
+                            .clipShape(Capsule())
+                            .overlay(
+                                Capsule().stroke(selected ? .clear : RexColor.border, lineWidth: 1)
+                            )
+                    }
+                    .buttonStyle(.plain)
+                }
+            }
+            .padding(.vertical, 1)
+        }
+    }
+
+    private static let itemCategories: [RexCategory] = [
+        .other, .place, .book, .movie, .tv, .podcast, .recipe, .event,
+    ]
 
     private func field<Content: View>(_ label: String, @ViewBuilder content: () -> Content) -> some View {
         VStack(alignment: .leading, spacing: RexSpacing.xs) {
@@ -173,7 +224,11 @@ struct ListItemSheet: View {
     }
 
     private func prefill() {
+        // The sheet opens on the list's own category the first time, so a
+        // list of books doesn't make you pick "Book" for every entry.
+        if existing == nil, title.isEmpty { type = searchCategory }
         guard let existing, title.isEmpty else { return }
+        type = existing.type
         title = existing.title
         linkURL = existing.linkURL ?? ""
         photoURLs = [existing.photoURL ?? existing.imageURL].compactMap { $0 }
@@ -189,7 +244,7 @@ struct ListItemSheet: View {
             try? await Task.sleep(nanoseconds: 300_000_000)
             guard !Task.isCancelled else { return }
             async let mine = (try? await RexAPI.shared.searchMyRexItems(query: q)) ?? []
-            async let web = RexSearch.search(category: searchCategory, query: q)
+            async let web = RexSearch.search(category: type, query: q)
             let (m, w) = await (mine, web)
             guard !Task.isCancelled else { return }
             myHits = m
@@ -221,7 +276,7 @@ struct ListItemSheet: View {
         guard !trimmedTitle.isEmpty else { return }
         let trimmedLink = linkURL.trimmingCharacters(in: .whitespaces)
         let stop = DraftStop(
-            type: picked.map { _ in searchCategory } ?? searchCategory,
+            type: type,
             title: trimmedTitle,
             subtitle: picked?.subtitle,
             address: nil,

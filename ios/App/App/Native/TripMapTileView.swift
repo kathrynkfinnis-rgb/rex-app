@@ -53,10 +53,12 @@ struct TripMapTileView: View {
         for place in sequence {
             queryItems.append(URLQueryItem(name: "markers", value: "color:0x173626|\(place.lat!),\(place.lng!)"))
         }
-        if ordered.count > 1 {
-            let points = ordered.map { "\($0.lat!),\($0.lng!)" }.joined(separator: "|")
-            queryItems.append(URLQueryItem(name: "path", value: "color:0x173626aa|weight:3|\(points)"))
-        }
+        // Sept 8 — "remove the lines from the trip maps". The route line
+        // drew stops in itinerary order, which implies a journey the trip
+        // rarely describes: a week in Paris isn't a path between its
+        // restaurants, and the line zig-zagged across the tile making the
+        // markers harder to read rather than easier. Markers alone say the
+        // true thing — here is where this trip happened.
         components.queryItems = queryItems
         return components.url
     }

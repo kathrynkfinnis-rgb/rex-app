@@ -2129,8 +2129,33 @@ final class RexAPI {
         }
     }
 
+    /// Sept 8 — "when you delete a trip, all individual stops should be
+    /// deleted". A trip and its stops are all rows in `recommendations`;
+    /// the trip is the parent and each stop carries `trip_id` pointing at
+    /// it (lists work the same way with `list_id`). Deleting only the
+    /// parent row left every stop behind as an orphan: invisible in the
+    /// feed, since only the trip posts, but still turning up in search and
+    /// on the map with no trip to belong to.
+    ///
+    /// Children go first so a failure part-way leaves the trip still
+    /// standing over its stops, rather than a deleted trip with orphans
+    /// underneath it — the state you can still see and retry from.
+    /// Non-parent Rexes match nothing here, so this costs two empty
+    /// deletes and no behaviour change.
     func deleteRecommendation(id: String) async throws {
         let token = try await validToken()
+        for parentField in ["trip_id", "list_id"] {
+            var childComponents = URLComponents(url: baseURL.appendingPathComponent("/rest/v1/recommendations"), resolvingAgainstBaseURL: false)!
+            childComponents.queryItems = [URLQueryItem(name: parentField, value: "eq.\(id)")]
+            var childRequest = URLRequest(url: childComponents.url!)
+            childRequest.httpMethod = "DELETE"
+            childRequest.setValue(anonKey, forHTTPHeaderField: "apikey")
+            childRequest.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+            let (childData, childResponse) = try await URLSession.shared.data(for: childRequest)
+            guard let childHTTP = childResponse as? HTTPURLResponse, childHTTP.statusCode < 400 else {
+                throw RexAPIError.server(friendlyError(childData, fallback: "Couldn't delete that Rex."))
+            }
+        }
         var components = URLComponents(url: baseURL.appendingPathComponent("/rest/v1/recommendations"), resolvingAgainstBaseURL: false)!
         components.queryItems = [URLQueryItem(name: "id", value: "eq.\(id)")]
         var request = URLRequest(url: components.url!)
@@ -3403,7 +3428,14 @@ final class RexAPI {
             return (try? JSONDecoder().decode([Row].self, from: data)) ?? []
         }
 
-        let categoryFilter: [(String, String)] = category.map { [("items.type", "eq.\($0)")] } ?? []
+        // Sept 8 — "your own 'want to try's should not appear on feed". The
+        // feed is what other people have Rex'd; your own wants are a
+        // private shortlist you already have a screen for (the Wants tab),
+        // and seeing them mixed in reads as though you'd posted them.
+        // Someone else's want still shows — that's a genuine signal.
+        var ownerFilter: [(String, String)] = []
+        if let currentUserId { ownerFilter = [("user_id", "neq.\(currentUserId)")] }
+        let categoryFilter: [(String, String)] = ownerFilter + (category.map { [("items.type", "eq.\($0)")] } ?? [])
         let rows: [Row]
         let profilesById: [String: RexProfile]
         if let trimmedSearch, !trimmedSearch.isEmpty {
