@@ -25,11 +25,23 @@ struct ItemDetailView: View {
     /// dedicated save-to-collection action back, just scoped to here (the
     /// full item page, which has the room) rather than reintroducing that
     /// on the card.
-    @State private var addingToCollection: FeedRecommendation?
+    /// Sept 9 — one sheet modifier, not several. Stacking `.sheet`
+    /// modifiers on the same view silently drops all but one of them; see
+    /// FeedView.ActiveSheet.
+    private enum ActiveSheet: Identifiable {
+        case collection(FeedRecommendation)
+        case edit(FeedRecommendation)
+        var id: String {
+            switch self {
+            case .collection(let rec): return "collection-\(rec.id)"
+            case .edit(let rec): return "edit-\(rec.id)"
+            }
+        }
+    }
+    @State private var activeSheet: ActiveSheet?
     /// "View on map function via a button" — the feed/profile cards
     /// already had one (#133), the full item page never did.
     @Environment(\.viewOnMap) private var viewOnMap
-    @State private var editingRec: FeedRecommendation?
 
     private var myRec: FeedRecommendation? {
         recs.first { $0.user_id == RexAPI.shared.currentUserId }
@@ -67,15 +79,17 @@ struct ItemDetailView: View {
         // A drag can drop the keyboard too, so the comment field and its Post
         // button aren't only reachable via the keyboard's own Done button.
         .scrollDismissesKeyboard(.interactively)
-        .sheet(item: $addingToCollection) { rec in
-            AddToCollectionView(rec: rec, onDone: {})
-        }
-        .sheet(item: $editingRec) { rec in
-            EditRexView(
-                rec: rec,
-                onSaved: { Task { await load() } },
-                onDeleted: { Task { await load() } }
-            )
+        .sheet(item: $activeSheet) { sheet in
+            switch sheet {
+            case .collection(let rec):
+                AddToCollectionView(rec: rec, onDone: {})
+            case .edit(let rec):
+                EditRexView(
+                    rec: rec,
+                    onSaved: { Task { await load() } },
+                    onDeleted: { Task { await load() } }
+                )
+            }
         }
         .task { await load() }
     }
@@ -217,7 +231,7 @@ struct ItemDetailView: View {
 
                 if let collectionTargetRec {
                     Button {
-                        addingToCollection = collectionTargetRec
+                        activeSheet = .collection(collectionTargetRec)
                     } label: {
                         HStack(spacing: 4) {
                             Image(systemName: "folder.badge.plus").font(.system(size: 12))
@@ -325,7 +339,7 @@ struct ItemDetailView: View {
                 // here with no way to get to it at all.
                 if let myRec {
                     Button {
-                        editingRec = myRec
+                        activeSheet = .edit(myRec)
                     } label: {
                         HStack(spacing: 4) {
                             Image(systemName: "pencil").font(.system(size: 11))

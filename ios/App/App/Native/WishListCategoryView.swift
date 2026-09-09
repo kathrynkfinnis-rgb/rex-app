@@ -12,14 +12,28 @@ struct WishListCategoryView: View {
     @State private var wants: [WantRow] = []
     @State private var isLoading = true
     @State private var pushedItemId: String?
-    @State private var addingToCollection: WantRow?
+    /// Sept 9 — one sheet modifier, not two. Stacking `.sheet` modifiers
+    /// on the same view silently drops all but one of them, which is why
+    /// "Rate it" appeared to do nothing: the collection sheet below it won.
+    /// Same fault, same fix as AddRexView (5 Sept) and CollectionDetailView
+    /// (8 Sept).
+    private enum ActiveSheet: Identifiable {
+        case edit(FeedRecommendation)
+        case collection(WantRow)
+        var id: String {
+            switch self {
+            case .edit(let rec): return "edit-\(rec.id)"
+            case .collection(let want): return "collection-\(want.id)"
+            }
+        }
+    }
+    @State private var activeSheet: ActiveSheet?
     /// Sept 7 — "need to be able to edit from want to try to rating once the
     /// book has been read". This screen had no edit path at all: you could
     /// remove a want or open the item, and that was it — so there was
     /// nowhere to say you'd actually done the thing. EditRexView already
     /// knows how to convert a want into a rated Rex (see its wantRowId), it
     /// just needed reaching from here.
-    @State private var rating: FeedRecommendation?
     /// Sub-category filter (genre) within this one category — same idea as
     /// the feed's own subcategory row, just scoped to what's actually saved
     /// here rather than the whole feed.
@@ -112,10 +126,17 @@ struct WishListCategoryView: View {
                                     }
                                     Spacer()
 
+                                    // Sept 9 — "you should be able to edit
+                                    // a want to try as well as a Rex". It
+                                    // opens the same editor a Rex gets —
+                                    // rate it, fix the title, correct the
+                                    // address, delete it — so the label
+                                    // says Edit rather than only naming the
+                                    // one thing it used to be for.
                                     Button {
-                                        rating = asRecommendation(want)
+                                        activeSheet = .edit(asRecommendation(want))
                                     } label: {
-                                        Text("Rate it")
+                                        Text("Edit")
                                             .font(RexFont.text(12, weight: .semibold))
                                             .foregroundStyle(RexColor.primary)
                                             .padding(.horizontal, RexSpacing.md)
@@ -143,7 +164,12 @@ struct WishListCategoryView: View {
                             }
                             .contextMenu {
                                 Button {
-                                    addingToCollection = want
+                                    activeSheet = .edit(asRecommendation(want))
+                                } label: {
+                                    Label("Edit", systemImage: "pencil")
+                                }
+                                Button {
+                                    activeSheet = .collection(want)
                                 } label: {
                                     Label(
                                         want.list_id != nil ? "Change collection" : "Add to collection",
@@ -162,17 +188,19 @@ struct WishListCategoryView: View {
         .navigationTitle(title)
         .navigationBarTitleDisplayMode(.inline)
         .navigationDestination(item: $pushedItemId) { ItemDetailView(itemId: $0) }
-        .sheet(item: $rating) { rec in
-            EditRexView(
-                rec: rec,
-                onSaved: { Task { await load() } },
-                onDeleted: { Task { await load() } }
-            )
-        }
-        .sheet(item: $addingToCollection) { want in
-            AddWantToListView(want: want) { newListId in
-                if let index = wants.firstIndex(where: { $0.id == want.id }) {
-                    wants[index].list_id = newListId
+        .sheet(item: $activeSheet) { sheet in
+            switch sheet {
+            case .edit(let rec):
+                EditRexView(
+                    rec: rec,
+                    onSaved: { Task { await load() } },
+                    onDeleted: { Task { await load() } }
+                )
+            case .collection(let want):
+                AddWantToListView(want: want) { newListId in
+                    if let index = wants.firstIndex(where: { $0.id == want.id }) {
+                        wants[index].list_id = newListId
+                    }
                 }
             }
         }

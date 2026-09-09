@@ -38,7 +38,6 @@ struct TripDetailView: View {
     @State private var regeocodeResult: String?
     @State private var renamingHeading: String?
     @State private var renameDraft = ""
-    @State private var showingAddStop = false
     @State private var addStopSection = ""
     /// #170 — the trip's own free-text note (separate from any stop's).
     @State private var tripNote: String?
@@ -58,7 +57,20 @@ struct TripDetailView: View {
     /// same EditRexView every other Rex is edited through. Trip stops
     /// never had any edit entry point of their own before this — only
     /// reorder/remove, added by #122.
-    @State private var editingStop: FeedRecommendation?
+    /// Sept 9 — one sheet modifier, not several. Stacking `.sheet`
+    /// modifiers on the same view silently drops all but one of them; see
+    /// FeedView.ActiveSheet.
+    private enum ActiveSheet: Identifiable {
+        case addStop
+        case editStop(FeedRecommendation)
+        var id: String {
+            switch self {
+            case .addStop: return "addStop"
+            case .editStop(let rec): return "editStop-\(rec.id)"
+            }
+        }
+    }
+    @State private var activeSheet: ActiveSheet?
 
     /// Sept 8 — "please can we give an option to show both the current
     /// expanding view but also a view similar to the edit view which is
@@ -180,7 +192,7 @@ struct TripDetailView: View {
                                             // stop too instead of only
                                             // reorder/remove.
                                             Button {
-                                                editingStop = stop
+                                                activeSheet = .editStop(stop)
                                             } label: {
                                                 Image(systemName: "pencil")
                                             }
@@ -281,15 +293,17 @@ struct TripDetailView: View {
         } message: {
             Text("Applies to every stop under this heading.")
         }
-        .sheet(isPresented: $showingAddStop, onDismiss: { Task { await load() } }) {
-            AddTripStopSheet(tripId: route.recommendationId, initialSection: addStopSection, onAdded: {})
-        }
-        .sheet(item: $editingStop) { stop in
-            EditRexView(
-                rec: stop,
-                onSaved: { Task { await load() } },
-                onDeleted: { Task { await load() } }
-            )
+        .sheet(item: $activeSheet, onDismiss: { Task { await load() } }) { sheet in
+            switch sheet {
+            case .addStop:
+                AddTripStopSheet(tripId: route.recommendationId, initialSection: addStopSection, onAdded: {})
+            case .editStop(let stop):
+                EditRexView(
+                    rec: stop,
+                    onSaved: { Task { await load() } },
+                    onDeleted: { Task { await load() } }
+                )
+            }
         }
     }
 
@@ -367,7 +381,7 @@ struct TripDetailView: View {
     private func addStopButton(heading: String) -> some View {
         Button {
             addStopSection = heading
-            showingAddStop = true
+            activeSheet = .addStop
         } label: {
             Label(heading.isEmpty ? "Add a stop" : "Add to \(heading)", systemImage: "plus")
                 .font(RexFont.text(13, weight: .medium))

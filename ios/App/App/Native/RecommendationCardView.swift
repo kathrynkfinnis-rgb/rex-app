@@ -31,16 +31,20 @@ struct RecommendationCardView: View {
     private var category: RexCategory { RexCategory(rawType: rec.items?.type) }
 
     /// How much trailing space the title's own line needs to clear, to
-    /// leave room for whichever badge is floating in the same top corner —
-    /// see the .overlay(alignment: .topTrailing) below. "Asking"/"Wants to
-    /// try" carry a text label and need real room; a rating is just one
-    /// small emoji; a plain Rex with none of the three needs nothing.
+    /// leave room for whatever is floating in the same top corner.
+    ///
+    /// Sept 9 — "heading should always go across the top without being
+    /// inhibited". It now reserves room only for things that are actually
+    /// there: the rating badge, and the edit pencil on your own cards
+    /// (EditableIfMine, applied outside this view). A want reserved 34pt
+    /// for a badge that has just been removed, which is exactly the
+    /// inhibiting-for-no-reason this fixes — someone else's want with no
+    /// rating gets the full width of the card.
     private var titleTrailingReserve: CGFloat {
-        // Sept 7 — was 110 when these carried a text label; they're a bare
-        // icon now, so the title gets that width back.
-        if rec.isBlast || rec.isWant { return 34 }
-        if rec.rating > 0 { return 40 }
-        return 0
+        var needed: CGFloat = 0
+        if rec.rating > 0 { needed = 40 }
+        if rec.user_id == RexAPI.shared.currentUserId { needed = max(needed, 30) }
+        return needed
     }
 
     private static let relativeFormatter: RelativeDateTimeFormatter = {
@@ -162,27 +166,14 @@ struct RecommendationCardView: View {
                         .frame(maxWidth: .infinity, alignment: .leading)
                         .overlay(alignment: .topTrailing) {
                             HStack(spacing: 4) {
-                                // A blast is a question, not a verdict.
-                                if rec.isBlast {
-                                    HStack(spacing: 4) {
-                                        Image(systemName: "sparkles")
-                                            .font(.system(size: 10))
-                                        Text("Asking")
-                                            .font(RexFont.text(12, weight: .semibold))
-                                    }
-                                    .foregroundStyle(RexColor.accent)
-                                }
-                                // A want has no rating — say what it is instead of
-                                // showing an empty space where the crown goes.
-                                if rec.isWant {
-                                    HStack(spacing: 4) {
-                                        Image(systemName: "bookmark")
-                                            .font(.system(size: 10))
-                                        Text("Wants to try")
-                                            .font(RexFont.text(12, weight: .semibold))
-                                    }
-                                    .foregroundStyle(RexColor.mutedForeground)
-                                }
+                                // Sept 9 — "remove the wants to try top right on
+                                // the card, don't need it twice". Correct: the
+                                // words moved down to the tags row on 7 Sept
+                                // (see statusPill) and this copy was left
+                                // behind, so every want card said it twice —
+                                // once in the tags, once floating over its own
+                                // title. Same for a blast's "Asking". Nothing
+                                // but the rating floats here now.
                                 // Rating is an "important element" — one of the few
                                 // places the spec allows forest green. Emoji only
                                 // here: there's no room for a full label ("Do not

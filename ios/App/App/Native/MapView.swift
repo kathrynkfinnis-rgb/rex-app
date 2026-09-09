@@ -17,6 +17,33 @@ struct RexMapView: View {
     @State private var places: [MapPlace] = []
     @State private var isLoading = true
     @State private var errorMessage: String?
+    /// Sept 9 — the map's three sheets as one value. Stacking `.sheet`
+    /// modifiers on the same view silently drops all but one of them (see
+    /// FeedView.ActiveSheet), so "follow a trip" and long-press-to-add
+    /// were both dead. Derived from the three existing states rather than
+    /// replacing them, so every call site that sets one still reads the
+    /// way it did.
+    private enum MapSheet: Identifiable {
+        case place(MapPlace)
+        case tripSearch
+        case newRex(RexSearchHit)
+
+        init?(place: MapPlace?, tripSearch: Bool, hit: RexSearchHit?) {
+            if let place { self = .place(place) }
+            else if tripSearch { self = .tripSearch }
+            else if let hit { self = .newRex(hit) }
+            else { return nil }
+        }
+
+        var id: String {
+            switch self {
+            case .place(let place): return "place-\(place.id)"
+            case .tripSearch: return "tripSearch"
+            case .newRex(let hit): return "newRex-\(hit.id)"
+            }
+        }
+    }
+
     @State private var selectedPlace: MapPlace?
     @State private var userCoordinate: CLLocationCoordinate2D?
     @State private var areaName: String?
@@ -208,18 +235,31 @@ struct RexMapView: View {
         // first appeared (tapping a card's map icon switches tabs and sets
         // the request in the same action), not only for later changes.
         .task(id: focusRequest) { await focusOn(focusRequest) }
-        .sheet(item: $selectedPlace) { place in
-            placeSheet(place)
-                // Compact by default; drag up when a place is on several trips.
-                .presentationDetents([.height(260), .height(440)])
+        // Sept 9 — one sheet modifier, not three; see FeedView.ActiveSheet.
+        // "Follow a trip" and long-press-to-add-a-place were both losing to
+        // the place sheet above them.
+        .sheet(item: Binding(
+            get: { MapSheet(place: selectedPlace, tripSearch: showingTripSearch, hit: pendingPlaceHit) },
+            set: { next in
+                if next == nil {
+                    selectedPlace = nil
+                    showingTripSearch = false
+                    pendingPlaceHit = nil
+                }
+            }
+        )) { sheet in
+            switch sheet {
+            case .place(let place):
+                placeSheet(place)
+                    // Compact by default; drag up when a place is on several trips.
+                    .presentationDetents([.height(260), .height(440)])
+            case .tripSearch:
+                TripSearchView(onSelect: { id, title in followTrip(id: id, title: title) })
+            case .newRex(let hit):
+                AddRexView(onDone: { pendingPlaceHit = nil; Task { await load() } }, initialPlaceHit: hit)
+            }
         }
         .navigationDestination(item: $openTrip) { TripDetailView(route: $0) }
-        .sheet(isPresented: $showingTripSearch) {
-            TripSearchView(onSelect: { id, title in followTrip(id: id, title: title) })
-        }
-        .sheet(item: $pendingPlaceHit) { hit in
-            AddRexView(onDone: { pendingPlaceHit = nil; Task { await load() } }, initialPlaceHit: hit)
-        }
         .alert("Couldn't find that place", isPresented: Binding(
             get: { longPressError != nil },
             set: { if !$0 { longPressError = nil } }

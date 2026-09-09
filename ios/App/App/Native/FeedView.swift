@@ -41,9 +41,24 @@ struct FeedView: View {
     @FocusState private var searchFocused: Bool
     @State private var noInspirationFor: RexCategory?
     @State private var myProfile: RexProfileDetail?
-    @State private var editing: FeedRecommendation?
-    @State private var addingToCollection: FeedRecommendation?
-    @State private var addingToTrip: FeedRecommendation?
+    /// Sept 9 — one sheet modifier, not three. Stacking `.sheet` modifiers
+    /// on the same view silently drops all but one of them: "add to
+    /// collection" and "add to trip" from a card's context menu were both
+    /// dead, losing to the edit sheet above them. Same fault, same fix as
+    /// AddRexView (5 Sept), CollectionDetailView and WishListCategoryView.
+    private enum ActiveSheet: Identifiable {
+        case edit(FeedRecommendation)
+        case collection(FeedRecommendation)
+        case trip(FeedRecommendation)
+        var id: String {
+            switch self {
+            case .edit(let rec): return "edit-\(rec.id)"
+            case .collection(let rec): return "collection-\(rec.id)"
+            case .trip(let rec): return "trip-\(rec.id)"
+            }
+        }
+    }
+    @State private var activeSheet: ActiveSheet?
 
     /// #129/live report — a category filter or search query used to just
     /// re-slice `recommendations`, which fetchFeed() caps at 50 unfiltered
@@ -370,7 +385,7 @@ struct FeedView: View {
                                         onViewOnMap: onViewOnMap
                                     )
                                 }
-                                .modifier(EditableIfMine(rec: rec, editing: $editing))
+                                .modifier(EditableIfMine(rec: rec, onEdit: { activeSheet = .edit($0) }))
                                 // No .draggable() here: Collections isn't
                                 // visible at the same time as the feed (they're
                                 // different tabs), so there's never a drop
@@ -388,7 +403,7 @@ struct FeedView: View {
                                     // WishListCategoryView instead.
                                     if !rec.isWant {
                                         Button {
-                                            addingToCollection = rec
+                                            activeSheet = .collection(rec)
                                         } label: {
                                             Label("Add to collection", systemImage: "folder.badge.plus")
                                         }
@@ -399,13 +414,13 @@ struct FeedView: View {
                                     // category TripStopsBuilderView deals in.
                                     if !rec.isWant, RexCategory(rawType: rec.items?.type) == .place {
                                         Button {
-                                            addingToTrip = rec
+                                            activeSheet = .trip(rec)
                                         } label: {
                                             Label("Add to trip", systemImage: "bag.badge.plus")
                                         }
                                     }
                                     if rec.user_id == RexAPI.shared.currentUserId {
-                                        Button { editing = rec } label: {
+                                        Button { activeSheet = .edit(rec) } label: {
                                             Label("Edit", systemImage: "pencil")
                                         }
                                     }
@@ -516,7 +531,13 @@ struct FeedView: View {
             await loadFeed()
             myProfile = try? await RexAPI.shared.fetchMyProfile()
         }
-        .sheet(item: $editing) { rec in
+        .sheet(item: $activeSheet) { sheet in
+            switch sheet {
+            case .collection(let rec):
+                AddToCollectionView(rec: rec, onDone: {})
+            case .trip(let rec):
+                AddToTripView(itemId: rec.item_id, itemTitle: rec.items?.title ?? "This place", onDone: {})
+            case .edit(let rec):
             // Sept 5 — "the edit button on the feed takes you to the old
             // edit page". A trip is edited in the Add-a-trip form now, not
             // EditRexView (which can only touch a single Rex's own fields
@@ -525,7 +546,7 @@ struct FeedView: View {
             // into editing gets it.
             if RexCategory(rawType: rec.items?.type) == .trip {
                 TripEditorLoader(trip: rec) {
-                    editing = nil
+                    activeSheet = nil
                     Task { await loadFeed() }
                 }
             } else {
@@ -535,12 +556,7 @@ struct FeedView: View {
                     onDeleted: { Task { await loadFeed() } }
                 )
             }
-        }
-        .sheet(item: $addingToCollection) { rec in
-            AddToCollectionView(rec: rec, onDone: {})
-        }
-        .sheet(item: $addingToTrip) { rec in
-            AddToTripView(itemId: rec.item_id, itemTitle: rec.items?.title ?? "This place", onDone: {})
+            }
         }
     }
 
@@ -1189,7 +1205,10 @@ struct SwipeIfMine<Content: View>: View {
 /// Adds an edit affordance to a card, but only on your own Rex.
 struct EditableIfMine: ViewModifier {
     let rec: FeedRecommendation
-    @Binding var editing: FeedRecommendation?
+    /// Sept 9 — a closure rather than a binding to the edit target. The
+    /// feed drives every sheet it can show through one modifier now (see
+    /// ActiveSheet), so there's no single `editing` state left to bind to.
+    let onEdit: (FeedRecommendation) -> Void
 
     private var isMine: Bool { rec.user_id == RexAPI.shared.currentUserId }
 
@@ -1197,7 +1216,7 @@ struct EditableIfMine: ViewModifier {
         if isMine {
             content
                 .overlay(alignment: .topTrailing) {
-                    Button { editing = rec } label: {
+                    Button { onEdit(rec) } label: {
                         // Sept 7 — "the edit button is too small, I can't get
                         // it to work 8/10 times". The visible circle is only
                         // ~26pt and sat inside a 10pt margin, well under the

@@ -37,14 +37,27 @@ struct ProfileView: View {
     @State private var isLoading = true
     @State private var errorMessage: String?
     @State private var selectedFilter: RexCategory?
-    @State private var editing: FeedRecommendation?
+    /// Sept 9 — one sheet modifier, not four; see FeedView.ActiveSheet for
+    /// the fault this fixes.
+    private enum ActiveSheet: Identifiable {
+        case editProfile
+        case edit(FeedRecommendation)
+        case collection(FeedRecommendation)
+        case trip(FeedRecommendation)
+        var id: String {
+            switch self {
+            case .editProfile: return "editProfile"
+            case .edit(let rec): return "edit-\(rec.id)"
+            case .collection(let rec): return "collection-\(rec.id)"
+            case .trip(let rec): return "trip-\(rec.id)"
+            }
+        }
+    }
+    @State private var activeSheet: ActiveSheet?
     @State private var selecting = false
     @State private var selectedIds: Set<String> = []
     @State private var confirmBulkDelete = false
     @State private var isDeleting = false
-    @State private var editingProfile = false
-    @State private var addingToCollection: FeedRecommendation?
-    @State private var addingToTrip: FeedRecommendation?
     @State private var rexCounts: [String: Int] = [:]
     /// #147: the old Lovable web profile led with a row of stat cards
     /// (Rex count / average rating / friends / collections) rather than the
@@ -148,30 +161,30 @@ struct ProfileView: View {
             Text("This can't be undone.")
         }
         .task { await load() }
-        .sheet(isPresented: $editingProfile) {
-            EditProfileView(profile: profile, onSaved: { Task { await load() } })
-        }
-        .sheet(item: $editing) { rec in
-            // Same branch as FeedView's — a trip edits in the Add-a-trip
-            // form, everything else in EditRexView.
-            if RexCategory(rawType: rec.items?.type) == .trip {
-                TripEditorLoader(trip: rec) {
-                    editing = nil
-                    Task { await load() }
+        .sheet(item: $activeSheet) { sheet in
+            switch sheet {
+            case .editProfile:
+                EditProfileView(profile: profile, onSaved: { Task { await load() } })
+            case .collection(let rec):
+                AddToCollectionView(rec: rec) { activeSheet = nil }
+            case .trip(let rec):
+                AddToTripView(itemId: rec.item_id, itemTitle: rec.items?.title ?? "This place", onDone: {})
+            case .edit(let rec):
+                // Same branch as FeedView's — a trip edits in the Add-a-trip
+                // form, everything else in EditRexView.
+                if RexCategory(rawType: rec.items?.type) == .trip {
+                    TripEditorLoader(trip: rec) {
+                        activeSheet = nil
+                        Task { await load() }
+                    }
+                } else {
+                    EditRexView(
+                        rec: rec,
+                        onSaved: { Task { await load() } },
+                        onDeleted: { Task { await load() } }
+                    )
                 }
-            } else {
-                EditRexView(
-                    rec: rec,
-                    onSaved: { Task { await load() } },
-                    onDeleted: { Task { await load() } }
-                )
             }
-        }
-        .sheet(item: $addingToCollection) { rec in
-            AddToCollectionView(rec: rec) { addingToCollection = nil }
-        }
-        .sheet(item: $addingToTrip) { rec in
-            AddToTripView(itemId: rec.item_id, itemTitle: rec.items?.title ?? "This place", onDone: {})
         }
         .navigationDestination(for: String.self) { ItemDetailView(itemId: $0) }
         .navigationDestination(for: UserProfileRoute.self) { UserProfileView(route: $0) }
@@ -293,7 +306,7 @@ struct ProfileView: View {
                 }
                 Spacer()
                 Button {
-                    editingProfile = true
+                    activeSheet = .editProfile
                 } label: {
                     Text("Edit")
                         .font(RexFont.text(13, weight: .semibold))
@@ -453,7 +466,7 @@ struct ProfileView: View {
                     // requested here separately three times.
                     .contextMenu {
                         Button {
-                            addingToCollection = rec
+                            activeSheet = .collection(rec)
                         } label: {
                             Label("Add to collection", systemImage: "folder.badge.plus")
                         }
@@ -462,20 +475,20 @@ struct ProfileView: View {
                         // just never got the option added at all here.
                         if RexCategory(rawType: rec.items?.type) == .place {
                             Button {
-                                addingToTrip = rec
+                                activeSheet = .trip(rec)
                             } label: {
                                 Label("Add to trip", systemImage: "bag.badge.plus")
                             }
                         }
                         Button {
-                            editing = rec
+                            activeSheet = .edit(rec)
                         } label: {
                             Label("Edit", systemImage: "pencil")
                         }
                     }
                     .overlay(alignment: .topTrailing) {
                         Button {
-                            editing = rec
+                            activeSheet = .edit(rec)
                         } label: {
                             // Sept 7 — same 44pt hit area as the feed's copy
                             // of this button; see EditableIfMine in FeedView.

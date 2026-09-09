@@ -27,7 +27,20 @@ struct ListDetailView: View {
     @State private var items: [FeedRecommendation] = []
     @State private var isLoading = true
     @State private var errorMessage: String?
-    @State private var editing: FeedRecommendation?
+    /// Sept 9 — one sheet modifier, not several. Stacking `.sheet`
+    /// modifiers on the same view silently drops all but one of them; see
+    /// FeedView.ActiveSheet.
+    private enum ActiveSheet: Identifiable {
+        case addItem
+        case edit(FeedRecommendation)
+        var id: String {
+            switch self {
+            case .addItem: return "addItem"
+            case .edit(let rec): return "edit-\(rec.id)"
+            }
+        }
+    }
+    @State private var activeSheet: ActiveSheet?
 
     @State private var isOwner = false
     @State private var isEditing = false
@@ -35,7 +48,6 @@ struct ListDetailView: View {
     @State private var mutationError: String?
     @State private var renamingHeading: String?
     @State private var renameDraft = ""
-    @State private var showingAddItem = false
     @State private var addItemSection = ""
     /// Aug 29 — "Phoebe's list has adopted the subtitle of a draft trip and
     /// she can't edit it": a list's underlying item can carry a subtitle
@@ -164,7 +176,7 @@ struct ListDetailView: View {
                 ToolbarItem(placement: .topBarTrailing) {
                     Button {
                         addItemSection = ""
-                        showingAddItem = true
+                        activeSheet = .addItem
                     } label: {
                         Image(systemName: "plus")
                     }
@@ -194,22 +206,24 @@ struct ListDetailView: View {
         } message: {
             Text("Shown under the list's title, including on its feed card.")
         }
-        .sheet(isPresented: $showingAddItem, onDismiss: { Task { await load() } }) {
-            AddTripStopSheet(listId: route.recommendationId, initialSection: addItemSection, onAdded: {})
-        }
-        .sheet(item: $editing) { rec in
-            EditRexView(
-                rec: rec,
-                onSaved: { Task { await load() } },
-                onDeleted: { Task { await load() } }
-            )
+        .sheet(item: $activeSheet, onDismiss: { Task { await load() } }) { sheet in
+            switch sheet {
+            case .addItem:
+                AddTripStopSheet(listId: route.recommendationId, initialSection: addItemSection, onAdded: {})
+            case .edit(let rec):
+                EditRexView(
+                    rec: rec,
+                    onSaved: { Task { await load() } },
+                    onDeleted: { Task { await load() } }
+                )
+            }
         }
     }
 
     private func addItemButton(heading: String) -> some View {
         Button {
             addItemSection = heading
-            showingAddItem = true
+            activeSheet = .addItem
         } label: {
             Label(heading.isEmpty ? "Add an item" : "Add to \(heading)", systemImage: "plus")
                 .font(RexFont.text(13, weight: .medium))
@@ -283,7 +297,7 @@ struct ListDetailView: View {
                 HStack {
                     Spacer()
                     Button {
-                        editing = item
+                        activeSheet = .edit(item)
                     } label: {
                         HStack(spacing: 4) {
                             Image(systemName: "pencil")
