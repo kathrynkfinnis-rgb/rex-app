@@ -36,8 +36,17 @@ struct TripItineraryBuilderView: View {
     /// rex, should take you to the same style of 'add a stop' [sheet] as in
     /// the manual add a trip process".
     var onEditStop: ((ItineraryEntry) -> Void)? = nil
-
-    @State private var showingAddStop = false
+    /// Sept 9 — "import from doc on list and trip still not working".
+    /// This view used to present the add-a-stop sheet itself, which meant
+    /// two `.sheet` modifiers live in the same presentation context: this
+    /// one, and the host's. Only one of them can win, and this one did —
+    /// so every sheet the host owned, the document importer included, set
+    /// a flag that nothing was listening to. Same fault as the stacked
+    /// sheets fixed on 5 Sept, across a parent/child boundary rather than
+    /// on one view, which is why consolidating the host's own four sheets
+    /// hadn't fixed it. The host opens this one now, through the same
+    /// single sheet it uses for everything else.
+    var onAddStop: (() -> Void)? = nil
     @State private var renamingHeadingId: UUID?
     @State private var headingDraft = ""
     @State private var draggingId: UUID?
@@ -87,7 +96,7 @@ struct TripItineraryBuilderView: View {
             .buttonStyle(DashedAddButtonStyle())
 
             Button {
-                showingAddStop = true
+                onAddStop?()
             } label: {
                 Label("Add \(noun == "stop" ? "a stop" : "an item")", systemImage: "plus")
                     .font(RexFont.text(13.5, weight: .semibold))
@@ -107,17 +116,6 @@ struct TripItineraryBuilderView: View {
             Text("Each \(noun) becomes its own Rex as well as part of the \(container) \u{2014} only the \(container) itself shows on the feed.")
                 .font(RexFont.text(11.5))
                 .foregroundStyle(RexColor.mutedForeground)
-        }
-        .sheet(isPresented: $showingAddStop) {
-            if mode == .trip {
-                TripStopSheet(subcategories: rexSubcategories[.place] ?? []) { stop in
-                    entries.append(ItineraryEntry(kind: .stop(stop)))
-                }
-            } else {
-                ListItemSheet { item in
-                    entries.append(ItineraryEntry(kind: .stop(item)))
-                }
-            }
         }
         .alert("Heading", isPresented: Binding(
             get: { renamingHeadingId != nil },

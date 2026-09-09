@@ -536,7 +536,9 @@ struct EditRexView: View {
             case (_?, true):
                 // Still a want, nothing to convert — just the note. Upserts
                 // on (user_id, item_id), same row as before.
-                try await RexAPI.shared.createWant(itemId: rec.item_id, note: note.isEmpty ? nil : note)
+                // Deliberately turning your own Rex back into a want — the
+                // kind that posts, not a bookmark of someone else's.
+                try await RexAPI.shared.createWant(itemId: rec.item_id, note: note.isEmpty ? nil : note, source: "add")
             case (let id?, false):
                 // Want -> rated: this row moves tables. Create the
                 // recommendation first — if that fails, the want is still
@@ -554,7 +556,9 @@ struct EditRexView: View {
                 try await RexAPI.shared.deleteWant(id: id)
             case (nil, true):
                 // Rated -> want: same ordering logic, create then delete.
-                try await RexAPI.shared.createWant(itemId: rec.item_id, note: note.isEmpty ? nil : note)
+                // Deliberately turning your own Rex back into a want — the
+                // kind that posts, not a bookmark of someone else's.
+                try await RexAPI.shared.createWant(itemId: rec.item_id, note: note.isEmpty ? nil : note, source: "add")
                 try await RexAPI.shared.deleteRecommendation(id: rec.id)
             case (nil, false):
                 try await RexAPI.shared.updateRecommendation(

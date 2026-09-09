@@ -185,6 +185,8 @@ struct AddRexView: View {
         case editTripStop(ItineraryEntry)
         case documentImport
         case buildTripFromRex
+        case addTripStop
+        case addListItem
 
         var id: String {
             switch self {
@@ -192,6 +194,8 @@ struct AddRexView: View {
             case .editTripStop(let e): return "tripStop-\(e.id)"
             case .documentImport: return "documentImport"
             case .buildTripFromRex: return "buildTripFromRex"
+            case .addTripStop: return "addTripStop"
+            case .addListItem: return "addListItem"
             }
         }
     }
@@ -235,80 +239,15 @@ struct AddRexView: View {
                 }
             }
         }
-        .tint(RexColor.primary)
-    }
-
-    private var categoryPicker: some View {
-        VStack(spacing: 16) {
-            LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 12) {
-                ForEach(creatableCategories, id: \.self) { cat in
-                    Button {
-                        withAnimation { category = cat }
-                    } label: {
-                        HStack(spacing: 0) {
-                            // Left accent bar — the one colour cue that
-                            // reads before the icon/label even register,
-                            // same trick the reference picker uses.
-                            Rectangle()
-                                .fill(cat.tintColor)
-                                .frame(width: 5)
-
-                            HStack(spacing: 10) {
-                                Image(systemName: cat.symbol)
-                                    .font(.system(size: 20))
-                                    .foregroundStyle(cat.tintColor)
-                                Text(cat.label)
-                                    .font(.system(size: 15, weight: .semibold))
-                                    .foregroundStyle(RexColor.foreground)
-                                Spacer(minLength: 0)
-                            }
-                            .padding(.vertical, 16)
-                            .padding(.horizontal, 14)
-                        }
-                        .background(RexColor.card)
-                        .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
-                        .overlay(
-                            RoundedRectangle(cornerRadius: 16, style: .continuous)
-                                .stroke(RexColor.border, lineWidth: 1)
-                        )
-                    }
-                    .buttonStyle(.plain)
-                }
-            }
-
-            // #109 — same entry point the web offers ("Import a collection"),
-            // but this one runs the extraction itself rather than deep
-            // -linking to the web importer: paste text in, review what came
-            // out, save as a Trip or a Collection.
-            Button {
-                activeSheet = .documentImport
-            } label: {
-                HStack(spacing: RexSpacing.md) {
-                    ZStack {
-                        RoundedRectangle(cornerRadius: RexRadius.input, style: .continuous)
-                            .fill(RexColor.badgeBackground)
-                        Image(systemName: "doc.text")
-                            .font(.system(size: 20))
-                            .foregroundStyle(RexColor.primary)
-                    }
-                    .frame(width: 48, height: 48)
-
-                    VStack(alignment: .leading, spacing: 2) {
-                        Text("Import from doc")
-                            .font(RexFont.display(17, weight: .semibold))
-                            .foregroundStyle(RexColor.foreground)
-                        Text("Paste from Notes, a Word doc, or an itinerary.")
-                            .font(RexFont.text(13))
-                            .foregroundStyle(RexColor.mutedForeground)
-                    }
-                    Spacer()
-                }
-                .padding(RexSpacing.md)
-                .rexCard()
-            }
-            .buttonStyle(.plain)
-        }
-        .padding(16)
+        // Sept 9 — "import from doc on list and trip still not working".
+        // This whole chain used to hang off `categoryPicker`, which is only
+        // in the hierarchy while `category == nil`. The moment you picked
+        // Trip or List the picker was replaced by the form — and the sheet
+        // modifier went with it, so every button on those forms set
+        // `activeSheet` with nothing left listening. It looked exactly like
+        // the stacked-sheet bug fixed on 5 Sept, which is why consolidating
+        // them there didn't fix this. On the NavigationStack it survives the
+        // switch.
         // "If you click on each rex, [it] should take you to the same style
         // of 'add a stop' [sheet] as in the manual add a trip process."
         // Sept 7 — one sheet modifier, not four.
@@ -389,6 +328,14 @@ struct AddRexView: View {
                         listEntries = entries
                     }
                 )
+            case .addTripStop:
+                TripStopSheet(subcategories: rexSubcategories[.place] ?? []) { stop in
+                    tripEntries.append(ItineraryEntry(kind: .stop(stop)))
+                }
+            case .addListItem:
+                ListItemSheet(searchCategory: .other) { item in
+                    listEntries.append(ItineraryEntry(kind: .stop(item)))
+                }
             case .buildTripFromRex:
                 BuildTripFromRexView(onDone: {
                     activeSheet = nil
@@ -396,6 +343,80 @@ struct AddRexView: View {
                 })
             }
         }
+        .tint(RexColor.primary)
+    }
+
+    private var categoryPicker: some View {
+        VStack(spacing: 16) {
+            LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 12) {
+                ForEach(creatableCategories, id: \.self) { cat in
+                    Button {
+                        withAnimation { category = cat }
+                    } label: {
+                        HStack(spacing: 0) {
+                            // Left accent bar — the one colour cue that
+                            // reads before the icon/label even register,
+                            // same trick the reference picker uses.
+                            Rectangle()
+                                .fill(cat.tintColor)
+                                .frame(width: 5)
+
+                            HStack(spacing: 10) {
+                                Image(systemName: cat.symbol)
+                                    .font(.system(size: 20))
+                                    .foregroundStyle(cat.tintColor)
+                                Text(cat.label)
+                                    .font(.system(size: 15, weight: .semibold))
+                                    .foregroundStyle(RexColor.foreground)
+                                Spacer(minLength: 0)
+                            }
+                            .padding(.vertical, 16)
+                            .padding(.horizontal, 14)
+                        }
+                        .background(RexColor.card)
+                        .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 16, style: .continuous)
+                                .stroke(RexColor.border, lineWidth: 1)
+                        )
+                    }
+                    .buttonStyle(.plain)
+                }
+            }
+
+            // #109 — same entry point the web offers ("Import a collection"),
+            // but this one runs the extraction itself rather than deep
+            // -linking to the web importer: paste text in, review what came
+            // out, save as a Trip or a Collection.
+            Button {
+                activeSheet = .documentImport
+            } label: {
+                HStack(spacing: RexSpacing.md) {
+                    ZStack {
+                        RoundedRectangle(cornerRadius: RexRadius.input, style: .continuous)
+                            .fill(RexColor.badgeBackground)
+                        Image(systemName: "doc.text")
+                            .font(.system(size: 20))
+                            .foregroundStyle(RexColor.primary)
+                    }
+                    .frame(width: 48, height: 48)
+
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text("Import from doc")
+                            .font(RexFont.display(17, weight: .semibold))
+                            .foregroundStyle(RexColor.foreground)
+                        Text("Paste from Notes, a Word doc, or an itinerary.")
+                            .font(RexFont.text(13))
+                            .foregroundStyle(RexColor.mutedForeground)
+                    }
+                    Spacer()
+                }
+                .padding(RexSpacing.md)
+                .rexCard()
+            }
+            .buttonStyle(.plain)
+        }
+        .padding(16)
     }
 
     @ViewBuilder
@@ -471,7 +492,8 @@ struct AddRexView: View {
 
                 TripItineraryBuilderView(
                     entries: $tripEntries,
-                    onEditStop: { entry in activeSheet = .editTripStop(entry) }
+                    onEditStop: { entry in activeSheet = .editTripStop(entry) },
+                    onAddStop: { activeSheet = .addTripStop }
                 )
 
                 // The old stops builder carried these two entry points and
@@ -521,7 +543,8 @@ struct AddRexView: View {
                 TripItineraryBuilderView(
                     entries: $listEntries,
                     mode: .list,
-                    onEditStop: { entry in activeSheet = .editListItem(entry) }
+                    onEditStop: { entry in activeSheet = .editListItem(entry) },
+                    onAddStop: { activeSheet = .addListItem }
                 )
 
                 Button {
@@ -1394,7 +1417,10 @@ struct AddRexView: View {
             case .want:
                 try await RexAPI.shared.createWant(
                     itemId: itemId,
-                    note: note.trimmingCharacters(in: .whitespaces).isEmpty ? nil : note
+                    note: note.trimmingCharacters(in: .whitespaces).isEmpty ? nil : note,
+                    // Added from scratch, not bookmarked off someone's Rex —
+                    // this is the kind that posts to the feed.
+                    source: "add"
                 )
                 didWant = true
                 lastWantItemId = itemId

@@ -1280,7 +1280,12 @@ final class RexAPI {
     }
 
     /// Marks an item as "want to try/watch/visit" instead of rating it — inserts into `wants`.
-    func createWant(itemId: String, note: String? = nil) async throws {
+    /// Sept 9 — `source` says how the want came to exist: "save" for the
+    /// bookmark on somebody else's Rex, "add" for one you created from
+    /// scratch. Only the second belongs in the feed — see fetchWantsFeed.
+    /// Sent only when the column exists, same probe-and-skip the note field
+    /// above uses, so this keeps working before the migration is run.
+    func createWant(itemId: String, note: String? = nil, source: String = "save") async throws {
         let token = try await validToken()
         guard let userId = currentUserId else { throw RexAPIError.notSignedIn }
         var request = URLRequest(url: baseURL.appendingPathComponent("/rest/v1/wants"))
@@ -1294,6 +1299,7 @@ final class RexAPI {
         // Only sent when there's something to say, so the column being absent
         // can't break saving.
         if let note, !note.isEmpty { body["note"] = note }
+        if await wantSourceField() { body["source"] = source }
         request.httpBody = try JSONSerialization.data(withJSONObject: body)
 
         var urlComponents = URLComponents(url: request.url!, resolvingAgainstBaseURL: false)!
@@ -3517,6 +3523,14 @@ final class RexAPI {
         // Someone else's want still shows — that's a genuine signal.
         var ownerFilter: [(String, String)] = []
         if let currentUserId { ownerFilter = [("user_id", "neq.\(currentUserId)")] }
+        // Sept 9 — "when Gemma saves one of my Rex so it becomes a want to
+        // try for her it shouldn't come up on the feed again". Bookmarking
+        // someone's Rex is a private save of something the feed has
+        // already shown once; re-posting it as her want is the same
+        // recommendation twice, the second time under the wrong name. A
+        // want added from scratch still posts — nobody has Rex'd that yet,
+        // so it's the only way anyone hears about it.
+        if await wantSourceField() { ownerFilter.append(("source", "neq.save")) }
         let categoryFilter: [(String, String)] = ownerFilter + (category.map { [("items.type", "eq.\($0)")] } ?? [])
         let rows: [Row]
         let profilesById: [String: RexProfile]
@@ -3576,6 +3590,27 @@ final class RexAPI {
                 recommendation_tags: nil
             )
         }
+    }
+
+    /// Same guard as wantNoteColumn, for wants.source (9 Sept migration).
+    private var wantSourceColumn: Bool?
+
+    private func wantSourceField() async -> Bool {
+        if let wantSourceColumn { return wantSourceColumn }
+        guard let token = try? await validToken() else { return false }
+        var components = URLComponents(url: baseURL.appendingPathComponent("/rest/v1/wants"), resolvingAgainstBaseURL: false)!
+        components.queryItems = [
+            URLQueryItem(name: "select", value: "source"),
+            URLQueryItem(name: "limit", value: "1"),
+        ]
+        var request = URLRequest(url: components.url!)
+        request.setValue(anonKey, forHTTPHeaderField: "apikey")
+        request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+        let ok = (try? await URLSession.shared.data(for: request))
+            .flatMap { ($0.1 as? HTTPURLResponse)?.statusCode }
+            .map { $0 < 400 } ?? false
+        wantSourceColumn = ok
+        return ok
     }
 
     /// Same guard as the anonymous column — the note only exists once that
