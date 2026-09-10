@@ -22,6 +22,8 @@ struct FeedView: View {
     /// #133 "view on map" — MainTabView switches to the Map tab and jumps
     /// to this item's pin.
     var onViewOnMap: ((String) -> Void)? = nil
+    /// Trip id and title — see MainTabView.focusMap(onTrip:title:).
+    var onViewTripOnMap: ((String, String) -> Void)? = nil
 
     @State private var path = NavigationPath()
 
@@ -382,7 +384,8 @@ struct FeedView: View {
                                             path.append(AuthorRoute(author: author))
                                         },
                                         onCommentTap: { open(rec) },
-                                        onViewOnMap: onViewOnMap
+                                        onViewOnMap: onViewOnMap,
+                                        onViewTripOnMap: onViewTripOnMap
                                     )
                                 }
                                 .modifier(EditableIfMine(rec: rec, onEdit: { activeSheet = .edit($0) }))
@@ -1224,8 +1227,12 @@ struct EditableIfMine: ViewModifier {
                         // card's own tap target, so every miss opened the Rex
                         // instead. The circle looks the same; the tappable
                         // area around it is now a full 44pt square.
-                        Image(systemName: "pencil")
-                            .font(.system(size: 13, weight: .semibold))
+                        // Sept 10 — "…" rather than a pencil, from the new
+                        // card mock-up: it sits beside the rating in the
+                        // corner, and reads as "more" rather than competing
+                        // with it as a second glyph.
+                        Image(systemName: "ellipsis")
+                            .font(.system(size: 13, weight: .bold))
                             .foregroundStyle(RexColor.mutedForeground)
                             .padding(8)
                             .background(RexColor.card)
@@ -1235,6 +1242,7 @@ struct EditableIfMine: ViewModifier {
                             .contentShape(Rectangle())
                     }
                     .buttonStyle(.plain)
+                    .accessibilityLabel("Edit")
                     .padding(2)
                 }
         } else {

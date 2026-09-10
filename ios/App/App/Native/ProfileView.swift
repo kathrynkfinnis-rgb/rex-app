@@ -11,6 +11,8 @@ struct ProfileView: View {
     /// #133 "view on map" — MainTabView switches to the Map tab and jumps
     /// to this item's pin.
     var onViewOnMap: ((String) -> Void)? = nil
+    /// Trip id and title — see MainTabView.focusMap(onTrip:title:).
+    var onViewTripOnMap: ((String, String) -> Void)? = nil
     /// "Can we make the friends and collections boxes here both buttons
     /// that take you to your respective pages?"
     @Environment(\.goToFriends) private var goToFriends
@@ -456,7 +458,8 @@ struct ProfileView: View {
                                         path.append(AuthorRoute(author: author))
                                     },
                                     onCommentTap: { path.append(rec.item_id) },
-                                    onViewOnMap: onViewOnMap
+                                    onViewOnMap: onViewOnMap,
+                                        onViewTripOnMap: onViewTripOnMap
                                 )
                             }
                         }

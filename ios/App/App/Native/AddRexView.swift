@@ -124,6 +124,9 @@ struct AddRexView: View {
     @State private var address = ""
     @State private var rating: Double = 10
     @State private var note = ""
+    /// Sept 10 — a list's free-text Notes, at the bottom of the form. See
+    /// RexAPI.updateLongNote for why it isn't `note`.
+    @State private var listNotes = ""
     @State private var isSaving = false
     /// Posting a trip is several sequential network calls (the trip itself,
     /// then each stop) — without this it just looks stuck for however many
@@ -264,6 +267,7 @@ struct AddRexView: View {
         .onChange(of: listEntries) { _, _ in persistDraft() }
         .onChange(of: title) { _, _ in persistDraft() }
         .onChange(of: note) { _, _ in persistDraft() }
+        .onChange(of: listNotes) { _, _ in persistDraft() }
         .onAppear {
             // Only offered when this is a fresh compose — an edit of a
             // posted trip, or a form already pre-filled from an import, has
@@ -326,7 +330,17 @@ struct AddRexView: View {
                         if title.trimmingCharacters(in: .whitespaces).isEmpty { title = name }
                         if !kind.isEmpty { listKind = kind }
                         listEntries = entries
-                    }
+                    },
+                    // Sept 10 — the other half of "if the app can't work out
+                    // what is in the list": the text you pasted doesn't have
+                    // to be thrown away when extraction finds nothing useful.
+                    // Only offered from the list form, which is the only
+                    // place with a Notes box to put it in.
+                    onUseAsNotes: category == .list ? { text in
+                        activeSheet = nil
+                        let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
+                        listNotes = listNotes.isEmpty ? trimmed : listNotes + "\n\n" + trimmed
+                    } : nil
                 )
             case .addTripStop:
                 TripStopSheet(subcategories: rexSubcategories[.place] ?? []) { stop in
@@ -596,6 +610,26 @@ struct AddRexView: View {
                     .background(RexColor.card)
                     .clipShape(RoundedRectangle(cornerRadius: 14))
                     .overlay(RoundedRectangle(cornerRadius: 14).stroke(RexColor.border, lineWidth: 1))
+
+                // Sept 10 — "a free text 'Notes' box at the bottom of lists
+                // so if the app can't work out what is in the list as it is
+                // misc, you have the opportunity to post free text instead".
+                // Last thing before Post on purpose: it's the catch-all for
+                // whatever the items above couldn't hold. A list can be all
+                // notes and no items, and still posts.
+                VStack(alignment: .leading, spacing: RexSpacing.xs) {
+                    Text("Notes").font(.system(size: 14, weight: .semibold)).foregroundStyle(RexColor.foreground)
+                    Text("Anything that doesn't fit an item — tips, commentary, the whole story. Shows on the list's page.")
+                        .font(RexFont.text(12))
+                        .foregroundStyle(RexColor.mutedForeground)
+                    TextField("Write as much as you like…", text: $listNotes, axis: .vertical)
+                        .lineLimit(5...20)
+                        .padding(12)
+                        .background(RexColor.card)
+                        .clipShape(RoundedRectangle(cornerRadius: 14))
+                        .overlay(RoundedRectangle(cornerRadius: 14).stroke(RexColor.border, lineWidth: 1))
+                }
+                .padding(.top, RexSpacing.sm)
             } else {
 
             modePicker(for: category)
@@ -1184,7 +1218,8 @@ struct AddRexView: View {
             tripYear: tripYear,
             photoURLs: photoURLs,
             entries: category == .list ? listEntries : tripEntries,
-            savedAt: Date()
+            savedAt: Date(),
+            longNote: category == .list ? listNotes : nil
         ))
     }
 
@@ -1199,6 +1234,7 @@ struct AddRexView: View {
         tripYear = draft.tripYear
         photoURLs = draft.photoURLs
         if draft.isList { listEntries = draft.entries } else { tripEntries = draft.entries }
+        listNotes = draft.longNote ?? ""
         restorableDraft = nil
     }
 
@@ -1348,6 +1384,9 @@ struct AddRexView: View {
                     note: note.isEmpty ? nil : note,
                     returningId: true
                 )
+                if !listNotes.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                    try? await RexAPI.shared.updateLongNote(recommendationId: listRecId, text: listNotes)
+                }
                 var createdItemRecIds: [String] = []
                 do {
                     for (index, draftItem) in listItems.enumerated() {
@@ -1406,9 +1445,14 @@ struct AddRexView: View {
                     // see the trip branch above.
                     photoURLs: category == .trip ? [] : photoURLs,
                     anonymous: anonymous,
-                    returningId: !taggedFriendIds.isEmpty,
+                    returningId: !taggedFriendIds.isEmpty || (category == .list && !listNotes.isEmpty),
                     asDraft: category == .trip && asDraft
                 )
+                // A list that's all notes and no items lands here rather
+                // than in the list branch above.
+                if category == .list, !listNotes.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                    try? await RexAPI.shared.updateLongNote(recommendationId: newRecId, text: listNotes)
+                }
                 if !taggedFriendIds.isEmpty {
                     try? await RexAPI.shared.setTaggedFriends(recommendationId: newRecId, userIds: Array(taggedFriendIds))
                 }
@@ -1469,6 +1513,7 @@ struct AddRexView: View {
     private func resetDraftFields() {
         title = ""
         note = ""
+        listNotes = ""
         productLink = ""
         photoURLs = []
         subcategories = []

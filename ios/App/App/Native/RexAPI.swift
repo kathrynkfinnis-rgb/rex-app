@@ -1834,6 +1834,18 @@ final class RexAPI {
     /// fixes it for everyone, since the row is shared.
     private static var repairedItemIds = Set<String>()
 
+    /// Sept 10 — guards all three repair sets below. They're plain statics
+    /// mutated from whatever task happens to call in, and
+    /// fetchMapPlaces(forTrip:) calls repairPlaceCoordsIfNeeded from a task
+    /// group — several at once, on different threads. Two concurrent
+    /// inserts into one Set is a data race, and it crashed the app
+    /// (EXC_BAD_ACCESS in Set.insert) the moment a trip card with
+    /// un-located stops scrolled into the feed. It had always been a race;
+    /// 9 Sept's no-address fallback is what made every such stop reach the
+    /// insert instead of bailing out before it. Check-and-insert is now one
+    /// locked step, so exactly one caller claims each id.
+    private static let repairLock = NSLock()
+
     /// #146: same self-healing idea, for place/event items missing lat/lng —
     /// mostly Lovable-era Rex predating #135's geocode-on-add, which just
     /// silently never got a map pin (fetchMapPlaces drops anything without
@@ -1850,8 +1862,7 @@ final class RexAPI {
     private static var thumbnailRepairedItemIds = Set<String>()
 
     func repairMissingThumbnailIfNeeded(itemId: String, type: String, title: String, subtitle: String?) async {
-        guard !Self.thumbnailRepairedItemIds.contains(itemId) else { return }
-        Self.thumbnailRepairedItemIds.insert(itemId)
+        guard Self.repairLock.withLock({ Self.thumbnailRepairedItemIds.insert(itemId).inserted }) else { return }
 
         // Recipe photos are always user-uploaded — there's no catalogue to
         // look one up in, so nothing to do there.
@@ -1894,8 +1905,7 @@ final class RexAPI {
     ) async -> (lat: Double, lng: Double)? {
         let query = address.isEmpty ? (fallbackQuery ?? "") : address
         guard !query.trimmingCharacters(in: .whitespaces).isEmpty else { return nil }
-        guard !Self.geocodeRepairedItemIds.contains(itemId) else { return nil }
-        Self.geocodeRepairedItemIds.insert(itemId)
+        guard Self.repairLock.withLock({ Self.geocodeRepairedItemIds.insert(itemId).inserted }) else { return nil }
 
         guard let located = await RexSearch.geocodeDetailed(query) else { return nil }
         guard let token = try? await validToken() else { return nil }
@@ -1918,8 +1928,7 @@ final class RexAPI {
 
     func repairPlacePhotoIfNeeded(itemId: String, imageURL: String?) async {
         guard let imageURL, imageURL.contains("places.googleapis.com") else { return }
-        guard !Self.repairedItemIds.contains(itemId) else { return }
-        Self.repairedItemIds.insert(itemId)
+        guard Self.repairLock.withLock({ Self.repairedItemIds.insert(itemId).inserted }) else { return }
 
         guard let fixed = await copyGooglePhoto(imageURL) else { return }
         let token = try? await validToken()
@@ -2194,6 +2203,81 @@ final class RexAPI {
         let (data, response) = try await URLSession.shared.data(for: request)
         guard let http = response as? HTTPURLResponse, http.statusCode < 400 else {
             throw RexAPIError.server(friendlyError(data, fallback: "Couldn't update the category."))
+        }
+    }
+
+    // MARK: - List notes (10 Sept)
+
+    /// Sept 10 — "a free text 'Notes' box at the bottom of lists so if the
+    /// app can't work out what is in the list as it is misc, you have the
+    /// opportunity to post free text instead. Especially helpful if there
+    /// is lots of commentary."
+    ///
+    /// Its own column (recommendations.long_note) rather than the existing
+    /// `note`, which is the one-line "why are you Rex'ing it" that shows on
+    /// the list's feed card. This is the other kind of writing — pages of
+    /// it, sometimes — and it lives on the list's own page, not the card.
+    ///
+    /// Read and written with requests of their own rather than folded into
+    /// fetchRecommendation's select: that read can go through the
+    /// recommendations_display view, which fixes its columns when it's
+    /// created and wouldn't know about this one. Probed like the other
+    /// late-arriving columns, so nothing breaks before the migration runs.
+    private var longNoteColumn: Bool?
+
+    func longNoteAvailable() async -> Bool {
+        if let longNoteColumn { return longNoteColumn }
+        guard let token = try? await validToken() else { return false }
+        var components = URLComponents(url: baseURL.appendingPathComponent("/rest/v1/recommendations"), resolvingAgainstBaseURL: false)!
+        components.queryItems = [
+            URLQueryItem(name: "select", value: "long_note"),
+            URLQueryItem(name: "limit", value: "1"),
+        ]
+        var request = URLRequest(url: components.url!)
+        request.setValue(anonKey, forHTTPHeaderField: "apikey")
+        request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+        let ok = (try? await URLSession.shared.data(for: request))
+            .flatMap { ($0.1 as? HTTPURLResponse)?.statusCode }
+            .map { $0 < 400 } ?? false
+        longNoteColumn = ok
+        return ok
+    }
+
+    func fetchLongNote(recommendationId: String) async -> String? {
+        guard await longNoteAvailable(), let token = try? await validToken() else { return nil }
+        var components = URLComponents(url: baseURL.appendingPathComponent("/rest/v1/recommendations"), resolvingAgainstBaseURL: false)!
+        components.queryItems = [
+            URLQueryItem(name: "select", value: "long_note"),
+            URLQueryItem(name: "id", value: "eq.\(recommendationId)"),
+        ]
+        var request = URLRequest(url: components.url!)
+        request.setValue(anonKey, forHTTPHeaderField: "apikey")
+        request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+        guard let (data, response) = try? await URLSession.shared.data(for: request),
+              let http = response as? HTTPURLResponse, http.statusCode < 400 else { return nil }
+        struct Row: Codable { let long_note: String? }
+        return (try? JSONDecoder().decode([Row].self, from: data))?.first?.long_note
+    }
+
+    func updateLongNote(recommendationId: String, text: String) async throws {
+        guard await longNoteAvailable() else {
+            throw RexAPIError.server("Notes aren't switched on yet — the database needs one more update.")
+        }
+        let token = try await validToken()
+        var components = URLComponents(url: baseURL.appendingPathComponent("/rest/v1/recommendations"), resolvingAgainstBaseURL: false)!
+        components.queryItems = [URLQueryItem(name: "id", value: "eq.\(recommendationId)")]
+        var request = URLRequest(url: components.url!)
+        request.httpMethod = "PATCH"
+        request.setValue(anonKey, forHTTPHeaderField: "apikey")
+        request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
+        request.httpBody = try JSONSerialization.data(withJSONObject: [
+            "long_note": trimmed.isEmpty ? (NSNull() as Any) : trimmed,
+        ])
+        let (data, response) = try await URLSession.shared.data(for: request)
+        guard let http = response as? HTTPURLResponse, http.statusCode < 400 else {
+            throw RexAPIError.server(friendlyError(data, fallback: "Couldn't save the notes."))
         }
     }
 
@@ -3876,7 +3960,7 @@ final class RexAPI {
                   let http = response as? HTTPURLResponse, http.statusCode < 400 else { continue }
             // So the map picks the new point up this session rather than
             // treating the stop as already repaired and skipping it.
-            Self.geocodeRepairedItemIds.remove(item.id)
+            _ = Self.repairLock.withLock { Self.geocodeRepairedItemIds.remove(item.id) }
             fixed += 1
         }
         return (fixed, total)

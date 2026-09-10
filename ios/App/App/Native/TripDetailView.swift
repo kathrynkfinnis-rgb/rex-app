@@ -82,8 +82,9 @@ struct TripDetailView: View {
     ///
     /// AppStorage, not State: whichever way you read trips is a habit, not
     /// a per-trip decision, and re-picking it on every trip is the annoying
-    /// half of offering the choice at all.
-    @AppStorage("tripDetailCompact") private var compact = false
+    /// half of offering the choice at all. Shared with ListDetailView since
+    /// 10 Sept — see ItineraryCompactViews.
+    @AppStorage(ItineraryViewMode.storageKey) private var compact = false
 
     init(route: TripRoute) {
         self.route = route
@@ -109,6 +110,13 @@ struct TripDetailView: View {
         ScrollView {
             VStack(alignment: .leading, spacing: 16) {
                 header
+
+                // Sept 10 — "there should be a toggle at the top of the page
+                // to switch views". It was a toolbar icon, which nobody
+                // found; up here it's seen before the content it changes.
+                if !stops.isEmpty {
+                    ItineraryViewToggle(compact: $compact)
+                }
 
                 if isLoading {
                     ForEach(0..<3, id: \.self) { _ in
@@ -148,7 +156,9 @@ struct TripDetailView: View {
                     }
                     ForEach(Array(groups.enumerated()), id: \.offset) { _, group in
                         VStack(alignment: .leading, spacing: 8) {
-                            if !group.heading.isEmpty || isEditing {
+                            if compact && !isEditing {
+                                if !group.heading.isEmpty { CompactHeadingRow(text: group.heading) }
+                            } else if !group.heading.isEmpty || isEditing {
                                 HStack(spacing: RexSpacing.sm) {
                                     Text(group.heading.isEmpty ? "No heading" : group.heading)
                                         .font(.system(size: 18, weight: .semibold, design: .rounded))
@@ -210,7 +220,7 @@ struct TripDetailView: View {
                                     }
                                     NavigationLink(value: stop.item_id) {
                                         if compact {
-                                            compactStopRow(stop, number: index + 1)
+                                            CompactItemRow(rec: stop)
                                         } else {
                                             RecommendationCardView(rec: stop)
                                         }
@@ -231,16 +241,6 @@ struct TripDetailView: View {
         .navigationTitle("Trip")
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
-            ToolbarItem(placement: .topBarTrailing) {
-                Button {
-                    withAnimation(.snappy) { compact.toggle() }
-                } label: {
-                    // The icon shows what you'd get, not what you have —
-                    // the usual reading of a toolbar toggle.
-                    Image(systemName: compact ? "rectangle.grid.1x2" : "list.bullet")
-                }
-                .accessibilityLabel(compact ? "Show full cards" : "Show compact list")
-            }
             if isOwner {
                 ToolbarItem(placement: .topBarTrailing) {
                     Menu {
@@ -304,77 +304,6 @@ struct TripDetailView: View {
                     onDeleted: { Task { await load() } }
                 )
             }
-        }
-    }
-
-    /// One line per stop: position, thumbnail, name, and where it is.
-    /// Deliberately close to the edit view's rows, which is the layout
-    /// Kathryn pointed at — the difference is that these are still links
-    /// through to the stop rather than handles for reordering it.
-    private func compactStopRow(_ stop: FeedRecommendation, number: Int) -> some View {
-        let category = RexCategory(rawType: stop.items?.type)
-        return HStack(spacing: RexSpacing.sm) {
-            Text("\(number)")
-                .font(RexFont.text(12, weight: .semibold))
-                .foregroundStyle(RexColor.mutedForeground)
-                .frame(width: 18, alignment: .trailing)
-
-            // A stop with no picture still gets a swatch rather than a
-            // hole, so the rows stay on one grid.
-            Group {
-                if let url = stop.items?.image_url, let parsed = URL(string: url) {
-                    AsyncImage(url: parsed) { phase in
-                        if let image = phase.image {
-                            Color.clear.overlay { image.resizable().scaledToFill() }
-                        } else {
-                            category.tintColor.opacity(0.18)
-                        }
-                    }
-                } else {
-                    category.tintColor.opacity(0.18)
-                }
-            }
-            .frame(width: 34, height: 34)
-            .clipShape(RoundedRectangle(cornerRadius: 7, style: .continuous))
-
-            VStack(alignment: .leading, spacing: 1) {
-                Text(stop.items?.title ?? "Untitled")
-                    .font(RexFont.text(14.5, weight: .medium))
-                    .foregroundStyle(RexColor.foreground)
-                    .lineLimit(1)
-                if let where_ = shortLocality(stop.items?.address) ?? stop.items?.subtitle, !where_.isEmpty {
-                    Text(where_)
-                        .font(RexFont.text(11.5))
-                        .foregroundStyle(RexColor.mutedForeground)
-                        .lineLimit(1)
-                }
-            }
-
-            Spacer(minLength: RexSpacing.xs)
-
-            if stop.rating > 0 {
-                RexRatingBadge(raw: stop.rating, compact: true)
-            }
-            Image(systemName: "chevron.right")
-                .font(.system(size: 11, weight: .semibold))
-                .foregroundStyle(RexColor.mutedForeground.opacity(0.7))
-        }
-        .padding(.horizontal, RexSpacing.md)
-        .padding(.vertical, RexSpacing.sm)
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .background(RexColor.card)
-        .clipShape(RoundedRectangle(cornerRadius: RexRadius.card, style: .continuous))
-        .overlay(
-            RoundedRectangle(cornerRadius: RexRadius.card, style: .continuous)
-                .stroke(RexColor.border, lineWidth: 1)
-        )
-        .overlay(alignment: .leading) {
-            // The same category cap the feed cards carry, turned on its
-            // side — at this size a 3px edge is all there's room for.
-            RoundedRectangle(cornerRadius: 2)
-                .fill(category.tintColor)
-                .frame(width: 3)
-                .padding(.vertical, 8)
         }
     }
 

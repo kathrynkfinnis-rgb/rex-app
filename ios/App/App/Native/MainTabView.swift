@@ -85,6 +85,14 @@ struct MainTabView: View {
         selection = 1
     }
 
+    /// Sept 10 — a trip card's map tile opens the Map tab following that
+    /// trip: only its pins, framed so all of them are on screen.
+    private func focusMap(onTrip tripId: String, title: String) {
+        mapFocusNonce += 1
+        mapFocusRequest = MapFocusRequest(itemId: "", nonce: mapFocusNonce, tripId: tripId, tripTitle: title)
+        selection = 1
+    }
+
     var body: some View {
         ZStack(alignment: .bottom) {
             TabView(selection: $selection) {
@@ -93,7 +101,8 @@ struct MainTabView: View {
                     popToRootSignal: feedPopSignal,
                     onFriendsTap: { selection = 4 },
                     addRexRefreshSignal: addRexRefreshSignal,
-                    onViewOnMap: { focusMap(onItemId: $0) }
+                    onViewOnMap: { focusMap(onItemId: $0) },
+                    onViewTripOnMap: { focusMap(onTrip: $0, title: $1) }
                 ).tag(0)
 
                 NavigationStack {
@@ -129,7 +138,7 @@ struct MainTabView: View {
                 // here, its own stack + bound path provided by whichever
                 // call site hosts it.
                 NavigationStack(path: $profilePath) {
-                    ProfileView(onSignedOut: onSignedOut, onViewOnMap: { focusMap(onItemId: $0) }, path: $profilePath)
+                    ProfileView(onSignedOut: onSignedOut, onViewOnMap: { focusMap(onItemId: $0) }, onViewTripOnMap: { focusMap(onTrip: $0, title: $1) }, path: $profilePath)
                 }
                 .tag(5)
             }

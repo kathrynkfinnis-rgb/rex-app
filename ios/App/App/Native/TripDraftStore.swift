@@ -24,10 +24,14 @@ struct TripDraft: Codable {
     var photoURLs: [String]
     var entries: [ItineraryEntry]
     var savedAt: Date
+    /// Sept 10 — a list's free-text Notes. Optional so a draft saved by an
+    /// older build still decodes.
+    var longNote: String? = nil
 
     /// Nothing worth restoring — an empty form shouldn't prompt anyone.
     var isEmpty: Bool {
         title.trimmingCharacters(in: .whitespaces).isEmpty && entries.isEmpty
+            && (longNote ?? "").trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
     }
 }
 

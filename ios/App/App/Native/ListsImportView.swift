@@ -11,6 +11,10 @@ struct ListsImportView: View {
     var onExtractedAsList: ((String, String, [ItineraryEntry]) -> Void)? = nil
     /// Passed straight through — see ImportReviewView.intoCollection.
     var intoCollection: (id: String, name: String)? = nil
+    /// Sept 10 — set from the list form only: hands the pasted text back to
+    /// become the list's Notes, for a document that's commentary rather
+    /// than a set of things.
+    var onUseAsNotes: ((String) -> Void)? = nil
 
     @Environment(\.dismiss) private var dismiss
 
@@ -55,6 +59,25 @@ struct ListsImportView: View {
                     }
                     .buttonStyle(RexPrimaryButtonStyle())
                     .disabled(isExtracting || text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+
+                    if let onUseAsNotes {
+                        Button {
+                            onUseAsNotes(text)
+                            dismiss()
+                        } label: {
+                            Text("Add it to the list\u{2019}s notes instead")
+                                .font(RexFont.text(14, weight: .semibold))
+                                .frame(maxWidth: .infinity)
+                        }
+                        .buttonStyle(.plain)
+                        .foregroundStyle(RexColor.primary)
+                        .disabled(isExtracting || text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+                        Text("For a document that's mostly commentary — it goes into the Notes box as it is, rather than being split into items.")
+                            .font(RexFont.text(12))
+                            .foregroundStyle(RexColor.mutedForeground)
+                            .multilineTextAlignment(.center)
+                            .frame(maxWidth: .infinity)
+                    }
                 }
                 .padding(RexSpacing.page)
             }
@@ -90,7 +113,9 @@ struct ListsImportView: View {
         do {
             let items = try await RexAPI.shared.extractRecommendations(text: text)
             guard !items.isEmpty else {
-                errorMessage = "Couldn't find any recommendations in that \u{2014} try adding a bit more detail."
+                errorMessage = onUseAsNotes == nil
+                    ? "Couldn't find any recommendations in that \u{2014} try adding a bit more detail."
+                    : "Couldn't pick out separate items in that \u{2014} you can add it to the list\u{2019}s notes instead."
                 isExtracting = false
                 return
             }

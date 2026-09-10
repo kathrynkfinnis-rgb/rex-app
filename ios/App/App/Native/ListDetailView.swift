@@ -33,17 +33,24 @@ struct ListDetailView: View {
     private enum ActiveSheet: Identifiable {
         case addItem
         case edit(FeedRecommendation)
+        case editNotes
         var id: String {
             switch self {
             case .addItem: return "addItem"
             case .edit(let rec): return "edit-\(rec.id)"
+            case .editNotes: return "editNotes"
             }
         }
     }
+    /// Sept 10 — the list's free-text Notes (RexAPI.fetchLongNote).
+    @State private var longNote = ""
     @State private var activeSheet: ActiveSheet?
 
     @State private var isOwner = false
     @State private var isEditing = false
+    /// Sept 10 — expanded (full cards) or compact (the edit view's rows).
+    /// Shared with TripDetailView; see ItineraryCompactViews.
+    @AppStorage(ItineraryViewMode.storageKey) private var compact = false
     @State private var isMutating = false
     @State private var mutationError: String?
     @State private var renamingHeading: String?
@@ -80,12 +87,20 @@ struct ListDetailView: View {
             VStack(alignment: .leading, spacing: 16) {
                 header
 
+                if !items.isEmpty {
+                    ItineraryViewToggle(compact: $compact)
+                }
+
                 if isLoading {
                     ForEach(0..<3, id: \.self) { _ in
                         RoundedRectangle(cornerRadius: 16).fill(RexColor.muted).frame(height: 90)
                     }
                 } else if let errorMessage {
                     errorState(errorMessage)
+                } else if items.isEmpty && !longNote.isEmpty {
+                    // A list that's all notes — the Notes section below is
+                    // the content, so no "nothing here" box above it.
+                    EmptyView()
                 } else if items.isEmpty {
                     Text("Nothing on this list yet.")
                         .font(.footnote)
@@ -105,7 +120,9 @@ struct ListDetailView: View {
                     }
                     ForEach(Array(groups.enumerated()), id: \.offset) { _, group in
                         VStack(alignment: .leading, spacing: 8) {
-                            if !group.heading.isEmpty || isEditing {
+                            if compact && !isEditing {
+                                if !group.heading.isEmpty { CompactHeadingRow(text: group.heading) }
+                            } else if !group.heading.isEmpty || isEditing {
                                 HStack(spacing: RexSpacing.sm) {
                                     Text(group.heading.isEmpty ? "No heading" : group.heading)
                                         .font(.system(size: 18, weight: .semibold, design: .rounded))
@@ -160,6 +177,10 @@ struct ListDetailView: View {
                             }
                         }
                     }
+                }
+
+                if !isLoading, errorMessage == nil, !longNote.isEmpty || isOwner {
+                    notesSection
                 }
             }
             .padding(12)
@@ -216,6 +237,10 @@ struct ListDetailView: View {
                     onSaved: { Task { await load() } },
                     onDeleted: { Task { await load() } }
                 )
+            case .editNotes:
+                ListNotesEditor(recommendationId: route.recommendationId, initialText: longNote) { saved in
+                    longNote = saved
+                }
             }
         }
     }
@@ -273,7 +298,85 @@ struct ListDetailView: View {
         }
     }
 
+    /// The list's Notes, under everything else — the same place the Notes
+    /// box sits on the form. Selectable, and links are tappable, since a
+    /// page of commentary is exactly where people paste them.
+    private var notesSection: some View {
+        VStack(alignment: .leading, spacing: RexSpacing.sm) {
+            HStack(spacing: RexSpacing.sm) {
+                Text("Notes")
+                    .font(.system(size: 18, weight: .semibold, design: .rounded))
+                    .foregroundStyle(RexColor.foreground)
+                Spacer()
+                if isOwner {
+                    Button {
+                        activeSheet = .editNotes
+                    } label: {
+                        Label(longNote.isEmpty ? "Add notes" : "Edit", systemImage: "pencil")
+                            .font(RexFont.text(12, weight: .semibold))
+                    }
+                    .buttonStyle(.plain)
+                    .foregroundStyle(RexColor.primary)
+                }
+            }
+            if longNote.isEmpty {
+                Text("Tips, commentary, anything that doesn't fit an item.")
+                    .font(RexFont.text(13))
+                    .foregroundStyle(RexColor.mutedForeground)
+            } else {
+                Text(linkifiedNotes(longNote))
+                    .font(RexFont.text(15))
+                    .foregroundStyle(RexColor.foreground.opacity(0.9))
+                    .tint(RexColor.primary)
+                    .textSelection(.enabled)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+        }
+        .padding(RexSpacing.cardPadding)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(RexColor.card)
+        .clipShape(RoundedRectangle(cornerRadius: RexRadius.card, style: .continuous))
+        .overlay(
+            RoundedRectangle(cornerRadius: RexRadius.card, style: .continuous)
+                .stroke(RexColor.border, lineWidth: 1)
+        )
+        .padding(.top, RexSpacing.sm)
+    }
+
+    private func linkifiedNotes(_ text: String) -> AttributedString {
+        var attributed = AttributedString(text)
+        guard let detector = try? NSDataDetector(types: NSTextCheckingResult.CheckingType.link.rawValue) else { return attributed }
+        let ns = text as NSString
+        for match in detector.matches(in: text, range: NSRange(location: 0, length: ns.length)) {
+            guard let url = match.url,
+                  let range = Range(match.range, in: text),
+                  let lower = AttributedString.Index(range.lowerBound, within: attributed),
+                  let upper = AttributedString.Index(range.upperBound, within: attributed) else { continue }
+            attributed[lower..<upper].link = url
+        }
+        return attributed
+    }
+
+    @ViewBuilder
     private func itemRow(_ item: FeedRecommendation) -> some View {
+        if compact && !isEditing {
+            NavigationLink(value: item.item_id) {
+                CompactItemRow(rec: item)
+            }
+            .buttonStyle(.plain)
+            // The expanded view's Edit button is the one thing a compact
+            // row has no room for; on your own list it's a long-press away.
+            .contextMenu {
+                if isOwner {
+                    Button { activeSheet = .edit(item) } label: { Label("Edit", systemImage: "pencil") }
+                }
+            }
+        } else {
+            expandedItemRow(item)
+        }
+    }
+
+    private func expandedItemRow(_ item: FeedRecommendation) -> some View {
         VStack(alignment: .leading, spacing: 0) {
             NavigationLink(value: item.item_id) {
                 RecommendationCardView(rec: item)
@@ -350,6 +453,7 @@ struct ListDetailView: View {
             isOwner = listRec?.user_id == RexAPI.shared.currentUserId
             listItemId = listRec?.item_id
             subtitle = listRec?.items?.subtitle ?? ""
+            longNote = await RexAPI.shared.fetchLongNote(recommendationId: route.recommendationId) ?? ""
         } catch {
             errorMessage = error.localizedDescription
         }
@@ -434,5 +538,74 @@ struct ListDetailView: View {
         }
         .padding(24)
         .frame(maxWidth: .infinity)
+    }
+}
+
+
+/// Sept 10 — editing a list's Notes after it's posted. A sheet with a real
+/// multi-line editor rather than an alert's one-line field: the whole
+/// point of Notes is that there can be a lot of it.
+struct ListNotesEditor: View {
+    let recommendationId: String
+    let initialText: String
+    var onSaved: (String) -> Void
+
+    @Environment(\.dismiss) private var dismiss
+    @State private var text = ""
+    @State private var isSaving = false
+    @State private var errorMessage: String?
+
+    var body: some View {
+        NavigationStack {
+            VStack(alignment: .leading, spacing: RexSpacing.md) {
+                TextEditor(text: $text)
+                    .font(RexFont.text(15))
+                    .scrollContentBackground(.hidden)
+                    .padding(RexSpacing.sm)
+                    .background(RexColor.card)
+                    .clipShape(RoundedRectangle(cornerRadius: RexRadius.input, style: .continuous))
+                    .overlay(
+                        RoundedRectangle(cornerRadius: RexRadius.input, style: .continuous)
+                            .stroke(RexColor.border, lineWidth: 1)
+                    )
+                if let errorMessage {
+                    Text(errorMessage)
+                        .font(RexFont.text(13))
+                        .foregroundStyle(RexColor.destructive)
+                }
+            }
+            .padding(RexSpacing.page)
+            .background(RexColor.background.ignoresSafeArea())
+            .navigationTitle("Notes")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .topBarLeading) {
+                    Button("Cancel") { dismiss() }
+                }
+                ToolbarItem(placement: .topBarTrailing) {
+                    Button {
+                        Task { await save() }
+                    } label: {
+                        if isSaving { ProgressView() } else { Text("Save").fontWeight(.semibold) }
+                    }
+                    .disabled(isSaving)
+                }
+            }
+        }
+        .tint(RexColor.primary)
+        .onAppear { if text.isEmpty { text = initialText } }
+    }
+
+    private func save() async {
+        isSaving = true
+        errorMessage = nil
+        do {
+            try await RexAPI.shared.updateLongNote(recommendationId: recommendationId, text: text)
+            onSaved(text.trimmingCharacters(in: .whitespacesAndNewlines))
+            dismiss()
+        } catch {
+            errorMessage = error.localizedDescription
+        }
+        isSaving = false
     }
 }

@@ -45,6 +45,8 @@ struct RexMapView: View {
     }
 
     @State private var selectedPlace: MapPlace?
+    /// See GoogleMapView.fitToPlacesNonce.
+    @State private var tripFitNonce = 0
     @State private var userCoordinate: CLLocationCoordinate2D?
     @State private var areaName: String?
     @State private var filter: RexCategory?
@@ -196,7 +198,8 @@ struct RexMapView: View {
                     radiusMeters: radiusMeters,
                     focusRequest: focusRequest,
                     onSelect: { selectedPlace = $0 },
-                    onLongPress: { coordinate in Task { await resolveLongPress(coordinate) } }
+                    onLongPress: { coordinate in Task { await resolveLongPress(coordinate) } },
+                    fitToPlacesNonce: tripFitNonce
                 )
                 .ignoresSafeArea(edges: .bottom)
             }
@@ -276,8 +279,15 @@ struct RexMapView: View {
         tripFilter = id
         followingTripTitle = title
         focusedTripPlaces = nil
+        // Other filters could hide the trip's own stops — clear them so
+        // "just the pins for that trip" means all of them.
+        filter = nil
+        subFilter = nil
+        personFilter = nil
         Task {
             focusedTripPlaces = (try? await RexAPI.shared.fetchMapPlaces(forTrip: id, tripName: title)) ?? []
+            // Frame every stop once they've arrived — see GoogleMapView.
+            tripFitNonce += 1
         }
     }
 
@@ -292,6 +302,11 @@ struct RexMapView: View {
     /// pops its info sheet the same as tapping the pin directly would.
     private func focusOn(_ request: MapFocusRequest?) async {
         guard let request else { return }
+        if let tripId = request.tripId {
+            selectedPlace = nil
+            followTrip(id: tripId, title: request.tripTitle ?? "Trip")
+            return
+        }
         guard let place = try? await RexAPI.shared.fetchMapPlace(itemId: request.itemId) else { return }
         // A category filter or a followed trip could hide the very place
         // being jumped to — clear both so it's guaranteed visible.

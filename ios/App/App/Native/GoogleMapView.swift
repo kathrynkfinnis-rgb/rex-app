@@ -12,6 +12,12 @@ import CoreLocation
 struct MapFocusRequest: Equatable {
     let itemId: String
     let nonce: Int
+    /// Sept 10 — "when you click on the map in a trip card in the feed, it
+    /// should take you to a filtered view of the map with just the pins for
+    /// that trip on it, zoomed to show all of them". Set instead of an item
+    /// to follow a whole trip.
+    var tripId: String? = nil
+    var tripTitle: String? = nil
 }
 
 struct GoogleMapView: UIViewRepresentable {
@@ -26,6 +32,10 @@ struct GoogleMapView: UIViewRepresentable {
     /// is already claimed (panning/pin selection); long-press is the same
     /// gesture Apple/Google Maps themselves use for "drop a pin here".
     var onLongPress: ((CLLocationCoordinate2D) -> Void)? = nil
+    /// Bumped whenever the camera should frame every pin currently shown —
+    /// following a trip, so all its stops are on screen at once rather than
+    /// wherever the map happened to be sitting.
+    var fitToPlacesNonce: Int = 0
 
     func makeCoordinator() -> Coordinator { Coordinator(self) }
 
@@ -73,6 +83,30 @@ struct GoogleMapView: UIViewRepresentable {
             context.coordinator.didCenter = true
         }
 
+        // Only once the pins are there to frame — a nonce that arrives
+        // before its places would otherwise be spent on an empty map.
+        if fitToPlacesNonce != context.coordinator.lastFitNonce {
+            let coords = places.compactMap { p -> CLLocationCoordinate2D? in
+                guard let lat = p.lat, let lng = p.lng else { return nil }
+                return CLLocationCoordinate2D(latitude: lat, longitude: lng)
+            }
+            if coords.count == 1 {
+                // Fitting one point zooms to street level; a single stop
+                // reads better with some neighbourhood around it.
+                mapView.animate(to: GMSCameraPosition(target: coords[0], zoom: zoomFor(radiusMeters: 1500)))
+                context.coordinator.lastFitNonce = fitToPlacesNonce
+            } else if coords.count > 1 {
+                var bounds = GMSCoordinateBounds()
+                for coord in coords { bounds = bounds.includingCoordinate(coord) }
+                // Generous at the top: the map's header (area name, the
+                // "Following" bar and two rows of filter chips) floats over
+                // the top ~230pt, and a pin framed under it is as good as
+                // missing. Bottom clears the tab bar and the + button.
+                mapView.animate(with: GMSCameraUpdate.fit(bounds, with: UIEdgeInsets(top: 250, left: 50, bottom: 130, right: 50)))
+                context.coordinator.lastFitNonce = fitToPlacesNonce
+            }
+        }
+
         if let focusRequest, focusRequest != context.coordinator.lastFocusRequest,
            let place = places.first(where: { $0.id == focusRequest.itemId }),
            let lat = place.lat, let lng = place.lng {
@@ -110,6 +144,7 @@ struct GoogleMapView: UIViewRepresentable {
         var renderedIds = ""
         var didCenter = false
         var lastFocusRequest: MapFocusRequest?
+        var lastFitNonce = 0
 
         init(_ parent: GoogleMapView) { self.parent = parent }
 
