@@ -186,3 +186,19 @@ new ones above once logged.
   matches what she'd expect.
 - Whether WhatsApp share needs a real public link (requiring a web route for
   collections that doesn't exist yet) or just a text summary.
+
+## Parked at Kathryn's request (11 Sept) — designs agreed, not started
+
+- **Official REX profile.** "Post as REX" switch for admins, not a shared
+  login. REX is a normal profile; an admins table + RLS lets only listed
+  admins write rows whose user_id is the REX profile. Admins: Kathryn,
+  Gemma, Phoebe. Needs Kathryn to create the auth user (Supabase →
+  Authentication → Add user, username "rex") — don't create it ourselves.
+- **Find friends via contacts.** Phase 1: match contacts' emails against
+  sign-ups via a security-definer RPC taking SHA-256 hashes (auth.users isn't
+  client-readable), plus an "Invite" share of the TestFlight/App Store link
+  for everyone else. Phase 2: optional verified phone at sign-up (SMS OTP
+  cost). Needs NSContactsUsageDescription, App Store privacy label update,
+  and a privacy-policy change for Kathryn's legal advisor.
+- **💯 reads as "707"** (TestFlight, 8 Sept). Word label or a different
+  emoji for the Obsessed rating — Kathryn's call.

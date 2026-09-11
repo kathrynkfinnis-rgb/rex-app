@@ -3614,7 +3614,17 @@ final class RexAPI {
         // recommendation twice, the second time under the wrong name. A
         // want added from scratch still posts — nobody has Rex'd that yet,
         // so it's the only way anyone hears about it.
-        if await wantSourceField() { ownerFilter.append(("source", "neq.save")) }
+        //
+        // Sept 11 — "Phoebe just added a want to try TV and doesn't appear in
+        // the feed". This was `source=neq.save`, which PostgREST turns into
+        // SQL `source <> 'save'` — and that's never true for NULL. Every want
+        // created by a build older than 33 (or anything else that doesn't
+        // know about the column) has a NULL source, so all of them were
+        // silently filtered out. Unknown now counts as shown: an old client's
+        // want appears the way every want did before, which is the safe side
+        // to be wrong on — a card too many, rather than a friend's new want
+        // that nobody ever sees.
+        if await wantSourceField() { ownerFilter.append(("or", "(source.is.null,source.neq.save)")) }
         let categoryFilter: [(String, String)] = ownerFilter + (category.map { [("items.type", "eq.\($0)")] } ?? [])
         let rows: [Row]
         let profilesById: [String: RexProfile]
