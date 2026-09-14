@@ -47,8 +47,7 @@ struct RecommendationCardView: View {
         var needed: CGFloat = 0
         if rec.isWant { needed = 104 }
         else if rec.isBlast { needed = 72 }
-        // "100%" (Obsessed at card size) is wider than an emoji.
-        else if rec.rating > 0 { needed = RexRatingTier.tier(forRaw: rec.rating) == .obsessed ? 46 : 30 }
+        else if rec.rating > 0 { needed = 30 }
         if rec.user_id == RexAPI.shared.currentUserId { needed += 36 }
         return needed
     }
