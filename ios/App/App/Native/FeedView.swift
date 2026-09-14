@@ -52,11 +52,13 @@ struct FeedView: View {
         case edit(FeedRecommendation)
         case collection(FeedRecommendation)
         case trip(FeedRecommendation)
+        case comments(FeedRecommendation)
         var id: String {
             switch self {
             case .edit(let rec): return "edit-\(rec.id)"
             case .collection(let rec): return "collection-\(rec.id)"
             case .trip(let rec): return "trip-\(rec.id)"
+            case .comments(let rec): return "comments-\(rec.id)"
             }
         }
     }
@@ -383,7 +385,9 @@ struct FeedView: View {
                                         onBookAuthorTap: { author in
                                             path.append(AuthorRoute(author: author))
                                         },
-                                        onCommentTap: { open(rec) },
+                                        // Blasts keep their own screen, which
+                                        // is where their responses live.
+                                        onCommentTap: { rec.isBlast ? open(rec) : (activeSheet = .comments(rec)) },
                                         onViewOnMap: onViewOnMap,
                                         onViewTripOnMap: onViewTripOnMap
                                     )
@@ -536,6 +540,8 @@ struct FeedView: View {
         }
         .sheet(item: $activeSheet) { sheet in
             switch sheet {
+            case .comments(let rec):
+                CommentsSheet(rec: rec)
             case .collection(let rec):
                 AddToCollectionView(rec: rec, onDone: {})
             case .trip(let rec):

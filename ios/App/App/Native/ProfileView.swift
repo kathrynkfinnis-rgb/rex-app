@@ -46,8 +46,10 @@ struct ProfileView: View {
         case edit(FeedRecommendation)
         case collection(FeedRecommendation)
         case trip(FeedRecommendation)
+        case comments(FeedRecommendation)
         var id: String {
             switch self {
+            case .comments(let rec): return "comments-\(rec.id)"
             case .editProfile: return "editProfile"
             case .edit(let rec): return "edit-\(rec.id)"
             case .collection(let rec): return "collection-\(rec.id)"
@@ -165,6 +167,8 @@ struct ProfileView: View {
         .task { await load() }
         .sheet(item: $activeSheet) { sheet in
             switch sheet {
+            case .comments(let rec):
+                CommentsSheet(rec: rec)
             case .editProfile:
                 EditProfileView(profile: profile, onSaved: { Task { await load() } })
             case .collection(let rec):
@@ -462,7 +466,7 @@ struct ProfileView: View {
                                     onBookAuthorTap: { author in
                                         path.append(AuthorRoute(author: author))
                                     },
-                                    onCommentTap: { path.append(rec.item_id) },
+                                    onCommentTap: { activeSheet = .comments(rec) },
                                     onViewOnMap: onViewOnMap,
                                         onViewTripOnMap: onViewTripOnMap
                                 )
