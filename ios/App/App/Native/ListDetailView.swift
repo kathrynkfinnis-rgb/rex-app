@@ -185,6 +185,29 @@ struct ListDetailView: View {
                 if !isLoading, errorMessage == nil, !longNote.isEmpty || isOwner {
                     notesSection
                 }
+
+                // Sept 14 — "I currently can't comment on someone else's
+                // list". A list's (and a trip's) own page had no likes or
+                // comments anywhere, and the comment icon on its feed card
+                // opens this page — so there was no way to reply at all. The
+                // same block every other Rex's page carries.
+                if !isLoading, errorMessage == nil {
+                    VStack(alignment: .leading, spacing: RexSpacing.sm) {
+                        Text("Comments")
+                            .font(.system(size: 18, weight: .semibold, design: .rounded))
+                            .foregroundStyle(RexColor.foreground)
+                        LikesCommentsView(recommendationId: route.recommendationId)
+                    }
+                    .padding(RexSpacing.cardPadding)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .background(RexColor.card)
+                    .clipShape(RoundedRectangle(cornerRadius: RexRadius.card, style: .continuous))
+                    .overlay(
+                        RoundedRectangle(cornerRadius: RexRadius.card, style: .continuous)
+                            .stroke(RexColor.border, lineWidth: 1)
+                    )
+                    .padding(.top, RexSpacing.sm)
+                }
             }
             .padding(12)
         }
