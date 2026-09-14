@@ -24,6 +24,8 @@
 	<string>$(CURRENT_PROJECT_VERSION)</string>
 	<key>LSRequiresIPhoneOS</key>
 	<true/>
+	<key>NSContactsUsageDescription</key>
+	<string>Rex checks the email addresses in your contacts to show which of your friends are already on Rex. They're scrambled on your phone first, and nothing is stored.</string>
 	<key>NSLocationWhenInUseUsageDescription</key>
 	<string>Rex uses your location to center the map on places near you.</string>
 	<key>ITSAppUsesNonExemptEncryption</key>

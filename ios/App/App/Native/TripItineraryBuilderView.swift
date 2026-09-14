@@ -300,6 +300,55 @@ struct TripEditorLoader: View {
     }
 }
 
+/// Sept 14 — TripEditorLoader's twin for lists: fetches the items and the
+/// notes, then opens the list in the form it was made in. Used by the list
+/// page's Edit and by the "…" on a list's feed card, so both land in the
+/// same place.
+struct ListEditorLoader: View {
+    let list: FeedRecommendation
+    var onDone: () -> Void
+
+    @State private var items: [FeedRecommendation]?
+    @State private var longNote: String?
+    @State private var failed = false
+
+    var body: some View {
+        Group {
+            if let items {
+                AddRexView(onDone: onDone, editingList: list, items: items, longNote: longNote)
+            } else if failed {
+                VStack(spacing: RexSpacing.md) {
+                    Image(systemName: "exclamationmark.triangle")
+                        .font(.title)
+                        .foregroundStyle(RexColor.destructive)
+                    Text("Couldn't open that list for editing.")
+                        .font(RexFont.text(14))
+                        .foregroundStyle(RexColor.mutedForeground)
+                    Button("Close", action: onDone)
+                        .buttonStyle(RexSecondaryButtonStyle())
+                        .padding(.horizontal, RexSpacing.xxl)
+                }
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                .background(RexColor.background.ignoresSafeArea())
+            } else {
+                ProgressView()
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    .background(RexColor.background.ignoresSafeArea())
+            }
+        }
+        .task {
+            guard items == nil else { return }
+            async let notes = RexAPI.shared.fetchLongNote(recommendationId: list.id)
+            if let loaded = try? await RexAPI.shared.fetchListItems(listRecommendationId: list.id) {
+                longNote = await notes
+                items = loaded
+            } else {
+                failed = true
+            }
+        }
+    }
+}
+
 /// Moves the dragged row to wherever it's hovering, live, so the list
 /// reorders under your finger rather than only on drop.
 private struct ReorderDropDelegate: DropDelegate {

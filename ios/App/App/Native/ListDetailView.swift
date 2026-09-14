@@ -48,6 +48,9 @@ struct ListDetailView: View {
 
     @State private var isOwner = false
     @State private var isEditing = false
+    /// Sept 14 — the list's own row, for opening it in the input form.
+    @State private var listRec: FeedRecommendation?
+    @State private var showingListEditor = false
     /// Sept 10 — expanded (full cards) or compact (the edit view's rows).
     /// Shared with TripDetailView; see ItineraryCompactViews.
     @AppStorage(ItineraryViewMode.storageKey) private var compact = false
@@ -203,13 +206,26 @@ struct ListDetailView: View {
                     }
                 }
                 ToolbarItem(placement: .topBarTrailing) {
-                    Button(isEditing ? "Done" : "Edit") {
-                        withAnimation { isEditing.toggle() }
-                    }
+                    // Sept 14 — "the two edit buttons take you to different
+                    // pages, they should be the same". This one toggled an
+                    // in-place editor; the "…" on the list's feed card opened
+                    // the single-Rex editor. Both open the list in the form
+                    // it was made in now — headings, drag to reorder, add and
+                    // remove items, notes — the same way a trip's Edit does.
+                    Button("Edit") { showingListEditor = true }
+                        .disabled(listRec == nil)
                 }
             }
         }
         .task { await load() }
+        .fullScreenCover(isPresented: $showingListEditor) {
+            if let listRec {
+                ListEditorLoader(list: listRec) {
+                    showingListEditor = false
+                    Task { await load() }
+                }
+            }
+        }
         .alert("Rename heading", isPresented: Binding(
             get: { renamingHeading != nil },
             set: { if !$0 { renamingHeading = nil } }
@@ -450,6 +466,7 @@ struct ListDetailView: View {
             // not knowing who owns this list should hide the Edit button,
             // not break loading the page.
             let listRec = try? await RexAPI.shared.fetchRecommendation(id: route.recommendationId)
+            self.listRec = listRec
             isOwner = listRec?.user_id == RexAPI.shared.currentUserId
             listItemId = listRec?.item_id
             subtitle = listRec?.items?.subtitle ?? ""

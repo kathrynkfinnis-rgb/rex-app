@@ -1536,6 +1536,104 @@ final class RexAPI {
         return try JSONDecoder().decode([SuggestedFriend].self, from: data)
     }
 
+    // MARK: - Finding friends (14 Sept)
+
+    /// A friend's own friends — "look at your friends' friends as another
+    /// way to find users". friends_of() only answers for someone you're
+    /// friends with; for anyone else it returns nothing, which the profile
+    /// screen reads as "don't offer the list".
+    func fetchFriendsOf(userId: String) async throws -> [FoundPerson] {
+        try await callPeopleRPC("friends_of", body: ["_user": userId, "_limit": 300],
+                                fallback: "Couldn't load their friends.")
+    }
+
+    /// Hashes of the emails in your contacts in, Rex profiles out. The
+    /// hashing happens on the phone (ContactsFriendFinderView); no address
+    /// ever leaves it.
+    func matchContactEmails(hashes: [String]) async throws -> [FoundPerson] {
+        guard !hashes.isEmpty else { return [] }
+        var found: [String: FoundPerson] = [:]
+        // The database caps a call at 2,000; a bigger address book goes in
+        // batches.
+        var start = 0
+        while start < hashes.count {
+            let batch = Array(hashes[start..<min(start + 2000, hashes.count)])
+            let people = try await callPeopleRPC("match_contact_emails", body: ["_hashes": batch],
+                                                 fallback: "Couldn't check your contacts.")
+            for person in people { found[person.id] = person }
+            start += 2000
+        }
+        return found.values.sorted { $0.name.localizedCaseInsensitiveCompare($1.name) == .orderedAscending }
+    }
+
+    private func callPeopleRPC(_ name: String, body: [String: Any], fallback: String) async throws -> [FoundPerson] {
+        let token = try await validToken()
+        var request = URLRequest(url: baseURL.appendingPathComponent("/rest/v1/rpc/\(name)"))
+        request.httpMethod = "POST"
+        request.setValue(anonKey, forHTTPHeaderField: "apikey")
+        request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        request.httpBody = try JSONSerialization.data(withJSONObject: body)
+        let (data, response) = try await URLSession.shared.data(for: request)
+        guard let http = response as? HTTPURLResponse, http.statusCode < 400 else {
+            throw RexAPIError.server(friendlyError(data, fallback: fallback))
+        }
+        return try JSONDecoder().decode([FoundPerson].self, from: data)
+    }
+
+    /// Sept 14 — "when Danny logged in, he wasn't asked to create a
+    /// username". Returns nil when there's nothing to ask: the username is
+    /// confirmed, or the column doesn't exist yet (before the migration
+    /// runs, nobody should be stopped at the door by a question the
+    /// database can't record the answer to).
+    func pendingUsernameSetup() async -> (username: String, displayName: String?)? {
+        guard let userId = currentUserId, let token = try? await validToken() else { return nil }
+        var components = URLComponents(url: baseURL.appendingPathComponent("/rest/v1/profiles"), resolvingAgainstBaseURL: false)!
+        components.queryItems = [
+            URLQueryItem(name: "select", value: "username,display_name,username_confirmed"),
+            URLQueryItem(name: "id", value: "eq.\(userId)"),
+        ]
+        var request = URLRequest(url: components.url!)
+        request.setValue(anonKey, forHTTPHeaderField: "apikey")
+        request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+        guard let (data, response) = try? await URLSession.shared.data(for: request),
+              let http = response as? HTTPURLResponse, http.statusCode < 400 else { return nil }
+        struct Row: Codable { let username: String; let display_name: String?; let username_confirmed: Bool? }
+        guard let row = (try? JSONDecoder().decode([Row].self, from: data))?.first,
+              row.username_confirmed == false else { return nil }
+        return (row.username, row.display_name)
+    }
+
+    /// Sets your username (and name, if given) and marks it confirmed.
+    /// Usernames are unique in the database, so "taken" comes back as a
+    /// 409 rather than needing a separate availability check that could go
+    /// stale between asking and saving.
+    func claimUsername(_ username: String, displayName: String?) async throws {
+        let token = try await validToken()
+        guard let userId = currentUserId else { throw RexAPIError.notSignedIn }
+        var components = URLComponents(url: baseURL.appendingPathComponent("/rest/v1/profiles"), resolvingAgainstBaseURL: false)!
+        components.queryItems = [URLQueryItem(name: "id", value: "eq.\(userId)")]
+        var request = URLRequest(url: components.url!)
+        request.httpMethod = "PATCH"
+        request.setValue(anonKey, forHTTPHeaderField: "apikey")
+        request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        var body: [String: Any] = ["username": username, "username_confirmed": true]
+        if let displayName {
+            let trimmed = displayName.trimmingCharacters(in: .whitespaces)
+            body["display_name"] = trimmed.isEmpty ? NSNull() : trimmed
+        }
+        request.httpBody = try JSONSerialization.data(withJSONObject: body)
+        let (data, response) = try await URLSession.shared.data(for: request)
+        guard let http = response as? HTTPURLResponse else { throw RexAPIError.server("Couldn't save your username.") }
+        if http.statusCode == 409 || String(data: data, encoding: .utf8)?.contains("23505") == true {
+            throw RexAPIError.server("@\(username) is taken \u{2014} try another.")
+        }
+        guard http.statusCode < 400 else {
+            throw RexAPIError.server(friendlyError(data, fallback: "Couldn't save your username."))
+        }
+    }
+
     func sendFriendRequest(addresseeId: String) async throws {
         let token = try await validToken()
         guard let userId = currentUserId else { throw RexAPIError.notSignedIn }
@@ -2400,6 +2498,26 @@ final class RexAPI {
         let (data, response) = try await URLSession.shared.data(for: request)
         guard let http = response as? HTTPURLResponse, http.statusCode < 400 else {
             throw RexAPIError.server(friendlyError(data, fallback: "Couldn't move that stop."))
+        }
+    }
+
+    /// Same as setTripSection, for an item's heading within its list.
+    func setListSection(recommendationId: String, section: String?) async throws {
+        let token = try await validToken()
+        var components = URLComponents(url: baseURL.appendingPathComponent("/rest/v1/recommendations"), resolvingAgainstBaseURL: false)!
+        components.queryItems = [URLQueryItem(name: "id", value: "eq.\(recommendationId)")]
+        var request = URLRequest(url: components.url!)
+        request.httpMethod = "PATCH"
+        request.setValue(anonKey, forHTTPHeaderField: "apikey")
+        request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        let trimmed = section?.trimmingCharacters(in: .whitespaces)
+        request.httpBody = try JSONSerialization.data(withJSONObject: [
+            "list_section": (trimmed?.isEmpty ?? true) ? (NSNull() as Any) : trimmed!,
+        ])
+        let (data, response) = try await URLSession.shared.data(for: request)
+        guard let http = response as? HTTPURLResponse, http.statusCode < 400 else {
+            throw RexAPIError.server(friendlyError(data, fallback: "Couldn't move that item."))
         }
     }
 

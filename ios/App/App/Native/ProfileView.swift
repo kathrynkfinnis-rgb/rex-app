@@ -179,6 +179,11 @@ struct ProfileView: View {
                         activeSheet = nil
                         Task { await load() }
                     }
+                } else if RexCategory(rawType: rec.items?.type) == .list {
+                    ListEditorLoader(list: rec) {
+                        activeSheet = nil
+                        Task { await load() }
+                    }
                 } else {
                     EditRexView(
                         rec: rec,

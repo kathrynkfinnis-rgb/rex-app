@@ -552,6 +552,12 @@ struct FeedView: View {
                     activeSheet = nil
                     Task { await loadFeed() }
                 }
+            } else if RexCategory(rawType: rec.items?.type) == .list {
+                // Sept 14 — same form the list's own page opens.
+                ListEditorLoader(list: rec) {
+                    activeSheet = nil
+                    Task { await loadFeed() }
+                }
             } else {
                 EditRexView(
                     rec: rec,

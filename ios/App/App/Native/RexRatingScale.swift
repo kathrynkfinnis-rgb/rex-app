@@ -120,7 +120,19 @@ struct RexRatingBadge: View {
     var body: some View {
         let tier = RexRatingTier.tier(forRaw: raw)
         HStack(spacing: 4) {
-            Text(tier.emoji).font(.system(size: compact ? 12 : 14))
+            // Sept 14 — "can we please keep the 100 emoji and just replace
+            // the 707 with '100%'". At card size, on its own in the corner,
+            // 💯 reads as "707" — a tester asked what the 707 meant. So the
+            // compact badge spells it out; everywhere the emoji sits beside
+            // the word "Obsessed" (the picker, the detail screen) it stays.
+            if compact && tier == .obsessed {
+                Text("100%")
+                    .font(RexFont.text(13, weight: .heavy))
+                    .foregroundStyle(Color(hex: "D7263D"))
+                    .accessibilityLabel("Obsessed")
+            } else {
+                Text(tier.emoji).font(.system(size: compact ? 12 : 14))
+            }
             if !compact {
                 Text(tier.label)
                     .font(RexFont.text(13, weight: .semibold))

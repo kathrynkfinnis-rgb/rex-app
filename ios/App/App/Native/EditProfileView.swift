@@ -10,6 +10,9 @@ struct EditProfileView: View {
     @Environment(\.dismiss) private var dismiss
 
     @State private var displayName = ""
+    /// Sept 14 — usernames were fixed at whatever sign-up generated; now
+    /// they can be changed here, the same way the first-run screen sets one.
+    @State private var username = ""
     @State private var avatarURL: String?
     @State private var pickerItem: PhotosPickerItem?
     @State private var isUploading = false
@@ -62,11 +65,34 @@ struct EditProfileView: View {
                                 RoundedRectangle(cornerRadius: RexRadius.input, style: .continuous)
                                     .stroke(RexColor.border, lineWidth: 1)
                             )
-                        if let username = profile?.username {
-                            Text("@\(username) — your username can't be changed here.")
-                                .font(RexFont.text(12))
-                                .foregroundStyle(RexColor.mutedForeground)
+                    }
+
+                    VStack(alignment: .leading, spacing: RexSpacing.sm) {
+                        Text("Username")
+                            .font(RexFont.text(14, weight: .semibold))
+                            .foregroundStyle(RexColor.foreground)
+                        HStack(spacing: 2) {
+                            Text("@").foregroundStyle(RexColor.mutedForeground)
+                            TextField("username", text: $username)
+                                .textInputAutocapitalization(.never)
+                                .autocorrectionDisabled()
+                                .onChange(of: username) { _, new in
+                                    let cleaned = new.lowercased().replacingOccurrences(of: " ", with: "_")
+                                    if cleaned != new { username = cleaned }
+                                }
                         }
+                        .font(RexFont.text(16))
+                        .padding(.horizontal, RexSpacing.lg)
+                        .frame(height: 52)
+                        .background(RexColor.card)
+                        .clipShape(RoundedRectangle(cornerRadius: RexRadius.input, style: .continuous))
+                        .overlay(
+                            RoundedRectangle(cornerRadius: RexRadius.input, style: .continuous)
+                                .stroke(RexColor.border, lineWidth: 1)
+                        )
+                        Text(usernameProblem ?? "Friends can find you by this or your name.")
+                            .font(RexFont.text(12))
+                            .foregroundStyle(usernameProblem == nil ? RexColor.mutedForeground : RexColor.destructive)
                     }
 
                     if let errorMessage {
@@ -86,7 +112,7 @@ struct EditProfileView: View {
                         }
                     }
                     .buttonStyle(RexPrimaryButtonStyle())
-                    .disabled(isSaving || isUploading)
+                    .disabled(isSaving || isUploading || usernameProblem != nil)
 
                     Spacer()
                 }
@@ -106,11 +132,22 @@ struct EditProfileView: View {
         .onAppear {
             displayName = profile?.display_name ?? ""
             avatarURL = profile?.avatar_url
+            username = profile?.username ?? ""
         }
         .onChange(of: pickerItem) { _, item in
             guard let item else { return }
             Task { await upload(item) }
         }
+    }
+
+    private var usernameProblem: String? {
+        let allowed = CharacterSet(charactersIn: "abcdefghijklmnopqrstuvwxyz0123456789_")
+        if username.count < 3 { return "At least 3 characters." }
+        if username.count > 20 { return "20 characters at most." }
+        if username.unicodeScalars.contains(where: { !allowed.contains($0) }) {
+            return "Letters, numbers and underscores only."
+        }
+        return nil
     }
 
     private func upload(_ item: PhotosPickerItem) async {
@@ -136,6 +173,9 @@ struct EditProfileView: View {
                 displayName: displayName.trimmingCharacters(in: .whitespaces),
                 avatarURL: avatarURL
             )
+            if username != profile?.username {
+                try await RexAPI.shared.claimUsername(username, displayName: nil)
+            }
             onSaved()
             dismiss()
         } catch {

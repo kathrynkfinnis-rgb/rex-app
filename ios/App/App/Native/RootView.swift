@@ -2,7 +2,21 @@ import SwiftUI
 
 struct RootView: View {
     @State private var isSignedIn = RexAPI.shared.isSignedIn
-    @State private var showingOnboarding = false
+    /// Sept 14 — what, if anything, stands between a signed-in person and
+    /// the app: choosing a username first, then the onboarding tour. One
+    /// cover driven by one value, not two covers on one view (only one of
+    /// those would ever present — see FeedView.ActiveSheet).
+    private enum Gate: Identifiable {
+        case username(suggested: String, name: String?)
+        case onboarding
+        var id: String {
+            switch self {
+            case .username: return "username"
+            case .onboarding: return "onboarding"
+            }
+        }
+    }
+    @State private var gate: Gate?
 
     var body: some View {
         Group {
@@ -14,19 +28,29 @@ struct RootView: View {
                     // here (email, Apple, or a plain returning sign-in on a
                     // fresh install) without LoginView needing to thread a
                     // separate "just signed up" signal through three screens.
-                    .onAppear { checkOnboarding() }
-                    .fullScreenCover(isPresented: $showingOnboarding) {
-                        OnboardingView(onDone: {
-                            markOnboarded()
-                            showingOnboarding = false
-                        })
+                    .onAppear { Task { await checkGates() } }
+                    .fullScreenCover(item: $gate) { current in
+                        switch current {
+                        case .username(let suggested, let name):
+                            UsernameSetupView(suggestedUsername: suggested, suggestedName: name) {
+                                // Straight on to the tour if they haven't
+                                // had it, rather than dropping them in the
+                                // feed and popping it up a second later.
+                                gate = needsOnboarding() ? .onboarding : nil
+                            }
+                        case .onboarding:
+                            OnboardingView(onDone: {
+                                markOnboarded()
+                                gate = nil
+                            })
+                        }
                     }
             } else {
                 LoginView(onSignedIn: { isSignedIn = true })
             }
         }
         .onChange(of: isSignedIn) { _, signedIn in
-            if signedIn { checkOnboarding() }
+            if signedIn { Task { await checkGates() } }
         }
         // The brand palette (RexColor) is fixed light-only — RexColor.card is
         // a literal white hex, not a semantic color that darkens with the
@@ -40,9 +64,21 @@ struct RootView: View {
 
     private func onboardedKey(_ userId: String) -> String { "rex.onboarded.\(userId)" }
 
-    private func checkOnboarding() {
-        guard let userId = RexAPI.shared.currentUserId else { return }
-        showingOnboarding = !UserDefaults.standard.bool(forKey: onboardedKey(userId))
+    private func needsOnboarding() -> Bool {
+        guard let userId = RexAPI.shared.currentUserId else { return false }
+        return !UserDefaults.standard.bool(forKey: onboardedKey(userId))
+    }
+
+    /// Username first — "when Danny logged in, he wasn't asked to create a
+    /// username" — because it's how friends find you, and the tour that
+    /// follows ends at finding friends.
+    private func checkGates() async {
+        guard gate == nil else { return }
+        if let pending = await RexAPI.shared.pendingUsernameSetup() {
+            gate = .username(suggested: pending.username, name: pending.displayName)
+        } else if needsOnboarding() {
+            gate = .onboarding
+        }
     }
 
     private func markOnboarded() {

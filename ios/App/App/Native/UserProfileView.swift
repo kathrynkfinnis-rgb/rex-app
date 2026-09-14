@@ -22,6 +22,11 @@ struct UserProfileView: View {
     @State private var followBusyIds: Set<String> = []
     @State private var addingToCollection: FeedRecommendation?
     @State private var rexCounts: [String: Int] = [:]
+    /// Sept 14 — "look at your friends' friends as another way to find
+    /// users". Only ever filled for someone you're friends with; the
+    /// database returns nothing for anyone else, and then there's no row.
+    @State private var theirFriends: [FoundPerson] = []
+    @State private var showingTheirFriends = false
     /// #148 — this shelf showed a plain emoji square per collection; the
     /// same shelf on your own Collections page (and Explore's friend-
     /// collections cards) shows a 2x2 grid of the collection's own content
@@ -44,6 +49,10 @@ struct UserProfileView: View {
         ScrollView {
             VStack(alignment: .leading, spacing: RexSpacing.lg) {
                 header
+
+                if !theirFriends.isEmpty {
+                    theirFriendsRow
+                }
 
                 if !theirLists.isEmpty {
                     collectionsShelf
@@ -113,10 +122,51 @@ struct UserProfileView: View {
         .background(RexColor.background.ignoresSafeArea())
         .navigationTitle(profile?.display_name ?? route.name)
         .navigationBarTitleDisplayMode(.inline)
+        .navigationDestination(isPresented: $showingTheirFriends) {
+            FriendsOfView(userId: route.userId, name: profile?.display_name ?? route.name)
+        }
         .sheet(item: $addingToCollection) { rec in
             AddToCollectionView(rec: rec) { addingToCollection = nil }
         }
         .task { await load() }
+    }
+
+    /// A row of their friends' faces and a count — tap through for the full
+    /// list, with an Add button beside anyone you don't know yet.
+    private var theirFriendsRow: some View {
+        let others = theirFriends.filter { $0.connection == "none" }.count
+        return Button {
+            showingTheirFriends = true
+        } label: {
+            HStack(spacing: RexSpacing.md) {
+                HStack(spacing: -10) {
+                    ForEach(theirFriends.prefix(4)) { person in
+                        UserAvatarView(url: person.avatar_url, name: person.name, size: 30)
+                            .overlay(Circle().stroke(RexColor.card, lineWidth: 2))
+                    }
+                }
+                VStack(alignment: .leading, spacing: 1) {
+                    Text("\(theirFriends.count) \(theirFriends.count == 1 ? "friend" : "friends")")
+                        .font(RexFont.text(14, weight: .semibold))
+                        .foregroundStyle(RexColor.foreground)
+                    if others > 0 {
+                        Text("\(others) you\u{2019}re not friends with yet")
+                            .font(RexFont.text(12))
+                            .foregroundStyle(RexColor.mutedForeground)
+                    }
+                }
+                Spacer()
+                Image(systemName: "chevron.right")
+                    .font(.system(size: 12, weight: .semibold))
+                    .foregroundStyle(RexColor.placeholder)
+            }
+            .padding(RexSpacing.md)
+            .background(RexColor.card)
+            .clipShape(RoundedRectangle(cornerRadius: RexRadius.card, style: .continuous))
+            .overlay(RoundedRectangle(cornerRadius: RexRadius.card, style: .continuous).stroke(RexColor.border, lineWidth: 1))
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
     }
 
     private var header: some View {
@@ -287,6 +337,9 @@ struct UserProfileView: View {
             myFollowedListIds = Set(followedLists.map { $0.id })
             let itemIds = Array(Set(recs.map { $0.item_id }))
             rexCounts = (try? await RexAPI.shared.fetchRexCounts(itemIds: itemIds)) ?? [:]
+            // Best-effort: before the 14 Sept migration the function doesn't
+            // exist, and a stranger's list comes back empty by design.
+            theirFriends = (try? await RexAPI.shared.fetchFriendsOf(userId: route.userId)) ?? []
 
             // #148 — same per-list thumbnail fetch as ExploreView's friend-
             // collection cards, so this shelf matches the one on your own

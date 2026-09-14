@@ -452,3 +452,18 @@ struct MyRexHit: Identifiable {
 
     var id: String { hit.id }
 }
+
+
+/// Sept 14 — someone you might add, from a friend's friend list or your
+/// contacts. `connection` is your own relationship to them, worked out by
+/// the database in the same query: "none", "requested" (you asked them),
+/// "requested_you" (they asked you), "friend", or "you".
+struct FoundPerson: Codable, Identifiable, Hashable {
+    let id: String
+    let username: String
+    let display_name: String?
+    let avatar_url: String?
+    var connection: String
+
+    var name: String { display_name?.isEmpty == false ? display_name! : username }
+}

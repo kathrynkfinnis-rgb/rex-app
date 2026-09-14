@@ -101,6 +101,47 @@ struct AddRexView: View {
         }
     }
 
+    /// Sept 14 — editing a posted list in the same form it was made in.
+    init(onDone: @escaping () -> Void, editingList list: FeedRecommendation, items: [FeedRecommendation], longNote: String?) {
+        self.onDone = onDone
+        _category = State(initialValue: .list)
+        _manualEntry = State(initialValue: true)
+        _editingListRecId = State(initialValue: list.id)
+        _editingListItemId = State(initialValue: list.item_id)
+        _title = State(initialValue: list.items?.title ?? "")
+        _note = State(initialValue: list.note ?? "")
+        _rating = State(initialValue: list.rating > 0 ? list.rating : 10)
+        _photoURLs = State(initialValue: [list.items?.image_url].compactMap { $0 })
+        _listNotes = State(initialValue: longNote ?? "")
+        if let kind = list.items?.genre, !kind.isEmpty {
+            _listKind = State(initialValue: kind)
+        }
+
+        let draftItems = items.map { rec in
+            DraftStop(
+                type: RexCategory(rawType: rec.items?.type),
+                title: rec.items?.title ?? "",
+                subtitle: rec.items?.subtitle,
+                address: rec.items?.address,
+                lat: rec.items?.lat,
+                lng: rec.items?.lng,
+                genre: rec.items?.genre,
+                imageURL: rec.items?.image_url,
+                externalId: nil,
+                externalSource: nil,
+                rating: rec.rating,
+                note: rec.note ?? "",
+                section: rec.list_section,
+                photoURL: rec.photo_urls?.first,
+                linkURL: rec.items?.link_url,
+                existingRecId: rec.id,
+                existingItemId: rec.item_id
+            )
+        }
+        _listEntries = State(initialValue: .fromStops(draftItems))
+        _originalListItemRecIds = State(initialValue: Set(items.map { $0.id }))
+    }
+
     // Trip sits second, as on the web. A trip is created as a normal Rex here
     // and stops get added to it afterwards from the trip screen. List sits
     // right after — same "container + its own items" shape as Trip — for
@@ -169,6 +210,14 @@ struct AddRexView: View {
     /// What the trip had when the editor opened, so stops deleted during
     /// the edit can be told from ones that were never there.
     @State private var originalStopRecIds: Set<String> = []
+    /// Sept 14 — the list equivalents of the three above. "The two edit
+    /// buttons take you to different pages — they should be the same":
+    /// a list's own page opened an in-place editor while its feed card
+    /// opened the single-Rex editor. Both open this form now, the way a
+    /// trip's do.
+    @State private var editingListRecId: String?
+    @State private var editingListItemId: String?
+    @State private var originalListItemRecIds: Set<String> = []
     @State private var listItems: [DraftStop] = []
     /// Sept 5 — a list's items are an ordered heading/item list now, the
     /// same shape a trip's itinerary uses. listItems above is still what
@@ -227,7 +276,11 @@ struct AddRexView: View {
             .rexDismissableKeyboard()
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
-                if category != nil && !didPost {
+                // No Back while editing a posted trip or list: it returns
+                // to the category picker and clears the form, which for an
+                // edit means throwing away what was loaded. Close is the
+                // way out.
+                if category != nil && !didPost && editingTripRecId == nil && editingListRecId == nil {
                     ToolbarItem(placement: .topBarLeading) {
                         Button("Back") {
                             withAnimation {
@@ -272,7 +325,7 @@ struct AddRexView: View {
             // Only offered when this is a fresh compose — an edit of a
             // posted trip, or a form already pre-filled from an import, has
             // its own content and shouldn't be talked out of it.
-            guard editingTripRecId == nil, tripEntries.isEmpty, listEntries.isEmpty,
+            guard editingTripRecId == nil, editingListRecId == nil, tripEntries.isEmpty, listEntries.isEmpty,
                   title.trimmingCharacters(in: .whitespaces).isEmpty,
                   let draft = TripDraftStore.load()
             else { return }
@@ -696,7 +749,7 @@ struct AddRexView: View {
                 if isSaving {
                     ProgressView().tint(RexColor.primaryForeground).frame(maxWidth: .infinity)
                 } else {
-                    Text(editingTripRecId != nil
+                    Text(editingTripRecId != nil || editingListRecId != nil
                          ? "Save changes"
                          : (mode == .rated ? "Post" : addToWantLabel(for: category)))
                         .fontWeight(.semibold).frame(maxWidth: .infinity)
@@ -1193,6 +1246,80 @@ struct AddRexView: View {
         isSaving = false
     }
 
+    /// Same shape as saveTripEdits, for a list: items that survived are
+    /// updated in place (each is a real Rex with its own likes and saves),
+    /// removed ones deleted, new ones created, and order re-stamped onto
+    /// created_at, which is what fetchListItems orders by.
+    private func saveListEdits() async {
+        guard let listRecId = editingListRecId, let listItemId = editingListItemId else { return }
+        isSaving = true
+        errorMessage = nil
+        do {
+            postingProgress = "Saving list…"
+            try await RexAPI.shared.updateItemTitle(itemId: listItemId, title: title.trimmingCharacters(in: .whitespaces))
+            try await RexAPI.shared.updateItemGenre(itemId: listItemId, genre: listKind)
+            try await RexAPI.shared.updateItemImageURL(itemId: listItemId, imageURL: photoURLs.first)
+            try await RexAPI.shared.updateRecommendation(
+                id: listRecId,
+                rating: rating,
+                note: note.isEmpty ? nil : note,
+                photoURLs: [],
+                tags: []
+            )
+            try? await RexAPI.shared.updateLongNote(recommendationId: listRecId, text: listNotes)
+
+            let items = listEntries.resolvedStops
+            let keptIds = Set(items.compactMap { $0.existingRecId })
+            for removed in originalListItemRecIds.subtracting(keptIds) {
+                try? await RexAPI.shared.deleteRecommendation(id: removed)
+            }
+
+            let base = Date().addingTimeInterval(-Double(items.count))
+            let formatter = ISO8601DateFormatter()
+            for (index, item) in items.enumerated() {
+                postingProgress = "Saving item \(index + 1) of \(items.count)…"
+                let stamp = formatter.string(from: base.addingTimeInterval(Double(index)))
+                if let recId = item.existingRecId, let itemId = item.existingItemId {
+                    try? await RexAPI.shared.updateItemTitle(itemId: itemId, title: item.title)
+                    try? await RexAPI.shared.updateItemImageURL(itemId: itemId, imageURL: item.photoURL ?? item.imageURL)
+                    try? await RexAPI.shared.setListSection(recommendationId: recId, section: item.section)
+                    try? await RexAPI.shared.setRecommendationCreatedAt(id: recId, createdAt: stamp)
+                } else {
+                    let item = await geocodedIfNeeded(item)
+                    let newItemId = try await RexAPI.shared.createItem(
+                        type: item.type.rawValue,
+                        title: item.title,
+                        subtitle: item.subtitle,
+                        address: item.address,
+                        genre: item.genre,
+                        linkURL: item.linkURL,
+                        externalId: item.externalId,
+                        externalSource: item.externalSource,
+                        imageURL: item.photoURL ?? item.imageURL,
+                        lat: item.lat,
+                        lng: item.lng
+                    )
+                    let newRecId = try await RexAPI.shared.createRecommendation(
+                        itemId: newItemId,
+                        rating: item.rating,
+                        note: item.note.isEmpty ? nil : item.note,
+                        listId: listRecId,
+                        listSection: item.section,
+                        showInFeed: false,
+                        returningId: true
+                    )
+                    try? await RexAPI.shared.setRecommendationCreatedAt(id: newRecId, createdAt: stamp)
+                }
+            }
+            postingProgress = nil
+            onDone()
+        } catch {
+            postingProgress = nil
+            errorMessage = error.localizedDescription
+        }
+        isSaving = false
+    }
+
     /// "March 2026", "2026", or nothing — every combination the two
     /// optional wheels can be left in.
     private var tripDateText: String? {
@@ -1207,7 +1334,7 @@ struct AddRexView: View {
     /// Writes whatever's on the form to disk, so a backgrounded app that
     /// iOS then terminates doesn't take the work with it.
     private func persistDraft() {
-        guard editingTripRecId == nil, category == .trip || category == .list else { return }
+        guard editingTripRecId == nil, editingListRecId == nil, category == .trip || category == .list else { return }
         TripDraftStore.save(TripDraft(
             isList: category == .list,
             title: title,
@@ -1267,6 +1394,10 @@ struct AddRexView: View {
         // creating a second one.
         if editingTripRecId != nil {
             await saveTripEdits()
+            return
+        }
+        if editingListRecId != nil {
+            await saveListEdits()
             return
         }
         isSaving = true

@@ -18,6 +18,12 @@ struct FriendsView: View {
     /// successful request just naturally drops out once `load()` refreshes
     /// friendships, no separate bookkeeping needed.
     @State private var suggested: [SuggestedFriend] = []
+    /// Sept 14 — search used to swallow its own failure and show nothing,
+    /// which is how a missing database function went unnoticed from July
+    /// to September. It says what happened now.
+    @State private var searchMessage: String?
+    @State private var searchTask: Task<Void, Never>?
+    @State private var showingContacts = false
 
     private var myId: String? { RexAPI.shared.currentUserId }
 
@@ -52,20 +58,30 @@ struct FriendsView: View {
             } else {
                 VStack(alignment: .leading, spacing: 0) {
                     searchSection
+                    if let searchMessage {
+                        Text(searchMessage)
+                            .font(.system(size: 13))
+                            .foregroundStyle(RexColor.mutedForeground)
+                            .padding(.horizontal, 16)
+                            .padding(.bottom, 16)
+                    }
                     if !searchResults.isEmpty { searchResultsSection }
+                    findFriendsCard
                     let suggestedVisible = suggested.filter { !alreadyConnected($0.id) }
                     if !suggestedVisible.isEmpty {
                         section("Suggested for you", rows: suggestedVisible.map { .suggested($0) })
                     }
                     if !incoming.isEmpty { section("Requests for you", rows: incoming.map { .request($0) }) }
                     if !outgoing.isEmpty { section("Pending", rows: outgoing.map { .pending($0) }) }
-                    section("Your friends\(accepted.isEmpty ? "" : " (\(accepted.count))")", rows: accepted.map { .friend($0) }, emptyText: "No friends yet. Search above to add someone.")
+                    section("Your friends\(accepted.isEmpty ? "" : " (\(accepted.count))")", rows: accepted.map { .friend($0) }, emptyText: "No friends yet. Search above, check your contacts, or open a friend\u{2019}s profile to see who they know.")
                 }
             }
         }
         .background(RexColor.background.ignoresSafeArea())
         .navigationTitle("Friends")
         .navigationBarTitleDisplayMode(.inline)
+        .navigationDestination(isPresented: $showingContacts) { ContactsFriendFinderView() }
+        .rexDismissableKeyboard()
         .task { await load() }
     }
 
@@ -90,12 +106,25 @@ struct FriendsView: View {
     private var searchSection: some View {
         VStack(alignment: .leading, spacing: 0) {
             HStack(spacing: 8) {
-                TextField("Search by username", text: $searchQuery)
+                // Sept 14 — names as well as usernames (the database has
+                // matched both since August; the placeholder never said so),
+                // and results as you type rather than only on the button.
+                TextField("Search by name or username", text: $searchQuery)
+                    .textInputAutocapitalization(.never)
+                    .autocorrectionDisabled()
                     .padding(12)
                     .background(RexColor.card)
                     .clipShape(RoundedRectangle(cornerRadius: 14))
                     .overlay(RoundedRectangle(cornerRadius: 14).stroke(RexColor.border, lineWidth: 1))
                     .onSubmit { Task { await search() } }
+                    .onChange(of: searchQuery) { _, _ in
+                        searchTask?.cancel()
+                        searchTask = Task {
+                            try? await Task.sleep(nanoseconds: 350_000_000)
+                            guard !Task.isCancelled else { return }
+                            await search()
+                        }
+                    }
 
                 Button {
                     Task { await search() }
@@ -117,10 +146,83 @@ struct FriendsView: View {
 
     private func search() async {
         let q = searchQuery.trimmingCharacters(in: .whitespaces)
-        guard !q.isEmpty else { return }
+        guard q.count >= 2 else {
+            searchResults = []
+            searchMessage = nil
+            return
+        }
         isSearching = true
-        searchResults = (try? await RexAPI.shared.searchProfilesByUsername(q)) ?? []
+        do {
+            searchResults = try await RexAPI.shared.searchProfilesByUsername(q)
+            searchMessage = searchResults.isEmpty
+                ? "No one on Rex matches \u{201C}\(q)\u{201D}. Try their name, or check your contacts below."
+                : nil
+        } catch {
+            searchResults = []
+            searchMessage = "Search isn\u{2019}t working right now \u{2014} \(error.localizedDescription)"
+        }
         isSearching = false
+    }
+
+    /// Contacts and invites, for when you don't know anyone's username —
+    /// which on day one is everyone's.
+    private var findFriendsCard: some View {
+        VStack(spacing: 8) {
+            Button {
+                showingContacts = true
+            } label: {
+                HStack(spacing: 12) {
+                    Image(systemName: "person.crop.circle.badge.plus")
+                        .font(.system(size: 22))
+                        .foregroundStyle(RexColor.primary)
+                        .frame(width: 40)
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text("Find friends from your contacts")
+                            .font(.system(size: 14, weight: .semibold))
+                            .foregroundStyle(RexColor.foreground)
+                        Text("See who you know that\u{2019}s already on Rex")
+                            .font(.system(size: 12))
+                            .foregroundStyle(RexColor.mutedForeground)
+                    }
+                    Spacer()
+                    Image(systemName: "chevron.right")
+                        .font(.system(size: 12, weight: .semibold))
+                        .foregroundStyle(RexColor.placeholder)
+                }
+                .padding(12)
+                .background(RexColor.card)
+                .clipShape(RoundedRectangle(cornerRadius: 16))
+                .overlay(RoundedRectangle(cornerRadius: 16).stroke(RexColor.border, lineWidth: 1))
+                .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+
+            ShareLink(item: RexInvite.link, message: Text(RexInvite.message)) {
+                HStack(spacing: 12) {
+                    Image(systemName: "paperplane")
+                        .font(.system(size: 20))
+                        .foregroundStyle(RexColor.primary)
+                        .frame(width: 40)
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text("Invite friends to Rex")
+                            .font(.system(size: 14, weight: .semibold))
+                            .foregroundStyle(RexColor.foreground)
+                        Text("Send a link by text, WhatsApp or email")
+                            .font(.system(size: 12))
+                            .foregroundStyle(RexColor.mutedForeground)
+                    }
+                    Spacer()
+                }
+                .padding(12)
+                .background(RexColor.card)
+                .clipShape(RoundedRectangle(cornerRadius: 16))
+                .overlay(RoundedRectangle(cornerRadius: 16).stroke(RexColor.border, lineWidth: 1))
+                .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+        }
+        .padding(.horizontal, 16)
+        .padding(.bottom, 16)
     }
 
     private var searchResultsSection: some View {
