@@ -1869,7 +1869,17 @@ final class RexAPI {
         request.setValue(anonKey, forHTTPHeaderField: "apikey")
         request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
-        request.setValue("resolution=merge-duplicates", forHTTPHeaderField: "Prefer")
+        // Sept 15 — "I have yet to get a push notification". This was
+        // resolution=merge-duplicates, i.e. INSERT ... ON CONFLICT DO
+        // UPDATE, which needs UPDATE permission on push_tokens — and the
+        // table only grants INSERT and DELETE (20260826120000). Postgres
+        // refuses the whole statement up front, conflict or not, so every
+        // token save since 1 Sept failed and AppDelegate's try? swallowed
+        // it. push_tokens was empty: nobody's phone was ever registered, so
+        // there was nowhere to send to. ignore-duplicates (ON CONFLICT DO
+        // NOTHING) needs only INSERT, and a token that's already saved has
+        // nothing to update anyway.
+        request.setValue("resolution=ignore-duplicates,return=minimal", forHTTPHeaderField: "Prefer")
         request.httpBody = try JSONSerialization.data(withJSONObject: ["user_id": userId, "device_token": deviceToken])
         let (data, response) = try await URLSession.shared.data(for: request)
         guard let http = response as? HTTPURLResponse, http.statusCode < 400 else {

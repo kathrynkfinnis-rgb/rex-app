@@ -85,6 +85,9 @@ struct RootView: View {
     /// username" — because it's how friends find you, and the tour that
     /// follows ends at finding friends.
     private func checkGates() async {
+        // Every sign-in and launch: make sure this phone's push token is on
+        // the server (see refreshRegistrationIfAuthorized).
+        await RexPushNotifications.refreshRegistrationIfAuthorized()
         guard gate == nil else { return }
         if let pending = await RexAPI.shared.pendingUsernameSetup() {
             gate = .username(suggested: pending.username, name: pending.displayName)

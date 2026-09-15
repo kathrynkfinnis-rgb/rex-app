@@ -18,6 +18,20 @@ enum RexPushNotifications {
         set { UserDefaults.standard.set(newValue, forKey: askedKey) }
     }
 
+    /// Sept 15 — the device token only ever reached the server once: the
+    /// moment someone first allowed notifications. If that one save
+    /// failed (it always did, until today) or they later signed in on the
+    /// same phone, the server never heard about this device again. Asking
+    /// iOS for the token on every launch while permission is granted is
+    /// Apple's own recommendation — the token can change, and iOS hands the
+    /// same one straight back when it hasn't — so it's cheap, and it's what
+    /// gets every phone that already said yes registered after this fix.
+    static func refreshRegistrationIfAuthorized() async {
+        let status = await UNUserNotificationCenter.current().notificationSettings().authorizationStatus
+        guard status == .authorized || status == .provisional || status == .ephemeral else { return }
+        await MainActor.run { UIApplication.shared.registerForRemoteNotifications() }
+    }
+
     /// True only while iOS hasn't been asked yet — after that, the answer
     /// lives in Settings and a second prompt from us would be pointless.
     static func canAsk() async -> Bool {
@@ -75,7 +89,14 @@ struct NotificationsAskView: View {
                 Task {
                     isAsking = true
                     RexPushNotifications.hasAsked = true
-                    await RexPushNotifications.requestPermission()
+                    let granted = await RexPushNotifications.requestPermission()
+                    // The server only pushes to people with push switched on
+                    // in their preferences (send-push checks push_enabled,
+                    // which defaults to off) — saying yes here has to flip it,
+                    // or iOS would allow notifications that never get sent.
+                    if granted {
+                        try? await RexAPI.shared.updateNotificationPreference(["push_enabled": true])
+                    }
                     isAsking = false
                     onDone()
                 }
