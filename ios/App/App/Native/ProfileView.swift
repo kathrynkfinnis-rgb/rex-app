@@ -100,6 +100,7 @@ struct ProfileView: View {
                     }
                     recList
                     if let onSignedOut {
+                        privacyButton
                         logOutButton(onSignedOut)
                     }
                 }
@@ -202,6 +203,7 @@ struct ProfileView: View {
         .navigationDestination(for: AuthorRoute.self) { AuthorBooksView(route: $0) }
         .navigationDestination(for: DraftsRoute.self) { _ in DraftsView() }
         .navigationDestination(for: NotificationPreferencesRoute.self) { _ in NotificationPreferencesView() }
+        .navigationDestination(for: PrivacyRoute.self) { _ in PrivacyDataView(onSignedOut: { onSignedOut?() }) }
         // Sept 1 — "when you go to a trip on your profile ... it doesn't
         // come up with the list of things on the trip. It comes up with
         // the update your take page only": tapping a card here always
@@ -521,6 +523,20 @@ struct ProfileView: View {
             }
             .padding(.horizontal, RexSpacing.page)
         }
+    }
+
+    /// Sept 15 — download your data, delete your account, read the
+    /// policies. Beside Log out, where account housekeeping already lives.
+    private var privacyButton: some View {
+        Button {
+            path.append(PrivacyRoute())
+        } label: {
+            Label("Your data & privacy", systemImage: "hand.raised")
+                .frame(maxWidth: .infinity)
+        }
+        .buttonStyle(RexSecondaryButtonStyle())
+        .padding(.horizontal, RexSpacing.page)
+        .padding(.top, RexSpacing.lg)
     }
 
     /// Log out lives at the bottom of Profile rather than eating space in the

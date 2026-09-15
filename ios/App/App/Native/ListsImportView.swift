@@ -30,6 +30,10 @@ struct ListsImportView: View {
                     Text("Paste in a list of recommendations \u{2014} from Notes, a Word doc, an itinerary, wherever. We'll pull out each one, with your comments kept intact, so you can check them before anything's posted.")
                         .font(RexFont.text(14))
                         .foregroundStyle(RexColor.mutedForeground)
+                    // Same disclosure as recipe photo import.
+                    Text("The text is sent to our AI provider (Anthropic) to pick out the recommendations. Rex keeps only what you choose to save.")
+                        .font(RexFont.text(11.5))
+                        .foregroundStyle(RexColor.mutedForeground)
 
                     TextEditor(text: $text)
                         .font(RexFont.text(15))

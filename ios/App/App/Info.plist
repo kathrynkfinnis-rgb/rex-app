@@ -27,7 +27,7 @@
 	<key>NSContactsUsageDescription</key>
 	<string>Rex checks the email addresses in your contacts to show which of your friends are already on Rex. They're scrambled on your phone first, and nothing is stored.</string>
 	<key>NSLocationWhenInUseUsageDescription</key>
-	<string>Rex uses your location to center the map on places near you.</string>
+	<string>Rex uses your location only while you're using the app, to centre the map on where you are. It isn't saved to your account or shared with your friends.</string>
 	<key>ITSAppUsesNonExemptEncryption</key>
 	<false/>
 	<key>TMDBApiKey</key>

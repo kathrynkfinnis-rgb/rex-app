@@ -7,11 +7,13 @@ struct RootView: View {
     /// cover driven by one value, not two covers on one view (only one of
     /// those would ever present — see FeedView.ActiveSheet).
     private enum Gate: Identifiable {
+        case consent
         case username(suggested: String, name: String?)
         case onboarding
         case notifications
         var id: String {
             switch self {
+            case .consent: return "consent"
             case .username: return "username"
             case .onboarding: return "onboarding"
             case .notifications: return "notifications"
@@ -33,6 +35,11 @@ struct RootView: View {
                     .onAppear { Task { await checkGates() } }
                     .fullScreenCover(item: $gate) { current in
                         switch current {
+                        case .consent:
+                            ConsentUpdateView(onAgreed: {
+                                gate = nil
+                                Task { await checkGates() }
+                            })
                         case .username(let suggested, let name):
                             UsernameSetupView(suggestedUsername: suggested, suggestedName: name) {
                                 // Straight on to the tour if they haven't
@@ -89,6 +96,19 @@ struct RootView: View {
         // the server (see refreshRegistrationIfAuthorized).
         await RexPushNotifications.refreshRegistrationIfAuthorized()
         guard gate == nil else { return }
+        // Sept 15 — agreement to the current Terms/Privacy Policy comes
+        // before anything else. Someone who ticked the box at email sign-up
+        // but had to confirm their email first had no session to record it
+        // with then; that agreement is recorded now instead of asking twice.
+        if await RexAPI.shared.consentNeedsUpdate() {
+            if UserDefaults.standard.bool(forKey: "rex.pendingSignupConsent"),
+               (try? await RexAPI.shared.recordConsent(source: "signup")) != nil {
+                UserDefaults.standard.removeObject(forKey: "rex.pendingSignupConsent")
+            } else {
+                gate = .consent
+                return
+            }
+        }
         if let pending = await RexAPI.shared.pendingUsernameSetup() {
             gate = .username(suggested: pending.username, name: pending.displayName)
         } else if needsOnboarding() {

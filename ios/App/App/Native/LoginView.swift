@@ -301,6 +301,15 @@ private struct SignUpScreen: View {
         Task {
             do {
                 try await RexAPI.shared.signUp(email: email, password: password)
+                // The box was ticked to get here. With a session, record it
+                // now; if Supabase is waiting on email confirmation there's no
+                // session yet, so remember it and RootView records it on the
+                // first sign-in (see checkGates).
+                if RexAPI.shared.hasSession {
+                    try? await RexAPI.shared.recordConsent(source: "signup")
+                } else {
+                    UserDefaults.standard.set(true, forKey: "rex.pendingSignupConsent")
+                }
                 await MainActor.run {
                     isLoading = false
                     // No session means Supabase is waiting on email confirmation.

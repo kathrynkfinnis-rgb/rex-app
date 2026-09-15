@@ -156,6 +156,14 @@ struct RecipeEditorView: View {
                 .buttonStyle(.plain)
             }
 
+            // Sept 15 — "if recipe photos go to Claude for import, be able
+            // to tell a user what happens to that photo afterwards". Said
+            // here, where the choice is made, not only in the policy.
+            Text("Import from photo sends the photo to our AI provider (Anthropic) just to read the recipe. Rex doesn\u{2019}t save the photo \u{2014} only the recipe text you choose to post.")
+                .font(RexFont.text(11))
+                .foregroundStyle(RexColor.mutedForeground)
+                .fixedSize(horizontal: false, vertical: true)
+
             if let importError {
                 Text(importError)
                     .font(RexFont.text(12))

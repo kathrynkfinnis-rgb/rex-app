@@ -6,6 +6,14 @@ import SwiftUI
 /// solicitor-reviewed policy; nothing else in the app depends on this
 /// copy's exact wording, only on `RexAPI.recordTermsAcceptance()` having
 /// been called, so swapping the text later is safe and self-contained.
+/// Sept 15 — the version people agree to. Bump it whenever the Terms or the
+/// Privacy Policy change materially: every account whose recorded version
+/// differs is asked to agree again (RootView's consent gate), and the new
+/// acceptance is logged in consent_log with a timestamp.
+enum RexLegal {
+    static let version = "2026-09-15"
+}
+
 struct LegalContentView: View {
     enum Section: String, CaseIterable, Identifiable {
         case terms = "Terms of Use"
@@ -53,7 +61,7 @@ struct LegalContentView: View {
 
     // MARK: - Copy
 
-    private static let lastUpdated = "26 August 2026"
+    private static let lastUpdated = "15 September 2026"
 
     private static let termsBody = """
     Last updated \(lastUpdated)
@@ -89,7 +97,7 @@ struct LegalContentView: View {
     We aim to keep REX running smoothly but don't guarantee it will always be available, error-free, or uninterrupted. Features may change, and this is an early-stage app that may still have bugs — thank you for helping us test it.
 
     8. Termination
-    You can delete your account at any time. We can suspend or terminate accounts that violate these Terms.
+    You can delete your account at any time, from Profile → Your data & privacy → Delete my account. We can suspend or terminate accounts that violate these Terms.
 
     9. Disclaimer and liability
     REX is provided "as is" without warranties of any kind. To the maximum extent permitted by law, REX isn't liable for indirect or consequential damages arising from your use of the app.
@@ -112,8 +120,11 @@ struct LegalContentView: View {
     • Account information: email address, and (if you use Sign in with Apple) the name Apple shares with us.
     • Profile information: username, display name, avatar photo, and anything else you choose to add.
     • Content you create: recommendations, ratings, notes, photos, trips, lists, blasts, comments, and your friend connections.
-    • Location-related data: addresses and coordinates for places you or your friends recommend, so they can be shown on the map. REX does not track your ongoing location in the background — location is only used, with permission, to centre the map or suggest nearby places.
-    • Device information: a push notification token, if you enable push notifications, so we can deliver them to your device.
+    • Places you recommend: addresses and map coordinates for places you or your friends Rex, so they can be shown on the map.
+    • Your device's location: only if you allow it, and only while you're using the app, to centre the map on where you are. Apple turns it into an area name (like "Hackney") for the map's header. It isn't saved to your account, it isn't shared with your friends, and REX never tracks your location in the background.
+    • Your contacts: only if you choose "Find friends from your contacts". REX reads the email addresses in your contacts on your phone and scrambles each one (a SHA-256 hash) before anything leaves the phone. Those scrambled values are compared with REX accounts to show you which of your contacts are already here, then discarded. We don't store your contacts or upload names, phone numbers or other details.
+    • Device information: a push notification token, if you turn on notifications, so we can deliver them to your phone.
+    • Records of your agreement to these policies: which version you agreed to, and when.
     • Usage information: basic technical logs needed to operate and secure the app.
 
     2. How we use this information
@@ -128,14 +139,21 @@ struct LegalContentView: View {
 
     3. Who your information is shared with
     • Other REX users: friends can see your recommendations, profile, and activity as described in the app; some features (like shared trip/list links) are visible to anyone with the link.
-    • Service providers: we use Supabase to store data and Google (Maps/Places) to look up locations — these providers process data on our behalf under their own security and privacy commitments.
+    • Service providers, who process data on our behalf under their own security and privacy commitments:
+      – Supabase: stores your account, content and photos.
+      – Google (Maps and Places): shows maps and looks up places and addresses.
+      – Apple: Sign in with Apple, push notifications, and naming the area on the map.
+      – Anthropic (Claude): reads documents and recipe photos you choose to import (see below).
     • We do not share your personal information with advertisers or data brokers.
+
+    Importing from a document or a recipe photo
+    When you use "Import from doc" or import a recipe from a photo, the text or photo you choose is sent to Anthropic's Claude AI to pick out the recommendations or read the recipe. REX doesn't keep a copy: the photo isn't uploaded to your account, and only the text you then choose to post is saved. Anthropic processes it under its commercial terms, doesn't use it to train its models, and deletes it after a limited retention period. If you'd rather it wasn't processed this way, type or paste the details in yourself instead.
 
     4. Anonymous posts
     Marking a post as anonymous hides your identity from other users in REX's normal interface. It does not anonymise the underlying record — REX retains the connection between you and the post. See the Terms of Use for more detail.
 
     5. Data retention
-    We keep your information for as long as your account is active. If you delete your account, we'll delete or anonymise your personal data within a reasonable period, except where we need to retain something for legal or security reasons.
+    We keep your information for as long as your account is active. When you delete your account, your profile, recommendations, trips, lists, collections, comments, likes, friend connections, photos and notification settings are deleted straight away. Copies may remain in our database provider's routine backups for a short period until those backups are overwritten.
 
     6. Your rights
     Depending on where you live (including under the UK/EU GDPR), you may have the right to:
@@ -146,7 +164,7 @@ struct LegalContentView: View {
     • object to or restrict certain processing;
     • withdraw consent at any time, where processing is based on consent.
 
-    To exercise any of these rights, contact us at kathryn.k.finnis@gmail.com and we'll respond as soon as we reasonably can.
+    You can download a copy of your data, or delete your account and everything in it, yourself at any time: Profile → Your data & privacy. For anything else, contact us at kathryn.k.finnis@gmail.com and we'll respond as soon as we reasonably can.
 
     7. Children's privacy
     REX isn't directed at children under 13, and we don't knowingly collect personal information from them.
@@ -158,7 +176,7 @@ struct LegalContentView: View {
     Our service providers may process data outside your home country. Where that happens, we rely on their own safeguards for handling data lawfully.
 
     10. Changes to this policy
-    We may update this policy as REX evolves. Material changes will be flagged in the app.
+    We may update this policy as REX evolves. When we make a material change, we'll ask you to review and agree to the new version in the app, and we keep a record of when you did.
 
     11. Contact
     Questions, requests, or concerns about your data? Email kathryn.k.finnis@gmail.com.

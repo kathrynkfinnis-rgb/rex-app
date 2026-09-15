@@ -49,6 +49,10 @@ struct RexMapView: View {
     @State private var tripFitNonce = 0
     @State private var userCoordinate: CLLocationCoordinate2D?
     @State private var areaName: String?
+    /// Sept 15 — location declined (or restricted). The map works without
+    /// it — it centres on the pins instead — but the header shouldn't claim
+    /// "near you", and there should be a way to change your mind.
+    @State private var locationDenied = false
     @State private var filter: RexCategory?
     /// Sept 5 — sub-category ("Restaurant", "Bar", …) and person filters,
     /// replacing/joining the old Places-vs-Events chips.
@@ -327,7 +331,7 @@ struct RexMapView: View {
                 Image(systemName: "location.fill")
                     .font(.system(size: 12))
                     .foregroundStyle(RexColor.primary)
-                Text(areaName ?? "Places near you")
+                Text(areaName ?? (locationDenied ? "Places" : "Places near you"))
                     .font(RexFont.display(18, weight: .semibold))
                     .foregroundStyle(RexColor.foreground)
                 Spacer()
@@ -351,6 +355,16 @@ struct RexMapView: View {
                 }
                 .buttonStyle(.plain)
                 .accessibilityLabel(showingList ? "Show map" : "Show list")
+            }
+
+            // Declined location: the map still works (it centres on the
+            // pins), so this is an offer, not a blocker.
+            if locationDenied, let settings = URL(string: UIApplication.openSettingsURLString) {
+                Link(destination: settings) {
+                    Label("Turn on location to centre the map on you", systemImage: "location.slash")
+                        .font(RexFont.text(12, weight: .medium))
+                        .foregroundStyle(RexColor.mutedForeground)
+                }
             }
 
             if tripFilter != nil, let title = followingTripTitle {
@@ -595,7 +609,10 @@ struct RexMapView: View {
                 do {
                     for try await update in CLLocationUpdate.liveUpdates() {
                         if let loc = update.location { return loc }
-                        if update.authorizationDenied || update.authorizationRestricted { return nil }
+                        if update.authorizationDenied || update.authorizationRestricted {
+                            await MainActor.run { locationDenied = true }
+                            return nil
+                        }
                     }
                 } catch {}
                 return nil

@@ -227,8 +227,32 @@ final class RexAPI {
     /// UI state. Best-effort: a failure here shouldn't block someone from
     /// actually getting into the app they just signed up for — the
     /// checkbox itself is still the real gate on the sign-up screen.
-    func recordTermsAcceptance() async {
-        guard let userId = currentUserId, let token = try? await validToken() else { return }
+    // MARK: - Privacy: consent, export, deletion (15 Sept)
+
+    /// Records agreement to the current Terms of Use + Privacy Policy: a
+    /// new row in consent_log (never overwritten — that's what makes it a
+    /// record), and the latest version on the profile so the app can tell
+    /// when to ask again. Falls back to just the old timestamp column if
+    /// the 15 Sept migration hasn't run yet.
+    func recordConsent(source: String) async throws {
+        let token = try await validToken()
+        guard let userId = currentUserId else { throw RexAPIError.notSignedIn }
+        let appVersion = [Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String,
+                          Bundle.main.infoDictionary?["CFBundleVersion"] as? String]
+            .compactMap { $0 }.joined(separator: " (") + ")"
+
+        var logRequest = URLRequest(url: baseURL.appendingPathComponent("/rest/v1/consent_log"))
+        logRequest.httpMethod = "POST"
+        logRequest.setValue(anonKey, forHTTPHeaderField: "apikey")
+        logRequest.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+        logRequest.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        logRequest.httpBody = try JSONSerialization.data(withJSONObject: [
+            "user_id": userId, "document": "terms_privacy", "version": RexLegal.version,
+            "source": source, "app_version": appVersion,
+        ])
+        let (_, logResponse) = try await URLSession.shared.data(for: logRequest)
+        let logged = ((logResponse as? HTTPURLResponse)?.statusCode ?? 500) < 400
+
         var components = URLComponents(url: baseURL.appendingPathComponent("/rest/v1/profiles"), resolvingAgainstBaseURL: false)!
         components.queryItems = [URLQueryItem(name: "id", value: "eq.\(userId)")]
         var request = URLRequest(url: components.url!)
@@ -236,10 +260,158 @@ final class RexAPI {
         request.setValue(anonKey, forHTTPHeaderField: "apikey")
         request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
-        request.httpBody = try? JSONSerialization.data(withJSONObject: [
-            "accepted_terms_at": ISO8601DateFormatter().string(from: Date()),
-        ])
-        _ = try? await URLSession.shared.data(for: request)
+        var body: [String: Any] = ["accepted_terms_at": ISO8601DateFormatter().string(from: Date())]
+        if logged { body["accepted_terms_version"] = RexLegal.version }
+        request.httpBody = try JSONSerialization.data(withJSONObject: body)
+        let (data, response) = try await URLSession.shared.data(for: request)
+        guard let http = response as? HTTPURLResponse, http.statusCode < 400 else {
+            throw RexAPIError.server(friendlyError(data, fallback: "Couldn't record that — please try again."))
+        }
+    }
+
+    /// True when this account hasn't agreed to the current version. False
+    /// before the migration runs (nothing to compare against), so nobody is
+    /// stopped at the door by a question the database can't record.
+    func consentNeedsUpdate() async -> Bool {
+        guard let userId = currentUserId, let token = try? await validToken() else { return false }
+        var components = URLComponents(url: baseURL.appendingPathComponent("/rest/v1/profiles"), resolvingAgainstBaseURL: false)!
+        components.queryItems = [
+            URLQueryItem(name: "select", value: "accepted_terms_version"),
+            URLQueryItem(name: "id", value: "eq.\(userId)"),
+        ]
+        var request = URLRequest(url: components.url!)
+        request.setValue(anonKey, forHTTPHeaderField: "apikey")
+        request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+        guard let (data, response) = try? await URLSession.shared.data(for: request),
+              let http = response as? HTTPURLResponse, http.statusCode < 400 else { return false }
+        struct Row: Codable { let accepted_terms_version: String? }
+        guard let row = (try? JSONDecoder().decode([Row].self, from: data))?.first else { return false }
+        return row.accepted_terms_version != RexLegal.version
+    }
+
+    /// Everything REX holds about you, as one JSON document — the "download
+    /// my data" right. Read with your own session, so it's exactly what the
+    /// database's access rules say is yours. A section that fails is
+    /// recorded as such in the file rather than failing the whole export.
+    func exportMyData() async throws -> URL {
+        let token = try await validToken()
+        guard let userId = currentUserId else { throw RexAPIError.notSignedIn }
+
+        func get(_ path: String, _ query: [String: String]) async -> Any {
+            var components = URLComponents(url: baseURL.appendingPathComponent(path), resolvingAgainstBaseURL: false)!
+            components.queryItems = query.map { URLQueryItem(name: $0.key, value: $0.value) }
+            var request = URLRequest(url: components.url!)
+            request.setValue(anonKey, forHTTPHeaderField: "apikey")
+            request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+            guard let (data, response) = try? await URLSession.shared.data(for: request) else {
+                return ["error": "couldn't be read"]
+            }
+            guard let http = response as? HTTPURLResponse, http.statusCode < 400 else {
+                return ["error": "couldn't be read (\((response as? HTTPURLResponse)?.statusCode ?? 0))"]
+            }
+            return (try? JSONSerialization.jsonObject(with: data)) ?? ["error": "unreadable"]
+        }
+        let mine = "eq.\(userId)"
+
+        var export: [String: Any] = [
+            "about": "Your REX data, exported \(ISO8601DateFormatter().string(from: Date())). Photos are linked by URL rather than included.",
+            "account": await get("/auth/v1/user", [:]),
+        ]
+        export["profile"] = await get("/rest/v1/profiles", ["id": mine, "select": "*"])
+        export["recommendations"] = await get("/rest/v1/recommendations", ["user_id": mine, "select": "*,items(*)", "order": "created_at.asc"])
+        export["wants_to_try"] = await get("/rest/v1/wants", ["user_id": mine, "select": "*,items(*)", "order": "created_at.asc"])
+        export["collections"] = await get("/rest/v1/hitlist_lists", ["user_id": mine, "select": "*"])
+        export["collection_entries"] = await get("/rest/v1/saved_posts", ["user_id": mine, "select": "*"])
+        export["followed_collections"] = await get("/rest/v1/list_follows", ["user_id": mine, "select": "*"])
+        export["blasts"] = await get("/rest/v1/requests", ["user_id": mine, "select": "*"])
+        export["comments"] = [
+            "on_rex": await get("/rest/v1/recommendation_comments", ["user_id": mine, "select": "*"]),
+            "on_wants": await get("/rest/v1/want_comments", ["user_id": mine, "select": "*"]),
+            "on_blasts": await get("/rest/v1/request_comments", ["user_id": mine, "select": "*"]),
+        ]
+        export["likes"] = [
+            "rex": await get("/rest/v1/recommendation_likes", ["user_id": mine, "select": "*"]),
+            "wants": await get("/rest/v1/want_likes", ["user_id": mine, "select": "*"]),
+            "blast_replies": await get("/rest/v1/request_comment_likes", ["user_id": mine, "select": "*"]),
+        ]
+        export["friendships"] = await get("/rest/v1/friendships", ["select": "*"])
+        export["top_friends"] = await get("/rest/v1/top_friends", ["user_id": mine, "select": "*"])
+        export["notification_settings"] = await get("/rest/v1/notification_preferences", ["user_id": mine, "select": "*"])
+        export["notifications"] = await get("/rest/v1/notifications", ["user_id": mine, "select": "*"])
+        export["feedback_sent"] = await get("/rest/v1/feedback", ["user_id": mine, "select": "*"])
+        export["consent_history"] = await get("/rest/v1/consent_log", ["user_id": mine, "select": "*", "order": "accepted_at.asc"])
+
+        let data = try JSONSerialization.data(withJSONObject: export, options: [.prettyPrinted, .sortedKeys])
+        let stamp = ISO8601DateFormatter.string(from: Date(), timeZone: .current, formatOptions: [.withFullDate])
+        let url = FileManager.default.temporaryDirectory.appendingPathComponent("rex-data-\(stamp).json")
+        try data.write(to: url, options: .atomic)
+        return url
+    }
+
+    /// Deletes every photo you've uploaded, from both buckets. Photos live
+    /// under a folder named for your user id (the Storage policies only let
+    /// you touch your own folder), so it's list-then-delete per bucket.
+    private func deleteMyStorageFiles() async throws {
+        let token = try await validToken()
+        guard let userId = currentUserId else { throw RexAPIError.notSignedIn }
+        for bucket in ["avatars", "rec-photos"] {
+            while true {
+                var list = URLRequest(url: baseURL.appendingPathComponent("/storage/v1/object/list/\(bucket)"))
+                list.httpMethod = "POST"
+                list.setValue(anonKey, forHTTPHeaderField: "apikey")
+                list.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+                list.setValue("application/json", forHTTPHeaderField: "Content-Type")
+                list.httpBody = try JSONSerialization.data(withJSONObject: ["prefix": "\(userId)/", "limit": 500, "offset": 0])
+                let (data, response) = try await URLSession.shared.data(for: list)
+                guard let http = response as? HTTPURLResponse, http.statusCode < 400 else { break }
+                struct Object: Codable { let name: String }
+                let names = ((try? JSONDecoder().decode([Object].self, from: data)) ?? []).map { "\(userId)/\($0.name)" }
+                if names.isEmpty { break }
+
+                var remove = URLRequest(url: baseURL.appendingPathComponent("/storage/v1/object/\(bucket)"))
+                remove.httpMethod = "DELETE"
+                remove.setValue(anonKey, forHTTPHeaderField: "apikey")
+                remove.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+                remove.setValue("application/json", forHTTPHeaderField: "Content-Type")
+                remove.httpBody = try JSONSerialization.data(withJSONObject: ["prefixes": names])
+                let (_, removed) = try await URLSession.shared.data(for: remove)
+                guard ((removed as? HTTPURLResponse)?.statusCode ?? 500) < 400 else {
+                    throw RexAPIError.server("Couldn't delete your photos — nothing else has been deleted yet. Please try again.")
+                }
+                if names.count < 500 { break }
+            }
+        }
+    }
+
+    /// "Delete my account and data." Photos first (the database can't reach
+    /// Storage), then delete_my_account(), which removes the login and
+    /// everything that hangs off it. Signs out locally at the end.
+    func deleteMyAccount() async throws {
+        let token = try await validToken()
+        try await deleteMyStorageFiles()
+
+        var request = URLRequest(url: baseURL.appendingPathComponent("/rest/v1/rpc/delete_my_account"))
+        request.httpMethod = "POST"
+        request.setValue(anonKey, forHTTPHeaderField: "apikey")
+        request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        request.httpBody = Data("{}".utf8)
+        let (data, response) = try await URLSession.shared.data(for: request)
+        guard let http = response as? HTTPURLResponse, http.statusCode < 400 else {
+            throw RexAPIError.server(friendlyError(data, fallback: "Couldn't delete your account. Please try again, or email kathryn.k.finnis@gmail.com."))
+        }
+
+        // Nothing of this account should linger on the phone either.
+        for key in UserDefaults.standard.dictionaryRepresentation().keys where key.hasPrefix("rex.") {
+            UserDefaults.standard.removeObject(forKey: key)
+        }
+        TripDraftStore.clear()
+        signOut()
+    }
+
+    /// Kept for the existing sign-up call sites — see recordConsent.
+    func recordTermsAcceptance() async {
+        try? await recordConsent(source: "signup")
     }
 
     /// Sign in with the identity token Apple handed us. Supabase verifies it
