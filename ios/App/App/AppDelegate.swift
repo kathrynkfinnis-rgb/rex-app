@@ -55,13 +55,25 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
     // somewhere to deliver to.
     func application(_ application: UIApplication, didRegisterForRemoteNotificationsWithDeviceToken deviceToken: Data) {
         let token = deviceToken.map { String(format: "%02x", $0) }.joined()
-        Task { try? await RexAPI.shared.registerPushToken(deviceToken: token) }
+        RexPushNotifications.record("Apple gave this phone a push address; saving it\u{2026}")
+        Task {
+            // Sept 15 — this used to be `try?`, which is how a failing save
+            // went unnoticed for two weeks. Still never interrupts anything,
+            // but the outcome is recorded and a failure reported.
+            do {
+                try await RexAPI.shared.registerPushToken(deviceToken: token)
+                RexPushNotifications.record("This phone is registered for notifications.")
+            } catch {
+                RexPushNotifications.record("Couldn't save this phone's push address: \(error.localizedDescription)")
+                await RexPushNotifications.reportFailure("token save failed: \(error.localizedDescription)")
+            }
+        }
     }
 
     func application(_ application: UIApplication, didFailToRegisterForRemoteNotificationsWithError error: Error) {
-        // Best-effort feature — a registration failure (simulator, no
-        // network, revoked permission mid-flight) shouldn't crash or
-        // otherwise interrupt anything else the app is doing.
+        // Never interrupts anything else, but no longer silent either.
+        RexPushNotifications.record("Apple wouldn't register this phone for notifications: \(error.localizedDescription)")
+        Task { await RexPushNotifications.reportFailure("APNs registration failed: \(error.localizedDescription)") }
     }
 
     func application(_ application: UIApplication,

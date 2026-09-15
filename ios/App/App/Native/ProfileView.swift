@@ -99,15 +99,16 @@ struct ProfileView: View {
                         filterRow
                     }
                     recList
-                    if let onSignedOut {
-                        privacyButton
-                        logOutButton(onSignedOut)
-                    }
+                    // Sept 15 — "no longer works to have them at the bottom
+                    // as the page is too long". Privacy and Log out moved to
+                    // Settings (the gear beside the bell).
                 }
             }
         }
         .background(RexColor.background.ignoresSafeArea())
-        .navigationTitle(profile?.display_name ?? profile?.username ?? "Profile")
+        // Sept 15 — no title: the name is already the first thing on the
+        // page, large, and repeating it in the bar just above read as a
+        // mistake ("remove the repeat of the profile name").
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
             ToolbarItem(placement: .topBarLeading) {
@@ -125,6 +126,16 @@ struct ProfileView: View {
                     Image(systemName: "bell")
                 }
                 .foregroundStyle(RexColor.primary)
+            }
+            // Sept 15 — "can we add a settings button next to the Bell".
+            ToolbarItem(placement: .topBarLeading) {
+                Button {
+                    path.append(SettingsRoute())
+                } label: {
+                    Image(systemName: "gearshape")
+                }
+                .foregroundStyle(RexColor.primary)
+                .accessibilityLabel("Settings")
             }
             ToolbarItem(placement: .topBarTrailing) {
                 if !recommendations.isEmpty {
@@ -204,6 +215,12 @@ struct ProfileView: View {
         .navigationDestination(for: DraftsRoute.self) { _ in DraftsView() }
         .navigationDestination(for: NotificationPreferencesRoute.self) { _ in NotificationPreferencesView() }
         .navigationDestination(for: PrivacyRoute.self) { _ in PrivacyDataView(onSignedOut: { onSignedOut?() }) }
+        .navigationDestination(for: SettingsRoute.self) { _ in
+            SettingsView(
+                onEditProfile: { activeSheet = .editProfile },
+                onSignedOut: onSignedOut.map { signOut in { RexAPI.shared.signOut(); signOut() } }
+            )
+        }
         // Sept 1 — "when you go to a trip on your profile ... it doesn't
         // come up with the list of things on the trip. It comes up with
         // the update your take page only": tapping a card here always
@@ -524,35 +541,6 @@ struct ProfileView: View {
             }
             .padding(.horizontal, RexSpacing.page)
         }
-    }
-
-    /// Sept 15 — download your data, delete your account, read the
-    /// policies. Beside Log out, where account housekeeping already lives.
-    private var privacyButton: some View {
-        Button {
-            path.append(PrivacyRoute())
-        } label: {
-            Label("Your data & privacy", systemImage: "hand.raised")
-                .frame(maxWidth: .infinity)
-        }
-        .buttonStyle(RexSecondaryButtonStyle())
-        .padding(.horizontal, RexSpacing.page)
-        .padding(.top, RexSpacing.lg)
-    }
-
-    /// Log out lives at the bottom of Profile rather than eating space in the
-    /// feed's top bar.
-    private func logOutButton(_ signOut: @escaping () -> Void) -> some View {
-        Button {
-            RexAPI.shared.signOut()
-            signOut()
-        } label: {
-            Text("Log out")
-        }
-        .buttonStyle(RexSecondaryButtonStyle())
-        .padding(.horizontal, RexSpacing.page)
-        .padding(.top, RexSpacing.sm)
-        .padding(.bottom, RexSpacing.xxl)
     }
 
     private func errorState(_ message: String) -> some View {

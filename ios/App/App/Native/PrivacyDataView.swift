@@ -5,6 +5,73 @@ import SwiftUI
 /// are GDPR rights (access/portability and erasure), and Apple requires the
 /// deletion one for any app you can create an account in.
 struct PrivacyRoute: Hashable {}
+struct SettingsRoute: Hashable {}
+
+/// Sept 15 — the gear beside Profile's bell. Everything about your account
+/// in one short list, instead of buttons at the bottom of a profile page
+/// too long to scroll to the end of.
+struct SettingsView: View {
+    var onEditProfile: () -> Void
+    var onSignedOut: (() -> Void)?
+
+    @Environment(\.dismiss) private var dismiss
+    @State private var confirmingLogOut = false
+
+    var body: some View {
+        List {
+            Section("Account") {
+                Button {
+                    dismiss()
+                    // After the pop, so the sheet presents from Profile
+                    // rather than from a screen that's going away.
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.35) { onEditProfile() }
+                } label: {
+                    row("person.crop.circle", "Edit profile", "Name, username and photo")
+                }
+                NavigationLink(value: NotificationPreferencesRoute()) {
+                    row("bell", "Notifications", "What you're told about, and push")
+                }
+            }
+            Section("Privacy") {
+                NavigationLink(value: PrivacyRoute()) {
+                    row("hand.raised", "Your data & privacy", "Download your data, delete your account, our policies")
+                }
+            }
+            if onSignedOut != nil {
+                Section {
+                    Button(role: .destructive) {
+                        confirmingLogOut = true
+                    } label: {
+                        Text("Log out").frame(maxWidth: .infinity)
+                    }
+                }
+            }
+        }
+        .scrollContentBackground(.hidden)
+        .background(RexColor.background.ignoresSafeArea())
+        .navigationTitle("Settings")
+        .navigationBarTitleDisplayMode(.inline)
+        .tint(RexColor.primary)
+        .alert("Log out of Rex?", isPresented: $confirmingLogOut) {
+            Button("Cancel", role: .cancel) {}
+            Button("Log out", role: .destructive) { onSignedOut?() }
+        }
+    }
+
+    private func row(_ icon: String, _ title: String, _ subtitle: String) -> some View {
+        HStack(spacing: RexSpacing.md) {
+            Image(systemName: icon)
+                .font(.system(size: 16))
+                .foregroundStyle(RexColor.primary)
+                .frame(width: 26)
+            VStack(alignment: .leading, spacing: 2) {
+                Text(title).font(RexFont.text(15, weight: .medium)).foregroundStyle(RexColor.foreground)
+                Text(subtitle).font(RexFont.text(12)).foregroundStyle(RexColor.mutedForeground)
+            }
+        }
+        .padding(.vertical, 2)
+    }
+}
 
 struct PrivacyDataView: View {
     var onSignedOut: () -> Void

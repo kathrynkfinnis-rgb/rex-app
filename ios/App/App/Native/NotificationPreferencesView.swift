@@ -14,6 +14,8 @@ struct NotificationPreferencesView: View {
     @State private var errorMessage: String?
     @State private var isRequestingPermission = false
 
+    @State private var pushStatus: String? = RexPushNotifications.lastStatus
+
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: RexSpacing.lg) {
@@ -53,7 +55,14 @@ struct NotificationPreferencesView: View {
         .background(RexColor.background.ignoresSafeArea())
         .navigationTitle("Notifications")
         .navigationBarTitleDisplayMode(.inline)
-        .task { await load() }
+        .task {
+            await load()
+            // Opening this screen re-tries registration and shows the result,
+            // so it doubles as a "check my phone is set up" button.
+            await RexPushNotifications.refreshRegistrationIfAuthorized()
+            try? await Task.sleep(nanoseconds: 2_500_000_000)
+            pushStatus = RexPushNotifications.lastStatus
+        }
     }
 
     private func pushRow(_ prefs: RexNotificationPreferences) -> some View {
@@ -61,6 +70,15 @@ struct NotificationPreferencesView: View {
             VStack(alignment: .leading, spacing: 2) {
                 Text("Push notifications").font(RexFont.text(15, weight: .medium)).foregroundStyle(RexColor.foreground)
                 Text("On this device").font(RexFont.text(12)).foregroundStyle(RexColor.mutedForeground)
+                // Sept 15 — where this phone's registration actually got to;
+                // see RexPushNotifications.record.
+                if let status = pushStatus {
+                    Text(status)
+                        .font(RexFont.text(11))
+                        .foregroundStyle(RexColor.mutedForeground)
+                        .fixedSize(horizontal: false, vertical: true)
+                        .padding(.top, 2)
+                }
             }
             Spacer()
             if isRequestingPermission {

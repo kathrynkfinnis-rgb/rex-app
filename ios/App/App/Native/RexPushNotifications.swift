@@ -28,8 +28,42 @@ enum RexPushNotifications {
     /// gets every phone that already said yes registered after this fix.
     static func refreshRegistrationIfAuthorized() async {
         let status = await UNUserNotificationCenter.current().notificationSettings().authorizationStatus
-        guard status == .authorized || status == .provisional || status == .ephemeral else { return }
+        guard status == .authorized || status == .provisional || status == .ephemeral else {
+            record(status == .denied ? "Notifications are turned off for Rex in iOS Settings."
+                   : "Rex hasn't asked for notification permission yet.")
+            return
+        }
+        record("Asking Apple for this phone's push address\u{2026}")
         await MainActor.run { UIApplication.shared.registerForRemoteNotifications() }
+    }
+
+    // MARK: - Diagnostics (15 Sept)
+
+    /// Sept 15 — pushes still weren't arriving after build 41's fix, and the
+    /// server showed no registered phones, with nothing on the phone to say
+    /// which step was failing: permission, Apple handing over the token, or
+    /// saving it. Each step now records what happened; Notification settings
+    /// shows the latest, and a failure is reported once so it can be seen
+    /// without anyone having to screenshot anything.
+    static let statusKey = "rex.pushStatus"
+
+    static var lastStatus: String? { UserDefaults.standard.string(forKey: statusKey) }
+
+    static func record(_ status: String) {
+        let stamp = DateFormatter.localizedString(from: Date(), dateStyle: .short, timeStyle: .short)
+        UserDefaults.standard.set("\(status) (\(stamp))", forKey: statusKey)
+    }
+
+    /// Reported at most once per build per phone, via the ordinary feedback
+    /// table — the one place the app already writes that the team reads.
+    static func reportFailure(_ detail: String) async {
+        let build = Bundle.main.infoDictionary?["CFBundleVersion"] as? String ?? "?"
+        let key = "rex.pushFailureReported.\(build)"
+        guard !UserDefaults.standard.bool(forKey: key) else { return }
+        UserDefaults.standard.set(true, forKey: key)
+        try? await RexAPI.shared.sendFeedback(
+            message: "[push diagnostic, build \(build)] \(detail)", anonymous: false, page: "push-registration"
+        )
     }
 
     /// True only while iOS hasn't been asked yet — after that, the answer
