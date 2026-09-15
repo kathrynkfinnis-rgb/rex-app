@@ -61,6 +61,13 @@ struct RexCardActions: View {
                     Text("\(rexCount)")
                         .font(RexFont.text(11))
                         .foregroundStyle(RexColor.mutedForeground)
+                        // Sept 15 — "if the number of Rexers is 2 or higher,
+                        // the number is slightly obscured by the heart". The
+                        // row gave the poster's name layout priority, so on a
+                        // tight row the counts were the thing squeezed —
+                        // down to a sliver under the next icon. Counts keep
+                        // their natural width now; the name truncates instead.
+                        .fixedSize()
                 }
             }
             .buttonStyle(.plain)
@@ -164,6 +171,7 @@ struct RexCardActions: View {
                     Text("\(count)")
                         .font(RexFont.text(11))
                         .foregroundStyle(RexColor.mutedForeground)
+                        .fixedSize()
                 }
             }
         }

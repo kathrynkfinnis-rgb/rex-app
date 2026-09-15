@@ -40,6 +40,10 @@ struct OnboardingView: View {
                 }
             }
             .background(RexColor.background.ignoresSafeArea())
+            // The find-friends step embeds FriendsView, whose rows link to
+            // profiles — this stack had nowhere to send them, so tapping a
+            // person during onboarding did nothing.
+            .navigationDestination(for: UserProfileRoute.self) { UserProfileView(route: $0) }
             .toolbar {
                 if step != .intro && step != .notifications {
                     ToolbarItem(placement: .topBarTrailing) {

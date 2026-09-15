@@ -74,10 +74,6 @@ struct MainTabView: View {
     /// re-centres rather than a same-value change being ignored.
     @State private var mapFocusRequest: MapFocusRequest?
     @State private var mapFocusNonce = 0
-    /// Profile's own tab-root NavigationStack (see ProfileView's `path`
-    /// doc comment) — separate from FeedView's own path, since tag(5) and
-    /// FeedView's pushed-avatar route are two different stacks.
-    @State private var profilePath = NavigationPath()
 
     private func focusMap(onItemId itemId: String) {
         mapFocusNonce += 1
@@ -99,7 +95,6 @@ struct MainTabView: View {
                 FeedView(
                     onSignedOut: onSignedOut,
                     popToRootSignal: feedPopSignal,
-                    onFriendsTap: { selection = 4 },
                     addRexRefreshSignal: addRexRefreshSignal,
                     onViewOnMap: { focusMap(onItemId: $0) },
                     onViewTripOnMap: { focusMap(onTrip: $0, title: $1) }
@@ -127,20 +122,15 @@ struct MainTabView: View {
                 }
                 .tag(3)
 
-                NavigationStack {
-                    FriendsView()
-                        .navigationDestination(for: UserProfileRoute.self) { UserProfileView(route: $0) }
-                }
-                .tag(4)
-
-                // ProfileView no longer owns its own NavigationStack (see
-                // its `path` doc comment) — same shape as every other tab
-                // here, its own stack + bound path provided by whichever
-                // call site hosts it.
-                NavigationStack(path: $profilePath) {
-                    ProfileView(onSignedOut: onSignedOut, onViewOnMap: { focusMap(onItemId: $0) }, onViewTripOnMap: { focusMap(onTrip: $0, title: $1) }, path: $profilePath)
-                }
-                .tag(5)
+                // Sept 15 — Danny's "2 back arrows": Friends and Profile used to
+                // be tabs 4 and 5 here. An iPhone tab bar holds five at most,
+                // and UIKit quietly moves anything past that into a system
+                // "More" tab with its own navigation controller — so Friends
+                // and everything pushed from it sat inside TWO navigation
+                // bars. The top back arrow was More's, and led to its blank
+                // list (blank because our tab bar is hidden, so the tabs have
+                // no labels). Neither needed to be a tab: Profile was already
+                // pushed onto the feed, and Friends now is too.
             }
             // Deliberately NOT .page style. That style pages on a horizontal
             // swipe ANYWHERE on screen, not just via the tab bar — which is
@@ -160,7 +150,6 @@ struct MainTabView: View {
         .ignoresSafeArea(.keyboard)
         .tint(RexColor.primary)
         .environment(\.viewOnMap, { focusMap(onItemId: $0) })
-        .environment(\.goToFriends, { selection = 4 })
         .environment(\.goToCollections, { selection = 2 })
         .sheet(isPresented: $showingAddRex, onDismiss: { addRexRefreshSignal += 1 }) {
             AddRexView(onDone: { showingAddRex = false })

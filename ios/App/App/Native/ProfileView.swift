@@ -341,8 +341,9 @@ struct ProfileView: View {
                 statCard(value: "\(recommendations.count)", label: "REX")
                 statCard(value: averageRatingText, label: "AVG RATING")
                 statCard(value: "\(friendCount)", label: "FRIENDS") {
-                    goToFriends?()
-                    dismissSelf()
+                    // Pushed onto the same stack now that Friends isn't a
+                    // tab — see MainTabView.
+                    path.append(FriendsRoute())
                 }
                 statCard(value: "\(collectionCount)", label: "COLLECTIONS") {
                     goToCollections?()

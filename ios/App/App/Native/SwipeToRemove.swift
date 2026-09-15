@@ -60,14 +60,6 @@ struct SwipeToRemove<Content: View>: View {
     @State private var isConfirming = false
     @State private var isWorking = false
 
-    /// Reported by a subview (PhotoCarouselView, via
-    /// .swipeToRemoveExclusionZone()) that has its own horizontal swipe —
-    /// a drag starting inside this rect belongs to that subview instead.
-    @State private var exclusionZone: CGRect?
-    /// Decided once, when a drag starts, from exclusionZone — a drag can't
-    /// change which view owns it partway through.
-    @State private var isDragExcluded = false
-
     static var coordinateSpaceName: String { "swipeToRemoveCard" }
 
     var body: some View {
@@ -100,63 +92,51 @@ struct SwipeToRemove<Content: View>: View {
                     // A tap while the action is showing just puts it away.
                     if offset < 0 { close() } else { onTap() }
                 }
-                // .highPriorityGesture rather than plain .gesture: this view
-                // lives inside a ScrollView, and ScrollView's own pan gesture
-                // (backed by UIScrollView.panGestureRecognizer, a separate
-                // UIKit recognizer from SwiftUI's gesture system) was winning
-                // outright on any drag, including clearly-horizontal ones —
-                // confirmed by testing: a horizontal swipe just scrolled the
-                // list vertically instead of revealing the delete action.
-                // highPriorityGesture is the documented way to make a child's
-                // gesture take precedence over an ancestor's, which plain
-                // .gesture does not do.
+                // While Delete is showing, a tap anywhere on the card closes
+                // it — including on a part with a tap of its own (a long
+                // note expands, a location opens the map), which would
+                // otherwise take the tap and leave Delete sitting open.
+                .overlay {
+                    if offset < 0 {
+                        Color.clear
+                            .contentShape(Rectangle())
+                            .offset(x: offset)
+                            .onTapGesture { close() }
+                    }
+                }
+                // Sept 15 — the third and hopefully last shape of this.
                 //
-                // That same priority-over-descendants behavior is exactly
-                // what broke the photo carousel's own swipe (#120/#111
-                // regression): once this card started fielding a photo
-                // carousel, ITS internal paging drag is a descendant of
-                // this highPriorityGesture too, so it lost every time a
-                // swipe started on the photo. coordinateSpaceName +
-                // exclusionZone below carve that region back out — a drag
-                // whose start point lands inside the reported carousel
-                // frame is marked excluded up front and this gesture does
-                // nothing for its whole lifetime, leaving the touch free
-                // for the carousel's own TabView to handle.
-                .coordinateSpace(name: Self.coordinateSpaceName)
-                .onPreferenceChange(SwipeExclusionZoneKey.self) { exclusionZone = $0 }
-                // Sept 14 — "I sometimes find the scrolling on the first tile
-                // of the Home Screen weird and have to scroll from the second"
-                // (Danny). The first tile was his own Rex, and only your own
-                // cards are wrapped in this. highPriorityGesture claimed every
-                // drag that started on the card — vertical ones included, which
-                // it then ignored — so the feed couldn't scroll from there.
-                // simultaneousGesture lets the scroll view keep its vertical
-                // pans while this still sees the horizontal ones.
-                .simultaneousGesture(
-                    DragGesture(minimumDistance: 14, coordinateSpace: .named(Self.coordinateSpaceName))
-                        .onChanged { value in
-                            if dragStart == nil {
-                                isDragExcluded = exclusionZone?.contains(value.startLocation) ?? false
-                                dragStart = offset
-                            }
-                            guard !isDragExcluded else { return }
-                            // Ignore anything that's really a scroll.
-                            guard abs(value.translation.width) > abs(value.translation.height) else { return }
+                // highPriorityGesture (Aug) claimed every drag that started on
+                // the card, vertical ones included, so the feed couldn't be
+                // scrolled from your own cards (Danny, 14 Sept).
+                // simultaneousGesture (build 40) fixed that but let this drag
+                // run alongside the photo carousel's own swipe — "I can't
+                // scroll through the carousel of photos any more".
+                //
+                // A SwiftUI DragGesture can't say "only horizontal" before it
+                // starts, which is the whole problem. A UIKit pan can: its
+                // delegate is asked whether to begin once the finger has
+                // moved, and says no for anything mostly vertical (so the
+                // feed scrolls) or anything that starts inside a sideways
+                // scroller (so the carousel pages). See HorizontalSwipeGesture.
+                .gesture(
+                    HorizontalSwipeGesture(
+                        onChanged: { translation in
+                            if dragStart == nil { dragStart = offset }
                             let base = dragStart ?? offset
-                            offset = min(0, max(base + value.translation.width, -commitWidth - 40))
-                        }
-                        .onEnded { value in
-                            defer { dragStart = nil; isDragExcluded = false }
-                            guard !isDragExcluded else { return }
-                            guard abs(value.translation.width) > abs(value.translation.height) || offset < 0 else { return }
-                            // No commit-on-full-swipe: a long flick is too easy
-                            // to do by accident, and this deletes things.
+                            offset = min(0, max(base + translation, -commitWidth - 40))
+                        },
+                        onEnded: { _ in
+                            defer { dragStart = nil }
+                            // No commit-on-full-swipe: a long flick is too
+                            // easy to do by accident, and this deletes things.
                             if offset < -actionWidth / 2 {
                                 withAnimation(.snappy) { offset = -actionWidth }
                             } else {
                                 withAnimation(.snappy) { offset = 0 }
                             }
                         }
+                    )
                 )
         }
         .alert(confirmMessage ?? "", isPresented: $isConfirming) {
@@ -184,5 +164,66 @@ struct SwipeToRemove<Content: View>: View {
 
     private func close() {
         withAnimation(.snappy) { offset = 0 }
+    }
+}
+
+
+/// A left/right pan that only ever starts for a sideways swipe.
+///
+/// - Mostly-vertical movement: declines to begin, and the scroll view it
+///   sits in (which waits for this to decide — see shouldBeRequiredToFailBy)
+///   scrolls as normal.
+/// - Starting inside something that itself scrolls sideways (the photo
+///   carousel's pager): declines, so that scroller gets the swipe.
+private struct HorizontalSwipeGesture: UIGestureRecognizerRepresentable {
+    var onChanged: (CGFloat) -> Void
+    var onEnded: (CGFloat) -> Void
+
+    func makeCoordinator(converter: CoordinateSpaceConverter) -> Coordinator { Coordinator() }
+
+    func makeUIGestureRecognizer(context: Context) -> UIPanGestureRecognizer {
+        let recognizer = UIPanGestureRecognizer()
+        recognizer.delegate = context.coordinator
+        return recognizer
+    }
+
+    func handleUIGestureRecognizerAction(_ recognizer: UIPanGestureRecognizer, context: Context) {
+        let x = recognizer.translation(in: recognizer.view).x
+        switch recognizer.state {
+        case .began, .changed: onChanged(x)
+        case .ended, .cancelled, .failed: onEnded(x)
+        default: break
+        }
+    }
+
+    final class Coordinator: NSObject, UIGestureRecognizerDelegate {
+        func gestureRecognizerShouldBegin(_ gestureRecognizer: UIGestureRecognizer) -> Bool {
+            guard let pan = gestureRecognizer as? UIPanGestureRecognizer, let view = pan.view else { return false }
+            let velocity = pan.velocity(in: view)
+            guard abs(velocity.x) > abs(velocity.y) * 1.2 else { return false }
+            // Walk up from whatever the touch landed on: a horizontal
+            // scroller on the way up means the swipe is its.
+            var hit = view.hitTest(pan.location(in: view), with: nil)
+            while let current = hit, current !== view {
+                if let scroller = current as? UIScrollView,
+                   scroller.contentSize.width > scroller.bounds.width + 1 {
+                    return false
+                }
+                hit = current.superview
+            }
+            return true
+        }
+
+        /// The feed's vertical scroll view waits (for the length of one
+        /// decision) until this has declined — otherwise it would start
+        /// scrolling on the same sideways swipe that should reveal Delete.
+        func gestureRecognizer(_ gestureRecognizer: UIGestureRecognizer,
+                               shouldBeRequiredToFailBy otherGestureRecognizer: UIGestureRecognizer) -> Bool {
+            guard let scroller = otherGestureRecognizer.view as? UIScrollView,
+                  otherGestureRecognizer === scroller.panGestureRecognizer else { return false }
+            // Vertical scrollers only; a sideways one (the carousel) must
+            // never wait on this.
+            return scroller.contentSize.width <= scroller.bounds.width + 1
+        }
     }
 }

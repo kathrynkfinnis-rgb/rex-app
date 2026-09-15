@@ -637,7 +637,7 @@ struct FeedView: View {
                 // button, per Kathryn's ask — see MainTabView.
                 // Friends moved up here in its place.
                 Button {
-                    onFriendsTap()
+                    path.append(FriendsRoute())
                 } label: {
                     Image(systemName: "person.2")
                         .font(.system(size: 18))

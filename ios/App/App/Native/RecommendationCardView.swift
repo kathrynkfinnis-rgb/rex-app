@@ -212,6 +212,10 @@ struct RecommendationCardView: View {
                     // Blasts are questions, not Rex — no like/save row.
                     if !rec.isBlast {
                         RexCardActions(rec: rec, rexCount: rexCount, onCommentTap: onCommentTap)
+                            // The icons and their counts never compress; the
+                            // name beside them takes any shortfall.
+                            .fixedSize(horizontal: true, vertical: false)
+                            .layoutPriority(2)
                     }
                 }
                 .padding(.horizontal, RexSpacing.cardPadding)

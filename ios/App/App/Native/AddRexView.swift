@@ -1771,18 +1771,37 @@ struct AddRexView: View {
 
             // People rarely add just one, so offer to go again without
             // having to come back in through the + button.
-            Button("Add another") { startAnother() }
-                .frame(maxWidth: .infinity)
-                .frame(height: 48)
-                .background(isRealPost && shareURL != nil ? RexColor.card : RexColor.primary)
-                .foregroundStyle(isRealPost && shareURL != nil ? RexColor.primary : RexColor.primaryForeground)
-                .clipShape(Capsule())
-                .overlay(Capsule().stroke(RexColor.primary, lineWidth: isRealPost && shareURL != nil ? 1.5 : 0))
-                .padding(.top, isRealPost && shareURL != nil ? 0 : 8)
+            // Sept 15 — "If I add a Rex through the map, the 'add another'
+            // button doesn't work". The frame and capsule were applied to the
+            // outside of a Button("Add another"), which only makes the words
+            // themselves tappable — a tap anywhere else on the pill did
+            // nothing. The whole pill is the button now.
+            Button {
+                startAnother()
+            } label: {
+                Text("Add another")
+                    .font(RexFont.text(16, weight: .semibold))
+                    .frame(maxWidth: .infinity)
+                    .frame(height: 48)
+                    .background(isRealPost && shareURL != nil ? RexColor.card : RexColor.primary)
+                    .foregroundStyle(isRealPost && shareURL != nil ? RexColor.primary : RexColor.primaryForeground)
+                    .clipShape(Capsule())
+                    .overlay(Capsule().stroke(RexColor.primary, lineWidth: isRealPost && shareURL != nil ? 1.5 : 0))
+                    .contentShape(Capsule())
+            }
+            .buttonStyle(.plain)
+            .padding(.top, isRealPost && shareURL != nil ? 0 : 8)
 
-            Button("Back to feed") { onDone() }
-                .font(RexFont.text(15, weight: .semibold))
-                .foregroundStyle(RexColor.primary)
+            Button {
+                onDone()
+            } label: {
+                Text("Back to feed")
+                    .font(RexFont.text(15, weight: .semibold))
+                    .foregroundStyle(RexColor.primary)
+                    .frame(maxWidth: .infinity, minHeight: 44)
+                    .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
 
             // Tapping "Want to try" used to be a one-way door — the only
             // way back was finding it in Collections and swiping it away.
