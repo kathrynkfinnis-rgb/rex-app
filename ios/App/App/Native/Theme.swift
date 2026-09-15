@@ -310,8 +310,13 @@ let rexListKinds: [String] = ["Book", "Place", "Trip", "Film & TV", "Recipe", "M
 /// Subcategories per category, mirroring src/lib/categories.ts. Stored
 /// comma-separated in items.genre.
 let rexSubcategories: [RexCategory: [String]] = [
-    .place: ["Restaurant", "Private dining", "Bar", "Café", "Beauty",
-             "Accommodation", "Shop", "Activity", "Town", "For kids", "Other"],
+    // Sept 15 — "Don't think private dining should be so far up the list
+    // as it's so niche. Restaurant, pub, cafe etc." and "Bar vs pub? Or
+    // both" (Danny). Everyday first, niche last, and Pub in its own right —
+    // a British pub isn't a bar. This is only the starting order: see
+    // rexOrderedSubcategories, which moves your own most-used up.
+    .place: ["Restaurant", "Pub", "Bar", "Café", "Shop", "Activity",
+             "Accommodation", "Town", "For kids", "Beauty", "Private dining", "Other"],
     .trip: ["City break", "Beach", "Road trip", "Countryside", "Ski", "Adventure",
             "Family", "Weekend away", "Honeymoon", "Work trip", "For kids", "Other"],
     .recipe: ["Salad", "Soup", "Pasta", "Rice & grains", "Meat", "Fish & seafood",
@@ -610,6 +615,7 @@ func rexSubcategoryColor(genre: String?, type: String?) -> Color {
     case "restaurant":       return Color(hex: "C0473E")   // red
     case "private dining":   return Color(hex: "8457C9")   // plum
     case "bar":              return Color(hex: "C98A2E")   // amber
+    case "pub":              return Color(hex: "7A4A1E")   // dark ale
     case "café", "cafe":     return Color(hex: "8A6D3B")   // brown
     case "beauty":           return Color(hex: "D2699A")   // pink
     case "accommodation":    return Color(hex: "3E7CB1")   // blue
@@ -624,3 +630,38 @@ func rexSubcategoryColor(genre: String?, type: String?) -> Color {
 /// The sub-categories the map offers as filters, in the order the legend
 /// and chip row show them.
 let rexMapSubcategories: [String] = (rexSubcategories[.place] ?? []) + ["Event"]
+
+
+/// Sept 15 — "maybe ranked in order of how often that person adds them"
+/// (Danny). Each category's sub-categories, with the ones you pick most
+/// often moved to the front. Counted on this phone as you post — it's a
+/// convenience, not something worth a server round trip or a column.
+/// "Other" always stays last; ties keep the default order above.
+enum RexSubcategoryUsage {
+    private static func key(_ category: RexCategory) -> String { "rex.subcategoryUse.\(category.rawValue)" }
+
+    static func record(_ category: RexCategory, _ picked: [String]) {
+        guard !picked.isEmpty else { return }
+        var counts = UserDefaults.standard.dictionary(forKey: key(category)) as? [String: Int] ?? [:]
+        for name in picked { counts[name, default: 0] += 1 }
+        UserDefaults.standard.set(counts, forKey: key(category))
+    }
+
+    static func counts(_ category: RexCategory) -> [String: Int] {
+        UserDefaults.standard.dictionary(forKey: key(category)) as? [String: Int] ?? [:]
+    }
+}
+
+func rexOrderedSubcategories(_ category: RexCategory) -> [String] {
+    let defaults = rexSubcategories[category] ?? []
+    let counts = RexSubcategoryUsage.counts(category)
+    guard !counts.isEmpty else { return defaults }
+    let position = Dictionary(uniqueKeysWithValues: defaults.enumerated().map { ($1, $0) })
+    return defaults.sorted { a, b in
+        if a == "Other" { return false }
+        if b == "Other" { return true }
+        let ca = counts[a] ?? 0, cb = counts[b] ?? 0
+        if ca != cb { return ca > cb }
+        return (position[a] ?? 0) < (position[b] ?? 0)
+    }
+}

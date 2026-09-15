@@ -229,6 +229,23 @@ struct ItemDetailView: View {
                     .buttonStyle(.plain)
                 }
 
+                if let link = item.link_url, let url = URL(string: link), url.scheme?.hasPrefix("http") == true {
+                    // Opens in Safari. Labelled with the site's own name so
+                    // it's clear where you're going.
+                    Link(destination: url) {
+                        HStack(spacing: 4) {
+                            Image(systemName: "arrow.up.right.square").font(.system(size: 12))
+                            Text(category == .other || category == .list ? "View product" : "Visit website")
+                                .font(RexFont.text(12, weight: .semibold))
+                        }
+                        .foregroundStyle(RexColor.primary)
+                        .padding(.horizontal, RexSpacing.sm)
+                        .padding(.vertical, 6)
+                        .overlay(Capsule().stroke(RexColor.primary, lineWidth: 1))
+                    }
+                    .accessibilityHint(url.host ?? "")
+                }
+
                 if let collectionTargetRec {
                     Button {
                         activeSheet = .collection(collectionTargetRec)

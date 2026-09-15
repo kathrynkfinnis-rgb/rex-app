@@ -249,7 +249,7 @@ struct EditRexView: View {
                     // too. Free-text here rather than rebuilding that chip
                     // picker, but same category gate and same comma-joined
                     // format, so a value set either way reads back fine.
-                    if let options = rexSubcategories[category], !options.isEmpty {
+                    if case let options = rexOrderedSubcategories(category), !options.isEmpty {
                         VStack(alignment: .leading, spacing: RexSpacing.sm) {
                             Text("Subcategories").font(RexFont.text(14, weight: .semibold))
                             TextField("e.g. \(options.first ?? "Type")", text: $genre)

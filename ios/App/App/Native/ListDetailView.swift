@@ -221,12 +221,20 @@ struct ListDetailView: View {
                 // finding the inline button under a heading; this is the
                 // same action, always one tap away.
                 ToolbarItem(placement: .topBarTrailing) {
+                    // Sept 15 — "When you add an item after the list has been
+                    // published it should be the same format as when you are
+                    // adding it for the first time ie take you back to the
+                    // original page where you can add product link etc"
+                    // (Phoebe). It opened the old add-a-stop sheet, which has
+                    // no product link and no thumbnail. It opens the list's
+                    // own form now, same as Edit — "Add an item" is right there.
                     Button {
-                        addItemSection = ""
-                        activeSheet = .addItem
+                        showingListEditor = true
                     } label: {
                         Image(systemName: "plus")
                     }
+                    .disabled(listRec == nil)
+                    .accessibilityLabel("Add an item")
                 }
                 ToolbarItem(placement: .topBarTrailing) {
                     // Sept 14 — "the two edit buttons take you to different

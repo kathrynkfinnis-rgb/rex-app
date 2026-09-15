@@ -27,6 +27,12 @@ struct UserProfileView: View {
     /// database returns nothing for anyone else, and then there's no row.
     @State private var theirFriends: [FoundPerson] = []
     @State private var showingTheirFriends = false
+    /// Sept 15 — "Really tricky to add friends. No option on Phoebe's page
+    /// to add her" (Danny). Your relationship with this person: nil while
+    /// loading, then "none", "requested", "requested_you", "friend", "you".
+    @State private var connection: String?
+    @State private var connectionFriendshipId: String?
+    @State private var isChangingConnection = false
     /// #148 — this shelf showed a plain emoji square per collection; the
     /// same shelf on your own Collections page (and Explore's friend-
     /// collections cards) shows a 2x2 grid of the collection's own content
@@ -81,7 +87,13 @@ struct UserProfileView: View {
                 } else if let errorMessage {
                     errorState(errorMessage)
                 } else if visible.isEmpty {
-                    Text(recommendations.isEmpty ? "Nothing Rex'd yet." : "Nothing in this category.")
+                    // A stranger's Rex are friends-only, so "Nothing Rex'd
+                    // yet" was untrue on Phoebe's page — she has hundreds.
+                    Text(recommendations.isEmpty
+                         ? (connection == "none" || connection == "requested" || connection == "requested_you"
+                            ? "Add \(profile?.display_name ?? route.name) as a friend to see their Rex."
+                            : "Nothing Rex'd yet.")
+                         : "Nothing in this category.")
                         .font(RexFont.text(14))
                         .foregroundStyle(RexColor.mutedForeground)
                         .frame(maxWidth: .infinity)
@@ -128,7 +140,10 @@ struct UserProfileView: View {
         .sheet(item: $addingToCollection) { rec in
             AddToCollectionView(rec: rec) { addingToCollection = nil }
         }
-        .task { await load() }
+        .task {
+            await load()
+            await loadConnection()
+        }
     }
 
     /// A row of their friends' faces and a count — tap through for the full
@@ -186,6 +201,9 @@ struct UserProfileView: View {
                         .font(RexFont.text(13))
                         .foregroundStyle(RexColor.mutedForeground)
                 }
+                // No count for someone you're not friends with — their Rex
+                // are friends-only, so it would always say a misleading 0.
+                if !recommendations.isEmpty || connection == "friend" || connection == "you" {
                 HStack(spacing: RexSpacing.md) {
                     Text("\(recommendations.count) Rex")
                         .font(RexFont.text(12))
@@ -193,10 +211,90 @@ struct UserProfileView: View {
                     RexRatingAverageBadge(ratings: recommendations.map { $0.rating })
                 }
                 .padding(.top, 2)
+                }
+                connectionButton
+                    .padding(.top, RexSpacing.xs)
             }
             Spacer()
         }
         .padding(.top, RexSpacing.sm)
+    }
+
+    @ViewBuilder
+    private var connectionButton: some View {
+        switch connection {
+        case "none":
+            Button {
+                Task { await addFriend() }
+            } label: {
+                Label("Add friend", systemImage: "person.badge.plus")
+                    .font(RexFont.text(13, weight: .semibold))
+                    .padding(.horizontal, 14).frame(height: 34)
+                    .background(RexColor.primary)
+                    .foregroundStyle(RexColor.primaryForeground)
+                    .clipShape(Capsule())
+            }
+            .buttonStyle(.plain)
+            .disabled(isChangingConnection)
+        case "requested":
+            Label("Request sent", systemImage: "clock")
+                .font(RexFont.text(13, weight: .medium))
+                .foregroundStyle(RexColor.mutedForeground)
+        case "requested_you":
+            Button {
+                Task { await acceptFriend() }
+            } label: {
+                Label("Accept friend request", systemImage: "checkmark")
+                    .font(RexFont.text(13, weight: .semibold))
+                    .padding(.horizontal, 14).frame(height: 34)
+                    .background(RexColor.primary)
+                    .foregroundStyle(RexColor.primaryForeground)
+                    .clipShape(Capsule())
+            }
+            .buttonStyle(.plain)
+            .disabled(isChangingConnection)
+        case "friend":
+            Label("Friends", systemImage: "checkmark")
+                .font(RexFont.text(13, weight: .semibold))
+                .foregroundStyle(RexColor.primary)
+        default:
+            EmptyView()
+        }
+    }
+
+    private func loadConnection() async {
+        guard let me = RexAPI.shared.currentUserId else { return }
+        if route.userId == me { connection = "you"; return }
+        guard let friendships = try? await RexAPI.shared.fetchFriendships() else { return }
+        let match = friendships.first {
+            ($0.requester_id == me && $0.addressee_id == route.userId)
+                || ($0.addressee_id == me && $0.requester_id == route.userId)
+        }
+        connectionFriendshipId = match?.id
+        switch (match?.status, match?.requester_id == me) {
+        case ("accepted", _): connection = "friend"
+        case ("pending", true): connection = "requested"
+        case ("pending", false): connection = "requested_you"
+        default: connection = "none"
+        }
+    }
+
+    private func addFriend() async {
+        isChangingConnection = true
+        if (try? await RexAPI.shared.sendFriendRequest(addresseeId: route.userId)) != nil {
+            connection = "requested"
+        }
+        isChangingConnection = false
+    }
+
+    private func acceptFriend() async {
+        guard let id = connectionFriendshipId else { return }
+        isChangingConnection = true
+        if (try? await RexAPI.shared.respondToFriendRequest(id: id, accept: true)) != nil {
+            connection = "friend"
+            await load()
+        }
+        isChangingConnection = false
     }
 
     /// Their public and friends-visible collections — never `draft`, those

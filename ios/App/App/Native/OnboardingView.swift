@@ -19,7 +19,7 @@ import SwiftUI
 struct OnboardingView: View {
     var onDone: () -> Void
 
-    private enum Step { case intro, interests, findFriends }
+    private enum Step { case intro, interests, findFriends, notifications }
 
     @State private var step: Step = .intro
     @State private var selected: Set<RexCategory> = []
@@ -36,11 +36,12 @@ struct OnboardingView: View {
                 case .intro: introStep
                 case .interests: interestsStep
                 case .findFriends: findFriendsStep
+                case .notifications: NotificationsAskView(onDone: onDone)
                 }
             }
             .background(RexColor.background.ignoresSafeArea())
             .toolbar {
-                if step != .intro {
+                if step != .intro && step != .notifications {
                     ToolbarItem(placement: .topBarTrailing) {
                         Button("Skip") { advance() }
                             .font(RexFont.text(14, weight: .semibold))
@@ -143,7 +144,9 @@ struct OnboardingView: View {
             HStack(spacing: RexSpacing.sm) {
                 Image(systemName: category.symbol)
                     .font(.system(size: 16))
-                Text(category.label)
+                // "Should these be plural?" (Danny) — yes: these name a kind
+                // of thing you're into, the same as the feed's filter chips.
+                Text(category.pluralLabel)
                     .font(RexFont.text(15, weight: .medium))
                 Spacer(minLength: 0)
                 if isOn {
@@ -203,7 +206,17 @@ struct OnboardingView: View {
         switch step {
         case .intro: step = .interests
         case .interests: step = .findFriends
-        case .findFriends: onDone()
+        case .findFriends:
+            // Last step: ask for notifications — unless iOS has already
+            // been asked, in which case there's nothing left to ask.
+            Task {
+                if await RexPushNotifications.canAsk() {
+                    step = .notifications
+                } else {
+                    onDone()
+                }
+            }
+        case .notifications: onDone()
         }
     }
 }

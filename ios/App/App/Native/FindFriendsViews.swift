@@ -375,10 +375,12 @@ struct UsernameSetupView: View {
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: RexSpacing.lg) {
+                // Same size as onboarding's — at 44pt it read as a different,
+                // heavier logo ("Phoebe thinks font might be off").
                 Image("RexWordmark")
                     .resizable()
                     .scaledToFit()
-                    .frame(height: 44)
+                    .frame(height: 28)
                     .padding(.top, RexSpacing.xxl)
 
                 VStack(alignment: .leading, spacing: RexSpacing.sm) {

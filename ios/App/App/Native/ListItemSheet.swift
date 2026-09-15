@@ -32,6 +32,9 @@ struct ListItemSheet: View {
     @State private var picked: RexSearchHit?
     @State private var title = ""
     @State private var linkURL = ""
+    /// Sept 15 — fetching the picture (and name) from a pasted link.
+    @State private var previewTask: Task<Void, Never>?
+    @State private var isFetchingPreview = false
     @State private var photoURLs: [String] = []
 
     @State private var myHits: [MyRexHit] = []
@@ -59,12 +62,21 @@ struct ListItemSheet: View {
 
                     field("Product link") {
                         TextField("https://…", text: $linkURL)
+                            .onChange(of: linkURL) { _, _ in schedulePreview() }
                             .textFieldStyle(.plain)
                             .textInputAutocapitalization(.never)
                             .autocorrectionDisabled()
                             .keyboardType(.URL)
                     }
-                    Text("Filled in automatically when you pick a search result that has one.")
+                    if isFetchingPreview {
+                        HStack(spacing: 6) {
+                            ProgressView().controlSize(.small)
+                            Text("Getting the picture from that page\u{2026}")
+                        }
+                        .font(RexFont.text(11.5))
+                        .foregroundStyle(RexColor.mutedForeground)
+                    }
+                    Text("Paste a link and the picture fills in from the page.")
                         .font(RexFont.text(11.5))
                         .foregroundStyle(RexColor.mutedForeground)
 
@@ -232,6 +244,33 @@ struct ListItemSheet: View {
         title = existing.title
         linkURL = existing.linkURL ?? ""
         photoURLs = [existing.photoURL ?? existing.imageURL].compactMap { $0 }
+    }
+
+    /// Only fills what's empty: a picture you chose, or a name you typed,
+    /// always wins over one guessed from the page.
+    private func schedulePreview() {
+        previewTask?.cancel()
+        let text = linkURL.trimmingCharacters(in: .whitespaces)
+        guard let url = URL(string: text), url.scheme?.hasPrefix("http") == true, url.host != nil else {
+            isFetchingPreview = false
+            return
+        }
+        guard photoURLs.isEmpty || title.trimmingCharacters(in: .whitespaces).isEmpty else { return }
+        previewTask = Task {
+            try? await Task.sleep(nanoseconds: 500_000_000)
+            guard !Task.isCancelled else { return }
+            isFetchingPreview = true
+            let preview = await RexSearch.linkPreview(for: url)
+            guard !Task.isCancelled else { return }
+            if photoURLs.isEmpty, let image = preview.imageURL { photoURLs = [image] }
+            if title.trimmingCharacters(in: .whitespaces).isEmpty, let name = preview.title {
+                title = name
+                // Filled from the page, not typed — don't go searching on it.
+                searchTask?.cancel()
+                myHits = []; webHits = []; isSearching = false
+            }
+            isFetchingPreview = false
+        }
     }
 
     private func scheduleSearch() {

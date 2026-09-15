@@ -401,6 +401,39 @@ enum RexSearch {
         return (lat, lng, first["formatted_address"] as? String)
     }
 
+    /// Sept 15 — where a *named* place is. "Quinn's" (a pub in Dingle)
+    /// landed in Canada and "Sora Lella" (a restaurant in Rome) in Jenin:
+    /// both were looked up with the Geocoding API, which is built for
+    /// street addresses and does a poor job of business names — it matches
+    /// fragments of the words to whatever town it can. Places Text Search is
+    /// built for exactly this ("Quinn's, Dingle"), so it goes first; the
+    /// Geocoding API stays as the fallback for anything Places can't find.
+    ///
+    /// When there's a real street address, use that instead — see
+    /// `locate(name:address:context:)`.
+    static func locatePlace(_ query: String) async -> (lat: Double, lng: Double, address: String?)? {
+        let q = query.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !q.isEmpty else { return nil }
+        if let hit = (try? await places(q))?.first, let lat = hit.lat, let lng = hit.lng {
+            return (lat, lng, hit.address)
+        }
+        return await geocodeDetailed(q)
+    }
+
+    /// The one entry point for "where is this?". A saved street address is
+    /// the most trustworthy thing we have, so it wins and goes to the
+    /// address geocoder; otherwise it's the name (plus whatever context —
+    /// city, trip name — is going) through Places.
+    static func locate(name: String?, address: String?, context: [String?] = []) async -> (lat: Double, lng: Double, address: String?)? {
+        if let address = address?.trimmingCharacters(in: .whitespacesAndNewlines), address.count > 8,
+           address.contains(where: \.isNumber) || address.contains(",") {
+            if let located = await geocodeDetailed(address) { return located }
+        }
+        let query = ([name] + context).compactMap { $0?.trimmingCharacters(in: .whitespaces) }
+            .filter { !$0.isEmpty }.joined(separator: ", ")
+        return await locatePlace(query)
+    }
+
     static func geocode(_ query: String) async -> (lat: Double, lng: Double)? {
         let q = query.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !q.isEmpty, !googleKey.isEmpty else { return nil }
@@ -417,6 +450,61 @@ enum RexSearch {
               let lat = location["lat"] as? Double, let lng = location["lng"] as? Double
         else { return nil }
         return (lat, lng)
+    }
+
+    // MARK: - Link previews (15 Sept)
+
+    /// Sept 15 — "If you upload a product link can it auto populate the
+    /// thumbnail with the product image" (Phoebe). Almost every shop page
+    /// declares its own share image and title for WhatsApp/iMessage
+    /// previews (og:image / og:title, or the twitter: equivalents); this
+    /// reads those, the same way a messaging app builds a link preview.
+    /// Best-effort — a site that blocks it, or has none, just leaves the
+    /// thumbnail for you to add.
+    static func linkPreview(for url: URL) async -> (title: String?, imageURL: String?) {
+        var request = URLRequest(url: url, timeoutInterval: 8)
+        // Some shops serve an empty shell to anything that doesn't look like
+        // a browser; Safari's own agent gets the real page.
+        request.setValue("Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.0 Mobile/15E148 Safari/604.1",
+                         forHTTPHeaderField: "User-Agent")
+        request.setValue("text/html", forHTTPHeaderField: "Accept")
+        guard let (data, response) = try? await URLSession.shared.data(for: request),
+              let http = response as? HTTPURLResponse, http.statusCode < 400 else { return (nil, nil) }
+        // The meta tags live in <head>; no need to decode a whole product page.
+        let head = String(decoding: data.prefix(600_000), as: UTF8.self)
+
+        func meta(_ names: [String]) -> String? {
+            for name in names {
+                // Attribute order varies between sites, so both orders.
+                let patterns = [
+                    "<meta[^>]+(?:property|name)=[\"']\(name)[\"'][^>]*content=[\"']([^\"']+)[\"']",
+                    "<meta[^>]+content=[\"']([^\"']+)[\"'][^>]*(?:property|name)=[\"']\(name)[\"']",
+                ]
+                for pattern in patterns {
+                    guard let regex = try? NSRegularExpression(pattern: pattern, options: [.caseInsensitive]) else { continue }
+                    let range = NSRange(head.startIndex..., in: head)
+                    if let match = regex.firstMatch(in: head, range: range),
+                       let r = Range(match.range(at: 1), in: head) {
+                        let value = String(head[r])
+                            .replacingOccurrences(of: "&amp;", with: "&")
+                            .replacingOccurrences(of: "&quot;", with: "\"")
+                            .replacingOccurrences(of: "&#39;", with: "'")
+                            .trimmingCharacters(in: .whitespacesAndNewlines)
+                        if !value.isEmpty { return value }
+                    }
+                }
+            }
+            return nil
+        }
+
+        var image = meta(["og:image:secure_url", "og:image", "twitter:image", "twitter:image:src"])
+        // A relative image path ("/images/bag.jpg") means relative to the page.
+        if let raw = image, !raw.hasPrefix("http"), let resolved = URL(string: raw, relativeTo: url) {
+            image = resolved.absoluteString
+        }
+        if image?.hasPrefix("http://") == true { image = image?.replacingOccurrences(of: "http://", with: "https://") }
+        let title = meta(["og:title", "twitter:title"])
+        return (title, image)
     }
 
     // MARK: - Helpers

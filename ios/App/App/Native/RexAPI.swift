@@ -554,7 +554,10 @@ final class RexAPI {
         // so a pasted/auto-populated recipe saved fine and then simply had
         // nowhere to display, matching "doesn't seem to have pulled
         // through... even though I checked it and posted it."
-        let base = "id,type,title,subtitle,image_url,genre,address,recipe_text"
+        // Sept 15 — "You can't see the product link" (Phoebe). It was saved
+        // on every list item and never selected back here, so the item page
+        // had nothing to show.
+        let base = "id,type,title,subtitle,image_url,genre,address,recipe_text,link_url"
         if let item = try? await fetchItem(id: id, select: base + ",google_rating,google_rating_count") {
             return item
         }
@@ -1536,6 +1539,50 @@ final class RexAPI {
         return try JSONDecoder().decode([SuggestedFriend].self, from: data)
     }
 
+    /// Sept 15 — "Maybe you could amp up people's dopamine when they submit.
+    /// Congratulate them or thank them. Or like Duolingo have a posting
+    /// streak" (Danny). How many Rex you've posted, and how many weeks in a
+    /// row (this one included) you've posted at least one. Stops and list
+    /// items don't count — they're part of a trip or list, not posts of
+    /// their own.
+    func fetchMyPostStats() async -> (count: Int, weekStreak: Int)? {
+        guard let userId = currentUserId, let token = try? await validToken() else { return nil }
+        var components = URLComponents(url: baseURL.appendingPathComponent("/rest/v1/recommendations"), resolvingAgainstBaseURL: false)!
+        components.queryItems = [
+            URLQueryItem(name: "select", value: "created_at"),
+            URLQueryItem(name: "user_id", value: "eq.\(userId)"),
+            URLQueryItem(name: "trip_id", value: "is.null"),
+            URLQueryItem(name: "list_id", value: "is.null"),
+            URLQueryItem(name: "order", value: "created_at.desc"),
+            URLQueryItem(name: "limit", value: "2000"),
+        ]
+        var request = URLRequest(url: components.url!)
+        request.setValue(anonKey, forHTTPHeaderField: "apikey")
+        request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+        guard let (data, response) = try? await URLSession.shared.data(for: request),
+              let http = response as? HTTPURLResponse, http.statusCode < 400 else { return nil }
+        struct Row: Codable { let created_at: String }
+        let rows = (try? JSONDecoder().decode([Row].self, from: data)) ?? []
+
+        let iso = ISO8601DateFormatter()
+        iso.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+        let plain = ISO8601DateFormatter()
+        var calendar = Calendar(identifier: .iso8601)
+        calendar.timeZone = .current
+        let weeks = Set(rows.compactMap { row -> Date? in
+            guard let date = iso.date(from: row.created_at) ?? plain.date(from: row.created_at) else { return nil }
+            return calendar.dateInterval(of: .weekOfYear, for: date)?.start
+        })
+        var streak = 0
+        var cursor = calendar.dateInterval(of: .weekOfYear, for: Date())?.start ?? Date()
+        while weeks.contains(cursor) {
+            streak += 1
+            guard let previous = calendar.date(byAdding: .weekOfYear, value: -1, to: cursor) else { break }
+            cursor = previous
+        }
+        return (rows.count, streak)
+    }
+
     // MARK: - Finding friends (14 Sept)
 
     /// A friend's own friends — "look at your friends' friends as another
@@ -1671,6 +1718,22 @@ final class RexAPI {
     }
 
     // MARK: - Notifications
+
+    /// Sept 15 — "I've no way to X them" (Danny). Your own notifications
+    /// are yours to delete (RLS: "Users delete own notifications").
+    func deleteNotification(id: String) async throws {
+        let token = try await validToken()
+        var components = URLComponents(url: baseURL.appendingPathComponent("/rest/v1/notifications"), resolvingAgainstBaseURL: false)!
+        components.queryItems = [URLQueryItem(name: "id", value: "eq.\(id)")]
+        var request = URLRequest(url: components.url!)
+        request.httpMethod = "DELETE"
+        request.setValue(anonKey, forHTTPHeaderField: "apikey")
+        request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+        let (data, response) = try await URLSession.shared.data(for: request)
+        guard let http = response as? HTTPURLResponse, http.statusCode < 400 else {
+            throw RexAPIError.server(friendlyError(data, fallback: "Couldn't remove that notification."))
+        }
+    }
 
     func fetchNotifications() async throws -> [RexNotification] {
         let token = try await validToken()
@@ -2005,7 +2068,13 @@ final class RexAPI {
         guard !query.trimmingCharacters(in: .whitespaces).isEmpty else { return nil }
         guard Self.repairLock.withLock({ Self.geocodeRepairedItemIds.insert(itemId).inserted }) else { return nil }
 
-        guard let located = await RexSearch.geocodeDetailed(query) else { return nil }
+        let located: (lat: Double, lng: Double, address: String?)?
+        if address.isEmpty {
+            located = await RexSearch.locatePlace(query)
+        } else {
+            located = await RexSearch.geocodeDetailed(query)
+        }
+        guard let located else { return nil }
         guard let token = try? await validToken() else { return nil }
         var components = URLComponents(url: baseURL.appendingPathComponent("/rest/v1/items"), resolvingAgainstBaseURL: false)!
         components.queryItems = [URLQueryItem(name: "id", value: "eq.\(itemId)")]
@@ -4068,9 +4137,12 @@ final class RexAPI {
             guard let item = stop.items,
                   item.type == "place" || item.type == "event" else { continue }
             total += 1
-            let query = [item.title, item.subtitle, tripName]
-                .compactMap { $0 }.filter { !$0.isEmpty }.joined(separator: ", ")
-            guard let located = await RexSearch.geocodeDetailed(query) else { continue }
+            // Sept 15 — the saved address first (Sora Lella's said Rome all
+            // along; only its pin was in Jenin), then the name through
+            // Places with the trip's name for context.
+            guard let located = await RexSearch.locate(
+                name: item.title, address: item.address, context: [item.subtitle, tripName]
+            ) else { continue }
 
             var components = URLComponents(url: baseURL.appendingPathComponent("/rest/v1/items"), resolvingAgainstBaseURL: false)!
             components.queryItems = [URLQueryItem(name: "id", value: "eq.\(item.id)")]
@@ -4574,9 +4646,9 @@ final class RexAPI {
             var geocodedLat: Double?
             var geocodedLng: Double?
             if type == "place" || type == "event" {
-                let query = [row.raw_title, row.raw_creator, locationHint]
-                    .compactMap { $0 }.filter { !$0.isEmpty }.joined(separator: ", ")
-                if let located = await RexSearch.geocode(query) {
+                if let located = await RexSearch.locate(
+                    name: row.raw_title, address: nil, context: [row.raw_creator, locationHint]
+                ) {
                     geocodedLat = located.lat
                     geocodedLng = located.lng
                 }

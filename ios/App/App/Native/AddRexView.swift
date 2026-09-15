@@ -176,6 +176,10 @@ struct AddRexView: View {
     @State private var anonymous = false
     @State private var errorMessage: String?
     @State private var didPost = false
+    /// Sept 15 — the Rex just posted, for sharing it from the success
+    /// screen, and your running totals for congratulating you on it.
+    @State private var lastPostedRecId: String?
+    @State private var postStats: (count: Int, weekStreak: Int)?
     @State private var didWant = false
     /// Trips only, for now — see AddRexView's "Save as draft" button.
     @State private var didSaveDraft = false
@@ -357,7 +361,7 @@ struct AddRexView: View {
                 }
             case .editTripStop(let entry):
                 TripStopSheet(
-                    subcategories: rexSubcategories[.place] ?? [],
+                    subcategories: rexOrderedSubcategories(.place),
                     existing: entry.stop
                 ) { updated in
                     guard let index = tripEntries.firstIndex(where: { $0.id == entry.id }) else { return }
@@ -396,7 +400,7 @@ struct AddRexView: View {
                     } : nil
                 )
             case .addTripStop:
-                TripStopSheet(subcategories: rexSubcategories[.place] ?? []) { stop in
+                TripStopSheet(subcategories: rexOrderedSubcategories(.place)) { stop in
                     tripEntries.append(ItineraryEntry(kind: .stop(stop)))
                 }
             case .addListItem:
@@ -632,7 +636,7 @@ struct AddRexView: View {
                 RecipeEditorView(recipeText: $recipeText, title: $title)
             }
 
-            if let options = rexSubcategories[category], !options.isEmpty {
+            if case let options = rexOrderedSubcategories(category), !options.isEmpty {
                 Text(category == .place ? "Type of place" : "Type")
                     .font(.system(size: 14, weight: .semibold))
                     .foregroundStyle(RexColor.foreground)
@@ -1378,15 +1382,22 @@ struct AddRexView: View {
     /// just doesn't get a pin, which is better than refusing the whole post.
     private func geocodedIfNeeded(_ stop: DraftStop) async -> DraftStop {
         guard stop.lat == nil || stop.lng == nil else { return stop }
-        let parts = [stop.title, stop.address, stop.subtitle]
-            .compactMap { $0?.trimmingCharacters(in: .whitespaces) }
-            .filter { !$0.isEmpty }
-        guard !parts.isEmpty else { return stop }
-        guard let coords = await RexSearch.geocode(parts.joined(separator: ", ")) else { return stop }
-        var located = stop
-        located.lat = coords.lat
-        located.lng = coords.lng
-        return located
+        // Only places and events go on a map. A pram bag or a book in a
+        // list has no business being geocoded to a town that shares a word
+        // with its name — which is how Phoebe's list items picked up US
+        // addresses (15 Sept).
+        guard stop.type == .place || stop.type == .event else { return stop }
+        // The trip or list's own name is the context that stops "The Ivy"
+        // resolving to the wrong city (see RexSearch.locate).
+        let context = title.trimmingCharacters(in: .whitespaces)
+        guard let located = await RexSearch.locate(
+            name: stop.title, address: stop.address, context: [stop.subtitle, context]
+        ) else { return stop }
+        var result = stop
+        result.lat = located.lat
+        result.lng = located.lng
+        if (result.address ?? "").isEmpty { result.address = located.address }
+        return result
     }
 
     private func post(category: RexCategory, asDraft: Bool = false) async {
@@ -1494,6 +1505,7 @@ struct AddRexView: View {
                 }
                 postingProgress = nil
                 didSaveDraft = asDraft
+                lastPostedRecId = tripRecId
                 withAnimation { didPost = true }
                 isSaving = false
                 return
@@ -1561,6 +1573,7 @@ struct AddRexView: View {
                     throw error
                 }
                 postingProgress = nil
+                lastPostedRecId = listRecId
                 withAnimation { didPost = true }
                 isSaving = false
                 return
@@ -1576,9 +1589,11 @@ struct AddRexView: View {
                     // see the trip branch above.
                     photoURLs: category == .trip ? [] : photoURLs,
                     anonymous: anonymous,
-                    returningId: !taggedFriendIds.isEmpty || (category == .list && !listNotes.isEmpty),
+                    // Always: the success screen shares the new Rex.
+                    returningId: true,
                     asDraft: category == .trip && asDraft
                 )
+                lastPostedRecId = newRecId
                 // A list that's all notes and no items lands here rather
                 // than in the list branch above.
                 if category == .list, !listNotes.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
@@ -1600,6 +1615,7 @@ struct AddRexView: View {
                 didWant = true
                 lastWantItemId = itemId
             }
+            RexSubcategoryUsage.record(category, Array(subcategories))
             withAnimation { didPost = true }
         } catch {
             errorMessage = error.localizedDescription
@@ -1623,6 +1639,8 @@ struct AddRexView: View {
 
     private func startAnother() {
         withAnimation {
+            lastPostedRecId = nil
+            postStats = nil
             didPost = false
             didWant = false
             didSaveDraft = false
@@ -1668,14 +1686,65 @@ struct AddRexView: View {
         recipeText = ""
     }
 
+    /// "Posted" became a moment rather than a receipt (Danny, 15 Sept):
+    /// a little bounce, your running total, a streak once you have one, and
+    /// the share button he asked for — sending a Rex to someone not on the
+    /// app yet is the most natural thing to do right after posting it.
+    private var isRealPost: Bool { !didWant && !didSaveDraft }
+
+    private var shareURL: URL? {
+        lastPostedRecId.flatMap { URL(string: "https://pocket-app-pioneers.lovable.app/r/\($0)") }
+    }
+
+    private static func ordinal(_ n: Int) -> String {
+        let formatter = NumberFormatter()
+        formatter.numberStyle = .ordinal
+        return formatter.string(from: NSNumber(value: n)) ?? "\(n)"
+    }
+
     private var successState: some View {
         VStack(spacing: 16) {
-            Image(systemName: didWant ? "bookmark.fill" : didSaveDraft ? "doc.text" : "checkmark.circle.fill")
-                .font(.system(size: 44))
-                .foregroundStyle(RexColor.primary)
-            Text(didWant ? "Saved" : didSaveDraft ? "Saved as draft" : "Posted")
-                .font(RexFont.display(26, weight: .semibold))
+            // Sept 15 — Kathryn's party Rex for a real post. Checked by
+            // name so the screen still works (with the plain seal) in any
+            // build where the artwork isn't in the asset catalogue yet.
+            if isRealPost, UIImage(named: "RexParty") != nil {
+                Image("RexParty")
+                    .resizable()
+                    .scaledToFit()
+                    .frame(height: 170)
+                    .accessibilityHidden(true)
+                    .symbolEffect(.bounce, value: didPost)
+                    .scaleEffect(didPost ? 1 : 0.6)
+                    .animation(.spring(response: 0.45, dampingFraction: 0.55), value: didPost)
+            } else {
+                Image(systemName: didWant ? "bookmark.fill" : didSaveDraft ? "doc.text" : "checkmark.seal.fill")
+                    .font(.system(size: isRealPost ? 56 : 44))
+                    .foregroundStyle(RexColor.primary)
+                    .symbolEffect(.bounce, value: didPost)
+            }
+            Text(didWant ? "Saved" : didSaveDraft ? "Saved as draft" : "Rex\u{2019}d!")
+                .font(RexFont.display(isRealPost ? 30 : 26, weight: .semibold))
                 .foregroundStyle(RexColor.foreground)
+
+            if isRealPost, let stats = postStats, stats.count > 0 {
+                VStack(spacing: 6) {
+                    Text(stats.count == 1
+                         ? "Your first Rex \u{2014} welcome to Rex."
+                         : "That\u{2019}s your \(Self.ordinal(stats.count)) Rex. Thank you for sharing it.")
+                        .font(RexFont.text(15, weight: .medium))
+                        .foregroundStyle(RexColor.foreground)
+                        .multilineTextAlignment(.center)
+                    if stats.weekStreak >= 2 {
+                        Label("\(stats.weekStreak) weeks in a row", systemImage: "flame.fill")
+                            .font(RexFont.text(13, weight: .semibold))
+                            .foregroundStyle(RexColor.accent)
+                            .padding(.horizontal, 12).padding(.vertical, 6)
+                            .background(RexColor.accent.opacity(0.12))
+                            .clipShape(Capsule())
+                    }
+                }
+                .transition(.opacity)
+            }
             Text(
                 didWant ? "\"\(title)\" is on your want-to list."
                 : didSaveDraft ? "\"\(title)\" is saved in Drafts. Nobody sees it until you publish."
@@ -1684,15 +1753,32 @@ struct AddRexView: View {
                 .font(.system(size: 15))
                 .foregroundStyle(RexColor.mutedForeground)
                 .multilineTextAlignment(.center)
+            // "Could you also add an option to share with friends or post to
+            // WhatsApp etc?" — the system share sheet covers WhatsApp,
+            // Messages, Instagram and the rest in one button.
+            if isRealPost, let shareURL {
+                ShareLink(item: shareURL, message: Text("I just Rex'd \u{201C}\(title)\u{201D} \u{2014} have a look:")) {
+                    Label("Share with friends", systemImage: "square.and.arrow.up")
+                        .font(RexFont.text(16, weight: .semibold))
+                        .frame(maxWidth: .infinity)
+                        .frame(height: 48)
+                        .background(RexColor.primary)
+                        .foregroundStyle(RexColor.primaryForeground)
+                        .clipShape(Capsule())
+                }
+                .padding(.top, 8)
+            }
+
             // People rarely add just one, so offer to go again without
             // having to come back in through the + button.
             Button("Add another") { startAnother() }
                 .frame(maxWidth: .infinity)
                 .frame(height: 48)
-                .background(RexColor.primary)
-                .foregroundStyle(RexColor.primaryForeground)
+                .background(isRealPost && shareURL != nil ? RexColor.card : RexColor.primary)
+                .foregroundStyle(isRealPost && shareURL != nil ? RexColor.primary : RexColor.primaryForeground)
                 .clipShape(Capsule())
-                .padding(.top, 8)
+                .overlay(Capsule().stroke(RexColor.primary, lineWidth: isRealPost && shareURL != nil ? 1.5 : 0))
+                .padding(.top, isRealPost && shareURL != nil ? 0 : 8)
 
             Button("Back to feed") { onDone() }
                 .font(RexFont.text(15, weight: .semibold))
@@ -1724,5 +1810,11 @@ struct AddRexView: View {
         .padding(32)
         .frame(maxWidth: .infinity)
         .padding(.top, 80)
+        .task(id: didPost) {
+            guard didPost, isRealPost else { return }
+            UINotificationFeedbackGenerator().notificationOccurred(.success)
+            let stats = await RexAPI.shared.fetchMyPostStats()
+            withAnimation { postStats = stats }
+        }
     }
 }

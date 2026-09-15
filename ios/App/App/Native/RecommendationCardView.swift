@@ -128,6 +128,14 @@ struct RecommendationCardView: View {
                             .onTapGesture {
                                 if canViewOnMap { onViewOnMap?(rec.item_id) }
                             }
+                            // Sept 15 — "Can't click through to the details in
+                            // this section, the whole tile should bring me
+                            // through" (Danny). This row and the note below
+                            // each had a tap of their own, which swallowed the
+                            // card's tap even when they had nothing to do. They
+                            // only take the tap now when there's something for
+                            // it to do; otherwise it falls through to the card.
+                            .allowsHitTesting(canViewOnMap)
                         }
 
                         // Why.
@@ -151,6 +159,8 @@ struct RecommendationCardView: View {
                                     withAnimation(.snappy) { noteExpanded.toggle() }
                                 }
                             }
+                            // Long enough to expand, or carrying a link to tap.
+                            .allowsHitTesting(note.count > 140 || note.contains("http") || note.contains("www."))
                         }
 
                         TaggedFriendsRow(friends: rec.taggedFriends)

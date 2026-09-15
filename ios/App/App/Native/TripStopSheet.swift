@@ -333,6 +333,7 @@ struct TripStopSheet: View {
         }
 
         let genre = chosenSubcategories.isEmpty ? nil : chosenSubcategories.sorted().joined(separator: ", ")
+        RexSubcategoryUsage.record(.place, Array(chosenSubcategories))
         let stop = DraftStop(
             type: .place,
             title: trimmedTitle,

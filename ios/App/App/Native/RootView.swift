@@ -9,10 +9,12 @@ struct RootView: View {
     private enum Gate: Identifiable {
         case username(suggested: String, name: String?)
         case onboarding
+        case notifications
         var id: String {
             switch self {
             case .username: return "username"
             case .onboarding: return "onboarding"
+            case .notifications: return "notifications"
             }
         }
     }
@@ -36,13 +38,23 @@ struct RootView: View {
                                 // Straight on to the tour if they haven't
                                 // had it, rather than dropping them in the
                                 // feed and popping it up a second later.
-                                gate = needsOnboarding() ? .onboarding : nil
+                                Task {
+                                    if needsOnboarding() {
+                                        gate = .onboarding
+                                    } else if !RexPushNotifications.hasAsked, await RexPushNotifications.canAsk() {
+                                        gate = .notifications
+                                    } else {
+                                        gate = nil
+                                    }
+                                }
                             }
                         case .onboarding:
                             OnboardingView(onDone: {
                                 markOnboarded()
                                 gate = nil
                             })
+                        case .notifications:
+                            NotificationsAskView(onDone: { gate = nil })
                         }
                     }
             } else {
@@ -78,6 +90,10 @@ struct RootView: View {
             gate = .username(suggested: pending.username, name: pending.displayName)
         } else if needsOnboarding() {
             gate = .onboarding
+        } else if !RexPushNotifications.hasAsked, await RexPushNotifications.canAsk() {
+            // Already through onboarding before it asked (Danny, and
+            // everyone before him) and never asked since: once.
+            gate = .notifications
         }
     }
 

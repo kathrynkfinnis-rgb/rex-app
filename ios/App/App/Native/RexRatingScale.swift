@@ -118,8 +118,20 @@ struct RexRatingBadge: View {
     var compact: Bool = false
 
     var body: some View {
+        // Sept 15 — "It has come up with... a do not Rex tag. You should not
+        // auto apply do not Rex to import from list" (Phoebe). Nothing was
+        // applying it: list items and imported rows are saved unrated
+        // (0), and tier(forRaw:) buckets everything under 6 — 0 included —
+        // as Do not Rex. Unrated now shows nothing at all, wherever a badge
+        // is drawn: the item page, "what friends say", the map's pin sheet.
+        if raw > 0 {
+            badge
+        }
+    }
+
+    private var badge: some View {
         let tier = RexRatingTier.tier(forRaw: raw)
-        HStack(spacing: 4) {
+        return HStack(spacing: 4) {
             // Sept 14 — briefly showed "100%" in place of 💯 at card size;
             // Kathryn's call is the emoji wherever the device can draw it,
             // which on iPhone is everywhere. (Testers reading it as "707"

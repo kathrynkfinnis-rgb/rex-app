@@ -124,7 +124,15 @@ struct SwipeToRemove<Content: View>: View {
                 // for the carousel's own TabView to handle.
                 .coordinateSpace(name: Self.coordinateSpaceName)
                 .onPreferenceChange(SwipeExclusionZoneKey.self) { exclusionZone = $0 }
-                .highPriorityGesture(
+                // Sept 14 — "I sometimes find the scrolling on the first tile
+                // of the Home Screen weird and have to scroll from the second"
+                // (Danny). The first tile was his own Rex, and only your own
+                // cards are wrapped in this. highPriorityGesture claimed every
+                // drag that started on the card — vertical ones included, which
+                // it then ignored — so the feed couldn't scroll from there.
+                // simultaneousGesture lets the scroll view keep its vertical
+                // pans while this still sees the horizontal ones.
+                .simultaneousGesture(
                     DragGesture(minimumDistance: 14, coordinateSpace: .named(Self.coordinateSpaceName))
                         .onChanged { value in
                             if dragStart == nil {

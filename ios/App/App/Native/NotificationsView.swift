@@ -182,7 +182,8 @@ struct NotificationsView: View {
             rowContentInner(n)
 
             if let accepted = respondedOutcome[n.id] {
-                Text(accepted ? "Accepted" : "Declined")
+                Label(accepted ? "You\u{2019}re friends" : "No longer pending",
+                      systemImage: accepted ? "checkmark" : "minus.circle")
                     .font(RexFont.text(12, weight: .semibold))
                     .foregroundStyle(accepted ? RexColor.primary : RexColor.mutedForeground)
             } else {
@@ -274,6 +275,30 @@ struct NotificationsView: View {
             if n.read_at == nil {
                 Circle().fill(RexColor.primary).frame(width: 8, height: 8).padding(.top, 5)
             }
+
+            // "...and I've no way to X them." Removes it for good.
+            Button {
+                Task { await dismiss(n) }
+            } label: {
+                Image(systemName: "xmark")
+                    .font(.system(size: 11, weight: .semibold))
+                    .foregroundStyle(RexColor.mutedForeground)
+                    .frame(width: 28, height: 28)
+                    .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+            .accessibilityLabel("Remove notification")
+        }
+    }
+
+    private func dismiss(_ n: RexNotification) async {
+        let previous = notifications
+        withAnimation(.snappy) { notifications.removeAll { $0.id == n.id } }
+        do {
+            try await RexAPI.shared.deleteNotification(id: n.id)
+        } catch {
+            notifications = previous
+            respondErrorMessage = error.localizedDescription
         }
     }
 
@@ -287,6 +312,24 @@ struct NotificationsView: View {
             // non-tappable rather than the whole screen erroring out.
             let recIds = Array(Set(notifications.compactMap(\.linkedRecommendationId)))
             recItemIds = (try? await RexAPI.shared.fetchItemIds(forRecommendations: recIds)) ?? [:]
+            // Sept 15 — "These notifications should change now that they have
+            // been actioned" (Danny). He'd accepted the requests from the
+            // Friends screen, but these rows only ever knew about answers
+            // given right here, so they kept offering Accept / Decline for
+            // friendships that already existed. They're checked against the
+            // friendship itself now: accepted shows as friends, and one
+            // that's no longer pending (declined, withdrawn) stops asking.
+            if let friendships = try? await RexAPI.shared.fetchFriendships() {
+                let byId = Dictionary(uniqueKeysWithValues: friendships.map { ($0.id, $0) })
+                for n in notifications where n.type == "friend_request" {
+                    guard respondedOutcome[n.id] == nil, let fid = n.entity_id else { continue }
+                    if let f = byId[fid] {
+                        if f.status == "accepted" { respondedOutcome[n.id] = true }
+                    } else {
+                        respondedOutcome[n.id] = false
+                    }
+                }
+            }
         } catch {
             errorMessage = error.localizedDescription
         }
