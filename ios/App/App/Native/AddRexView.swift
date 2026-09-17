@@ -1693,7 +1693,9 @@ struct AddRexView: View {
     private var isRealPost: Bool { !didWant && !didSaveDraft }
 
     private var shareURL: URL? {
-        lastPostedRecId.flatMap { URL(string: "https://pocket-app-pioneers.lovable.app/r/\($0)") }
+        lastPostedRecId.flatMap {
+            RexShareLink.url(recommendationId: $0, type: category?.rawValue)
+        }
     }
 
     private static func ordinal(_ n: Int) -> String {

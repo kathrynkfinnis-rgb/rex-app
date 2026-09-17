@@ -26,11 +26,11 @@ struct RexCardActions: View {
     @State private var showingRexers = false
 
     /// #177 — used to share plain text with no link at all, so there was
-    /// nothing for the recipient to actually open. `/r/$id` is a real public
-    /// page the web app already serves (OG tags, sign-up prompt, "Open in
-    /// REX" deep link) — same URL shape ShareButton uses on web already.
-    private var shareURL: URL {
-        URL(string: "https://pocket-app-pioneers.lovable.app/r/\(rec.id)")!
+    /// nothing for the recipient to actually open. The link opens a real
+    /// public page on find-rex.com: the Rex itself, whoever posted it, and a
+    /// way in for someone who hasn't got the app yet.
+    private var shareURL: URL? {
+        RexShareLink.url(recommendationId: rec.id, type: rec.items?.type)
     }
 
     private var shareText: String {
@@ -127,7 +127,7 @@ struct RexCardActions: View {
             // (that'd need a web-side route + RPC of its own), so sharing
             // one right now would just hand out a dead link. Held back for
             // wants until that exists, rather than ship a broken share.
-            if !rec.isWant {
+            if !rec.isWant, let shareURL {
                 ShareLink(item: shareURL, message: Text(shareText)) {
                     Image(systemName: "paperplane")
                         .font(.system(size: 15))
