@@ -1,0 +1,3 @@
+# /r/<id> and /t/<id> are server-rendered by functions/, not redirected —
+# link previews need real meta tags in the HTML, which a redirect can't give.
+/share/*  /  301
