@@ -95,6 +95,14 @@ struct PrivacyDataView: View {
                     }
                 }
 
+                group("Safety") {
+                    NavigationLink(value: BlockedAccountsRoute()) {
+                        rowContent(icon: "hand.raised.slash", title: "Blocked accounts",
+                                   subtitle: "People you've blocked, and how to undo it")
+                    }
+                    .buttonStyle(.plain)
+                }
+
                 group("Your data") {
                     VStack(alignment: .leading, spacing: RexSpacing.sm) {
                         HStack(alignment: .top, spacing: RexSpacing.md) {
@@ -173,6 +181,7 @@ struct PrivacyDataView: View {
         .navigationTitle("Your data & privacy")
         .navigationBarTitleDisplayMode(.inline)
         .sheet(item: $legalSection) { LegalContentView(section: $0) }
+        .navigationDestination(for: BlockedAccountsRoute.self) { _ in BlockedAccountsView() }
         .fullScreenCover(isPresented: $showingDelete) {
             DeleteAccountView(onDeleted: {
                 showingDelete = false
@@ -215,21 +224,28 @@ struct PrivacyDataView: View {
 
     private func row(icon name: String, title: String, subtitle: String, action: @escaping () -> Void) -> some View {
         Button(action: action) {
-            HStack(spacing: RexSpacing.md) {
-                icon(name)
-                VStack(alignment: .leading, spacing: 2) {
-                    Text(title).font(RexFont.text(15, weight: .semibold)).foregroundStyle(RexColor.foreground)
-                    Text(subtitle).font(RexFont.text(12.5)).foregroundStyle(RexColor.mutedForeground)
-                }
-                Spacer()
-                Image(systemName: "chevron.right")
-                    .font(.system(size: 12, weight: .semibold))
-                    .foregroundStyle(RexColor.placeholder)
-            }
-            .padding(RexSpacing.md)
-            .contentShape(Rectangle())
+            rowContent(icon: name, title: title, subtitle: subtitle)
         }
         .buttonStyle(.plain)
+    }
+
+    /// The row without a tap of its own, for use inside a NavigationLink —
+    /// a Button nested in a link swallows the tap and goes nowhere.
+    private func rowContent(icon name: String, title: String, subtitle: String) -> some View {
+        HStack(spacing: RexSpacing.md) {
+            icon(name)
+            VStack(alignment: .leading, spacing: 2) {
+                Text(title).font(RexFont.text(15, weight: .semibold)).foregroundStyle(RexColor.foreground)
+                Text(subtitle).font(RexFont.text(12.5)).foregroundStyle(RexColor.mutedForeground)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+            Spacer()
+            Image(systemName: "chevron.right")
+                .font(.system(size: 12, weight: .semibold))
+                .foregroundStyle(RexColor.placeholder)
+        }
+        .padding(RexSpacing.md)
+        .contentShape(Rectangle())
     }
 }
 

@@ -227,6 +227,138 @@ final class RexAPI {
     /// UI state. Best-effort: a failure here shouldn't block someone from
     /// actually getting into the app they just signed up for — the
     /// checkbox itself is still the real gate on the sign-up screen.
+    // MARK: - Reporting and blocking (17 Sept)
+
+    /// Sept 17 — "please can we build the report or block functionality".
+    /// Required by the App Store for anything with user-generated content
+    /// (Guideline 1.2), and needed before Rex is open to people who don't
+    /// all know each other.
+    enum ReportTarget: String {
+        case recommendation, comment, blast, blast_reply, list, trip, profile, photo
+    }
+
+    func reportContent(kind: ReportTarget, targetId: String, targetUserId: String?,
+                       reason: String, detail: String?) async throws {
+        let token = try await validToken()
+        guard let userId = currentUserId else { throw RexAPIError.notSignedIn }
+        var request = URLRequest(url: baseURL.appendingPathComponent("/rest/v1/content_reports"))
+        request.httpMethod = "POST"
+        request.setValue(anonKey, forHTTPHeaderField: "apikey")
+        request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        var body: [String: Any] = [
+            "reporter_id": userId, "target_kind": kind.rawValue,
+            "target_id": targetId, "reason": reason,
+        ]
+        if let targetUserId { body["target_user_id"] = targetUserId }
+        if let detail, !detail.trimmingCharacters(in: .whitespaces).isEmpty { body["detail"] = detail }
+        request.httpBody = try JSONSerialization.data(withJSONObject: body)
+        let (data, response) = try await URLSession.shared.data(for: request)
+        guard let http = response as? HTTPURLResponse, http.statusCode < 400 else {
+            throw RexAPIError.server(friendlyError(data, fallback: "Couldn't send that report."))
+        }
+    }
+
+    /// Blocking also ends the friendship both ways and clears the
+    /// notifications between you — see block_user().
+    func blockUser(id: String) async throws {
+        let token = try await validToken()
+        var request = URLRequest(url: baseURL.appendingPathComponent("/rest/v1/rpc/block_user"))
+        request.httpMethod = "POST"
+        request.setValue(anonKey, forHTTPHeaderField: "apikey")
+        request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        request.httpBody = try JSONSerialization.data(withJSONObject: ["_blocked": id])
+        let (data, response) = try await URLSession.shared.data(for: request)
+        guard let http = response as? HTTPURLResponse, http.statusCode < 400 else {
+            throw RexAPIError.server(friendlyError(data, fallback: "Couldn't block that person."))
+        }
+        Self.hiddenUserIds.insert(id)
+    }
+
+    func unblockUser(id: String) async throws {
+        let token = try await validToken()
+        guard let userId = currentUserId else { throw RexAPIError.notSignedIn }
+        var components = URLComponents(url: baseURL.appendingPathComponent("/rest/v1/user_blocks"), resolvingAgainstBaseURL: false)!
+        components.queryItems = [
+            URLQueryItem(name: "blocker_id", value: "eq.\(userId)"),
+            URLQueryItem(name: "blocked_id", value: "eq.\(id)"),
+        ]
+        var request = URLRequest(url: components.url!)
+        request.httpMethod = "DELETE"
+        request.setValue(anonKey, forHTTPHeaderField: "apikey")
+        request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+        let (data, response) = try await URLSession.shared.data(for: request)
+        guard let http = response as? HTTPURLResponse, http.statusCode < 400 else {
+            throw RexAPIError.server(friendlyError(data, fallback: "Couldn't unblock that person."))
+        }
+        Self.hiddenUserIds.remove(id)
+        _ = await refreshHiddenUsers()
+    }
+
+    /// The people whose content shouldn't appear: those you blocked, and
+    /// those who blocked you. Held in memory and refreshed on sign-in and
+    /// on each feed load — a handful of ids, and every list fetch filters
+    /// against it (filterHidden below) rather than each screen remembering
+    /// to.
+    private static var hiddenUserIds = Set<String>()
+    private static let hiddenLock = NSLock()
+
+    var hiddenUsers: Set<String> { Self.hiddenLock.withLock { Self.hiddenUserIds } }
+
+    @discardableResult
+    func refreshHiddenUsers() async -> Set<String> {
+        guard let token = try? await validToken() else { return [] }
+        var request = URLRequest(url: baseURL.appendingPathComponent("/rest/v1/rpc/hidden_user_ids"))
+        request.httpMethod = "POST"
+        request.setValue(anonKey, forHTTPHeaderField: "apikey")
+        request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        request.httpBody = Data("{}".utf8)
+        guard let (data, response) = try? await URLSession.shared.data(for: request),
+              let http = response as? HTTPURLResponse, http.statusCode < 400 else { return hiddenUsers }
+        struct Row: Codable { let user_id: String }
+        let ids = Set(((try? JSONDecoder().decode([Row].self, from: data)) ?? []).map { $0.user_id })
+        Self.hiddenLock.withLock { Self.hiddenUserIds = ids }
+        return ids
+    }
+
+    /// Everyone you've blocked, with their profiles, for the list in
+    /// Settings.
+    func fetchBlockedUsers() async throws -> [RexProfileDetail] {
+        let token = try await validToken()
+        guard let userId = currentUserId else { throw RexAPIError.notSignedIn }
+        var components = URLComponents(url: baseURL.appendingPathComponent("/rest/v1/user_blocks"), resolvingAgainstBaseURL: false)!
+        components.queryItems = [
+            URLQueryItem(name: "select", value: "blocked_id"),
+            URLQueryItem(name: "blocker_id", value: "eq.\(userId)"),
+        ]
+        var request = URLRequest(url: components.url!)
+        request.setValue(anonKey, forHTTPHeaderField: "apikey")
+        request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+        let (data, response) = try await URLSession.shared.data(for: request)
+        guard let http = response as? HTTPURLResponse, http.statusCode < 400 else {
+            throw RexAPIError.server("Couldn't load your blocked accounts.")
+        }
+        struct Row: Codable { let blocked_id: String }
+        let ids = ((try? JSONDecoder().decode([Row].self, from: data)) ?? []).map { $0.blocked_id }
+        guard !ids.isEmpty else { return [] }
+        // Their profile is normally hidden by RLS once you're not friends,
+        // so fall back to the id itself rather than showing nothing.
+        let profiles = (try? await fetchProfiles(ids: ids)) ?? []
+        let byId = Dictionary(uniqueKeysWithValues: profiles.map { ($0.id, $0) })
+        return ids.map { id in
+            byId[id] ?? RexProfileDetail(id: id, username: "Blocked account", display_name: nil, avatar_url: nil)
+        }
+    }
+
+    /// Drops anything posted by someone on either side of a block.
+    func filterHidden(_ recs: [FeedRecommendation]) -> [FeedRecommendation] {
+        let hidden = hiddenUsers
+        guard !hidden.isEmpty else { return recs }
+        return recs.filter { !hidden.contains($0.user_id) }
+    }
+
     // MARK: - Privacy: consent, export, deletion (15 Sept)
 
     /// Records agreement to the current Terms of Use + Privacy Policy: a
@@ -716,6 +848,27 @@ final class RexAPI {
         return try JSONDecoder().decode([FeedRecommendation].self, from: data)
     }
 
+    /// Sept 17 — the catalogue id a film, TV show or book came from, used
+    /// to pull its synopsis and ratings (RexSearch.details). Its own small
+    /// request rather than columns on RexItem, which a dozen selects would
+    /// otherwise have to carry for two screens' benefit.
+    func fetchItemExternalRef(itemId: String) async -> (id: String?, source: String?) {
+        guard let token = try? await validToken() else { return (nil, nil) }
+        var components = URLComponents(url: baseURL.appendingPathComponent("/rest/v1/items"), resolvingAgainstBaseURL: false)!
+        components.queryItems = [
+            URLQueryItem(name: "select", value: "external_id,external_source"),
+            URLQueryItem(name: "id", value: "eq.\(itemId)"),
+        ]
+        var request = URLRequest(url: components.url!)
+        request.setValue(anonKey, forHTTPHeaderField: "apikey")
+        request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+        guard let (data, response) = try? await URLSession.shared.data(for: request),
+              let http = response as? HTTPURLResponse, http.statusCode < 400 else { return (nil, nil) }
+        struct Row: Codable { let external_id: String?; let external_source: String? }
+        let row = (try? JSONDecoder().decode([Row].self, from: data))?.first
+        return (row?.external_id, row?.external_source)
+    }
+
     func fetchItem(id: String) async throws -> RexItem {
         // The Google rating columns only exist once that migration has been run.
         // Ask for them, but fall back to the base columns rather than failing the
@@ -1070,7 +1223,14 @@ final class RexAPI {
 
     func fetchRecommendations(forItem itemId: String) async throws -> [FeedRecommendation] {
         let token = try await validToken()
+        // Sept 17 — "error said 'title can't be empty' even though it
+        // wasn't". This select had no items embed, so every Rex on an item
+        // page came back with items == nil. EditRexView takes its starting
+        // title from rec.items?.title, so opening Edit from here began with
+        // an empty Title field (off the top of the screen, above the note
+        // and photos) and refused to save.
         let select = "id,rating,note,created_at,photo_url,photo_urls,tags\(await anonymousField()),user_id,item_id," +
+            "items(id,type,title,subtitle,image_url,genre,address,link_url,recipe_text,lat,lng)," +
             "profiles!recommendations_user_id_fkey(username,display_name,avatar_url)," +
             "recommendation_tags(profiles(id,username,display_name,avatar_url))"
         var components = URLComponents(url: baseURL.appendingPathComponent("/rest/v1/recommendations"), resolvingAgainstBaseURL: false)!
@@ -3969,13 +4129,12 @@ final class RexAPI {
             return (try? JSONDecoder().decode([Row].self, from: data)) ?? []
         }
 
-        // Sept 8 — "your own 'want to try's should not appear on feed". The
-        // feed is what other people have Rex'd; your own wants are a
-        // private shortlist you already have a screen for (the Wants tab),
-        // and seeing them mixed in reads as though you'd posted them.
-        // Someone else's want still shows — that's a genuine signal.
+        // Sept 8 — "your own 'want to try's should not appear on feed", then
+        // Sept 17 — "can we please change the rules so you can see your own
+        // 'want to try's in the feed". Back in: the feed is your own record
+        // as much as your friends', and a want you just saved vanishing
+        // from it reads as though it didn't save.
         var ownerFilter: [(String, String)] = []
-        if let currentUserId { ownerFilter = [("user_id", "neq.\(currentUserId)")] }
         // Sept 9 — "when Gemma saves one of my Rex so it becomes a want to
         // try for her it shouldn't come up on the feed again". Bookmarking
         // someone's Rex is a private save of something the feed has

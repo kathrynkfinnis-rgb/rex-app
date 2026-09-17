@@ -4,6 +4,11 @@ struct ItemDetailView: View {
     let itemId: String
 
     @State private var item: RexItem?
+    /// Sept 17 — synopsis and ratings for films, TV and books, fetched from
+    /// the catalogue the item came from. See RexSearch.details.
+    @State private var details: RexSearch.ItemDetails?
+    @State private var isLoadingDetails = false
+    @State private var synopsisExpanded = false
     @State private var recs: [FeedRecommendation] = []
     @State private var isLoading = true
     @State private var errorMessage: String?
@@ -106,7 +111,9 @@ struct ItemDetailView: View {
             async let wantedTask = RexAPI.shared.isWanted(itemId: itemId)
             let (fetchedItem, fetchedRecs) = try await (itemTask, recsTask)
             item = fetchedItem
-            recs = fetchedRecs
+            // Nothing from someone on either side of a block.
+            recs = RexAPI.shared.filterHidden(fetchedRecs)
+            Task { await loadDetails(fetchedItem) }
             wanted = (try? await wantedTask) ?? false
             if let mine = fetchedRecs.first(where: { $0.user_id == RexAPI.shared.currentUserId }) {
                 rating = mine.rating
@@ -197,6 +204,8 @@ struct ItemDetailView: View {
                     }
                 }
             }
+
+            detailsSection
 
             HStack(spacing: RexSpacing.md) {
                 if !recs.isEmpty {
@@ -496,6 +505,89 @@ struct ItemDetailView: View {
             }
         }
         .padding(16)
+    }
+
+    /// What the thing actually is, before what your friends made of it:
+    /// the ratings strip, then the synopsis. Only films, TV and books have
+    /// one; everything else skips it entirely.
+    @ViewBuilder
+    private var detailsSection: some View {
+        if isLoadingDetails, details == nil {
+            HStack(spacing: 6) {
+                ProgressView().controlSize(.small)
+                Text("Looking it up\u{2026}").font(RexFont.text(12)).foregroundStyle(RexColor.mutedForeground)
+            }
+        } else if let details, !details.isEmpty {
+            VStack(alignment: .leading, spacing: RexSpacing.sm) {
+                if !details.ratings.isEmpty {
+                    ScrollView(.horizontal, showsIndicators: false) {
+                        HStack(spacing: RexSpacing.sm) {
+                            ForEach(details.ratings, id: \.source) { rating in
+                                VStack(alignment: .leading, spacing: 1) {
+                                    Text(rating.source.uppercased())
+                                        .font(.system(size: 9, weight: .semibold))
+                                        .tracking(0.4)
+                                        .foregroundStyle(RexColor.mutedForeground)
+                                    Text(rating.value)
+                                        .font(RexFont.display(16, weight: .semibold))
+                                        .foregroundStyle(RexColor.foreground)
+                                    if let detail = rating.detail {
+                                        Text(detail)
+                                            .font(RexFont.text(10))
+                                            .foregroundStyle(RexColor.mutedForeground)
+                                    }
+                                }
+                                .padding(.horizontal, RexSpacing.md)
+                                .padding(.vertical, RexSpacing.sm)
+                                .background(RexColor.card)
+                                .clipShape(RoundedRectangle(cornerRadius: RexRadius.input, style: .continuous))
+                                .overlay(
+                                    RoundedRectangle(cornerRadius: RexRadius.input, style: .continuous)
+                                        .stroke(RexColor.border, lineWidth: 1)
+                                )
+                            }
+                        }
+                        .padding(.horizontal, 1)
+                    }
+                }
+
+                if let facts = details.facts {
+                    Text(facts).font(RexFont.text(12)).foregroundStyle(RexColor.mutedForeground)
+                }
+
+                if let synopsis = details.synopsis {
+                    Text(synopsis)
+                        .font(RexFont.text(14))
+                        .foregroundStyle(RexColor.foreground.opacity(0.9))
+                        .lineLimit(synopsisExpanded ? nil : 4)
+                        .fixedSize(horizontal: false, vertical: true)
+                    if !synopsisExpanded, synopsis.count > 220 {
+                        Button("Read more") { withAnimation(.snappy) { synopsisExpanded = true } }
+                            .font(RexFont.text(12, weight: .semibold))
+                            .foregroundStyle(RexColor.primary)
+                    }
+                    // Whose description this is, so the numbers above aren't
+                    // mistaken for Rex's own.
+                    Text("From \(details.ratings.first?.source ?? "the catalogue")")
+                        .font(RexFont.text(10))
+                        .foregroundStyle(RexColor.placeholder)
+                }
+            }
+            .padding(.top, RexSpacing.xs)
+        }
+    }
+
+    private func loadDetails(_ item: RexItem) async {
+        let category = RexCategory(rawType: item.type)
+        guard category == .movie || category == .tv || category == .book, details == nil else { return }
+        isLoadingDetails = true
+        let reference = await RexAPI.shared.fetchItemExternalRef(itemId: item.id)
+        let fetched = await RexSearch.details(
+            type: category, externalId: reference.id, externalSource: reference.source,
+            title: item.title, subtitle: item.subtitle
+        )
+        details = fetched
+        isLoadingDetails = false
     }
 
     private func errorState(_ message: String) -> some View {

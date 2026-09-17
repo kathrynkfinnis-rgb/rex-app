@@ -452,6 +452,181 @@ enum RexSearch {
         return (lat, lng)
     }
 
+    // MARK: - Item details (17 Sept)
+
+    /// Sept 17 — "make the item pages for films, tv and books more
+    /// interesting by importing a synopsis and also their ratings".
+    ///
+    /// Fetched when the page opens rather than stored: every film and TV
+    /// Rex already carries its TMDB id and every book its Open Library key
+    /// (see the search functions above), so there's nothing to migrate and
+    /// nothing to go stale. URLSession's cache means a second visit is free.
+    ///
+    /// On ratings: Rotten Tomatoes has no public API — scores are licensed
+    /// through Fandango — so it can't be read directly. TMDB's own audience
+    /// score always shows; if an OMDb key is in Info.plist as OMDbApiKey,
+    /// Rotten Tomatoes, IMDb and Metacritic come through that (OMDb
+    /// republishes them, free up to 1,000 lookups a day). Books use Open
+    /// Library's own ratings — Goodreads closed its API to new keys in 2020.
+    struct ItemDetails {
+        var synopsis: String?
+        /// "TMDB", "Rotten Tomatoes", "IMDb", "Open Library"…
+        var ratings: [(source: String, value: String, detail: String?)] = []
+        /// "1h 58m · Drama, Romance" / "3 seasons" / "384 pages"
+        var facts: String?
+        var isEmpty: Bool { synopsis == nil && ratings.isEmpty && facts == nil }
+    }
+
+    static func details(type: RexCategory, externalId: String?, externalSource: String?,
+                        title: String, subtitle: String?) async -> ItemDetails {
+        switch type {
+        case .movie, .tv:
+            let kind = type == .movie ? "movie" : "tv"
+            var id = (externalSource?.hasPrefix("tmdb") == true) ? externalId : nil
+            if id == nil { id = await tmdbId(forTitle: title, kind: kind) }
+            guard let id else { return ItemDetails() }
+            return await tmdbDetails(id: id, kind: kind, title: title)
+        case .book:
+            return await bookDetails(externalId: externalId, title: title, author: subtitle)
+        default:
+            return ItemDetails()
+        }
+    }
+
+    private static func tmdbId(forTitle title: String, kind: String) async -> String? {
+        guard !tmdbKey.isEmpty,
+              let json = try? await getJSON("https://api.themoviedb.org/3/search/\(kind)?api_key=\(tmdbKey)&query=\(esc(title))&include_adult=false"),
+              let first = (json["results"] as? [[String: Any]])?.first,
+              let id = first["id"] as? Int else { return nil }
+        return String(id)
+    }
+
+    private static func tmdbDetails(id: String, kind: String, title: String) async -> ItemDetails {
+        var out = ItemDetails()
+        guard !tmdbKey.isEmpty,
+              let json = try? await getJSON("https://api.themoviedb.org/3/\(kind)/\(id)?api_key=\(tmdbKey)") else { return out }
+
+        if let overview = json["overview"] as? String, !overview.isEmpty { out.synopsis = overview }
+
+        if let score = json["vote_average"] as? Double, score > 0 {
+            let votes = json["vote_count"] as? Int ?? 0
+            out.ratings.append((
+                source: "TMDB",
+                value: String(format: "%.1f/10", score),
+                detail: votes > 0 ? "\(formattedCount(votes)) votes" : nil
+            ))
+        }
+
+        var facts: [String] = []
+        if let minutes = json["runtime"] as? Int, minutes > 0 {
+            facts.append(minutes >= 60 ? "\(minutes / 60)h \(minutes % 60)m" : "\(minutes)m")
+        }
+        if let seasons = json["number_of_seasons"] as? Int, seasons > 0 {
+            facts.append("\(seasons) season\(seasons == 1 ? "" : "s")")
+        }
+        let genres = (json["genres"] as? [[String: Any]])?.compactMap { $0["name"] as? String } ?? []
+        if !genres.isEmpty { facts.append(genres.prefix(3).joined(separator: ", ")) }
+        if !facts.isEmpty { out.facts = facts.joined(separator: " \u{00B7} ") }
+
+        // The imdb_id here is what lets OMDb find the same title.
+        let imdbId = json["imdb_id"] as? String ?? json["external_ids"] as? String
+        if let extra = await omdbRatings(imdbId: imdbId, title: title) {
+            out.ratings.append(contentsOf: extra)
+        }
+        return out
+    }
+
+    /// Only if a key is configured — otherwise silently nothing, and the
+    /// page just shows TMDB's score.
+    private static func omdbRatings(imdbId: String?, title: String) async -> [(source: String, value: String, detail: String?)]? {
+        guard let key = Bundle.main.object(forInfoDictionaryKey: "OMDbApiKey") as? String, !key.isEmpty else { return nil }
+        let query = imdbId.map { "i=\($0)" } ?? "t=\(esc(title))"
+        guard let json = try? await getJSON("https://www.omdbapi.com/?apikey=\(key)&\(query)"),
+              let ratings = json["Ratings"] as? [[String: String]] else { return nil }
+        return ratings.compactMap { entry in
+            guard let source = entry["Source"], let value = entry["Value"] else { return nil }
+            switch source {
+            case "Rotten Tomatoes": return ("Rotten Tomatoes", value, nil)
+            case "Internet Movie Database": return ("IMDb", value.replacingOccurrences(of: "/10", with: "/10"), nil)
+            case "Metacritic": return ("Metacritic", value.replacingOccurrences(of: "/100", with: ""), nil)
+            default: return nil
+            }
+        }
+    }
+
+    private static func bookDetails(externalId: String?, title: String, author: String?) async -> ItemDetails {
+        var out = ItemDetails()
+        // Book search stores Open Library's work key ("works/OL123W").
+        var workKey = externalId.flatMap { $0.hasPrefix("works/") ? $0 : nil }
+        if workKey == nil {
+            let query = [title, author?.components(separatedBy: " \u{00B7} ").first]
+                .compactMap { $0 }.joined(separator: " ")
+            if let json = try? await getJSON("https://openlibrary.org/search.json?q=\(esc(query))&limit=1&fields=key,number_of_pages_median"),
+               let first = (json["docs"] as? [[String: Any]])?.first,
+               let key = first["key"] as? String {
+                workKey = key.hasPrefix("/") ? String(key.dropFirst()) : key
+            }
+        }
+
+        if let workKey {
+            if let json = try? await getJSON("https://openlibrary.org/\(workKey).json") {
+                // description is either a plain string or { "value": "…" }.
+                if let text = json["description"] as? String {
+                    out.synopsis = text
+                } else if let wrapped = json["description"] as? [String: Any], let text = wrapped["value"] as? String {
+                    out.synopsis = text
+                }
+            }
+            if let json = try? await getJSON("https://openlibrary.org/\(workKey)/ratings.json"),
+               let summary = json["summary"] as? [String: Any],
+               let average = summary["average"] as? Double, average > 0 {
+                let count = (summary["count"] as? Int) ?? 0
+                out.ratings.append((
+                    source: "Open Library",
+                    value: String(format: "%.1f/5", average),
+                    detail: count > 0 ? "\(formattedCount(count)) ratings" : nil
+                ))
+            }
+        }
+
+        // Google Books fills in whichever of the two is still missing —
+        // it has a description for most books, and a rating for some.
+        if out.synopsis == nil || out.ratings.isEmpty {
+            let query = [title, author?.components(separatedBy: " \u{00B7} ").first]
+                .compactMap { $0 }.joined(separator: " ")
+            if let json = try? await getJSON("https://www.googleapis.com/books/v1/volumes?q=\(esc(query))&maxResults=1"),
+               let info = (json["items"] as? [[String: Any]])?.first?["volumeInfo"] as? [String: Any] {
+                if out.synopsis == nil, let text = info["description"] as? String, !text.isEmpty {
+                    out.synopsis = text
+                }
+                if out.ratings.isEmpty, let average = info["averageRating"] as? Double, average > 0 {
+                    let count = info["ratingsCount"] as? Int ?? 0
+                    out.ratings.append((
+                        source: "Google Books",
+                        value: String(format: "%.1f/5", average),
+                        detail: count > 0 ? "\(formattedCount(count)) ratings" : nil
+                    ))
+                }
+                if out.facts == nil, let pages = info["pageCount"] as? Int, pages > 0 {
+                    out.facts = "\(pages) pages"
+                }
+            }
+        }
+
+        // Open Library descriptions often end with a source credit line.
+        if let synopsis = out.synopsis {
+            out.synopsis = synopsis
+                .components(separatedBy: "----------")[0]
+                .components(separatedBy: "([source]")[0]
+                .trimmingCharacters(in: .whitespacesAndNewlines)
+        }
+        return out
+    }
+
+    private static func formattedCount(_ n: Int) -> String {
+        n >= 1000 ? String(format: "%.1fk", Double(n) / 1000).replacingOccurrences(of: ".0k", with: "k") : "\(n)"
+    }
+
     // MARK: - Link previews (15 Sept)
 
     /// Sept 15 — "If you upload a product link can it auto populate the

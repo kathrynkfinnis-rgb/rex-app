@@ -33,6 +33,10 @@ struct UserProfileView: View {
     @State private var connection: String?
     @State private var connectionFriendshipId: String?
     @State private var isChangingConnection = false
+    /// Sept 17 — reporting or blocking this person.
+    @Environment(\.dismiss) private var dismissSelf
+    @State private var reporting: ReportSubject?
+    @State private var confirmingBlock = false
     /// #148 — this shelf showed a plain emoji square per collection; the
     /// same shelf on your own Collections page (and Explore's friend-
     /// collections cards) shows a 2x2 grid of the collection's own content
@@ -89,15 +93,25 @@ struct UserProfileView: View {
                 } else if visible.isEmpty {
                     // A stranger's Rex are friends-only, so "Nothing Rex'd
                     // yet" was untrue on Phoebe's page — she has hundreds.
-                    Text(recommendations.isEmpty
-                         ? (connection == "none" || connection == "requested" || connection == "requested_you"
-                            ? "Add \(profile?.display_name ?? route.name) as a friend to see their Rex."
-                            : "Nothing Rex'd yet.")
-                         : "Nothing in this category.")
-                        .font(RexFont.text(14))
-                        .foregroundStyle(RexColor.mutedForeground)
-                        .frame(maxWidth: .infinity)
-                        .padding(.vertical, RexSpacing.xxl)
+                    VStack(spacing: RexSpacing.md) {
+                        Image("RexPlaceholderList")
+                            .resizable()
+                            .scaledToFit()
+                            .frame(height: 130)
+                            .clipShape(RoundedRectangle(cornerRadius: RexRadius.card, style: .continuous))
+                            .opacity(0.9)
+                            .accessibilityHidden(true)
+                        Text(recommendations.isEmpty
+                             ? (connection == "none" || connection == "requested" || connection == "requested_you"
+                                ? "Add \(profile?.display_name ?? route.name) as a friend to see their Rex."
+                                : "\(profile?.display_name ?? route.name) hasn\u{2019}t Rex\u{2019}d anything yet.")
+                             : "Nothing in this category.")
+                            .font(RexFont.text(14))
+                            .foregroundStyle(RexColor.mutedForeground)
+                            .multilineTextAlignment(.center)
+                    }
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, RexSpacing.xxl)
                 } else {
                     LazyVStack(spacing: RexSpacing.betweenCards) {
                         ForEach(visible) { rec in
@@ -134,6 +148,35 @@ struct UserProfileView: View {
         .background(RexColor.background.ignoresSafeArea())
         .navigationTitle(profile?.display_name ?? route.name)
         .navigationBarTitleDisplayMode(.inline)
+        .toolbar {
+            ToolbarItem(placement: .topBarTrailing) {
+                if route.userId != RexAPI.shared.currentUserId {
+                    Menu {
+                        Button {
+                            reporting = .person(route.userId, name: profile?.display_name ?? route.name)
+                        } label: {
+                            Label("Report", systemImage: "flag")
+                        }
+                        Button(role: .destructive) {
+                            confirmingBlock = true
+                        } label: {
+                            Label("Block", systemImage: "hand.raised")
+                        }
+                    } label: {
+                        Image(systemName: "ellipsis.circle")
+                    }
+                }
+            }
+        }
+        .sheet(item: $reporting) { subject in
+            ReportSheet(subject: subject, onBlocked: { dismissSelf() })
+        }
+        .alert("Block \(profile?.display_name ?? route.name)?", isPresented: $confirmingBlock) {
+            Button("Cancel", role: .cancel) {}
+            Button("Block", role: .destructive) { Task { await block() } }
+        } message: {
+            Text("You won't see each other's Rex, and any friendship between you ends. They aren't told.")
+        }
         .navigationDestination(isPresented: $showingTheirFriends) {
             FriendsOfView(userId: route.userId, name: profile?.display_name ?? route.name)
         }
@@ -260,6 +303,14 @@ struct UserProfileView: View {
         default:
             EmptyView()
         }
+    }
+
+    private func block() async {
+        isChangingConnection = true
+        if (try? await RexAPI.shared.blockUser(id: route.userId)) != nil {
+            dismissSelf()
+        }
+        isChangingConnection = false
     }
 
     private func loadConnection() async {
@@ -430,7 +481,7 @@ struct UserProfileView: View {
             async let followedTask = RexAPI.shared.fetchFollowedLists()
             let (profiles, recs, lists, followedLists) = try await (profileTask, recsTask, listsTask, followedTask)
             profile = profiles.first
-            recommendations = recs
+            recommendations = RexAPI.shared.filterHidden(recs)
             theirLists = lists
             myFollowedListIds = Set(followedLists.map { $0.id })
             let itemIds = Array(Set(recs.map { $0.item_id }))

@@ -47,8 +47,10 @@ struct ProfileView: View {
         case collection(FeedRecommendation)
         case trip(FeedRecommendation)
         case comments(FeedRecommendation)
+        case addRex
         var id: String {
             switch self {
+            case .addRex: return "addRex"
             case .comments(let rec): return "comments-\(rec.id)"
             case .editProfile: return "editProfile"
             case .edit(let rec): return "edit-\(rec.id)"
@@ -179,6 +181,8 @@ struct ProfileView: View {
         .task { await load() }
         .sheet(item: $activeSheet) { sheet in
             switch sheet {
+            case .addRex:
+                AddRexView(onDone: { activeSheet = nil; Task { await load() } })
             case .comments(let rec):
                 CommentsSheet(rec: rec)
             case .editProfile:
@@ -434,11 +438,47 @@ struct ProfileView: View {
     @ViewBuilder
     private var recList: some View {
         if filteredRecommendations.isEmpty {
-            Text("Nothing posted yet.")
-                .font(.system(size: 14))
-                .foregroundStyle(RexColor.mutedForeground)
-                .frame(maxWidth: .infinity)
-                .padding(.top, 40)
+            // Sept 17 — "make the profile page when someone hasn't Rex'd
+            // anything yet more interesting (currently blank) maybe a Rex
+            // Dino of some kind". A new account's profile was one grey
+            // sentence on an empty screen — the first thing anyone sees of
+            // Rex after signing up.
+            VStack(spacing: RexSpacing.md) {
+                Image(recommendations.isEmpty ? "RexPlaceholderList" : "RexPlaceholderOther")
+                    .resizable()
+                    .scaledToFit()
+                    .frame(height: 150)
+                    .clipShape(RoundedRectangle(cornerRadius: RexRadius.card, style: .continuous))
+                    .accessibilityHidden(true)
+                Text(recommendations.isEmpty ? "Your Rex live here" : "Nothing in this category yet")
+                    .font(RexFont.display(20, weight: .semibold))
+                    .foregroundStyle(RexColor.foreground)
+                Text(recommendations.isEmpty
+                     ? "Rex a place you loved, a book you couldn\u{2019}t put down, a trip worth copying \u{2014} your friends see it in their feed."
+                     : "Try another category, or add one.")
+                    .font(RexFont.text(14))
+                    .foregroundStyle(RexColor.mutedForeground)
+                    .multilineTextAlignment(.center)
+                    .fixedSize(horizontal: false, vertical: true)
+                Button {
+                    activeSheet = .addRex
+                } label: {
+                    Label("Add your first Rex", systemImage: "plus")
+                        .font(RexFont.text(15, weight: .semibold))
+                        .frame(maxWidth: .infinity)
+                        .frame(height: 46)
+                        .background(RexColor.primary)
+                        .foregroundStyle(RexColor.primaryForeground)
+                        .clipShape(Capsule())
+                        .contentShape(Capsule())
+                }
+                .buttonStyle(.plain)
+                .padding(.top, RexSpacing.xs)
+                .padding(.horizontal, RexSpacing.xxl)
+            }
+            .frame(maxWidth: .infinity)
+            .padding(.top, RexSpacing.xl)
+            .padding(.bottom, RexSpacing.xxl)
         } else {
             // Live report: "profile loading really really slowly and often
             // crashing when you try and scroll." This was a plain VStack —

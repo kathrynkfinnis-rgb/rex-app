@@ -160,7 +160,7 @@ struct LikesCommentsView: View {
                 likeCount = entry.count
                 likedByMe = entry.likedByMe
             }
-            comments = loadedComments ?? []
+            comments = (loadedComments ?? []).filter { !RexAPI.shared.hiddenUsers.contains($0.user_id) }
         } else {
             async let likes = try? RexAPI.shared.fetchLikeState(recommendationIds: [recommendationId])
             async let fetched = try? RexAPI.shared.fetchComments(recommendationId: recommendationId)
@@ -169,7 +169,7 @@ struct LikesCommentsView: View {
                 likeCount = entry.count
                 likedByMe = entry.likedByMe
             }
-            comments = loadedComments ?? []
+            comments = (loadedComments ?? []).filter { !RexAPI.shared.hiddenUsers.contains($0.user_id) }
         }
         isLoading = false
     }

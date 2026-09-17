@@ -60,7 +60,7 @@ struct LoginView: View {
                         .buttonStyle(RexSecondaryButtonStyle())
                 }
 
-                Text("By continuing you agree to the Terms of Service and Privacy Policy.")
+                Text("You must be 16 or over. By continuing you agree to the Terms of Service and Privacy Policy.")
                     .font(RexFont.text(12))
                     .foregroundStyle(RexColor.mutedForeground)
                     .multilineTextAlignment(.center)

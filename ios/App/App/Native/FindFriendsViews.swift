@@ -140,6 +140,7 @@ struct FriendsOfView: View {
         isLoading = true
         do {
             people = try await RexAPI.shared.fetchFriendsOf(userId: userId)
+                .filter { !RexAPI.shared.hiddenUsers.contains($0.id) }
         } catch {
             errorMessage = error.localizedDescription
         }
@@ -327,6 +328,7 @@ struct ContactsFriendFinderView: View {
         contactCount = hashes.count
         do {
             matches = try await RexAPI.shared.matchContactEmails(hashes: hashes)
+                .filter { !RexAPI.shared.hiddenUsers.contains($0.id) }
         } catch {
             errorMessage = error.localizedDescription
         }

@@ -53,8 +53,10 @@ struct FeedView: View {
         case collection(FeedRecommendation)
         case trip(FeedRecommendation)
         case comments(FeedRecommendation)
+        case report(ReportSubject)
         var id: String {
             switch self {
+            case .report(let subject): return "report-\(subject.id)"
             case .edit(let rec): return "edit-\(rec.id)"
             case .collection(let rec): return "collection-\(rec.id)"
             case .trip(let rec): return "trip-\(rec.id)"
@@ -406,6 +408,20 @@ struct FeedView: View {
                                     // A want has no recommendation row, so
                                     // there's nothing for saved_posts to
                                     // reference — this silently 404'd before.
+                                    // Sept 17 — report/block whoever posted it.
+                                    if rec.user_id != RexAPI.shared.currentUserId {
+                                        Button {
+                                            activeSheet = .report(.rex(rec))
+                                        } label: {
+                                            Label("Report", systemImage: "flag")
+                                        }
+                                        Button(role: .destructive) {
+                                            Task { await block(rec) }
+                                        } label: {
+                                            Label("Block \(rec.profiles?.display_name ?? rec.profiles?.username ?? "this person")",
+                                                  systemImage: "hand.raised")
+                                        }
+                                    }
                                     // Your own wants get the real thing from
                                     // WishListCategoryView instead.
                                     if !rec.isWant {
@@ -540,6 +556,10 @@ struct FeedView: View {
         }
         .sheet(item: $activeSheet) { sheet in
             switch sheet {
+            case .report(let subject):
+                // Sept 17 — report the content, and optionally block whoever
+                // posted it, from the menu the card already has.
+                ReportSheet(subject: subject, onBlocked: { Task { await loadFeed() } })
             case .comments(let rec):
                 CommentsSheet(rec: rec)
             case .collection(let rec):
@@ -953,6 +973,16 @@ struct FeedView: View {
         }
     }
 
+    /// Blocking from the feed: they leave it straight away.
+    private func block(_ rec: FeedRecommendation) async {
+        do {
+            try await RexAPI.shared.blockUser(id: rec.user_id)
+            await loadFeed()
+        } catch {
+            errorMessage = error.localizedDescription
+        }
+    }
+
     private func deleteRex(_ rec: FeedRecommendation) async {
         recommendations.removeAll { $0.id == rec.id }
         do {
@@ -1039,6 +1069,9 @@ struct FeedView: View {
     }
 
     private func loadFeed() async {
+        // Sept 17 — who's blocked, in either direction; everything below
+        // is filtered against it (RexAPI.filterHidden).
+        await RexAPI.shared.refreshHiddenUsers()
         isLoading = recommendations.isEmpty
         errorMessage = nil
         do {
@@ -1050,7 +1083,7 @@ struct FeedView: View {
             let merged = (try await rex)
                 + ((try? await wantsFeed) ?? [])
                 + ((try? await blastsFeed) ?? [])
-            recommendations = merged.sorted { $0.created_at > $1.created_at }
+            recommendations = RexAPI.shared.filterHidden(merged).sorted { $0.created_at > $1.created_at }
             // A fresh load resets paging; a full page back means there's
             // probably more behind it (see loadMore).
             let rexRows = try await rex
@@ -1092,7 +1125,7 @@ struct FeedView: View {
         var seen = Set(recommendations.map { $0.id })
         let fresh = older.filter { seen.insert($0.id).inserted }
         guard !fresh.isEmpty else { return }
-        recommendations = (recommendations + fresh).sorted { $0.created_at > $1.created_at }
+        recommendations = RexAPI.shared.filterHidden(recommendations + fresh).sorted { $0.created_at > $1.created_at }
 
         // Same two follow-up fetches loadFeed does, for the new rows only.
         let newItemIds = Array(Set(fresh.map { $0.item_id }))

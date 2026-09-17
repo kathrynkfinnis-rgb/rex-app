@@ -154,6 +154,7 @@ struct FriendsView: View {
         isSearching = true
         do {
             searchResults = try await RexAPI.shared.searchProfilesByUsername(q)
+                .filter { !RexAPI.shared.hiddenUsers.contains($0.id) }
             searchMessage = searchResults.isEmpty
                 ? "No one on Rex matches \u{201C}\(q)\u{201D}. Try their name, or check your contacts below."
                 : nil
