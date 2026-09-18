@@ -24,6 +24,12 @@ struct LikesCommentsView: View {
     @State private var isPosting = false
     @State private var isLoading = true
     @FocusState private var draftFocused: Bool
+    /// Phoebe, 17 Sept: "Can edit or delete comments". Only your own —
+    /// the id of the one being edited, and the text as it's being changed.
+    @State private var editingId: String?
+    @State private var editDraft = ""
+    @State private var pendingDelete: RexComment?
+    @FocusState private var editFocused: Bool
 
     var body: some View {
         VStack(alignment: .leading, spacing: RexSpacing.md) {
@@ -82,12 +88,31 @@ struct LikesCommentsView: View {
                                 Text(comment.profiles?.display_name ?? comment.profiles?.username ?? "Someone")
                                     .font(RexFont.text(13, weight: .semibold))
                                     .foregroundStyle(RexColor.foreground)
-                                Text(comment.body)
-                                    .font(RexFont.text(14))
-                                    .foregroundStyle(RexColor.foreground.opacity(0.9))
-                                    .fixedSize(horizontal: false, vertical: true)
+                                if editingId == comment.id {
+                                    editor(for: comment)
+                                } else {
+                                    Text(comment.body)
+                                        .font(RexFont.text(14))
+                                        .foregroundStyle(RexColor.foreground.opacity(0.9))
+                                        .fixedSize(horizontal: false, vertical: true)
+                                }
                             }
                             Spacer()
+                        }
+                        // Your own comments only. A long press is where the
+                        // app already puts "things you can do to this" —
+                        // same as a card in the feed.
+                        .contextMenu {
+                            if comment.user_id == RexAPI.shared.currentUserId, editingId == nil {
+                                Button {
+                                    editDraft = comment.body
+                                    editingId = comment.id
+                                    editFocused = true
+                                } label: { Label("Edit", systemImage: "pencil") }
+                                Button(role: .destructive) {
+                                    pendingDelete = comment
+                                } label: { Label("Delete", systemImage: "trash") }
+                            }
                         }
                     }
                 }
@@ -148,6 +173,22 @@ struct LikesCommentsView: View {
                 draftFocused = true
             }
         }
+        .confirmationDialog(
+            "Delete this comment?",
+            isPresented: Binding(
+                get: { pendingDelete != nil },
+                set: { if !$0 { pendingDelete = nil } }
+            ),
+            titleVisibility: .visible
+        ) {
+            Button("Delete", role: .destructive) {
+                if let comment = pendingDelete {
+                    pendingDelete = nil
+                    Task { await delete(comment) }
+                }
+            }
+            Button("Cancel", role: .cancel) { pendingDelete = nil }
+        }
     }
 
     private func load() async {
@@ -188,6 +229,67 @@ struct LikesCommentsView: View {
         } catch {
             likedByMe = !next
             likeCount = max(0, likeCount + (next ? -1 : 1))
+        }
+    }
+
+    /// An edit happens in place, where the comment already is, rather than
+    /// in a sheet that hides the thread you're correcting yourself in.
+    @ViewBuilder
+    private func editor(for comment: RexComment) -> some View {
+        VStack(alignment: .leading, spacing: RexSpacing.sm) {
+            TextField("Comment", text: $editDraft, axis: .vertical)
+                .font(RexFont.text(14))
+                .focused($editFocused)
+                .lineLimit(1...6)
+                .padding(.horizontal, RexSpacing.sm)
+                .padding(.vertical, 8)
+                .background(RexColor.card)
+                .clipShape(RoundedRectangle(cornerRadius: RexRadius.input, style: .continuous))
+                .overlay(
+                    RoundedRectangle(cornerRadius: RexRadius.input, style: .continuous)
+                        .stroke(RexColor.border, lineWidth: 1)
+                )
+            HStack(spacing: RexSpacing.md) {
+                Button("Cancel") { editingId = nil; editDraft = "" }
+                    .font(RexFont.text(13))
+                    .foregroundStyle(RexColor.mutedForeground)
+                Button("Save") { Task { await saveEdit(comment) } }
+                    .font(RexFont.text(13, weight: .semibold))
+                    .foregroundStyle(RexColor.primary)
+                    .disabled(
+                        editDraft.trimmingCharacters(in: .whitespaces).isEmpty
+                            || editDraft == comment.body
+                    )
+            }
+            .buttonStyle(.plain)
+        }
+    }
+
+    private func saveEdit(_ comment: RexComment) async {
+        let text = editDraft.trimmingCharacters(in: .whitespaces)
+        guard !text.isEmpty else { return }
+        do {
+            try await RexAPI.shared.updateComment(id: comment.id, body: text, isWant: wantId != nil)
+            editingId = nil
+            editDraft = ""
+            await reloadComments()
+        } catch {
+            // Leave the editor open with what they typed still in it.
+        }
+    }
+
+    private func delete(_ comment: RexComment) async {
+        // Gone from the thread straight away; the reload confirms it.
+        comments.removeAll { $0.id == comment.id }
+        try? await RexAPI.shared.deleteComment(id: comment.id, isWant: wantId != nil)
+        await reloadComments()
+    }
+
+    private func reloadComments() async {
+        if let wantId {
+            comments = (try? await RexAPI.shared.fetchWantComments(wantId: wantId)) ?? comments
+        } else {
+            comments = (try? await RexAPI.shared.fetchComments(recommendationId: recommendationId)) ?? comments
         }
     }
 

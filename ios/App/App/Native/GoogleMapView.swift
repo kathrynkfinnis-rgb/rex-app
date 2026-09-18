@@ -32,6 +32,13 @@ struct GoogleMapView: UIViewRepresentable {
     /// is already claimed (panning/pin selection); long-press is the same
     /// gesture Apple/Google Maps themselves use for "drop a pin here".
     var onLongPress: ((CLLocationCoordinate2D) -> Void)? = nil
+    /// Phoebe, 16 Sept: "I have filtered by restaurant, but still other types
+    /// of pins are coming up". They were all restaurants — but a place tagged
+    /// "Bar, Restaurant" is drawn in its FIRST sub-category's colour, and
+    /// the chips double as the colour key, so a filtered map looked unfiltered.
+    /// While a filter is on, every pin is drawn in that filter's colour: they
+    /// all match it, and the colour then says why the pin is there.
+    var highlightGenre: String? = nil
     /// Bumped whenever the camera should frame every pin currently shown —
     /// following a trip, so all its stops are on screen at once rather than
     /// wherever the map happened to be sitting.
@@ -58,7 +65,7 @@ struct GoogleMapView: UIViewRepresentable {
     func updateUIView(_ mapView: GMSMapView, context: Context) {
         // Only rebuild markers when the set of places actually changes —
         // clearing on every SwiftUI update makes the map flicker.
-        let ids = places.map(\.id).joined(separator: ",")
+        let ids = places.map(\.id).joined(separator: ",") + "|" + (highlightGenre ?? "")
         if context.coordinator.renderedIds != ids {
             mapView.clear()
             context.coordinator.markersById.removeAll()
@@ -127,7 +134,13 @@ struct GoogleMapView: UIViewRepresentable {
     /// place's own sub-category, so dinner, drinks and somewhere to stay
     /// read apart at a glance. See rexSubcategoryColor.
     private func markerColor(for place: MapPlace) -> UIColor {
-        UIColor(rexSubcategoryColor(genre: place.genre, type: place.type))
+        if let highlightGenre {
+            return UIColor(rexSubcategoryColor(
+                genre: highlightGenre == "Event" ? nil : highlightGenre,
+                type: highlightGenre == "Event" ? "event" : "place"
+            ))
+        }
+        return UIColor(rexSubcategoryColor(genre: place.genre, type: place.type))
     }
 
     /// Rough conversion from a radius in metres to a Google zoom level.

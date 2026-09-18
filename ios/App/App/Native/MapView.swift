@@ -203,6 +203,7 @@ struct RexMapView: View {
                     focusRequest: focusRequest,
                     onSelect: { selectedPlace = $0 },
                     onLongPress: { coordinate in Task { await resolveLongPress(coordinate) } },
+                    highlightGenre: subFilter,
                     fitToPlacesNonce: tripFitNonce
                 )
                 .ignoresSafeArea(edges: .bottom)
@@ -687,97 +688,106 @@ struct RexMapView: View {
     @ViewBuilder
     private func placeSheet(_ place: MapPlace) -> some View {
         NavigationStack {
-            VStack(alignment: .leading, spacing: RexSpacing.md) {
-                HStack(spacing: 4) {
-                    Image(systemName: RexCategory(rawType: place.type).symbol).font(.system(size: 9))
-                    Text(RexCategory(rawType: place.type).label.uppercased())
-                        .font(.system(size: 10, weight: .semibold)).tracking(0.6)
-                }
-                .foregroundStyle(RexColor.badgeForeground)
-                .padding(.horizontal, RexSpacing.sm).padding(.vertical, 3)
-                .background(RexColor.badgeBackground)
-                .clipShape(Capsule())
-
-                Text(place.title)
-                    .font(RexFont.display(22, weight: .semibold))
-                    .foregroundStyle(RexColor.foreground)
-
-                if let address = place.address, !address.isEmpty {
-                    Text(address)
-                        .font(RexFont.text(13))
-                        .foregroundStyle(RexColor.mutedForeground)
-                        .lineLimit(2)
-                }
-
-                HStack(spacing: 6) {
-                    if place.recommendations.count == 1 {
-                        RexRatingBadge(raw: place.recommendations[0].rating)
-                    } else {
-                        RexRatingAverageBadge(ratings: place.recommendations.map { $0.rating })
+            // Phoebe, 16 Sept: "The alignment of the text box here is
+            // offkilter. This happened after I had added a Rex from my
+            // previous pin." A plain VStack is laid out at its ideal height
+            // and centred in the detent, so as soon as a place gained enough
+            // content to outgrow 260pt — another Rex, a trip it belongs to —
+            // the top of it spilled out above the sheet and sat over the map.
+            // Scrolling keeps it inside whatever detent it's in.
+            ScrollView {
+                VStack(alignment: .leading, spacing: RexSpacing.md) {
+                    HStack(spacing: 4) {
+                        Image(systemName: RexCategory(rawType: place.type).symbol).font(.system(size: 9))
+                        Text(RexCategory(rawType: place.type).label.uppercased())
+                            .font(.system(size: 10, weight: .semibold)).tracking(0.6)
                     }
-                    Text("· \(place.recommenderSummary)")
-                        .font(RexFont.text(13)).foregroundStyle(RexColor.mutedForeground)
-                }
+                    .foregroundStyle(RexColor.badgeForeground)
+                    .padding(.horizontal, RexSpacing.sm).padding(.vertical, 3)
+                    .background(RexColor.badgeBackground)
+                    .clipShape(Capsule())
 
-                // A stop usually belongs to a trip — let people jump to the
-                // whole itinerary, or follow it on the map.
-                let trips = place.tripIds.compactMap { id in
-                    tripTitles[id].map { (id: id, title: $0) }
-                }
-                if !trips.isEmpty {
-                    VStack(alignment: .leading, spacing: RexSpacing.sm) {
-                        Text("Part of")
-                            .font(RexFont.text(12, weight: .semibold))
+                    Text(place.title)
+                        .font(RexFont.display(22, weight: .semibold))
+                        .foregroundStyle(RexColor.foreground)
+
+                    if let address = place.address, !address.isEmpty {
+                        Text(address)
+                            .font(RexFont.text(13))
                             .foregroundStyle(RexColor.mutedForeground)
-                        ForEach(trips, id: \.id) { trip in
-                            HStack(spacing: RexSpacing.sm) {
-                                Button {
-                                    selectedPlace = nil
-                                    openTrip = TripRoute(recommendationId: trip.id, title: trip.title)
-                                } label: {
-                                    HStack(spacing: RexSpacing.sm) {
-                                        Image(systemName: "suitcase")
-                                            .font(.system(size: 13))
-                                        Text(trip.title)
-                                            .font(RexFont.text(14, weight: .medium))
-                                            .lineLimit(1)
-                                        Spacer()
-                                        Image(systemName: "chevron.right")
-                                            .font(.system(size: 11, weight: .semibold))
-                                    }
-                                    .foregroundStyle(RexColor.foreground)
-                                    .padding(RexSpacing.md)
-                                    .contentShape(Rectangle())
-                                    .rexCard()
-                                }
-                                .buttonStyle(.plain)
+                            .lineLimit(2)
+                    }
 
-                                Button {
-                                    followTrip(id: trip.id, title: trip.title)
-                                    selectedPlace = nil
-                                } label: {
-                                    Text("Map it")
-                                        .font(RexFont.text(12, weight: .semibold))
-                                        .foregroundStyle(RexColor.primary)
-                                        .padding(.horizontal, RexSpacing.sm + 2)
-                                        .padding(.vertical, 8)
-                                        .overlay(Capsule().stroke(RexColor.primary.opacity(0.4), lineWidth: 1))
+                    HStack(spacing: 6) {
+                        if place.recommendations.count == 1 {
+                            RexRatingBadge(raw: place.recommendations[0].rating)
+                        } else {
+                            RexRatingAverageBadge(ratings: place.recommendations.map { $0.rating })
+                        }
+                        Text("· \(place.recommenderSummary)")
+                            .font(RexFont.text(13)).foregroundStyle(RexColor.mutedForeground)
+                    }
+
+                    // A stop usually belongs to a trip — let people jump to the
+                    // whole itinerary, or follow it on the map.
+                    let trips = place.tripIds.compactMap { id in
+                        tripTitles[id].map { (id: id, title: $0) }
+                    }
+                    if !trips.isEmpty {
+                        VStack(alignment: .leading, spacing: RexSpacing.sm) {
+                            Text("Part of")
+                                .font(RexFont.text(12, weight: .semibold))
+                                .foregroundStyle(RexColor.mutedForeground)
+                            ForEach(trips, id: \.id) { trip in
+                                HStack(spacing: RexSpacing.sm) {
+                                    Button {
+                                        selectedPlace = nil
+                                        openTrip = TripRoute(recommendationId: trip.id, title: trip.title)
+                                    } label: {
+                                        HStack(spacing: RexSpacing.sm) {
+                                            Image(systemName: "suitcase")
+                                                .font(.system(size: 13))
+                                            Text(trip.title)
+                                                .font(RexFont.text(14, weight: .medium))
+                                                .lineLimit(1)
+                                            Spacer()
+                                            Image(systemName: "chevron.right")
+                                                .font(.system(size: 11, weight: .semibold))
+                                        }
+                                        .foregroundStyle(RexColor.foreground)
+                                        .padding(RexSpacing.md)
+                                        .contentShape(Rectangle())
+                                        .rexCard()
+                                    }
+                                    .buttonStyle(.plain)
+
+                                    Button {
+                                        followTrip(id: trip.id, title: trip.title)
+                                        selectedPlace = nil
+                                    } label: {
+                                        Text("Map it")
+                                            .font(RexFont.text(12, weight: .semibold))
+                                            .foregroundStyle(RexColor.primary)
+                                            .padding(.horizontal, RexSpacing.sm + 2)
+                                            .padding(.vertical, 8)
+                                            .overlay(Capsule().stroke(RexColor.primary.opacity(0.4), lineWidth: 1))
+                                    }
+                                    .buttonStyle(.plain)
                                 }
-                                .buttonStyle(.plain)
                             }
                         }
+                        .padding(.top, RexSpacing.sm)
                     }
-                    .padding(.top, RexSpacing.sm)
-                }
 
-                NavigationLink(value: place.id) {
-                    Text("View details")
-                }
-                .buttonStyle(RexPrimaryButtonStyle())
+                    NavigationLink(value: place.id) {
+                        Text("View details")
+                    }
+                    .buttonStyle(RexPrimaryButtonStyle())
 
-                Spacer()
+                }
+                .padding(RexSpacing.page)
+                .frame(maxWidth: .infinity, alignment: .leading)
             }
-            .padding(RexSpacing.page)
             .background(RexColor.background.ignoresSafeArea())
             .navigationDestination(for: String.self) { ItemDetailView(itemId: $0) }
         }

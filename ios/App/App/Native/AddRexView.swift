@@ -502,7 +502,10 @@ struct AddRexView: View {
             // something of your own.
             field(searchFirst ? "Search" : (category == .trip ? "Name your trip" : category == .list ? "Name your list" : "Title"), text: $title,
                   placeholder: searchFirst
-                      ? "Search \(category.label.lowercased())s…"
+                      // Phoebe, 17 Sept: "Shouldn't be 'tvs' should be 'tv'".
+                      // Appending an s to the singular label was wrong for
+                      // exactly the categories that don't take one.
+                      ? "Search \(category.pluralLabel.lowercased())…"
                       : "e.g. \(placeholderTitle(for: category))")
                 .onChange(of: title) { _, _ in scheduleSearch(for: category) }
 

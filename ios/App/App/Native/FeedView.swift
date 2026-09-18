@@ -51,6 +51,7 @@ struct FeedView: View {
     private enum ActiveSheet: Identifiable {
         case edit(FeedRecommendation)
         case collection(FeedRecommendation)
+        case wantCollection(FeedRecommendation)
         case trip(FeedRecommendation)
         case comments(FeedRecommendation)
         case report(ReportSubject)
@@ -59,6 +60,7 @@ struct FeedView: View {
             case .report(let subject): return "report-\(subject.id)"
             case .edit(let rec): return "edit-\(rec.id)"
             case .collection(let rec): return "collection-\(rec.id)"
+            case .wantCollection(let rec): return "wantcollection-\(rec.id)"
             case .trip(let rec): return "trip-\(rec.id)"
             case .comments(let rec): return "comments-\(rec.id)"
             }
@@ -422,8 +424,20 @@ struct FeedView: View {
                                                   systemImage: "hand.raised")
                                         }
                                     }
-                                    // Your own wants get the real thing from
-                                    // WishListCategoryView instead.
+                                    // Sept 18 — "can we also make sure you
+                                    // can add 'want to try's to collections".
+                                    // A want has no recommendation row, so it
+                                    // goes through wants.list_id rather than
+                                    // saved_posts — same menu item, different
+                                    // sheet. Only your own: you can't file
+                                    // someone else's want in your collection.
+                                    if rec.isWant, rec.user_id == RexAPI.shared.currentUserId {
+                                        Button {
+                                            activeSheet = .wantCollection(rec)
+                                        } label: {
+                                            Label("Add to collection", systemImage: "folder.badge.plus")
+                                        }
+                                    }
                                     if !rec.isWant {
                                         Button {
                                             activeSheet = .collection(rec)
@@ -564,6 +578,13 @@ struct FeedView: View {
                 CommentsSheet(rec: rec)
             case .collection(let rec):
                 AddToCollectionView(rec: rec, onDone: {})
+            case .wantCollection(let rec):
+                AddWantToListView(
+                    wantId: String(rec.id.dropFirst("want-".count)),
+                    title: rec.items?.title,
+                    itemType: rec.items?.type,
+                    onChange: { _ in }
+                )
             case .trip(let rec):
                 AddToTripView(itemId: rec.item_id, itemTitle: rec.items?.title ?? "This place", onDone: {})
             case .edit(let rec):

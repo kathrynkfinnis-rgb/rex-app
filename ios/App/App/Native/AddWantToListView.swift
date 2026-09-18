@@ -8,10 +8,27 @@ import SwiftUI
 /// either client ever read or wrote it until now, which is why there was no
 /// way to do this at all.
 struct AddWantToListView: View {
-    let want: WantRow
+    let wantId: String
+    let title: String?
+    let itemType: String?
     /// Called with the want's new list_id (nil if removed) so the caller
     /// can update its own local copy without a full reload.
     var onChange: (String?) -> Void
+
+    init(want: WantRow, onChange: @escaping (String?) -> Void) {
+        self.init(wantId: want.id, title: want.items?.title, itemType: want.items?.type, onChange: onChange)
+    }
+
+    /// Sept 18 — "can we also make sure you can add 'want to try's to
+    /// collections". The feed carries a want as a `want-<id>` row with no
+    /// WantRow behind it, so this init takes the pieces directly and reads
+    /// the current collection from the database rather than being handed it.
+    init(wantId: String, title: String?, itemType: String?, onChange: @escaping (String?) -> Void) {
+        self.wantId = wantId
+        self.title = title
+        self.itemType = itemType
+        self.onChange = onChange
+    }
 
     @Environment(\.dismiss) private var dismiss
 
@@ -27,7 +44,7 @@ struct AddWantToListView: View {
         NavigationStack {
             ScrollView {
                 VStack(alignment: .leading, spacing: RexSpacing.lg) {
-                    if let title = want.items?.title {
+                    if let title {
                         Text(title)
                             .font(RexFont.display(20, weight: .semibold))
                             .foregroundStyle(RexColor.foreground)
@@ -140,8 +157,8 @@ struct AddWantToListView: View {
 
     private func load() async {
         isLoading = true
-        selectedListId = want.list_id
         lists = (try? await RexAPI.shared.fetchLists()) ?? []
+        selectedListId = try? await RexAPI.shared.fetchWantListId(wantId: wantId)
         isLoading = false
     }
 
@@ -152,7 +169,7 @@ struct AddWantToListView: View {
         errorMessage = nil
         let next = selectedListId == list.id ? nil : list.id
         do {
-            try await RexAPI.shared.setWantList(wantId: want.id, listId: next)
+            try await RexAPI.shared.setWantList(wantId: wantId, listId: next)
             selectedListId = next
             onChange(next)
         } catch {
@@ -169,9 +186,9 @@ struct AddWantToListView: View {
         do {
             let id = try await RexAPI.shared.createCollection(
                 name: name, emoji: nil,
-                itemType: want.items?.type ?? "other"
+                itemType: itemType ?? "other"
             )
-            try await RexAPI.shared.setWantList(wantId: want.id, listId: id)
+            try await RexAPI.shared.setWantList(wantId: wantId, listId: id)
             selectedListId = id
             onChange(id)
             newName = ""

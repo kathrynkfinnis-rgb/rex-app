@@ -3713,6 +3713,41 @@ final class RexAPI {
         }
     }
 
+    /// Phoebe, 17 Sept: "Can edit or delete comments". Both tables have
+    /// carried "your own to update/delete" policies since day one — nothing
+    /// in either client ever used them, so a typo in a comment was permanent.
+    /// `isWant` picks the table: a want keeps its comments in want_comments.
+    func updateComment(id: String, body text: String, isWant: Bool) async throws {
+        try await writeComment(id: id, isWant: isWant, method: "PATCH", body: ["body": text],
+                               failure: "Couldn't save that change.")
+    }
+
+    func deleteComment(id: String, isWant: Bool) async throws {
+        try await writeComment(id: id, isWant: isWant, method: "DELETE", body: nil,
+                               failure: "Couldn't delete that comment.")
+    }
+
+    private func writeComment(id: String, isWant: Bool, method: String,
+                              body: [String: Any]?, failure: String) async throws {
+        let token = try await validToken()
+        let table = isWant ? "want_comments" : "recommendation_comments"
+        var components = URLComponents(url: baseURL.appendingPathComponent("/rest/v1/\(table)"), resolvingAgainstBaseURL: false)!
+        components.queryItems = [URLQueryItem(name: "id", value: "eq.\(id)")]
+        var request = URLRequest(url: components.url!)
+        request.httpMethod = method
+        request.setValue(anonKey, forHTTPHeaderField: "apikey")
+        request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+        if let body {
+            request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+            request.httpBody = try JSONSerialization.data(withJSONObject: body)
+        }
+
+        let (data, response) = try await URLSession.shared.data(for: request)
+        guard let http = response as? HTTPURLResponse, http.statusCode < 400 else {
+            throw RexAPIError.server(friendlyError(data, fallback: failure))
+        }
+    }
+
     /// The user's own curated lists (hitlist_lists) — e.g. "Baby Recs".
     func fetchLists() async throws -> [RexList] {
         let token = try await validToken()
@@ -4013,6 +4048,29 @@ final class RexAPI {
             throw RexAPIError.server("Couldn't load your want-to list.")
         }
         return try JSONDecoder().decode([WantRow].self, from: data)
+    }
+
+    /// Which collection a want is currently in, if any. The feed knows a
+    /// want only as a `want-<id>` row with no list_id on it, so the sheet
+    /// asks for the current answer rather than being handed a stale one.
+    func fetchWantListId(wantId: String) async throws -> String? {
+        struct Row: Decodable { let list_id: String? }
+        let token = try await validToken()
+        var components = URLComponents(url: baseURL.appendingPathComponent("/rest/v1/wants"), resolvingAgainstBaseURL: false)!
+        components.queryItems = [
+            URLQueryItem(name: "id", value: "eq.\(wantId)"),
+            URLQueryItem(name: "select", value: "list_id"),
+            URLQueryItem(name: "limit", value: "1"),
+        ]
+        var request = URLRequest(url: components.url!)
+        request.setValue(anonKey, forHTTPHeaderField: "apikey")
+        request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+
+        let (data, response) = try await URLSession.shared.data(for: request)
+        guard let http = response as? HTTPURLResponse, http.statusCode < 400 else {
+            throw RexAPIError.server("Couldn't load that want.")
+        }
+        return try JSONDecoder().decode([Row].self, from: data).first?.list_id
     }
 
     /// Puts a want in a collection, or takes it out (listId: nil). Unlike a
