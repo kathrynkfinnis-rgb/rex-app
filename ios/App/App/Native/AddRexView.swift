@@ -769,11 +769,11 @@ struct AddRexView: View {
             .disabled(isSaving || title.trimmingCharacters(in: .whitespaces).isEmpty)
             .padding(.top, 6)
 
-            // Drafts only make sense for trips right now — journaling stops
-            // over several sittings and publishing the finished itinerary
-            // at the end. A single Rex is a one-shot post; there's nothing
-            // to draft.
-            if category == .trip && mode == .rated {
+            // Trips and lists only: both are built up over several sittings
+            // and published when they're finished. A single Rex is a one-shot
+            // post; there's nothing to draft. (Sept 18 — "need to be able to
+            // save lists as drafts".)
+            if (category == .trip || category == .list) && mode == .rated {
                 Button {
                     Task { await post(category: category, asDraft: true) }
                 } label: {
@@ -1594,7 +1594,7 @@ struct AddRexView: View {
                     anonymous: anonymous,
                     // Always: the success screen shares the new Rex.
                     returningId: true,
-                    asDraft: category == .trip && asDraft
+                    asDraft: asDraft
                 )
                 lastPostedRecId = newRecId
                 // A list that's all notes and no items lands here rather
@@ -1606,7 +1606,7 @@ struct AddRexView: View {
                     try? await RexAPI.shared.setTaggedFriends(recommendationId: newRecId, userIds: Array(taggedFriendIds))
                 }
                 didWant = false
-                didSaveDraft = category == .trip && asDraft
+                didSaveDraft = asDraft
             case .want:
                 try await RexAPI.shared.createWant(
                     itemId: itemId,

@@ -833,7 +833,7 @@ final class RexAPI {
         components.queryItems = [
             URLQueryItem(name: "select", value: select),
             URLQueryItem(name: "trip_id", value: "is.null"),
-            URLQueryItem(name: "items.type", value: "eq.trip"),
+            URLQueryItem(name: "items.type", value: "in.(trip,list)"),
             URLQueryItem(name: "order", value: "created_at.desc"),
             URLQueryItem(name: "limit", value: "300"),
         ]
@@ -933,9 +933,15 @@ final class RexAPI {
         return row.published_at == nil
     }
 
-    /// Publishes a draft trip and every stop journaled onto it in one go —
-    /// the whole point of drafting a trip is adding stops over time and
-    /// then sharing the finished itinerary all at once, not stop by stop.
+    /// Publishes a draft trip or list, and everything journaled onto it, in
+    /// one go — the whole point of drafting is adding entries over time and
+    /// then sharing the finished thing all at once, not one at a time. A
+    /// list's items hang off it by trip_id exactly as a trip's stops do, so
+    /// the same query covers both.
+    func publishDraft(recommendationId: String) async throws {
+        try await publishTrip(tripRecommendationId: recommendationId)
+    }
+
     func publishTrip(tripRecommendationId: String) async throws {
         let token = try await validToken()
         var components = URLComponents(url: baseURL.appendingPathComponent("/rest/v1/recommendations"), resolvingAgainstBaseURL: false)!
@@ -953,7 +959,7 @@ final class RexAPI {
 
         let (data, response) = try await URLSession.shared.data(for: request)
         guard let http = response as? HTTPURLResponse, http.statusCode < 400 else {
-            throw RexAPIError.server(friendlyError(data, fallback: "Couldn't publish this trip."))
+            throw RexAPIError.server(friendlyError(data, fallback: "Couldn't publish this."))
         }
     }
 
@@ -1117,11 +1123,15 @@ final class RexAPI {
         }
     }
 
-    /// Your own draft trips — trip_id is.null (a trip itself, not a stop)
-    /// and published_at is.null (never published). Only ever your own by
-    /// construction: RLS hides anyone else's drafts before this query even
-    /// runs, so there's no need to filter user_id client-side too.
-    func fetchDraftTrips() async throws -> [FeedRecommendation] {
+    /// Your own drafts — trip_id is.null (the trip or list itself, not one
+    /// of its entries) and published_at is.null (never published). Only ever
+    /// your own by construction: RLS hides anyone else's drafts before this
+    /// query even runs, so there's no need to filter user_id client-side too.
+    ///
+    /// Sept 18 — "need to be able to save lists as drafts". Lists are built
+    /// by the same screen as trips and stored the same way, so they only
+    /// ever needed letting through here.
+    func fetchDrafts() async throws -> [FeedRecommendation] {
         let token = try await validToken()
         guard let userId = currentUserId else { throw RexAPIError.notSignedIn }
         let select = "id,rating,note,created_at,photo_url,photo_urls,tags,user_id,item_id,trip_id," +

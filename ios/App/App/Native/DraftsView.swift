@@ -2,14 +2,15 @@ import SwiftUI
 
 struct DraftsRoute: Hashable {}
 
-/// Your own draft trips — journaled but not yet published. Reached from
-/// Profile. Only ever shows your own by construction: RLS hides anyone
-/// else's drafts before fetchDraftTrips' query even runs.
+/// Your own drafts — trips and lists journaled but not yet published.
+/// Reached from Profile. Only ever shows your own by construction: RLS hides
+/// anyone else's drafts before fetchDrafts' query even runs.
 struct DraftsView: View {
     @State private var drafts: [FeedRecommendation] = []
     @State private var isLoading = true
     @State private var errorMessage: String?
     @State private var openTrip: TripRoute?
+    @State private var openList: ListRoute?
 
     var body: some View {
         ScrollView {
@@ -27,7 +28,12 @@ struct DraftsView: View {
                 } else {
                     ForEach(drafts) { draft in
                         Button {
-                            openTrip = TripRoute(recommendationId: draft.id, title: draft.items?.title ?? "Trip")
+                            let title = draft.items?.title ?? (isList(draft) ? "List" : "Trip")
+                            if isList(draft) {
+                                openList = ListRoute(recommendationId: draft.id, title: title)
+                            } else {
+                                openTrip = TripRoute(recommendationId: draft.id, title: title)
+                            }
                         } label: {
                             row(draft)
                         }
@@ -42,20 +48,26 @@ struct DraftsView: View {
         .navigationTitle("Drafts")
         .navigationBarTitleDisplayMode(.inline)
         .navigationDestination(item: $openTrip) { TripDetailView(route: $0) }
+        .navigationDestination(item: $openList) { ListDetailView(route: $0) }
         .task { await load() }
+    }
+
+    private func isList(_ draft: FeedRecommendation) -> Bool {
+        RexCategory(rawType: draft.items?.type) == .list
     }
 
     private func row(_ draft: FeedRecommendation) -> some View {
         HStack(spacing: RexSpacing.md) {
             ZStack {
                 RexColor.muted
-                Image(systemName: "bag").font(.system(size: 18)).foregroundStyle(RexColor.mutedForeground)
+                Image(systemName: isList(draft) ? "list.bullet" : "bag")
+                    .font(.system(size: 18)).foregroundStyle(RexColor.mutedForeground)
             }
             .frame(width: 48, height: 48)
             .clipShape(RoundedRectangle(cornerRadius: RexRadius.input, style: .continuous))
 
             VStack(alignment: .leading, spacing: 2) {
-                Text(draft.items?.title ?? "Trip")
+                Text(draft.items?.title ?? (isList(draft) ? "List" : "Trip"))
                     .font(RexFont.text(15, weight: .semibold))
                     .foregroundStyle(RexColor.foreground)
                     .lineLimit(1)
@@ -84,7 +96,7 @@ struct DraftsView: View {
         isLoading = true
         errorMessage = nil
         do {
-            drafts = try await RexAPI.shared.fetchDraftTrips()
+            drafts = try await RexAPI.shared.fetchDrafts()
         } catch {
             errorMessage = error.localizedDescription
         }
@@ -97,7 +109,7 @@ struct DraftsView: View {
             Text("No drafts")
                 .font(RexFont.display(20, weight: .semibold))
                 .foregroundStyle(RexColor.foreground)
-            Text("Start a trip and save it as a draft to journal stops as you go, then publish the whole thing when you're ready.")
+            Text("Save a trip or a list as a draft to build it up over time, then publish the whole thing when you're ready.")
                 .font(RexFont.text(14))
                 .foregroundStyle(RexColor.mutedForeground)
                 .multilineTextAlignment(.center)

@@ -47,6 +47,12 @@ struct ListDetailView: View {
     @State private var activeSheet: ActiveSheet?
 
     @State private var isOwner = false
+    /// Sept 18 — "need to be able to save lists as drafts". A draft is a
+    /// list with no published_at: yours to build up, invisible to everyone
+    /// else, until you publish it from the banner below.
+    @State private var isDraft = false
+    @State private var isPublishing = false
+    @State private var publishError: String?
     @State private var isEditing = false
     /// Sept 14 — the list's own row, for opening it in the input form.
     @State private var listRec: FeedRecommendation?
@@ -342,7 +348,68 @@ struct ListDetailView: View {
                     .font(.footnote)
                     .foregroundStyle(RexColor.mutedForeground)
             }
+
+            if isDraft {
+                draftBanner
+            }
         }
+    }
+
+    /// Mirrors TripDetailView's banner — a list and a trip are drafted and
+    /// published the same way, so they shouldn't look or read differently.
+    private var draftBanner: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            HStack(spacing: 6) {
+                Image(systemName: "doc.text").font(.system(size: 12))
+                Text("Draft — only you can see this")
+                    .font(RexFont.text(13, weight: .medium))
+                Spacer()
+            }
+            .foregroundStyle(RexColor.mutedForeground)
+
+            Button {
+                Task { await publish() }
+            } label: {
+                if isPublishing {
+                    ProgressView().tint(RexColor.primaryForeground).frame(maxWidth: .infinity)
+                } else {
+                    Text("Publish list").fontWeight(.semibold).frame(maxWidth: .infinity)
+                }
+            }
+            .frame(height: 44)
+            .background(RexColor.primary)
+            .foregroundStyle(RexColor.primaryForeground)
+            .clipShape(Capsule())
+            .disabled(isPublishing || (items.isEmpty && longNote.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty))
+
+            if items.isEmpty, longNote.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                Text("Add an item or some notes before publishing.")
+                    .font(RexFont.text(12))
+                    .foregroundStyle(RexColor.mutedForeground)
+            }
+
+            if let publishError {
+                Text(publishError)
+                    .font(RexFont.text(12))
+                    .foregroundStyle(RexColor.destructive)
+            }
+        }
+        .padding(12)
+        .background(RexColor.badgeBackground)
+        .clipShape(RoundedRectangle(cornerRadius: 14))
+        .padding(.top, 8)
+    }
+
+    private func publish() async {
+        isPublishing = true
+        publishError = nil
+        do {
+            try await RexAPI.shared.publishDraft(recommendationId: route.recommendationId)
+            isDraft = false
+        } catch {
+            publishError = error.localizedDescription
+        }
+        isPublishing = false
     }
 
     /// The list's Notes, under everything else — the same place the Notes
@@ -502,6 +569,12 @@ struct ListDetailView: View {
             listItemId = listRec?.item_id
             subtitle = listRec?.items?.subtitle ?? ""
             longNote = await RexAPI.shared.fetchLongNote(recommendationId: route.recommendationId) ?? ""
+            // Best-effort, same as isOwner: not knowing shows no banner
+            // rather than breaking the page. Kept out of an `&&` — its
+            // right-hand side is an autoclosure, which can't be awaited.
+            if isOwner {
+                isDraft = (try? await RexAPI.shared.isDraft(recommendationId: route.recommendationId)) ?? false
+            }
         } catch {
             errorMessage = error.localizedDescription
         }
