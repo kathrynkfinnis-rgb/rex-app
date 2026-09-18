@@ -174,6 +174,14 @@ struct AddRexView: View {
     /// stops there are.
     @State private var postingProgress: String?
     @State private var anonymous = false
+    /// Sept 18 — "a Rex profile, that we can start automatically posting
+    /// recommendations to keep the feed interesting". Admins only, and only
+    /// visible once the REX account actually exists on this project.
+    @State private var isAdmin = false
+    @State private var officialAccountId: String?
+    @State private var postAsRex = false
+    @State private var scheduleRexPost = false
+    @State private var rexPostDate = Calendar.current.date(byAdding: .day, value: 1, to: Date()) ?? Date()
     @State private var errorMessage: String?
     @State private var didPost = false
     /// Sept 15 — the Rex just posted, for sharing it from the success
@@ -325,6 +333,13 @@ struct AddRexView: View {
         .onChange(of: title) { _, _ in persistDraft() }
         .onChange(of: note) { _, _ in persistDraft() }
         .onChange(of: listNotes) { _, _ in persistDraft() }
+        .task {
+            // Both cached in RexAPI, so this costs one request per launch
+            // however many times the add screen is opened. Non-admins never
+            // see the section and never learn the REX account exists.
+            isAdmin = await RexAPI.shared.isAdmin()
+            if isAdmin { officialAccountId = await RexAPI.shared.officialAccountId() }
+        }
         .onAppear {
             // Only offered when this is a fresh compose — an edit of a
             // posted trip, or a form already pre-filled from an import, has
@@ -730,6 +745,10 @@ struct AddRexView: View {
                 Text("Tag friends (optional)").font(.system(size: 14, weight: .semibold)).foregroundStyle(RexColor.foreground)
                 FriendTagPickerView(selectedIds: $taggedFriendIds)
 
+                if isAdmin, officialAccountId != nil {
+                    postAsRexSection
+                }
+
                 Toggle(isOn: $anonymous) {
                     VStack(alignment: .leading, spacing: 2) {
                         Text("Post anonymously")
@@ -787,6 +806,59 @@ struct AddRexView: View {
             }
         }
         .padding(16)
+    }
+
+    /// Posting as REX, for the three of us. Deliberately plain and a little
+    /// stark — it should never be possible to post as REX by accident, or to
+    /// not notice that you have.
+    private var postAsRexSection: some View {
+        VStack(alignment: .leading, spacing: RexSpacing.sm) {
+            Toggle(isOn: $postAsRex.animation()) {
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("Post as REX")
+                        .font(.system(size: 14, weight: .semibold))
+                        .foregroundStyle(RexColor.foreground)
+                    Text("Posts from the REX account instead of yours. Everyone sees it.")
+                        .font(RexFont.text(12))
+                        .foregroundStyle(RexColor.mutedForeground)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+            }
+            .tint(RexColor.primary)
+
+            if postAsRex {
+                Toggle(isOn: $scheduleRexPost.animation()) {
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text("Schedule it")
+                            .font(.system(size: 14, weight: .semibold))
+                            .foregroundStyle(RexColor.foreground)
+                        Text("Held back until then, then posted for you.")
+                            .font(RexFont.text(12))
+                            .foregroundStyle(RexColor.mutedForeground)
+                    }
+                }
+                .tint(RexColor.primary)
+
+                if scheduleRexPost {
+                    DatePicker(
+                        "Goes out",
+                        selection: $rexPostDate,
+                        in: Date()...,
+                        displayedComponents: [.date, .hourAndMinute]
+                    )
+                    .font(RexFont.text(14))
+                    .tint(RexColor.primary)
+                    // It publishes on the quarter hour, so a time is a
+                    // promise of "around then", not to the minute.
+                    Text("Goes out within about fifteen minutes of that time.")
+                        .font(RexFont.text(12))
+                        .foregroundStyle(RexColor.mutedForeground)
+                }
+            }
+        }
+        .padding(RexSpacing.md)
+        .background(RexColor.badgeBackground)
+        .clipShape(RoundedRectangle(cornerRadius: RexRadius.card, style: .continuous))
     }
 
     /// Live results from the external catalogues. Hidden once the user picks
@@ -1594,7 +1666,9 @@ struct AddRexView: View {
                     anonymous: anonymous,
                     // Always: the success screen shares the new Rex.
                     returningId: true,
-                    asDraft: asDraft
+                    asDraft: asDraft,
+                    postAs: postAsRex ? officialAccountId : nil,
+                    scheduledAt: postAsRex && scheduleRexPost ? rexPostDate : nil
                 )
                 lastPostedRecId = newRecId
                 // A list that's all notes and no items lands here rather
@@ -1606,7 +1680,9 @@ struct AddRexView: View {
                     try? await RexAPI.shared.setTaggedFriends(recommendationId: newRecId, userIds: Array(taggedFriendIds))
                 }
                 didWant = false
-                didSaveDraft = asDraft
+                // A scheduled REX post hasn't gone anywhere yet, so the
+                // success screen shouldn't offer to share it.
+                didSaveDraft = asDraft || (postAsRex && scheduleRexPost)
             case .want:
                 try await RexAPI.shared.createWant(
                     itemId: itemId,

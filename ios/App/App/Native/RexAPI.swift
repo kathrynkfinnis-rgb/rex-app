@@ -1567,6 +1567,53 @@ final class RexAPI {
         return r * c
     }
 
+    /// Sept 18 — the REX account: is this person one of the three admins,
+    /// and what's the official account's id? Both are asked once per launch
+    /// and cached — the answer doesn't change while the app is open, and the
+    /// add screen would otherwise ask on every appearance.
+    private var cachedIsAdmin: Bool?
+    private var cachedOfficialId: String??
+
+    func isAdmin() async -> Bool {
+        if let cachedIsAdmin { return cachedIsAdmin }
+        guard let token = try? await validToken(), let userId = currentUserId else { return false }
+        var components = URLComponents(url: baseURL.appendingPathComponent("/rest/v1/user_roles"), resolvingAgainstBaseURL: false)!
+        components.queryItems = [
+            URLQueryItem(name: "select", value: "role"),
+            URLQueryItem(name: "user_id", value: "eq.(userId)"),
+            URLQueryItem(name: "role", value: "eq.admin"),
+            URLQueryItem(name: "limit", value: "1"),
+        ]
+        var request = URLRequest(url: components.url!)
+        request.setValue(anonKey, forHTTPHeaderField: "apikey")
+        request.setValue("Bearer (token)", forHTTPHeaderField: "Authorization")
+        guard let (data, response) = try? await URLSession.shared.data(for: request),
+              let http = response as? HTTPURLResponse, http.statusCode < 400,
+              let rows = try? JSONSerialization.jsonObject(with: data) as? [[String: Any]]
+        else { return false }
+        let result = !rows.isEmpty
+        cachedIsAdmin = result
+        return result
+    }
+
+    /// The REX account's id, or nil if it hasn't been set up on this project.
+    func officialAccountId() async -> String? {
+        if let cachedOfficialId { return cachedOfficialId }
+        guard let token = try? await validToken() else { return nil }
+        var request = URLRequest(url: baseURL.appendingPathComponent("/rest/v1/rpc/official_account_id"))
+        request.httpMethod = "POST"
+        request.setValue(anonKey, forHTTPHeaderField: "apikey")
+        request.setValue("Bearer (token)", forHTTPHeaderField: "Authorization")
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        request.httpBody = Data("{}".utf8)
+        guard let (data, response) = try? await URLSession.shared.data(for: request),
+              let http = response as? HTTPURLResponse, http.statusCode < 400
+        else { return nil }
+        let id = try? JSONDecoder().decode(String?.self, from: data)
+        cachedOfficialId = .some(id ?? nil)
+        return id ?? nil
+    }
+
     /// Creates a brand-new recommendation (used right after createItem — no existing row to merge with).
     @discardableResult
     func createRecommendation(
@@ -1582,10 +1629,17 @@ final class RexAPI {
         showInFeed: Bool? = nil,
         anonymous: Bool = false,
         returningId: Bool = false,
-        asDraft: Bool = false
+        asDraft: Bool = false,
+        /// Post as someone else — only ever the REX account, and only ever
+        /// by an admin. The database enforces both (see migration
+        /// 20260918100000); this just says who to write down as the author.
+        postAs: String? = nil,
+        /// When a queued REX post should go out. A row with this set and no
+        /// published_at is picked up by publish_due_official_posts().
+        scheduledAt: Date? = nil
     ) async throws -> String {
         let token = try await validToken()
-        guard let userId = currentUserId else { throw RexAPIError.notSignedIn }
+        guard let userId = postAs ?? currentUserId else { throw RexAPIError.notSignedIn }
         var request = URLRequest(url: baseURL.appendingPathComponent("/rest/v1/recommendations"))
         request.httpMethod = "POST"
         request.setValue(anonKey, forHTTPHeaderField: "apikey")
@@ -1607,7 +1661,10 @@ final class RexAPI {
         // 20260815162631. Everything else (feed, item pages, map,
         // leaderboard) already excludes these via RLS, not a client filter,
         // so there's nothing else to thread this through.
-        if asDraft { body["published_at"] = NSNull() }
+        if asDraft || scheduledAt != nil { body["published_at"] = NSNull() }
+        if let scheduledAt {
+            body["scheduled_at"] = ISO8601DateFormatter().string(from: scheduledAt)
+        }
         request.httpBody = try JSONSerialization.data(withJSONObject: body)
         if returningId {
             request.setValue("return=representation", forHTTPHeaderField: "Prefer")
