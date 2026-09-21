@@ -47,6 +47,13 @@ struct TripItineraryBuilderView: View {
     /// hadn't fixed it. The host opens this one now, through the same
     /// single sheet it uses for everything else.
     var onAddStop: (() -> Void)? = nil
+    /// Sept 21 — "want the option to replace the +items/headings with 'Add as
+    /// free text'. If you put it in notes, you wouldn't see it." Some lists
+    /// aren't a list of things at all — they're a paragraph. Binding this
+    /// swaps the two add buttons for a text box, and what's typed there
+    /// becomes the list's own body rather than a footnote under it.
+    var freeText: Binding<String>? = nil
+    @State private var writingFreeText = false
     @State private var renamingHeadingId: UUID?
     @State private var headingDraft = ""
     @State private var draggingId: UUID?
@@ -77,6 +84,10 @@ struct TripItineraryBuilderView: View {
             // Both buttons live here, below everything, and reappear after
             // every add — the "these keep coming up until you are ready to
             // submit" loop from the brief.
+            if let freeText, writingFreeText || !freeText.wrappedValue.isEmpty {
+                freeTextBox(freeText)
+            } else {
+
             Button {
                 headingDraft = ""
                 renamingHeadingId = nil
@@ -104,6 +115,18 @@ struct TripItineraryBuilderView: View {
             }
             .buttonStyle(DashedAddButtonStyle())
 
+            if freeText != nil {
+                Button {
+                    withAnimation { writingFreeText = true }
+                } label: {
+                    Text("Or write it as free text instead")
+                        .font(RexFont.text(13, weight: .semibold))
+                        .foregroundStyle(RexColor.primary)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                }
+                .buttonStyle(.plain)
+            }
+
             if entries.count > 1 {
                 HStack(spacing: 5) {
                     Image(systemName: "info.circle").font(.system(size: 10))
@@ -111,6 +134,7 @@ struct TripItineraryBuilderView: View {
                 }
                 .font(RexFont.text(11.5))
                 .foregroundStyle(RexColor.mutedForeground)
+            }
             }
 
             Text("Each \(noun) becomes its own Rex as well as part of the \(container) \u{2014} only the \(container) itself shows on the feed.")
@@ -230,6 +254,37 @@ struct TripItineraryBuilderView: View {
         }
         .frame(width: 30, height: 30)
         .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
+    }
+
+    /// The whole \(container) as one piece of writing. Shown where the items
+    /// would have been, and it's what the \(container)'s page leads with — the
+    /// point of this over Notes, which sits below everything else.
+    @ViewBuilder
+    private func freeTextBox(_ text: Binding<String>) -> some View {
+        VStack(alignment: .leading, spacing: RexSpacing.xs) {
+            TextField("Write the \(container) out however you like…", text: text, axis: .vertical)
+                .font(RexFont.text(15))
+                .lineLimit(6...24)
+                .padding(12)
+                .background(RexColor.card)
+                .clipShape(RoundedRectangle(cornerRadius: 14))
+                .overlay(RoundedRectangle(cornerRadius: 14).stroke(RexColor.border, lineWidth: 1))
+
+            HStack {
+                Text("This becomes the \(container) itself, not a note under it.")
+                    .font(RexFont.text(11.5))
+                    .foregroundStyle(RexColor.mutedForeground)
+                Spacer()
+                if text.wrappedValue.isEmpty {
+                    Button("Add \(noun == "stop" ? "stops" : "items") instead") {
+                        withAnimation { writingFreeText = false }
+                    }
+                    .font(RexFont.text(12, weight: .semibold))
+                    .foregroundStyle(RexColor.primary)
+                    .buttonStyle(.plain)
+                }
+            }
+        }
     }
 
     private func addHeading() {

@@ -633,7 +633,11 @@ struct AddRexView: View {
                     entries: $listEntries,
                     mode: .list,
                     onEditStop: { entry in activeSheet = .editListItem(entry) },
-                    onAddStop: { activeSheet = .addListItem }
+                    onAddStop: { activeSheet = .addListItem },
+                    // Shares the long-note field: a list that's all writing
+                    // and no items already leads with it on the list's page,
+                    // so this is the way in rather than a second column.
+                    freeText: $listNotes
                 )
 
                 Button {
