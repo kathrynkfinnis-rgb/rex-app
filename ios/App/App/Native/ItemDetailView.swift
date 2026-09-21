@@ -240,8 +240,11 @@ struct ItemDetailView: View {
 
                 if let link = item.link_url, let url = URL(string: link), url.scheme?.hasPrefix("http") == true {
                     // Opens in Safari. Labelled with the site's own name so
-                    // it's clear where you're going.
-                    Link(destination: url) {
+                    // it's clear where you're going. Sept 21 — goes through
+                    // RexOutboundLink, which asks for tracking permission the
+                    // first time and only then routes it via the affiliate
+                    // redirect; a refusal opens the plain link just as fast.
+                    RexOutboundLinkButton(url: url) {
                         HStack(spacing: 4) {
                             Image(systemName: "arrow.up.right.square").font(.system(size: 12))
                             Text(category == .other || category == .list ? "View product" : "Visit website")
@@ -252,7 +255,6 @@ struct ItemDetailView: View {
                         .padding(.vertical, 6)
                         .overlay(Capsule().stroke(RexColor.primary, lineWidth: 1))
                     }
-                    .accessibilityHint(url.host ?? "")
                 }
 
                 if let collectionTargetRec {

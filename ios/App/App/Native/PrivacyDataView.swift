@@ -95,6 +95,11 @@ struct PrivacyDataView: View {
                     }
                 }
 
+                // Sept 21 — whoever said yes or no to tracking should be
+                // able to find out what that meant without knowing the answer
+                // lives in iOS Settings.
+                AffiliateLinksSection()
+
                 group("Safety") {
                     NavigationLink(value: BlockedAccountsRoute()) {
                         rowContent(icon: "hand.raised.slash", title: "Blocked accounts",

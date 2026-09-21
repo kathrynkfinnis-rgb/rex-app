@@ -455,7 +455,7 @@ struct ExploreView: View {
                 Button { pushedItemId = itemId } label: { editorialCardBody(item) }
                     .buttonStyle(.plain)
             } else if let linkString = item.link_url, let url = URL(string: linkString) {
-                Link(destination: url) { editorialCardBody(item) }
+                RexOutboundLinkButton(url: url) { editorialCardBody(item) }
             } else {
                 editorialCardBody(item)
             }

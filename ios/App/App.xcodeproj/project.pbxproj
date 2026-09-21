@@ -68,6 +68,7 @@
 		FEED072B0000000000000000 /* FindFriendsViews.swift in Sources */ = {isa = PBXBuildFile; fileRef = FEED072A0000000000000000 /* FindFriendsViews.swift */; };
 		FEED073B0000000000000000 /* PrivacyDataView.swift in Sources */ = {isa = PBXBuildFile; fileRef = FEED073A0000000000000000 /* PrivacyDataView.swift */; };
 		FEED074B0000000000000000 /* ReportBlockViews.swift in Sources */ = {isa = PBXBuildFile; fileRef = FEED074A0000000000000000 /* ReportBlockViews.swift */; };
+		FEED07610000000000000000 /* RexOutboundLinks.swift in Sources */ = {isa = PBXBuildFile; fileRef = FEED07600000000000000000 /* RexOutboundLinks.swift */; };
 		FEED07510000000000000000 /* RexShareLinks.swift in Sources */ = {isa = PBXBuildFile; fileRef = FEED07500000000000000000 /* RexShareLinks.swift */; };
 		FEED064B0000000000000000 /* RexersSheetView.swift in Sources */ = {isa = PBXBuildFile; fileRef = FEED064A0000000000000000 /* RexersSheetView.swift */; };
 		FEED065B0000000000000000 /* PhotoFullScreenView.swift in Sources */ = {isa = PBXBuildFile; fileRef = FEED065A0000000000000000 /* PhotoFullScreenView.swift */; };
@@ -156,6 +157,7 @@
 		FEED072A0000000000000000 /* FindFriendsViews.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FindFriendsViews.swift; sourceTree = "<group>"; };
 		FEED073A0000000000000000 /* PrivacyDataView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PrivacyDataView.swift; sourceTree = "<group>"; };
 		FEED074A0000000000000000 /* ReportBlockViews.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ReportBlockViews.swift; sourceTree = "<group>"; };
+		FEED07600000000000000000 /* RexOutboundLinks.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RexOutboundLinks.swift; sourceTree = "<group>"; };
 		FEED07500000000000000000 /* RexShareLinks.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RexShareLinks.swift; sourceTree = "<group>"; };
 		FEED064A0000000000000000 /* RexersSheetView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RexersSheetView.swift; sourceTree = "<group>"; };
 		FEED065A0000000000000000 /* PhotoFullScreenView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PhotoFullScreenView.swift; sourceTree = "<group>"; };
@@ -282,6 +284,7 @@
 				FEED072A0000000000000000 /* FindFriendsViews.swift */,
 				FEED073A0000000000000000 /* PrivacyDataView.swift */,
 				FEED074A0000000000000000 /* ReportBlockViews.swift */,
+				FEED07600000000000000000 /* RexOutboundLinks.swift */,
 				FEED07500000000000000000 /* RexShareLinks.swift */,
 				FEED064A0000000000000000 /* RexersSheetView.swift */,
 				FEED065A0000000000000000 /* PhotoFullScreenView.swift */,
@@ -441,6 +444,7 @@
 				FEED072B0000000000000000 /* FindFriendsViews.swift in Sources */,
 				FEED073B0000000000000000 /* PrivacyDataView.swift in Sources */,
 				FEED074B0000000000000000 /* ReportBlockViews.swift in Sources */,
+				FEED07610000000000000000 /* RexOutboundLinks.swift in Sources */,
 				FEED07510000000000000000 /* RexShareLinks.swift in Sources */,
 				FEED064B0000000000000000 /* RexersSheetView.swift in Sources */,
 				FEED065B0000000000000000 /* PhotoFullScreenView.swift in Sources */,
@@ -596,7 +600,7 @@
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CODE_SIGN_ENTITLEMENTS = App/App.entitlements;
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 49;
+				CURRENT_PROJECT_VERSION = 50;
 				DEVELOPMENT_TEAM = X54V2C674U;
 				INFOPLIST_FILE = App/Info.plist;
 				IPHONEOS_DEPLOYMENT_TARGET = 18.0;
@@ -620,7 +624,7 @@
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CODE_SIGN_ENTITLEMENTS = App/App.entitlements;
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 49;
+				CURRENT_PROJECT_VERSION = 50;
 				DEVELOPMENT_TEAM = X54V2C674U;
 				INFOPLIST_FILE = App/Info.plist;
 				IPHONEOS_DEPLOYMENT_TARGET = 18.0;

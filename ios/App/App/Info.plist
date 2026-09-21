@@ -2,12 +2,12 @@
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
-  <key>CAPACITOR_DEBUG</key>
+	<key>CAPACITOR_DEBUG</key>
 	<string>$(CAPACITOR_DEBUG)</string>
 	<key>CFBundleDevelopmentRegion</key>
 	<string>en</string>
 	<key>CFBundleDisplayName</key>
-        <string>Rex</string>
+	<string>Rex</string>
 	<key>CFBundleExecutable</key>
 	<string>$(EXECUTABLE_NAME)</string>
 	<key>CFBundleIdentifier</key>
@@ -22,40 +22,42 @@
 	<string>$(MARKETING_VERSION)</string>
 	<key>CFBundleVersion</key>
 	<string>$(CURRENT_PROJECT_VERSION)</string>
+	<key>GMSApiKey</key>
+	<string>AIzaSyDl2PCHjjKbAje0C-NjJNkb-AKn5LwAtGU</string>
+	<key>GoogleCSEApiKey</key>
+	<string>AIzaSyD7CA_SOpUqX3lU3YonDvHEHA2rfMBrA2o</string>
+	<key>GoogleCSEEngineId</key>
+	<string>e7ee7b5e87ca1417e</string>
+	<key>ITSAppUsesNonExemptEncryption</key>
+	<false/>
 	<key>LSRequiresIPhoneOS</key>
 	<true/>
 	<key>NSContactsUsageDescription</key>
 	<string>Rex checks the email addresses in your contacts to show which of your friends are already on Rex. They're scrambled on your phone first, and nothing is stored.</string>
 	<key>NSLocationWhenInUseUsageDescription</key>
 	<string>Rex uses your location only while you're using the app, to centre the map on where you are. It isn't saved to your account or shared with your friends.</string>
-	<key>ITSAppUsesNonExemptEncryption</key>
-	<false/>
+	<key>NSUserTrackingUsageDescription</key>
+	<string>REX uses this to earn a small commission when you buy something you tapped through from a friend's recommendation. It never costs you anything, and saying no changes nothing about how REX works.</string>
 	<key>TMDBApiKey</key>
 	<string>f72338e298712db7cbb764225473f7f0</string>
-	<key>GMSApiKey</key>
-	<string>AIzaSyDl2PCHjjKbAje0C-NjJNkb-AKn5LwAtGU</string>
-	<key>GoogleCSEEngineId</key>
-	<string>e7ee7b5e87ca1417e</string>
-	<key>GoogleCSEApiKey</key>
-	<string>AIzaSyD7CA_SOpUqX3lU3YonDvHEHA2rfMBrA2o</string>
 	<key>UIApplicationSceneManifest</key>
 	<dict>
 		<key>UIApplicationSupportsMultipleScenes</key>
-    <false/>
-    <key>UISceneConfigurations</key>
-    <dict>
-      <key>UIWindowSceneSessionRoleApplication</key>
-      <array>
-        <dict>
-            <key>UISceneConfigurationName</key>
-            <string>Default Configuration</string>
-            <key>UISceneDelegateClassName</key>
-            <string>$(PRODUCT_MODULE_NAME).SceneDelegate</string>
-            <key>UISceneStoryboardFile</key>
-            <string>Main</string>
-        </dict>
-      </array>
-    </dict>
+		<false/>
+		<key>UISceneConfigurations</key>
+		<dict>
+			<key>UIWindowSceneSessionRoleApplication</key>
+			<array>
+				<dict>
+					<key>UISceneConfigurationName</key>
+					<string>Default Configuration</string>
+					<key>UISceneDelegateClassName</key>
+					<string>$(PRODUCT_MODULE_NAME).SceneDelegate</string>
+					<key>UISceneStoryboardFile</key>
+					<string>Main</string>
+				</dict>
+			</array>
+		</dict>
 	</dict>
 	<key>UILaunchStoryboardName</key>
 	<string>LaunchScreen</string>

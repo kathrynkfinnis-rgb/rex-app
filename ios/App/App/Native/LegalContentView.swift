@@ -11,7 +11,7 @@ import SwiftUI
 /// differs is asked to agree again (RootView's consent gate), and the new
 /// acceptance is logged in consent_log with a timestamp.
 enum RexLegal {
-    static let version = "2026-09-17"
+    static let version = "2026-09-21"
 }
 
 struct LegalContentView: View {
@@ -61,7 +61,7 @@ struct LegalContentView: View {
 
     // MARK: - Copy
 
-    private static let lastUpdated = "17 September 2026"
+    private static let lastUpdated = "21 September 2026"
 
     // Sept 17 — rewritten from Kathryn's solicitor drafts ("Find Rex",
     // Three Lines Studio Ltd) merged with what the app actually does, which
@@ -170,7 +170,7 @@ struct LegalContentView: View {
     • Understanding overall usage so we can improve the App — our legitimate interest in developing the service.
     • Responding to your questions, complaints and data requests — our legal obligations and legitimate interests.
 
-    We don't sell your personal data, we don't use it for advertising, and we don't make decisions about you by automated means alone.
+    We don't sell your personal data, we don't show you adverts, and we don't make decisions about you by automated means alone. The one commercial exception is shop links, explained in section 5.
 
     3. Who processes your data
     We share data only with providers who process it on our instructions, under contract:
@@ -179,6 +179,7 @@ struct LegalContentView: View {
     • Apple — Sign in with Apple, push notification delivery, and turning coordinates into an area name.
     • Anthropic — reading documents and recipe photos you choose to import (section 4).
     • TMDB, Open Library and Google Books — descriptions and ratings for films, TV and books shown on item pages. These are lookups of the title, not of you.
+    • Skimlinks — only if you have allowed tracking, and only when you tap a link to a shop (section 5).
 
     We may also disclose data where the law requires it, or to protect the rights and safety of our users.
 
@@ -187,35 +188,40 @@ struct LegalContentView: View {
     4. Importing documents and recipe photos
     When you use "Import from doc" or import a recipe from a photo, the text or image is sent to Anthropic's Claude to pick out the recommendations or read the recipe. REX doesn't store the photo — it isn't added to your account — and only the text you then choose to post is saved. Anthropic processes it under its commercial terms, doesn't use it to train its models, and deletes it after a limited retention period. If you'd rather not, type the details in yourself instead.
 
-    5. Anonymous posts
+    5. Shop links and commission
+    Some Rex link to a shop. If you have allowed tracking — iOS asks you the first time you tap one of these links, and you can change your answer in iOS Settings — REX opens that link through Skimlinks, a service that pays us a small commission if you go on to buy something. The price you pay is never affected.
+    If you say no, the link opens directly and we earn nothing. Nothing else about REX changes: not what you see, not the order you see it in, and not what your friends recommend. Commission never influences which recommendations appear or how they're ranked — they come from the people you follow, and that's the whole point of REX.
+    When a link is opened this way, Skimlinks sees the address you're going to, your IP address and your browser type, and sets its own cookies in your browser to connect a later purchase to that click. We don't send it your name, email or account. We never read your device's advertising identifier.
+
+    6. Anonymous posts
     Marking a post anonymous hides your name and photo from other users in the App's normal display. It doesn't anonymise the underlying record: REX keeps the link between you and the post, and can be required to disclose it. Don't rely on it to post anything you wouldn't want linked to you.
 
-    6. Keeping and deleting your data
+    7. Keeping and deleting your data
     We keep your information while your account is active.
 
     When you delete your account (Profile → Settings → Your data & privacy), your profile, recommendations, trips, lists, collections, comments, likes, photos, friend connections and notification settings are deleted immediately. Copies may remain in our providers' routine backups for a short period until those are overwritten, and we may keep a minimal record of reports and safety actions where we need to for legal reasons.
 
-    7. International transfers
+    8. International transfers
     Our providers may process data outside the UK and European Economic Area. Where they do, we rely on appropriate safeguards such as the UK International Data Transfer Agreement or Standard Contractual Clauses.
 
-    8. Your rights
+    9. Your rights
     Under UK and EU data protection law you can: access a copy of your data; correct it; delete it; export it in a portable format; restrict or object to processing; and withdraw consent at any time.
 
     Two of these you can exercise yourself, immediately: Profile → Settings → Your data & privacy → Download my data, or Delete my account. For anything else, email support@find-rex.com.
 
-    9. Complaints
+    10. Complaints
     If you're unhappy with how we handle your data, email support@find-rex.com and we'll acknowledge it and investigate. If you're still unsatisfied you can complain to the Information Commissioner's Office (ico.org.uk) or your local supervisory authority.
 
-    10. Children
+    11. Children
     REX is not for under-16s. We don't knowingly collect data from them. If we learn we have, we'll delete it.
 
-    11. Security
+    12. Security
     We protect your information with access controls on our database, encrypted connections, and rules that limit what each account can read. No system is completely secure, and we can't guarantee absolute security.
 
-    12. Changes
+    13. Changes
     We may update this policy. When we make a material change we'll ask you to review and agree to the new version in the App, and we keep a record of when you did.
 
-    13. Contact
+    14. Contact
     Three Lines Studio Ltd
     support@find-rex.com
     Registered address: [TO CONFIRM — Kathryn to add the registered company address]
