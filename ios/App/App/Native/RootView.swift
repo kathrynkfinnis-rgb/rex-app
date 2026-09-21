@@ -79,6 +79,10 @@ struct RootView: View {
         // there. Locking to light stops every current and future field from
         // inheriting a scheme this palette was never built for.
         .preferredColorScheme(.light)
+        // Tap anywhere off a text field to put the keyboard away — installed
+        // once here rather than screen by screen, so it covers every form in
+        // the app including the ones nobody has written yet.
+        .rexInstallsKeyboardDismissal()
     }
 
     private func onboardedKey(_ userId: String) -> String { "rex.onboarded.\(userId)" }

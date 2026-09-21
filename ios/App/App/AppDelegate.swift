@@ -8,10 +8,14 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
     var window: UIWindow?
 
     func application(_ application: UIApplication, didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]?) -> Bool {
-        // Google Maps must be keyed before any GMSMapView is created. The key
-        // is iOS-restricted to this bundle id, so it's safe to ship in the app
-        // (as Google intends for client keys) but is read from Info.plist to
-        // keep it out of source.
+        // Google Maps must be keyed before any GMSMapView is created.
+        //
+        // Sept 21, security review: this comment used to claim the key was
+        // iOS-restricted to this bundle id. It wasn't — the same key answered
+        // Places and Geocoding calls from a plain server with no iOS headers
+        // at all, which means anyone who pulls it out of the binary can bill
+        // Places queries to us. Restrict it in the Google Cloud console
+        // (Application restrictions -> iOS apps) before the App Store release.
         if let key = Bundle.main.object(forInfoDictionaryKey: "GMSApiKey") as? String, !key.isEmpty {
             GMSServices.provideAPIKey(key)
         }
