@@ -99,7 +99,7 @@ ${image ? `<meta name="twitter:image" content="${esc(image)}">` : ""}
 </head>
 <body>
 <header class="site"><div class="wrap">
-  <a class="brand" href="/"><img src="/wordmark.png" alt="REX"></a>
+  <a class="brand" href="/"><img class="mark" src="/dinologo.png" alt=""><img class="word" src="/wordmark.png" alt="REX"></a>
   <nav class="site"><a href="/support.html">Support</a><a href="/privacy.html">Privacy</a></nav>
 </div></header>
 <main><div class="wrap">

@@ -76,7 +76,7 @@ PAGE = """<!doctype html>
 </head>
 <body>
 <header class="site"><div class="wrap">
-  <a class="brand" href="/"><img src="/wordmark.png" alt="REX"></a>
+  <a class="brand" href="/"><img class="mark" src="/dinologo.png" alt=""><img class="word" src="/wordmark.png" alt="REX"></a>
   <nav class="site">
     <a href="/privacy.html">Privacy</a>
     <a href="/terms.html">Terms</a>

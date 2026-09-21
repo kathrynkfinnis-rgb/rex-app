@@ -20,6 +20,10 @@ struct CollectionDetailView: View {
     @State private var emoji: String
     @State private var visibility: String = "draft"
     @State private var rows: [SavedPost] = []
+    /// Sept 21 — "build a list view and expanded view on collections (like
+    /// we have for trips and lists)". Same @AppStorage key as those, so the
+    /// choice carries across all three rather than being three settings.
+    @AppStorage(ItineraryViewMode.storageKey) private var compact = false
     @State private var isLoading = true
     @State private var errorMessage: String?
     @State private var renaming = false
@@ -85,6 +89,12 @@ struct CollectionDetailView: View {
         ScrollView {
             VStack(alignment: .leading, spacing: RexSpacing.lg) {
                 headerBlock
+
+                // Not while arranging: the compact rows have no move handles,
+                // so switching mid-rearrange would take the controls away.
+                if !rows.isEmpty, !isArranging {
+                    ItineraryViewToggle(compact: $compact)
+                }
 
                 // A failed refresh shouldn't wipe out what's already on screen —
                 // show it as a line above the contents, not instead of them.
@@ -191,6 +201,9 @@ struct CollectionDetailView: View {
                                     await remove(rec.id)
                                 }
                             ) {
+                                if compact && !isArranging {
+                                    CompactItemRow(rec: rec)
+                                } else {
                                 RecommendationCardView(rec: rec)
                                     // Drag a card out to drop it into another
                                     // collection. Dropping copies — a Rex can
@@ -244,6 +257,7 @@ struct CollectionDetailView: View {
                                             .padding(2)
                                         }
                                     }
+                                }
                             }
                         }
                         }

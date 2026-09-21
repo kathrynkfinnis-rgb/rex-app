@@ -8,6 +8,16 @@ import SwiftUI
 /// week. Reached from the Explore tab, not the logo — see FeedView/
 /// MainTabView for the nav rework that made room for a dedicated tab.
 struct ExploreView: View {
+    /// Sept 21 — "two buttons at the top: 'Rex from Friends' and 'Rex from
+    /// Rexperts'". Friends is the default, and is a condensed version of the
+    /// feed: what your friends have Rex'd most, and where they've been.
+    /// Rexperts is the curated and app-wide material that used to be mixed
+    /// in with it — which was most of why this page looked empty.
+    enum ExploreSource: String, CaseIterable {
+        case friends, rexperts
+        var label: String { self == .friends ? "Rex from friends" : "Rex from Rexperts" }
+    }
+    @State private var source: ExploreSource = .friends
     @State private var filter: RexCategory?
     @State private var friendsCollections: [RexList] = []
     @State private var collectionOwners: [String: RexProfileDetail] = [:]
@@ -64,17 +74,50 @@ struct ExploreView: View {
     /// One shelf per category, same grouping FeedView's own categoryShelves
     /// used before #169 moved it here. Respects the same filter row every
     /// other shelf on this screen already does.
+    /// The same thing Rex'd by more than one friend, most first — the
+    /// closest honest answer to "most Rex'd" from the rows this tab already
+    /// has. One card per thing, not one per friend.
+    private var mostRexdByCategory: [(category: RexCategory, recs: [(rec: FeedRecommendation, count: Int)])] {
+        var byItem: [String: [FeedRecommendation]] = [:]
+        for rec in recentRex where !rec.isWant && !rec.isBlast && RexCategory(rawType: rec.items?.type) != .trip {
+            byItem[rec.item_id, default: []].append(rec)
+        }
+        var byCategory: [RexCategory: [(rec: FeedRecommendation, count: Int)]] = [:]
+        for (_, recs) in byItem {
+            guard let first = recs.first, recs.count > 1 else { continue }
+            byCategory[RexCategory(rawType: first.items?.type), default: []].append((first, recs.count))
+        }
+        return rexAllCategories
+            .filter { filter == nil || $0 == filter }
+            .compactMap { category in
+                guard let recs = byCategory[category], !recs.isEmpty else { return nil }
+                return (category, recs.sorted { $0.count > $1.count }.prefix(10).map { $0 })
+            }
+    }
+
+    /// Where your friends have been lately — trips get their own shelf
+    /// rather than sitting in the per-category rows, because a trip is the
+    /// thing people most want to borrow whole.
+    private var recentTrips: [FeedRecommendation] {
+        recentRex
+            .filter { RexCategory(rawType: $0.items?.type) == .trip && !$0.isWant && !$0.isBlast }
+            .prefix(10)
+            .map { $0 }
+    }
+
     private var recentByCategory: [(category: RexCategory, recs: [FeedRecommendation])] {
         var byCategory: [RexCategory: [FeedRecommendation]] = [:]
         for rec in recentRex where !rec.isWant && !rec.isBlast {
             byCategory[RexCategory(rawType: rec.items?.type), default: []].append(rec)
         }
-        // A shelf of one item isn't worth a whole horizontal row — that's
-        // just the same card the vertical feed already shows, framed oddly.
+        // This used to need two before a category earned a shelf, which on a
+        // young app meant most of them were thrown away and the page read as
+        // empty. One is enough — one real recommendation from a friend beats
+        // a blank screen.
         return rexAllCategories
             .filter { filter == nil || $0 == filter }
             .compactMap { category in
-                guard let recs = byCategory[category], recs.count >= 2 else { return nil }
+                guard let recs = byCategory[category], !recs.isEmpty else { return nil }
                 return (category, Array(recs.prefix(10)))
             }
     }
@@ -89,6 +132,7 @@ struct ExploreView: View {
         Group {
             ScrollView {
                 VStack(alignment: .leading, spacing: 0) {
+                    sourceToggle
                     filterRow
 
                     if isLoading {
@@ -101,40 +145,10 @@ struct ExploreView: View {
                         }
                     } else if let errorMessage {
                         errorState(errorMessage)
-                    } else if visibleFriendsCollections.isEmpty && visibleTrending.isEmpty && visibleEditorial.isEmpty {
-                        emptyState
+                    } else if source == .friends {
+                        friendsSections
                     } else {
-                        if !visibleFriendsCollections.isEmpty {
-                            shelf(title: "Missed from your friends", tag: "FRIENDS") {
-                                ForEach(visibleFriendsCollections) { list in
-                                    friendCollectionCard(list)
-                                }
-                            }
-                        }
-                        ForEach(visibleEditorial) { collection in
-                            if !collection.items.isEmpty {
-                                shelf(title: collection.title, tag: collection.source_label.uppercased()) {
-                                    ForEach(collection.items) { item in
-                                        editorialCard(item)
-                                    }
-                                }
-                            }
-                        }
-                        ForEach(trendingByCategory, id: \.category) { group in
-                            shelf(title: group.category.pluralLabel, tag: "POPULAR") {
-                                ForEach(group.items) { item in
-                                    trendingCard(item)
-                                }
-                            }
-                        }
-                        ForEach(recentByCategory, id: \.category) { group in
-                            shelf(title: group.category.label, tag: "RECENT") {
-                                ForEach(group.recs) { rec in
-                                    Button { openRex(rec) } label: { recentRexCard(rec) }
-                                        .buttonStyle(.plain)
-                                }
-                            }
-                        }
+                        rexpertsSections
                     }
                 }
                 .padding(.bottom, RexSpacing.xxl)
@@ -150,6 +164,117 @@ struct ExploreView: View {
             .task { await load() }
         }
         .tint(RexColor.primary)
+    }
+
+    private var sourceToggle: some View {
+        HStack(spacing: RexSpacing.sm) {
+            ForEach(ExploreSource.allCases, id: \.self) { option in
+                Button {
+                    withAnimation(.easeOut(duration: 0.15)) { source = option }
+                } label: {
+                    Text(option.label)
+                        .font(RexFont.text(14, weight: .semibold))
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 9)
+                        .background(source == option ? RexColor.primary : RexColor.card)
+                        .foregroundStyle(source == option ? RexColor.primaryForeground : RexColor.foreground)
+                        .clipShape(Capsule())
+                        .overlay(Capsule().stroke(source == option ? Color.clear : RexColor.border, lineWidth: 1))
+                        .contentShape(Capsule())
+                }
+                .buttonStyle(.plain)
+            }
+        }
+        .padding(.horizontal, RexSpacing.page)
+        .padding(.top, RexSpacing.md)
+    }
+
+    /// A condensed version of the feed: what more than one friend has Rex'd,
+    /// where they've been, what they've collected, then the rest by category.
+    @ViewBuilder
+    private var friendsSections: some View {
+        if mostRexdByCategory.isEmpty && recentTrips.isEmpty
+            && visibleFriendsCollections.isEmpty && recentByCategory.isEmpty {
+            emptyState
+        } else {
+            ForEach(mostRexdByCategory, id: \.category) { group in
+                shelf(title: "Most Rex'd \(group.category.pluralLabel.lowercased())", tag: "AGREED ON") {
+                    ForEach(group.recs, id: \.rec.id) { entry in
+                        Button { openRex(entry.rec) } label: { recentRexCard(entry.rec) }
+                            .buttonStyle(.plain)
+                    }
+                }
+            }
+            if !recentTrips.isEmpty, filter == nil || filter == .trip {
+                shelf(title: "Recent trips", tag: "FRIENDS") {
+                    ForEach(recentTrips) { rec in
+                        Button { openRex(rec) } label: { recentRexCard(rec) }
+                            .buttonStyle(.plain)
+                    }
+                }
+            }
+            if !visibleFriendsCollections.isEmpty {
+                shelf(title: "Collections you haven't followed", tag: "FRIENDS") {
+                    ForEach(visibleFriendsCollections) { list in
+                        friendCollectionCard(list)
+                    }
+                }
+            }
+            ForEach(recentByCategory, id: \.category) { group in
+                shelf(title: group.category.label, tag: "RECENT") {
+                    ForEach(group.recs) { rec in
+                        Button { openRex(rec) } label: { recentRexCard(rec) }
+                            .buttonStyle(.plain)
+                    }
+                }
+            }
+        }
+    }
+
+    /// Curated by the REX team, plus what the whole app is Rexing this week.
+    @ViewBuilder
+    private var rexpertsSections: some View {
+        if visibleEditorial.isEmpty && visibleTrending.isEmpty {
+            rexpertsEmptyState
+        } else {
+            ForEach(visibleEditorial) { collection in
+                if !collection.items.isEmpty {
+                    shelf(title: collection.title, tag: collection.source_label.uppercased()) {
+                        ForEach(collection.items) { item in
+                            editorialCard(item)
+                        }
+                    }
+                }
+            }
+            ForEach(trendingByCategory, id: \.category) { group in
+                shelf(title: group.category.pluralLabel, tag: "POPULAR") {
+                    ForEach(group.items) { item in
+                        trendingCard(item)
+                    }
+                }
+            }
+        }
+    }
+
+    private var rexpertsEmptyState: some View {
+        VStack(spacing: RexSpacing.sm) {
+            Image("RexDinoLogo").resizable().scaledToFit().frame(width: 84, height: 84)
+            Text("Nothing from the Rexperts yet")
+                .font(RexFont.display(20, weight: .semibold))
+                .foregroundStyle(RexColor.foreground)
+            Text("This is where REX's own picks will live. In the meantime, Rex from friends is the good stuff.")
+                .font(RexFont.text(14))
+                .foregroundStyle(RexColor.mutedForeground)
+                .multilineTextAlignment(.center)
+            Button("See Rex from friends") {
+                withAnimation(.easeOut(duration: 0.15)) { source = .friends }
+            }
+            .font(RexFont.text(14, weight: .semibold))
+            .foregroundStyle(RexColor.primary)
+            .padding(.top, RexSpacing.xs)
+        }
+        .padding(RexSpacing.xxl)
+        .frame(maxWidth: .infinity)
     }
 
     private var filterRow: some View {

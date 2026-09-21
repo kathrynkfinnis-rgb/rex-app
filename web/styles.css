@@ -34,7 +34,11 @@ header.site {
 }
 header.site .wrap { display: flex; align-items: center; gap: .75rem; }
 .brand { font-family: "Sentient", Georgia, serif; font-weight: 700; font-size: 1.3rem; color: var(--forest); text-decoration: none; letter-spacing: .02em; }
-.brand img { height: 26px; vertical-align: -5px; margin-right: .4rem; }
+/* The logo lockup — the crowned dino beside the wordmark. Same two marks
+   as the app icon and the splash, so the site reads as the same thing. */
+.brand { display: inline-flex; align-items: center; gap: .55rem; }
+.brand .mark { height: 30px; width: auto; }
+.brand .word { height: 22px; width: auto; }
 nav.site { margin-left: auto; display: flex; gap: 1.1rem; font-size: .93rem; }
 nav.site a { color: var(--muted); text-decoration: none; }
 nav.site a:hover { color: var(--forest); }

@@ -243,24 +243,16 @@ struct RecommendationCardView: View {
         )
     }
 
-    /// Top-right corner: what state this Rex is in. "Wants to try" and
-    /// "Asking" say it in words — they're the one place on the card that
-    /// does — and a rating says it with its emoji.
+    /// Top-right corner: the rating, and only the rating.
+    ///
+    /// Sept 21 — "the want to try tag still takes up all the heading — move
+    /// it above the map in line with 'On your list'". A rating badge is two
+    /// characters wide and leaves the title alone; "Wants to try" is eleven
+    /// and was squeezing every long title into three lines. It sits with the
+    /// other status chips now, where it reads as the same kind of thing.
     @ViewBuilder
     private var cornerLabel: some View {
-        if rec.isWant {
-            HStack(spacing: 5) {
-                Image(systemName: "bookmark").font(.system(size: 12))
-                Text("Wants to try").font(RexFont.text(12.5, weight: .semibold))
-            }
-            .foregroundStyle(RexColor.mutedForeground)
-        } else if rec.isBlast {
-            HStack(spacing: 4) {
-                Image(systemName: "sparkles").font(.system(size: 11))
-                Text("Asking").font(RexFont.text(12.5, weight: .semibold))
-            }
-            .foregroundStyle(RexColor.accent)
-        } else if rec.rating > 0 {
+        if !rec.isWant, !rec.isBlast, rec.rating > 0 {
             RexRatingBadge(raw: rec.rating, compact: true)
         }
     }
@@ -324,8 +316,18 @@ struct RecommendationCardView: View {
     @ViewBuilder
     private var rexdByRow: some View {
         let others = max(0, rexCount - 1)
-        if others > 0 || isOnMyList {
+        if others > 0 || isOnMyList || rec.isWant || rec.isBlast {
             HStack(spacing: RexSpacing.sm) {
+                if rec.isWant || rec.isBlast {
+                    HStack(spacing: 4) {
+                        Image(systemName: rec.isWant ? "bookmark" : "sparkles")
+                            .font(.system(size: 10))
+                        Text(rec.isWant ? "Wants to try" : "Asking")
+                            .font(RexFont.text(11, weight: .medium))
+                    }
+                    .foregroundStyle(rec.isWant ? RexColor.mutedForeground : RexColor.accent)
+                }
+
                 if others > 0 {
                     HStack(spacing: 4) {
                         // Three or more people is worth calling hot.

@@ -1581,6 +1581,9 @@ struct AddRexView: View {
                 postingProgress = nil
                 didSaveDraft = asDraft
                 lastPostedRecId = tripRecId
+                // Posted (or saved as a server-side draft) — the local
+                // unfinished copy is spent either way. See the note further down.
+                TripDraftStore.clear()
                 withAnimation { didPost = true }
                 isSaving = false
                 return
@@ -1649,6 +1652,9 @@ struct AddRexView: View {
                 }
                 postingProgress = nil
                 lastPostedRecId = listRecId
+                // Posted (or saved as a server-side draft) — the local
+                // unfinished copy is spent either way. See the note further down.
+                TripDraftStore.clear()
                 withAnimation { didPost = true }
                 isSaving = false
                 return
@@ -1695,6 +1701,13 @@ struct AddRexView: View {
                 lastWantItemId = itemId
             }
             RexSubcategoryUsage.record(category, Array(subcategories))
+            // Phoebe, 21 Sept: the "pick up where you left off?" prompt kept
+            // offering a trip that had already been posted. The saved draft
+            // was only cleared by startAnother() — post and close the sheet
+            // instead of tapping "Add another", and it outlived the thing it
+            // was a draft of. Posting is what makes a draft spent, so it's
+            // cleared here, where the post actually succeeds.
+            TripDraftStore.clear()
             withAnimation { didPost = true }
         } catch {
             errorMessage = error.localizedDescription
