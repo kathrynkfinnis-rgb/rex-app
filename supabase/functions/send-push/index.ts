@@ -103,10 +103,47 @@ async function makeApnsJwt(): Promise<string> {
   return `${signingInput}.${sigB64}`;
 }
 
+
+// Sept 21, security review — the comment this replaces said that reaching the
+// handler meant the caller held a valid session. It didn't. Supabase's
+// verify_jwt accepts ANY valid JWT for this project, and that includes the
+// public anon key, which ships inside the app binary and sits in the website's
+// source. So this function was callable by anyone who looked.
+//
+// The role claim is what actually distinguishes them. It is signed by Supabase
+// and can't be edited without the JWT secret, so reading it without verifying
+// the signature is safe HERE — the runtime has already checked the signature;
+// all that's left is to look at who it says this is.
+function callerRole(req: Request): string | null {
+  const header = req.headers.get("authorization") ?? "";
+  const token = header.replace(/^[Bb]earer\s+/, "");
+  const payload = token.split(".")[1];
+  if (!payload) return null;
+  try {
+    const json = atob(payload.replace(/-/g, "+").replace(/_/g, "/"));
+    return (JSON.parse(json) as { role?: string }).role ?? null;
+  } catch {
+    return null;
+  }
+}
+
+function rejectUnlessServiceRole(req: Request): Response | null {
+  if (callerRole(req) === "service_role") return null;
+  return new Response(JSON.stringify({ error: "Not allowed" }), {
+    status: 403,
+    headers: { "Content-Type": "application/json" },
+  });
+}
+
 Deno.serve(async (req: Request) => {
   if (req.method !== "POST") {
     return new Response(JSON.stringify({ error: "POST only" }), { status: 405 });
   }
+
+  // Only the notifications trigger sends pushes. Anyone else asking to push
+  // "Phoebe commented on your Rex" to an arbitrary user id is an attacker.
+  const denied = rejectUnlessServiceRole(req);
+  if (denied) return denied;
 
   // Database Webhooks POST { type, table, record, old_record, schema }.
   const body = await req.json();

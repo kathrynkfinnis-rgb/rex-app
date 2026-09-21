@@ -86,16 +86,47 @@ stop early, do not summarize, do not sample a subset and call it done. Work
 through the whole document from top to bottom before answering. A long
 document with many items is normal, not a signal to abbreviate.`;
 
+
+// Sept 21, security review — the comment this replaces said that reaching the
+// handler meant the caller held a valid session. It didn't. Supabase's
+// verify_jwt accepts ANY valid JWT for this project, and that includes the
+// public anon key, which ships inside the app binary and sits in the website's
+// source. So this function was callable by anyone who looked.
+//
+// The role claim is what actually distinguishes them. It is signed by Supabase
+// and can't be edited without the JWT secret, so reading it without verifying
+// the signature is safe HERE — the runtime has already checked the signature;
+// all that's left is to look at who it says this is.
+function callerRole(req: Request): string | null {
+  const header = req.headers.get("authorization") ?? "";
+  const token = header.replace(/^[Bb]earer\s+/, "");
+  const payload = token.split(".")[1];
+  if (!payload) return null;
+  try {
+    const json = atob(payload.replace(/-/g, "+").replace(/_/g, "/"));
+    return (JSON.parse(json) as { role?: string }).role ?? null;
+  } catch {
+    return null;
+  }
+}
+
+function rejectUnlessAuthenticated(req: Request): Response | null {
+  if (callerRole(req) === "authenticated") return null;
+  return new Response(JSON.stringify({ error: "Not allowed" }), {
+    status: 403,
+    headers: { "Content-Type": "application/json" },
+  });
+}
+
 Deno.serve(async (req: Request) => {
   if (req.method !== "POST") {
     return new Response(JSON.stringify({ error: "POST only" }), { status: 405 });
   }
 
-  // Supabase's edge runtime verifies the JWT in the Authorization header
-  // before this handler even runs (verify_jwt defaults to true on deploy) —
-  // reaching this line already means the caller has a valid session. No
-  // separate auth check needed here, same trust boundary the rest of this
-  // app's RLS policies rely on.
+  // A signed-in person, not the anon key — these calls cost real money at
+  // Anthropic, and the anon key is public by design.
+  const denied = rejectUnlessAuthenticated(req);
+  if (denied) return denied;
 
   let body: { text?: string };
   try {
