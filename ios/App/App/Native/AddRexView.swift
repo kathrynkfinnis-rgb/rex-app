@@ -179,6 +179,13 @@ struct AddRexView: View {
     /// visible once the REX account actually exists on this project.
     @State private var isAdmin = false
     @State private var officialAccountId: String?
+    /// Sept 21 — "I just lost a whole trip by accident, because I scrolled
+    /// down." A swipe on the sheet threw away a half-built trip with no
+    /// warning and nothing to undo it.
+    @State private var confirmingClose = false
+    /// This compose session's draft id — so typing updates one draft rather
+    /// than writing over whatever else was unfinished.
+    @State private var draftId = UUID()
     @State private var postAsRex = false
     @State private var scheduleRexPost = false
     @State private var rexPostDate = Calendar.current.date(byAdding: .day, value: 1, to: Date()) ?? Date()
@@ -303,9 +310,39 @@ struct AddRexView: View {
                     }
                 }
                 ToolbarItem(placement: .topBarTrailing) {
-                    Button("Close") { onDone() }
+                    Button("Close") {
+                        if hasUnsavedWork { confirmingClose = true } else { onDone() }
+                    }
                 }
             }
+        }
+        // A half-built trip is easy to swipe away by accident and there's no
+        // undo for it, so while there's something worth keeping the sheet
+        // only closes deliberately, through the Close button and the
+        // question below. An empty form still swipes away freely.
+        .interactiveDismissDisabled(hasUnsavedWork)
+        .confirmationDialog(
+            "Keep this \(closeNoun)?",
+            isPresented: $confirmingClose,
+            titleVisibility: .visible
+        ) {
+            if canSaveDraft {
+                Button("Save as draft") {
+                    Task {
+                        await post(category: category ?? .other, asDraft: true)
+                        if errorMessage == nil { onDone() }
+                    }
+                }
+            }
+            Button("Discard", role: .destructive) {
+                TripDraftStore.clear(id: draftId)
+                onDone()
+            }
+            Button("Keep editing", role: .cancel) {}
+        } message: {
+            Text(canSaveDraft
+                 ? "A draft only you can see, that you can finish and publish later."
+                 : "Discarding loses what you've typed.")
         }
         // Sept 9 — "import from doc on list and trip still not working".
         // This whole chain used to hang off `categoryPicker`, which is only
@@ -353,7 +390,7 @@ struct AddRexView: View {
         }
         .alert("Pick up where you left off?", isPresented: $showingRestorePrompt, presenting: restorableDraft) { draft in
             Button("Discard", role: .destructive) {
-                TripDraftStore.clear()
+                TripDraftStore.clear(id: draftId)
                 restorableDraft = nil
             }
             Button("Restore") { restore(draft) }
@@ -1416,9 +1453,36 @@ struct AddRexView: View {
 
     /// Writes whatever's on the form to disk, so a backgrounded app that
     /// iOS then terminates doesn't take the work with it.
+    /// Anything typed that would be lost by closing. A picked category on
+    /// its own doesn't count — that's one tap to redo.
+    private var hasUnsavedWork: Bool {
+        guard !didPost, !isSaving else { return false }
+        return !title.trimmingCharacters(in: .whitespaces).isEmpty
+            || !note.trimmingCharacters(in: .whitespaces).isEmpty
+            || !listNotes.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+            || !photoURLs.isEmpty
+            || !tripEntries.isEmpty
+            || !listEntries.isEmpty
+    }
+
+    /// Only trips and lists have somewhere to be saved to — see DraftsView.
+    private var canSaveDraft: Bool {
+        (category == .trip || category == .list)
+            && !title.trimmingCharacters(in: .whitespaces).isEmpty
+    }
+
+    private var closeNoun: String {
+        switch category {
+        case .trip: return "trip"
+        case .list: return "list"
+        default: return "Rex"
+        }
+    }
+
     private func persistDraft() {
         guard editingTripRecId == nil, editingListRecId == nil, category == .trip || category == .list else { return }
         TripDraftStore.save(TripDraft(
+            id: draftId,
             isList: category == .list,
             title: title,
             note: note,
@@ -1434,6 +1498,7 @@ struct AddRexView: View {
     }
 
     private func restore(_ draft: TripDraft) {
+        draftId = draft.id
         category = draft.isList ? .list : .trip
         manualEntry = true
         title = draft.title
@@ -1587,7 +1652,7 @@ struct AddRexView: View {
                 lastPostedRecId = tripRecId
                 // Posted (or saved as a server-side draft) — the local
                 // unfinished copy is spent either way. See the note further down.
-                TripDraftStore.clear()
+                TripDraftStore.clear(id: draftId)
                 withAnimation { didPost = true }
                 isSaving = false
                 return
@@ -1658,7 +1723,7 @@ struct AddRexView: View {
                 lastPostedRecId = listRecId
                 // Posted (or saved as a server-side draft) — the local
                 // unfinished copy is spent either way. See the note further down.
-                TripDraftStore.clear()
+                TripDraftStore.clear(id: draftId)
                 withAnimation { didPost = true }
                 isSaving = false
                 return
@@ -1711,7 +1776,7 @@ struct AddRexView: View {
             // instead of tapping "Add another", and it outlived the thing it
             // was a draft of. Posting is what makes a draft spent, so it's
             // cleared here, where the post actually succeeds.
-            TripDraftStore.clear()
+            TripDraftStore.clear(id: draftId)
             withAnimation { didPost = true }
         } catch {
             errorMessage = error.localizedDescription
@@ -1776,7 +1841,7 @@ struct AddRexView: View {
         tripYear = nil
         listItems = []
         listEntries = []
-        TripDraftStore.clear()
+        TripDraftStore.clear(id: draftId)
         customListKind = ""
         showingCustomListKind = false
         recipeText = ""

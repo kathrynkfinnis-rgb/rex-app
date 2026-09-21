@@ -537,7 +537,7 @@ final class RexAPI {
         for key in UserDefaults.standard.dictionaryRepresentation().keys where key.hasPrefix("rex.") {
             UserDefaults.standard.removeObject(forKey: key)
         }
-        TripDraftStore.clear()
+        TripDraftStore.clearAll()
         signOut()
     }
 
