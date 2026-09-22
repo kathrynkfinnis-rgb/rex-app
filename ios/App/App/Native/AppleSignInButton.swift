@@ -32,9 +32,17 @@ struct AppleSignInButton: View {
                     errorMessage = "Apple didn't return a sign-in token. Try again."
                     return
                 }
+                // Sept 22 — Apple's one-time authorization code, which is
+                // what a server needs to revoke this connection when the
+                // account is deleted. The identity token alone can't do it.
+                let authCode = credential.authorizationCode
+                    .flatMap { String(data: $0, encoding: .utf8) }
                 Task {
                     do {
                         try await RexAPI.shared.signInWithApple(idToken: idToken, nonce: rawNonce)
+                        // Best effort, and after sign-in on purpose: failing to
+                        // store it must never stop someone getting into the app.
+                        if let authCode { await RexAPI.shared.linkAppleCredential(code: authCode) }
                         await MainActor.run { onSignedIn() }
                     } catch {
                         await MainActor.run { errorMessage = error.localizedDescription }

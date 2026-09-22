@@ -518,8 +518,41 @@ final class RexAPI {
     /// "Delete my account and data." Photos first (the database can't reach
     /// Storage), then delete_my_account(), which removes the login and
     /// everything that hangs off it. Signs out locally at the end.
+    /// Sept 22 — hands Apple's one-time authorization code to the server,
+    /// which exchanges it for a refresh token and keeps it. That token is the
+    /// only way to revoke the Sign in with Apple connection when the account
+    /// is deleted, which Apple requires of every app offering both.
+    ///
+    /// Deliberately best-effort and silent: nobody should be kept out of the
+    /// app because a bookkeeping call to Apple failed.
+    func linkAppleCredential(code: String) async {
+        await callAppleAccount(action: "link", code: code)
+    }
+
+    @discardableResult
+    private func callAppleAccount(action: String, code: String? = nil) async -> Bool {
+        guard let token = try? await validToken() else { return false }
+        var request = URLRequest(url: baseURL.appendingPathComponent("/functions/v1/apple-account"))
+        request.httpMethod = "POST"
+        request.setValue(anonKey, forHTTPHeaderField: "apikey")
+        request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        var body: [String: Any] = ["action": action]
+        if let code { body["code"] = code }
+        request.httpBody = try? JSONSerialization.data(withJSONObject: body)
+        guard let (_, response) = try? await URLSession.shared.data(for: request),
+              let http = response as? HTTPURLResponse
+        else { return false }
+        return http.statusCode < 400
+    }
+
     func deleteMyAccount() async throws {
         let token = try await validToken()
+        // Before the account goes, not after: revoking needs to know who is
+        // asking, and a moment later there'll be nobody to ask. A failure here
+        // doesn't stop the deletion — being unable to tell Apple is a smaller
+        // problem than being unable to delete your account.
+        await callAppleAccount(action: "revoke")
         try await deleteMyStorageFiles()
 
         var request = URLRequest(url: baseURL.appendingPathComponent("/rest/v1/rpc/delete_my_account"))

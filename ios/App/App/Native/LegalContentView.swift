@@ -11,7 +11,7 @@ import SwiftUI
 /// differs is asked to agree again (RootView's consent gate), and the new
 /// acceptance is logged in consent_log with a timestamp.
 enum RexLegal {
-    static let version = "2026-09-21"
+    static let version = "2026-09-22"
 }
 
 struct LegalContentView: View {
@@ -61,7 +61,7 @@ struct LegalContentView: View {
 
     // MARK: - Copy
 
-    private static let lastUpdated = "21 September 2026"
+    private static let lastUpdated = "22 September 2026"
 
     // Sept 17 — rewritten from Kathryn's solicitor drafts ("Find Rex",
     // Three Lines Studio Ltd) merged with what the app actually does, which
@@ -176,7 +176,7 @@ struct LegalContentView: View {
     We share data only with providers who process it on our instructions, under contract:
     • Supabase — database, file storage and authentication.
     • Google (Maps, Places) — maps, place and address lookup.
-    • Apple — Sign in with Apple, push notification delivery, and turning coordinates into an area name.
+    • Apple — Sign in with Apple, push notification delivery, and turning coordinates into an area name. If you signed in with Apple, we keep one token from Apple for as long as your account exists, used for one thing only: telling Apple to forget the connection between you and REX when you delete your account.
     • Anthropic — reading documents and recipe photos you choose to import (section 4).
     • TMDB, Open Library and Google Books — descriptions and ratings for films, TV and books shown on item pages. These are lookups of the title, not of you.
 
