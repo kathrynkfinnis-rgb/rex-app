@@ -258,7 +258,9 @@ struct ExploreView: View {
 
     private var rexpertsEmptyState: some View {
         VStack(spacing: RexSpacing.sm) {
-            Image("RexDinoLogo").resizable().scaledToFit().frame(width: 84, height: 84)
+            // Kathryn's hard-hat Rex — this shelf genuinely is under
+            // construction rather than empty, and the difference matters.
+            Image("RexUnderConstruction").resizable().scaledToFit().frame(width: 120, height: 120)
             Text("Nothing from the Rexperts yet")
                 .font(RexFont.display(20, weight: .semibold))
                 .foregroundStyle(RexColor.foreground)

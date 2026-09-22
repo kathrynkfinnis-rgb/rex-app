@@ -102,3 +102,8 @@ blockquote {
 .stop-body h3 { margin: 0 0 .2rem; }
 .stop-body p { margin: .3rem 0; }
 .stop-photo { display: block; width: calc(100% + 2.2rem); margin: 0 -1.1rem; max-height: 13rem; object-fit: cover; }
+
+/* The photo of two phones — what the app actually looks like, which no
+   amount of copy does as well. Full-bleed within the column. */
+.shot { margin: 2.6rem 0 0; }
+.shot img { display: block; width: 100%; height: auto; border-radius: 16px; }

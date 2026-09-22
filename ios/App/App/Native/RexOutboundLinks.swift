@@ -24,6 +24,18 @@ import AdSupport
 /// We never read the advertising identifier ourselves. Permission is asked
 /// because of what the redirect does, not because REX wants an ID.
 enum RexOutboundLink {
+    /// Sept 22 — Skimlinks turned find-rex.com down: no original content and
+    /// no traffic, which is exactly what their published criteria say they
+    /// reject. Until some affiliate network approves us there is nothing to
+    /// earn, so the whole thing is dormant: links open directly, and nobody
+    /// is asked for permission to track them for revenue that doesn't exist.
+    ///
+    /// Everything below is kept, working, behind this one flag. Flip it back
+    /// on the day an application is accepted — and update the privacy policy
+    /// and the App Store privacy label in the same breath, because both
+    /// currently say, truthfully, that REX does no tracking at all.
+    static let isAffiliateProgrammeActive = false
+
     /// From the Skimlinks dashboard: publisher 309502, site X1797857.
     private static let skimlinksId = "309502X1797857"
 
@@ -34,7 +46,7 @@ enum RexOutboundLink {
     @discardableResult
     static func requestTrackingPermissionIfNeeded() async -> ATTrackingManager.AuthorizationStatus {
         let status = ATTrackingManager.trackingAuthorizationStatus
-        guard status == .notDetermined else { return status }
+        guard isAffiliateProgrammeActive, status == .notDetermined else { return status }
         return await ATTrackingManager.requestTrackingAuthorization()
     }
 
@@ -45,7 +57,8 @@ enum RexOutboundLink {
     /// The URL to actually open. Only ever decorated for http(s) links, and
     /// only when the person has said yes — anything else is returned untouched.
     static func resolved(_ url: URL) -> URL {
-        guard isTrackingAllowed,
+        guard isAffiliateProgrammeActive,
+              isTrackingAllowed,
               let scheme = url.scheme?.lowercased(),
               scheme == "http" || scheme == "https",
               // Our own links have nothing to earn and shouldn't be bounced
@@ -106,6 +119,7 @@ struct AffiliateLinksSection: View {
     }
 
     var body: some View {
+        if RexOutboundLink.isAffiliateProgrammeActive {
         VStack(alignment: .leading, spacing: RexSpacing.sm) {
             Text("Shop links")
                 .font(RexFont.text(14, weight: .semibold))
@@ -130,5 +144,6 @@ struct AffiliateLinksSection: View {
         .padding(RexSpacing.md)
         .rexCard()
         .task { status = ATTrackingManager.trackingAuthorizationStatus }
+        }
     }
 }
