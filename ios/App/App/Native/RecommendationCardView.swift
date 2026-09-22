@@ -58,15 +58,40 @@ struct RecommendationCardView: View {
     private var railColor: Color { category.tintColor.opacity(0.38) }
     private static let railWidth: CGFloat = 10
 
-    private static let relativeFormatter: RelativeDateTimeFormatter = {
-        let f = RelativeDateTimeFormatter()
-        f.unitsStyle = .abbreviated
+    /// Sept 22 — the feed never showed when anything was posted. Written to
+    /// the Instagram rule Kathryn picked: relative while relative still means
+    /// something, then a plain date once nobody counts in that unit any more.
+    /// "4h" tells you something; "36w ago" makes you do arithmetic.
+    private static let dayMonth: DateFormatter = {
+        let f = DateFormatter()
+        f.setLocalizedDateFormatFromTemplate("d MMM")
+        return f
+    }()
+
+    private static let dayMonthYear: DateFormatter = {
+        let f = DateFormatter()
+        f.setLocalizedDateFormatFromTemplate("d MMM yyyy")
         return f
     }()
 
     private var relativeTime: String {
         guard let date = rec.createdDate else { return "" }
-        return Self.relativeFormatter.localizedString(for: date, relativeTo: Date())
+        let seconds = Date().timeIntervalSince(date)
+        // A clock skew between phone and server shouldn't read "in 2 minutes".
+        guard seconds > 0 else { return "now" }
+        switch seconds {
+        case ..<60: return "now"
+        case ..<3_600: return "\(Int(seconds / 60))m ago"
+        case ..<86_400: return "\(Int(seconds / 3_600))h ago"
+        case ..<604_800: return "\(Int(seconds / 86_400))d ago"
+        default:
+            let calendar = Calendar.current
+            let sameYear = calendar.component(.year, from: date)
+                == calendar.component(.year, from: Date())
+            return sameYear
+                ? Self.dayMonth.string(from: date)
+                : Self.dayMonthYear.string(from: date)
+        }
     }
 
     var body: some View {
@@ -490,6 +515,14 @@ struct RecommendationCardView: View {
                     // width; this makes sure the name actually gets to keep
                     // it instead of the Spacer eating the gain.
                     .layoutPriority(1)
+
+                if !relativeTime.isEmpty {
+                    Text("· \(relativeTime)")
+                        .font(RexFont.text(12))
+                        .foregroundStyle(RexColor.mutedForeground)
+                        .lineLimit(1)
+                        .fixedSize()
+                }
             }
             .contentShape(Rectangle())
             .onTapGesture {
