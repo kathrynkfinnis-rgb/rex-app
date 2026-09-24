@@ -4,6 +4,13 @@ import AdSupport
 
 /// Sept 21 — affiliate links, and the permission they require.
 ///
+/// Sept 24, from App Store review: the Info.plist key that goes with this
+/// (NSUserTrackingUsageDescription) has been REMOVED. Apple refuses a
+/// submission where the binary says it may ask to track but the privacy
+/// label says it doesn't — and with no affiliate programme approved, the
+/// label is the one telling the truth. Put the key back in the same breath
+/// as flipping isAffiliateProgrammeActive, or the submission bounces.
+///
 /// When someone taps through to a shop from REX, we can earn a commission on
 /// what they buy. Skimlinks does the work: hand it any outbound link and it
 /// turns the ones from merchants it covers into affiliate links, leaving

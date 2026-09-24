@@ -127,8 +127,21 @@ function callerRole(req: Request): string | null {
   }
 }
 
+// Sept 23 — the role claim only exists on a JWT. Supabase's newer keys
+// (sb_secret_…) are opaque strings with no claims at all, so a project using
+// one would have every push silently refused by this guard. Compare the raw
+// token against our own service key as well: same secret, same authority,
+// whichever format the project happens to be issuing.
+function isServiceRole(req: Request): boolean {
+  const token = (req.headers.get("authorization") ?? "").replace(/^[Bb]earer\s+/, "");
+  if (!token) return false;
+  const ours = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
+  if (ours && token === ours) return true;
+  return callerRole(req) === "service_role";
+}
+
 function rejectUnlessServiceRole(req: Request): Response | null {
-  if (callerRole(req) === "service_role") return null;
+  if (isServiceRole(req)) return null;
   return new Response(JSON.stringify({ error: "Not allowed" }), {
     status: 403,
     headers: { "Content-Type": "application/json" },

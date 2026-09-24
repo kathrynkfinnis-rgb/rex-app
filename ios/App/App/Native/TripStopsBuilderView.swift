@@ -415,6 +415,8 @@ struct TripStopsBuilderView: View {
                 VStack(spacing: 0) {
                     ForEach(hits.prefix(5)) { hit in
                         Button {
+                            searchTask?.cancel()
+                            searchTask = nil
                             picked = hit
                             title = hit.title
                             address = hit.address ?? ""
@@ -525,7 +527,11 @@ struct TripStopsBuilderView: View {
             if Task.isCancelled { return }
             let results = await RexSearch.search(category: type, query: term)
             if Task.isCancelled { return }
-            await MainActor.run { hits = results }
+            await MainActor.run {
+                // Stale once something's been picked — see AddTripStopSheet.
+                guard picked == nil else { return }
+                hits = results
+            }
         }
     }
 

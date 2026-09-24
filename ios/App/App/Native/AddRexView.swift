@@ -1023,6 +1023,8 @@ struct AddRexView: View {
     }
 
     private func apply(_ hit: RexSearchHit) {
+        searchTask?.cancel()
+        searchTask = nil
         picked = hit
         title = hit.title
         // Google returns the place name in displayName, so its "subtitle" is
@@ -1058,8 +1060,12 @@ struct AddRexView: View {
             let results = await RexSearch.search(category: category, query: term)
             if Task.isCancelled { return }
             await MainActor.run {
-                hits = results
+                // Sept 23 — a result that lands after something was picked is
+                // stale, and putting the list back is what made people tap a
+                // suggestion twice. See AddTripStopSheet for the full note.
                 isSearching = false
+                guard picked == nil else { return }
+                hits = results
             }
         }
     }

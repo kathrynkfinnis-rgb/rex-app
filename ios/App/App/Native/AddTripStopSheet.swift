@@ -1,4 +1,5 @@
 import SwiftUI
+import UIKit
 
 /// Adds one stop/item directly to an already-published trip or list — the
 /// "add" half of #122's trip editing (add/remove/reorder stops per heading,
@@ -84,10 +85,24 @@ struct AddTripStopSheet: View {
                         VStack(spacing: 0) {
                             ForEach(hits.prefix(5)) { hit in
                                 Button {
+                                    // Sept 23 — "you always have to click twice on the
+                                    // suggestion". Setting the title here fires the
+                                    // field's own onChange, and a search already in
+                                    // flight could still land afterwards and put the
+                                    // list straight back — so the second tap was
+                                    // dismissing a list the first tap had reopened.
+                                    // Cancel what's running, and see searchTask below
+                                    // for the late-arrival guard.
+                                    searchTask?.cancel()
+                                    searchTask = nil
                                     picked = hit
                                     title = hit.title
                                     address = hit.address ?? ""
                                     hits = []
+                                    UIApplication.shared.sendAction(
+                                        #selector(UIResponder.resignFirstResponder),
+                                        to: nil, from: nil, for: nil
+                                    )
                                 } label: {
                                     VStack(alignment: .leading, spacing: 2) {
                                         Text(hit.title)
@@ -189,7 +204,13 @@ struct AddTripStopSheet: View {
             if Task.isCancelled { return }
             let results = await RexSearch.search(category: type, query: term)
             if Task.isCancelled { return }
-            await MainActor.run { hits = results }
+            await MainActor.run {
+                // Picked while this was in flight: the answer is no longer
+                // wanted, and showing it would reopen the list under the
+                // user's finger.
+                guard picked == nil else { return }
+                hits = results
+            }
         }
     }
 
