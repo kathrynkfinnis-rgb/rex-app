@@ -420,18 +420,69 @@ enum RexSearch {
         return await geocodeDetailed(q)
     }
 
+    /// Sept 28 — "Calma Lisbon is appearing in South Korea", and before that
+    /// four Rome restaurants pinned in Lebanon. Both are the same fault: a
+    /// name searched without enough context matches confidently somewhere
+    /// else entirely, and nothing about a plausible wrong coordinate looks
+    /// wrong afterwards. You can't tell a right pin from a wrong one once
+    /// it's saved, which is why these keep having to be found by a human
+    /// noticing their dinner is in the wrong hemisphere.
+    ///
+    /// So: when we know roughly where a place ought to be — the trip's city,
+    /// usually — the answer has to land near it. Anything further than this
+    /// is refused outright and the place keeps no coordinates at all. A
+    /// missing pin is visibly missing; a wrong one is a lie the map tells
+    /// confidently.
+    private static let plausibleRadiusMeters: Double = 250_000
+
+    /// City centres, looked up once each. Cheap, and it stops a trip with
+    /// twenty stops geocoding "Lisbon" twenty times.
+    private static var cityCentres: [String: (lat: Double, lng: Double)?] = [:]
+    private static let cityLock = NSLock()
+
+    private static func centre(of city: String) async -> (lat: Double, lng: Double)? {
+        let key = city.lowercased()
+        if let cached = cityLock.withLock({ cityCentres[key] }) { return cached }
+        let found = await geocode(city)
+        cityLock.withLock { cityCentres[key] = found }
+        return found
+    }
+
+    private static func metres(_ a: (lat: Double, lng: Double), _ b: (lat: Double, lng: Double)) -> Double {
+        let earth = 6_371_000.0
+        let dLat = (b.lat - a.lat) * .pi / 180
+        let dLng = (b.lng - a.lng) * .pi / 180
+        let h = sin(dLat / 2) * sin(dLat / 2)
+            + cos(a.lat * .pi / 180) * cos(b.lat * .pi / 180) * sin(dLng / 2) * sin(dLng / 2)
+        return earth * 2 * atan2(sqrt(h), sqrt(1 - h))
+    }
+
     /// The one entry point for "where is this?". A saved street address is
     /// the most trustworthy thing we have, so it wins and goes to the
     /// address geocoder; otherwise it's the name (plus whatever context —
-    /// city, trip name — is going) through Places.
+    /// city, trip name — is going) through Places, and then the sanity check
+    /// above before we believe the answer.
     static func locate(name: String?, address: String?, context: [String?] = []) async -> (lat: Double, lng: Double, address: String?)? {
         if let address = address?.trimmingCharacters(in: .whitespacesAndNewlines), address.count > 8,
            address.contains(where: \.isNumber) || address.contains(",") {
+            // A real street address is specific enough to trust on its own.
             if let located = await geocodeDetailed(address) { return located }
         }
-        let query = ([name] + context).compactMap { $0?.trimmingCharacters(in: .whitespaces) }
-            .filter { !$0.isEmpty }.joined(separator: ", ")
-        return await locatePlace(query)
+        let cleanContext = context.compactMap { $0?.trimmingCharacters(in: .whitespaces) }.filter { !$0.isEmpty }
+        let query = ([name].compactMap { $0?.trimmingCharacters(in: .whitespaces) }.filter { !$0.isEmpty } + cleanContext)
+            .joined(separator: ", ")
+        guard let found = await locatePlace(query) else { return nil }
+
+        // Nothing to check it against — take it, as before.
+        guard let expected = cleanContext.first, let centre = await centre(of: expected) else { return found }
+
+        let away = metres((found.lat, found.lng), centre)
+        guard away <= plausibleRadiusMeters else {
+            // Refuse rather than save. See the note above: no pin beats a
+            // pin in the wrong country.
+            return nil
+        }
+        return found
     }
 
     static func geocode(_ query: String) async -> (lat: Double, lng: Double)? {
