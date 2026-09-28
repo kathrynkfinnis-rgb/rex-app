@@ -14,6 +14,10 @@ import UIKit
 struct AddTripStopSheet: View {
     enum Container { case trip(String), list(String) }
     let container: Container
+    /// The trip or list's own name — "Lisbon, a long weekend". The only clue
+    /// we have to which city a hand-typed stop is in, and the difference
+    /// between finding Calma in Lisbon and finding it in South Korea.
+    var containerName: String?
     var onAdded: () -> Void
 
     @Environment(\.dismiss) private var dismiss
@@ -42,14 +46,16 @@ struct AddTripStopSheet: View {
     }
     private var noun: String { if case .trip = container { return "stop" } else { return "item" } }
 
-    init(tripId: String, initialSection: String? = nil, onAdded: @escaping () -> Void) {
+    init(tripId: String, tripName: String? = nil, initialSection: String? = nil, onAdded: @escaping () -> Void) {
         self.container = .trip(tripId)
+        self.containerName = tripName
         self.onAdded = onAdded
         _section = State(initialValue: initialSection ?? "")
     }
 
-    init(listId: String, initialSection: String? = nil, onAdded: @escaping () -> Void) {
+    init(listId: String, listName: String? = nil, initialSection: String? = nil, onAdded: @escaping () -> Void) {
         self.container = .list(listId)
+        self.containerName = listName
         self.onAdded = onAdded
         _section = State(initialValue: initialSection ?? "")
     }
@@ -224,10 +230,27 @@ struct AddTripStopSheet: View {
 
         // #135's rule applies here too — a stop typed by hand (no search
         // suggestion tapped) needs geocoding or it never gets a map pin.
+        //
+        // Sept 28: through locate() rather than the bare geocoder, with the
+        // trip's name as context. That does two things this used to get
+        // wrong. It finds the right "Calma" when there are several in the
+        // world, because it knows we mean the Lisbon one. And it refuses an
+        // answer that lands nowhere near, so a stop ends up with no pin
+        // rather than a pin in South Korea.
+        //
+        // It also stops a second problem: a stop saved with no coordinates
+        // is a stub, and the next person to add the same place individually
+        // creates a SECOND row for it — 41 of those in the catalogue today.
+        // Geocoding it properly here means there's one row with a location,
+        // which findNearbyItem can then match against.
         if picked == nil, lat == nil, (type == .place || type == .event),
            !(trimmedAddress.isEmpty && trimmed.isEmpty) {
             isGeocoding = true
-            let located = await RexSearch.geocode(trimmedAddress.isEmpty ? trimmed : trimmedAddress)
+            let located = await RexSearch.locate(
+                name: trimmed.isEmpty ? nil : trimmed,
+                address: trimmedAddress.isEmpty ? nil : trimmedAddress,
+                context: [containerName]
+            )
             lat = located?.lat
             lng = located?.lng
             isGeocoding = false

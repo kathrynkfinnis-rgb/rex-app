@@ -283,7 +283,7 @@ struct ListDetailView: View {
         .sheet(item: $activeSheet, onDismiss: { Task { await load() } }) { sheet in
             switch sheet {
             case .addItem:
-                AddTripStopSheet(listId: route.recommendationId, initialSection: addItemSection, onAdded: {})
+                AddTripStopSheet(listId: route.recommendationId, listName: route.title, initialSection: addItemSection, onAdded: {})
             case .edit(let rec):
                 EditRexView(
                     rec: rec,
