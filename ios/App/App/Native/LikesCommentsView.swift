@@ -30,6 +30,10 @@ struct LikesCommentsView: View {
     @State private var editDraft = ""
     @State private var pendingDelete: RexComment?
     @FocusState private var editFocused: Bool
+    /// Sept 28 — "@-tagging people in comments". The server has notified on
+    /// @username since July; this is the half that lets you write one without
+    /// knowing the spelling by heart.
+    @State private var friends: [RexProfileDetail] = []
 
     var body: some View {
         VStack(alignment: .leading, spacing: RexSpacing.md) {
@@ -91,10 +95,7 @@ struct LikesCommentsView: View {
                                 if editingId == comment.id {
                                     editor(for: comment)
                                 } else {
-                                    Text(comment.body)
-                                        .font(RexFont.text(14))
-                                        .foregroundStyle(RexColor.foreground.opacity(0.9))
-                                        .fixedSize(horizontal: false, vertical: true)
+                                    MentionedText(text: comment.body)
                                 }
                             }
                             Spacer()
@@ -120,6 +121,12 @@ struct LikesCommentsView: View {
                 Text("No comments yet — be the first.")
                     .font(RexFont.text(13))
                     .foregroundStyle(RexColor.mutedForeground)
+            }
+
+            if let query = MentionDraft.inProgress(in: draft), !friends.isEmpty {
+                MentionPicker(query: query, friends: friends) { friend in
+                    draft = MentionDraft.complete(draft, with: friend.username)
+                }
             }
 
             HStack(spacing: RexSpacing.sm) {
@@ -166,6 +173,7 @@ struct LikesCommentsView: View {
         }
         .task {
             await load()
+            friends = (try? await RexAPI.shared.fetchAcceptedFriendProfiles()) ?? []
             // Focus set while a sheet is still animating in is dropped, so
             // wait for it to settle first.
             if focusOnAppear {
