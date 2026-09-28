@@ -129,20 +129,137 @@ enum RexSearch {
     /// Tea, not Colm Tóibín — so the main pass is a field-scoped title search
     /// with a trailing wildcard on the last word, which does match as you type.
     /// The plain search still earns its place for "title author" queries.
-    private static func books(_ q: String) async throws -> [RexSearchHit] {
-        async let titleHits = openLibrary("title=\(esc(wildcardLastWord(q)))")
-        async let generalHits: [RexSearchHit] = q.split(separator: " ").count >= 2
-            ? openLibrary("q=\(esc(q))")
-            : []
+    /// Sept 28 — "streamline book search so you can search by author or
+    /// title, and ensure only one version of each book comes up".
+    ///
+    /// Three passes rather than two, because the old pair could only really
+    /// find a book by its title: typing an author's name fell through to the
+    /// loose general search, which ranks by relevance across everything and
+    /// buried the actual books. Author is now its own pass.
+    ///
+    /// And the dedupe is by the book rather than by the record. OpenLibrary
+    /// hands back one entry per *work*, but the same novel routinely appears
+    /// as several works — reissues, a translation, a film tie-in — each with
+    /// its own key, so deduping on the key alone let all of them through.
+    /// Matching on title-and-author collapses those into one, and the copy
+    /// that survives is the one most likely to be the edition someone means:
+    /// it has a cover, and it's the earliest printing.
+    private static var editionCounts: [String: Int] = [:]
+    private static let editionCountLock = NSLock()
 
-        // Title matches lead; the general pass fills in behind, deduped.
-        var seen = Set<String>()
-        var out: [RexSearchHit] = []
-        for hit in (try await titleHits) + (try await generalHits) where !seen.contains(hit.externalId) {
-            seen.insert(hit.externalId)
-            out.append(hit)
+    private static func books(_ q: String) async throws -> [RexSearchHit] {
+        let words = q.split(separator: " ").count
+        // OpenLibrary files plenty of books without their leading article —
+        // Paul Murray's novel is "Bee Sting", not "The Bee Sting" — so a
+        // title search for exactly what someone typed misses it entirely.
+        let unarticled = dropLeadingArticle(q)
+        async let titleHits = openLibrary("title=\(esc(wildcardLastWord(q)))")
+        async let bareTitleHits: [RexSearchHit] = unarticled == q
+            ? [] : openLibrary("title=\(esc(wildcardLastWord(unarticled)))")
+        async let authorHits: [RexSearchHit] = words >= 2 ? openLibrary("author=\(esc(q))") : []
+        async let generalHits: [RexSearchHit] = words >= 2 ? openLibrary("q=\(esc(q))") : []
+
+        let all = (try await titleHits) + (try await bareTitleHits)
+            + (try await authorHits) + (try await generalHits)
+
+        var best: [String: RexSearchHit] = [:]
+        var order: [String] = []
+        for hit in all {
+            let key = bookIdentity(hit)
+            guard let existing = best[key] else {
+                best[key] = hit
+                order.append(key)
+                continue
+            }
+            if preferredEdition(hit, over: existing) { best[key] = hit }
         }
-        return Array(out.prefix(15))
+        // Rank rather than trust the order the passes came back in: a title
+        // that matches exactly, or an author who does, beats OpenLibrary's own
+        // relevance — which happily puts a study guide above the novel it's
+        // about. Edition count breaks the remaining ties.
+        let target = normalizedBookPart(q)
+        let ranked = order.compactMap { best[$0] }.sorted { left, right in
+            score(left, target: target) > score(right, target: target)
+        }
+        return Array(ranked.prefix(15))
+    }
+
+    /// Ranking, because OpenLibrary's own relevance is not good enough to
+    /// trust: searching an author's name returns study guides about them
+    /// above their novels, and a title search can bury a 2023 prizewinner
+    /// under Victorian railway pamphlets that happen to share its name.
+    ///
+    /// The author match is weighted above an exact title match on purpose —
+    /// someone typing "Colm Toibin" wants his books, not the biography of
+    /// him that is literally called "Colm Toibin". Recency is worth real
+    /// points too: people recommend books published in their lifetime, and
+    /// an exact title match still beats it, so the classics survive.
+    private static func score(_ hit: RexSearchHit, target: String) -> Int {
+        var points = 0
+        let title = normalizedBookPart(hit.title.split(separator: ":").first.map(String.init) ?? hit.title)
+        let author = normalizedBookPart((hit.subtitle ?? "").split(separator: "·").first.map(String.init) ?? "")
+
+        if author == target { points += 1_200 }
+        else if author.contains(target) { points += 500 }
+
+        if title == target { points += 1_000 }
+        else if title.hasPrefix(target) { points += 400 }
+
+        if hit.imageURL != nil { points += 60 }
+
+        let published = year(of: hit)
+        if published != .max, published >= 2000 { points += 250 }
+        else if published != .max, published >= 1970 { points += 100 }
+
+        let editions = editionCountLock.withLock { editionCounts["/" + hit.externalId] ?? 0 }
+        return points + min(editions, 300)
+    }
+
+    private static func dropLeadingArticle(_ q: String) -> String {
+        var words = q.split(separator: " ").map(String.init)
+        if let first = words.first?.lowercased(), ["the", "a", "an"].contains(first), words.count > 1 {
+            words.removeFirst()
+            return words.joined(separator: " ")
+        }
+        return q
+    }
+
+    /// The same novel however it was catalogued: title and first author,
+    /// stripped of the things that differ between editions — a subtitle after
+    /// a colon, articles, punctuation, case.
+    private static func bookIdentity(_ hit: RexSearchHit) -> String {
+        let title = hit.title
+            .split(separator: ":").first.map(String.init) ?? hit.title
+        let author = (hit.subtitle ?? "")
+            .split(separator: "·").first.map(String.init) ?? ""
+        return normalizedBookPart(title) + "|" + normalizedBookPart(author)
+    }
+
+    private static func normalizedBookPart(_ text: String) -> String {
+        let lowered = text.lowercased()
+            .folding(options: .diacriticInsensitive, locale: .current)
+        let stripped = lowered.unicodeScalars.filter {
+            CharacterSet.alphanumerics.contains($0) || $0 == " "
+        }
+        var words = String(String.UnicodeScalarView(stripped))
+            .split(separator: " ").map(String.init)
+        if let first = words.first, ["the", "a", "an"].contains(first) { words.removeFirst() }
+        return words.joined(separator: " ")
+    }
+
+    /// Which of two records for the same book to keep. A cover matters most —
+    /// a coverless row looks broken in the results — then the earliest year,
+    /// which is the original rather than a reissue.
+    private static func preferredEdition(_ candidate: RexSearchHit, over existing: RexSearchHit) -> Bool {
+        let candidateHasCover = candidate.imageURL != nil
+        let existingHasCover = existing.imageURL != nil
+        if candidateHasCover != existingHasCover { return candidateHasCover }
+        return year(of: candidate) < year(of: existing)
+    }
+
+    private static func year(of hit: RexSearchHit) -> Int {
+        guard let tail = hit.subtitle?.split(separator: "·").last else { return .max }
+        return Int(tail.trimmingCharacters(in: .whitespaces)) ?? .max
     }
 
     /// Everything OpenLibrary has by a given author — the real bibliography,
@@ -172,7 +289,7 @@ enum RexSearch {
     }
 
     private static func openLibrary(_ queryPart: String) async throws -> [RexSearchHit] {
-        let url = "https://openlibrary.org/search.json?\(queryPart)&limit=15&fields=key,title,author_name,first_publish_year,cover_i,subject"
+        let url = "https://openlibrary.org/search.json?\(queryPart)&limit=15&fields=key,title,author_name,first_publish_year,cover_i,subject,edition_count"
         let json = try await getJSON(url)
         let docs = json["docs"] as? [[String: Any]] ?? []
         return docs.compactMap { d in
@@ -183,6 +300,12 @@ enum RexSearch {
             if let year { subtitle += subtitle.isEmpty ? "\(year)" : " · \(year)" }
             let cover = (d["cover_i"] as? Int).map { "https://covers.openlibrary.org/b/id/\($0)-M.jpg" }
             let subjects = (d["subject"] as? [String]) ?? []
+            // How many editions exist is the closest thing OpenLibrary gives
+            // us to "is this the well-known one" — a novel everyone has read
+            // has dozens; a self-published namesake has one.
+            if let editions = d["edition_count"] as? Int, let key = d["key"] as? String {
+                editionCountLock.withLock { editionCounts[key] = editions }
+            }
             return RexSearchHit(
                 externalId: key.hasPrefix("/") ? String(key.dropFirst()) : key,
                 externalSource: "google_books",   // same enum value the web uses
