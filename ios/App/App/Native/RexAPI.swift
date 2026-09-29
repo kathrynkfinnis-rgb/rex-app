@@ -1264,6 +1264,113 @@ final class RexAPI {
         }
     }
 
+    // MARK: - Talk to Rex
+
+    /// Sept 29 — the conversational half of Explore.
+    ///
+    /// The server returns *ids*, never descriptions: which of your friends'
+    /// Rex it picked, and — where your friends had nothing — search hints for
+    /// things worth looking up. Nothing it says about an item is trusted, so
+    /// nothing it says about an item can be wrong. The cards are drawn from
+    /// rows fetched here, and the web tier is resolved through the same
+    /// catalogue search the Add screen uses.
+    func askRex(question: String, history: [AskRexTurn] = []) async throws -> AskRexReply {
+        let token = try await validToken()
+        var request = URLRequest(url: baseURL.appendingPathComponent("/functions/v1/ask-rex"))
+        request.httpMethod = "POST"
+        request.setValue(anonKey, forHTTPHeaderField: "apikey")
+        request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        // Long enough for a slow model on a cold start; a conversational
+        // screen that gives up at 10s would fail constantly.
+        request.timeoutInterval = 45
+        request.httpBody = try JSONSerialization.data(withJSONObject: [
+            "question": question,
+            "history": history.map { ["role": $0.role, "text": $0.text] },
+        ])
+
+        let (data, response) = try await URLSession.shared.data(for: request)
+        guard let http = response as? HTTPURLResponse else {
+            throw RexAPIError.server("Couldn't reach Rex.")
+        }
+        guard http.statusCode < 400 else {
+            // 503 is the "no API key set" case, which is a different sentence
+            // from a model that fell over, and the user can't fix either.
+            throw RexAPIError.server(friendlyError(
+                data,
+                fallback: http.statusCode == 503
+                    ? "Talk to Rex isn't switched on yet."
+                    : "Rex couldn't answer that just now."
+            ))
+        }
+        return try JSONDecoder().decode(AskRexReply.self, from: data)
+    }
+
+    /// The Rex behind the ids the server picked, in the order it picked them —
+    /// PostgREST returns rows in its own order, and the ranking is the point.
+    func fetchRecommendations(ids: [String]) async throws -> [FeedRecommendation] {
+        guard !ids.isEmpty else { return [] }
+        let token = try await validToken()
+        let select = "id,rating,note,created_at,photo_url,photo_urls,tags\(await anonymousField()),user_id,item_id," +
+            "items(id,type,title,subtitle,image_url,genre,address,link_url,recipe_text,lat,lng)," +
+            "profiles!recommendations_user_id_fkey(username,display_name,avatar_url)," +
+            "recommendation_tags(profiles(id,username,display_name,avatar_url))"
+        var components = URLComponents(url: baseURL.appendingPathComponent("/rest/v1/recommendations"), resolvingAgainstBaseURL: false)!
+        components.queryItems = [
+            URLQueryItem(name: "select", value: select),
+            URLQueryItem(name: "id", value: "in.(\(ids.joined(separator: ",")))"),
+        ]
+        var request = URLRequest(url: components.url!)
+        request.setValue(anonKey, forHTTPHeaderField: "apikey")
+        request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+
+        let (data, response) = try await URLSession.shared.data(for: request)
+        guard let http = response as? HTTPURLResponse, http.statusCode < 400 else {
+            throw RexAPIError.server("Couldn't load those recommendations.")
+        }
+        let rows = try JSONDecoder().decode([FeedRecommendation].self, from: data)
+        let byId = Dictionary(uniqueKeysWithValues: rows.map { ($0.id, $0) })
+        return ids.compactMap { byId[$0] }
+    }
+
+    /// What Talk to Rex has remembered about you. Yours alone — RLS sees to
+    /// that — and every line is deletable from Settings.
+    func fetchRexFacts() async throws -> [RexFact] {
+        let token = try await validToken()
+        var components = URLComponents(url: baseURL.appendingPathComponent("/rest/v1/rex_facts"), resolvingAgainstBaseURL: false)!
+        components.queryItems = [
+            URLQueryItem(name: "select", value: "id,fact,source,updated_at"),
+            URLQueryItem(name: "order", value: "updated_at.desc"),
+        ]
+        var request = URLRequest(url: components.url!)
+        request.setValue(anonKey, forHTTPHeaderField: "apikey")
+        request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+        let (data, response) = try await URLSession.shared.data(for: request)
+        guard let http = response as? HTTPURLResponse, http.statusCode < 400 else {
+            throw RexAPIError.server("Couldn't load what Rex remembers.")
+        }
+        return try JSONDecoder().decode([RexFact].self, from: data)
+    }
+
+    func deleteRexFact(id: String) async throws {
+        let token = try await validToken()
+        var components = URLComponents(url: baseURL.appendingPathComponent("/rest/v1/rex_facts"), resolvingAgainstBaseURL: false)!
+        components.queryItems = [URLQueryItem(name: "id", value: "eq.\(id)")]
+        var request = URLRequest(url: components.url!)
+        request.httpMethod = "DELETE"
+        request.setValue(anonKey, forHTTPHeaderField: "apikey")
+        request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+        request.setValue("return=representation", forHTTPHeaderField: "Prefer")
+        let (data, response) = try await URLSession.shared.data(for: request)
+        guard let http = response as? HTTPURLResponse, http.statusCode < 400 else {
+            throw RexAPIError.server("Couldn't forget that.")
+        }
+        let deleted = (try? JSONSerialization.jsonObject(with: data)) as? [Any]
+        guard (deleted?.count ?? 0) > 0 else {
+            throw RexAPIError.server("Couldn't forget that — it may already be gone.")
+        }
+    }
+
     func fetchRecommendations(forItem itemId: String) async throws -> [FeedRecommendation] {
         let token = try await validToken()
         // Sept 17 — "error said 'title can't be empty' even though it

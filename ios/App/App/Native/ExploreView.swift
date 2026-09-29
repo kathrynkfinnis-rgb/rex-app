@@ -27,6 +27,7 @@ struct ExploreView: View {
     @State private var isLoading = true
     @State private var errorMessage: String?
     @State private var pushedItemId: String?
+    @State private var showingTalkToRex = false
     @State private var pushedCollection: CollectionRoute?
     @State private var pushedTrip: TripRoute?
     @State private var pushedList: ListRoute?
@@ -132,6 +133,7 @@ struct ExploreView: View {
         Group {
             ScrollView {
                 VStack(alignment: .leading, spacing: 0) {
+                    talkToRexBar
                     sourceToggle
                     filterRow
 
@@ -160,6 +162,9 @@ struct ExploreView: View {
             .navigationDestination(item: $pushedCollection) { CollectionDetailView(route: $0) }
             .navigationDestination(item: $pushedTrip) { TripDetailView(route: $0) }
             .navigationDestination(item: $pushedList) { ListDetailView(route: $0) }
+            .navigationDestination(isPresented: $showingTalkToRex) {
+                TalkToRexView(onOpenItem: { pushedItemId = $0 })
+            }
             .refreshable { await load() }
             .task { await load() }
         }
@@ -190,6 +195,44 @@ struct ExploreView: View {
     }
 
     /// A condensed version of the feed: what more than one friend has Rex'd,
+    /// Sept 29 — "we'd like to make the Explore page more conversational and
+    /// AI-led", with "still want the ability to scroll through most Rex'd
+    /// and/or external experts' ideas".
+    ///
+    /// So this sits above everything and takes nothing away. Browsing is still
+    /// what you land on; talking is what you reach for. It's a bar rather than
+    /// the screen itself because an empty box is a worse first impression than
+    /// a shelf of your friends' recommendations.
+    private var talkToRexBar: some View {
+        Button {
+            showingTalkToRex = true
+        } label: {
+            HStack(spacing: RexSpacing.sm) {
+                Image(systemName: "sparkles")
+                    .font(.system(size: 14))
+                    .foregroundStyle(RexColor.primary)
+                Text("Talk to Rex — ask for anything")
+                    .font(RexFont.text(14))
+                    .foregroundStyle(RexColor.mutedForeground)
+                Spacer(minLength: 0)
+                Image(systemName: "chevron.right")
+                    .font(.system(size: 11, weight: .semibold))
+                    .foregroundStyle(RexColor.mutedForeground)
+            }
+            .padding(.horizontal, RexSpacing.md)
+            .frame(height: 46)
+            .background(RexColor.card)
+            .clipShape(RoundedRectangle(cornerRadius: RexRadius.input, style: .continuous))
+            .overlay(
+                RoundedRectangle(cornerRadius: RexRadius.input, style: .continuous)
+                    .stroke(RexColor.border, lineWidth: 1)
+            )
+        }
+        .buttonStyle(.plain)
+        .padding(.horizontal, RexSpacing.page)
+        .padding(.bottom, RexSpacing.md)
+    }
+
     /// where they've been, what they've collected, then the rest by category.
     @ViewBuilder
     private var friendsSections: some View {
