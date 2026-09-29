@@ -44,10 +44,18 @@ struct RecommendationCardView: View {
     /// short of the label instead of running underneath it, which is what
     /// the 9 Sept screenshots were showing.
     private var titleTrailingReserve: CGFloat {
+        // Sept 29 — "the title should run to the end of the card".
+        //
+        // This reserved 104pt on a want-to-try and 72pt on a blast for
+        // corner labels that haven't been there since 21 Sept, when "Wants
+        // to try" moved down into the status row. cornerLabel draws nothing
+        // in either case now, so the title was wrapping early to make room
+        // for empty space — "Mackerel Sky Seafood Bar" taking two lines in
+        // a card with a third of its width spare.
+        //
+        // Reserve what's actually in the corner, and nothing else.
         var needed: CGFloat = 0
-        if rec.isWant { needed = 104 }
-        else if rec.isBlast { needed = 72 }
-        else if rec.rating > 0 { needed = 30 }
+        if !rec.isWant, !rec.isBlast, rec.rating > 0 { needed = 30 }
         if rec.user_id == RexAPI.shared.currentUserId { needed += 36 }
         return needed
     }
@@ -231,16 +239,31 @@ struct RecommendationCardView: View {
                         .padding(.leading, RexSpacing.cardPadding)
                 }
 
-                HStack(spacing: RexSpacing.sm) {
-                    authorRow
-                    Spacer(minLength: RexSpacing.sm)
-                    // Blasts are questions, not Rex — no like/save row.
-                    if !rec.isBlast {
-                        RexCardActions(rec: rec, rexCount: rexCount, onCommentTap: onCommentTap)
-                            // The icons and their counts never compress; the
-                            // name beside them takes any shortfall.
-                            .fixedSize(horizontal: true, vertical: false)
-                            .layoutPriority(2)
+                // Sept 29 — "need to be able to see the full username
+                // always". Priority alone wasn't enough: five icons and a
+                // count are genuinely wider than what's left, so on a long
+                // name something had to give and it was always the name.
+                //
+                // So stop making it a contest. ViewThatFits takes the one-row
+                // layout when the whole name fits on it, and drops the icons
+                // onto their own row when it doesn't — the name is never the
+                // thing that gets cut.
+                ViewThatFits(in: .horizontal) {
+                    HStack(spacing: RexSpacing.sm) {
+                        authorRow
+                        Spacer(minLength: RexSpacing.sm)
+                        // Blasts are questions, not Rex — no like/save row.
+                        if !rec.isBlast {
+                            RexCardActions(rec: rec, rexCount: rexCount, onCommentTap: onCommentTap)
+                        }
+                    }
+
+                    VStack(alignment: .leading, spacing: RexSpacing.sm) {
+                        authorRow
+                        if !rec.isBlast {
+                            RexCardActions(rec: rec, rexCount: rexCount, onCommentTap: onCommentTap)
+                                .frame(maxWidth: .infinity, alignment: .leading)
+                        }
                     }
                 }
                 .padding(.horizontal, RexSpacing.cardPadding)
@@ -511,10 +534,10 @@ struct RecommendationCardView: View {
                     .font(RexFont.text(13, weight: .medium))
                     .foregroundStyle(RexColor.foreground)
                     .lineLimit(1)
-                    // Tighter icon row (see RexCardActions) frees up the
-                    // width; this makes sure the name actually gets to keep
-                    // it instead of the Spacer eating the gain.
-                    .layoutPriority(1)
+                    // Asks for the width the whole name needs. ViewThatFits
+                    // above is what makes that safe: a name too long for one
+                    // row moves the icons down rather than truncating here.
+                    .fixedSize(horizontal: true, vertical: false)
 
                 if !relativeTime.isEmpty {
                     Text("· \(relativeTime)")

@@ -8,6 +8,19 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
     var window: UIWindow?
 
     func application(_ application: UIApplication, didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]?) -> Bool {
+        // Sept 29 — "images on the feed aren't loading".
+        //
+        // They did load; they were just slow enough that the placeholder was
+        // what you saw. The default shared cache is 512KB in memory, and a
+        // single map tile is over 100KB — so scrolling down and back up
+        // re-downloaded every tile that had just been on screen. This holds a
+        // realistic scroll's worth, which is what makes the second look
+        // instant rather than another wait.
+        URLCache.shared = URLCache(
+            memoryCapacity: 64 * 1024 * 1024,
+            diskCapacity: 512 * 1024 * 1024
+        )
+
         // Google Maps must be keyed before any GMSMapView is created.
         //
         // Sept 21, security review: this comment used to claim the key was

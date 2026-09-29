@@ -2955,9 +2955,15 @@ final class RexAPI {
         request.httpMethod = "DELETE"
         request.setValue(anonKey, forHTTPHeaderField: "apikey")
         request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+        // See deleteWant: a DELETE that matches nothing is still a 204.
+        request.setValue("return=representation", forHTTPHeaderField: "Prefer")
         let (data, response) = try await URLSession.shared.data(for: request)
         guard let http = response as? HTTPURLResponse, http.statusCode < 400 else {
             throw RexAPIError.server(friendlyError(data, fallback: "Couldn't delete that Rex."))
+        }
+        let deleted = (try? JSONSerialization.jsonObject(with: data)) as? [Any]
+        guard (deleted?.count ?? 0) > 0 else {
+            throw RexAPIError.server("Couldn't delete that — it may already be gone. Pull to refresh.")
         }
     }
 
@@ -4227,6 +4233,17 @@ final class RexAPI {
         }
     }
 
+    /// Sept 29 — "it is not letting Phoebe delete this entry".
+    ///
+    /// The delete itself was fine; what wasn't is that a DELETE which matches
+    /// nothing is a 204 like any other, so a row RLS wouldn't let you touch
+    /// reported success, the sheet closed, and the card was still there on
+    /// the next load. Indistinguishable, from the outside, from the app
+    /// ignoring you.
+    ///
+    /// Asking for the deleted rows back turns that into a plain answer: an
+    /// empty array means nothing was deleted, and that's an error rather than
+    /// a silent shrug.
     func deleteWant(id: String) async throws {
         let token = try await validToken()
         var components = URLComponents(url: baseURL.appendingPathComponent("/rest/v1/wants"), resolvingAgainstBaseURL: false)!
@@ -4235,10 +4252,15 @@ final class RexAPI {
         request.httpMethod = "DELETE"
         request.setValue(anonKey, forHTTPHeaderField: "apikey")
         request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+        request.setValue("return=representation", forHTTPHeaderField: "Prefer")
 
         let (data, response) = try await URLSession.shared.data(for: request)
         guard let http = response as? HTTPURLResponse, http.statusCode < 400 else {
             throw RexAPIError.server(friendlyError(data, fallback: "Couldn't remove."))
+        }
+        let deleted = (try? JSONSerialization.jsonObject(with: data)) as? [Any]
+        guard (deleted?.count ?? 0) > 0 else {
+            throw RexAPIError.server("Couldn't remove that — it may already be gone. Pull to refresh.")
         }
     }
 

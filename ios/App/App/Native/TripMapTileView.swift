@@ -53,6 +53,11 @@ struct TripMapTileView: View {
         var queryItems = [
             URLQueryItem(name: "size", value: "640x320"),
             URLQueryItem(name: "scale", value: "\(min(scale, 2))"),
+            // Sept 29 — "images on the feed aren't loading". They were
+            // loading, just slowly enough to screenshot the placeholder.
+            // JPEG is about a fifth smaller than the default PNG for the
+            // same tile, and a map photograph loses nothing to it.
+            URLQueryItem(name: "format", value: "jpg"),
             URLQueryItem(name: "key", value: googleKey),
         ]
         for place in sequence {
@@ -142,6 +147,7 @@ struct PlaceMapTileView: View {
         components.queryItems = [
             URLQueryItem(name: "size", value: "640x280"),
             URLQueryItem(name: "scale", value: "\(min(Int(UIScreen.main.scale), 2))"),
+            URLQueryItem(name: "format", value: "jpg"),
             URLQueryItem(name: "zoom", value: "14"),
             URLQueryItem(name: "center", value: "\(lat),\(lng)"),
             URLQueryItem(name: "markers", value: "color:0x173626|\(lat),\(lng)"),

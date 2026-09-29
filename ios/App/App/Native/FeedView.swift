@@ -540,6 +540,16 @@ struct FeedView: View {
                 ProfileView(onSignedOut: onSignedOut, path: $path)
             }
             .toolbar { feedToolbarContent }
+            // Sept 29 — "when you scroll, you can see the previous text
+            // behind here. Makes it a little cluttered".
+            //
+            // iOS 26 draws the navigation bar as clear glass by default and
+            // lets content run under it, so cards scrolling past showed
+            // through around the wordmark. Pin an opaque bar instead: the
+            // filter chips below it are already opaque for the same reason,
+            // and the two now read as one solid header.
+            .toolbarBackground(RexColor.background, for: .navigationBar)
+            .toolbarBackgroundVisibility(.visible, for: .navigationBar)
         }
         .tint(RexColor.primary)
         .onChange(of: popToRootSignal) { _, _ in
