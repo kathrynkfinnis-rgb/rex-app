@@ -46,6 +46,22 @@ struct SettingsView: View {
                     }
                 }
             }
+
+            // Sept 29 — "I can't see the Talk to Rex box on my version", which
+            // took three guesses to resolve because there was no way to tell
+            // which build was on the phone. It rode along with feedback and
+            // nowhere else. On a TestFlight app that question comes up every
+            // release; this answers it in one look.
+            Section {
+                HStack {
+                    Text("Version").font(RexFont.text(14)).foregroundStyle(RexColor.mutedForeground)
+                    Spacer()
+                    Text(Self.versionString)
+                        .font(RexFont.text(14))
+                        .foregroundStyle(RexColor.mutedForeground)
+                        .textSelection(.enabled)
+                }
+            }
         }
         .scrollContentBackground(.hidden)
         .background(RexColor.background.ignoresSafeArea())
@@ -56,6 +72,14 @@ struct SettingsView: View {
             Button("Cancel", role: .cancel) {}
             Button("Log out", role: .destructive) { onSignedOut?() }
         }
+    }
+
+    /// "1.0 (56)" — the same pair TestFlight shows, so the two can be compared
+    /// without translation.
+    static var versionString: String {
+        let short = Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "?"
+        let build = Bundle.main.infoDictionary?["CFBundleVersion"] as? String ?? "?"
+        return "\(short) (\(build))"
     }
 
     private func row(_ icon: String, _ title: String, _ subtitle: String) -> some View {
