@@ -15,6 +15,7 @@ struct UserProfileView: View {
     @State private var profile: RexProfileDetail?
     @State private var recommendations: [FeedRecommendation] = []
     @State private var isLoading = true
+    @State private var showingAsk = false
     @State private var errorMessage: String?
     @State private var filter: RexCategory?
     @State private var theirLists: [RexList] = []
@@ -48,6 +49,12 @@ struct UserProfileView: View {
     private var availableCategories: [RexCategory] {
         let present = Set(recommendations.compactMap { RexCategory(rawType: $0.items?.type) })
         return rexAllCategories.filter { present.contains($0) }
+    }
+
+    /// A friend of yours who has posted nothing — as distinct from someone
+    /// you can't see yet, whose Rex are hidden rather than absent.
+    private var isEmptyFriend: Bool {
+        recommendations.isEmpty && connection == "friend"
     }
 
     private var visible: [FeedRecommendation] {
@@ -93,8 +100,15 @@ struct UserProfileView: View {
                 } else if visible.isEmpty {
                     // A stranger's Rex are friends-only, so "Nothing Rex'd
                     // yet" was untrue on Phoebe's page — she has hundreds.
+                    //
+                    // Sept 29 — "friends homepage, if they haven't Rex'd
+                    // anything, what do we want to see here?" A friend with an
+                    // empty page is the one case where there's something
+                    // useful to do about it: ask them for something. The
+                    // hard-hat Rex says the page is waiting rather than
+                    // broken, and the button turns a dead end into a blast.
                     VStack(spacing: RexSpacing.md) {
-                        Image("RexPlaceholderList")
+                        Image(isEmptyFriend ? "RexUnderConstruction" : "RexPlaceholderList")
                             .resizable()
                             .scaledToFit()
                             .frame(height: 130)
@@ -104,11 +118,27 @@ struct UserProfileView: View {
                         Text(recommendations.isEmpty
                              ? (connection == "none" || connection == "requested" || connection == "requested_you"
                                 ? "Add \(profile?.display_name ?? route.name) as a friend to see their Rex."
-                                : "\(profile?.display_name ?? route.name) hasn\u{2019}t Rex\u{2019}d anything yet.")
+                                : "\(profile?.display_name ?? route.name) hasn’t Rex’d anything yet.")
                              : "Nothing in this category.")
                             .font(RexFont.text(14))
                             .foregroundStyle(RexColor.mutedForeground)
                             .multilineTextAlignment(.center)
+
+                        if isEmptyFriend {
+                            Text("Ask them for one — a blast goes to all your friends, and theirs is the answer you're after.")
+                                .font(RexFont.text(13))
+                                .foregroundStyle(RexColor.mutedForeground)
+                                .multilineTextAlignment(.center)
+                                .padding(.horizontal, RexSpacing.lg)
+                            Button {
+                                showingAsk = true
+                            } label: {
+                                Label("Ask for a Rex", systemImage: "sparkles")
+                                    .font(RexFont.text(15, weight: .semibold))
+                            }
+                            .buttonStyle(RexPrimaryButtonStyle())
+                            .padding(.top, RexSpacing.xs)
+                        }
                     }
                     .frame(maxWidth: .infinity)
                     .padding(.vertical, RexSpacing.xxl)
@@ -167,6 +197,9 @@ struct UserProfileView: View {
                     }
                 }
             }
+        }
+        .sheet(isPresented: $showingAsk) {
+            AskForRexView()
         }
         .sheet(item: $reporting) { subject in
             ReportSheet(subject: subject, onBlocked: { dismissSelf() })
