@@ -74,7 +74,7 @@ struct ItemDetailView: View {
                     recipeSection(item: item)
                     yourTakeSection
                     friendsSection
-                    googleSection
+                    elsewhereSection
                 }
             }
         }
@@ -427,33 +427,76 @@ struct ItemDetailView: View {
     }
 
     /// Public Google rating, deliberately after "What friends say" — friends
-    /// lead, the crowd is secondary.
+    /// lead, the crowd is secondary. Sept 29: the rating card is now a way
+    /// through to the Google listing rather than a dead end, and everything
+    /// that isn't a place gets the nearest equivalent.
     @ViewBuilder
-    private var googleSection: some View {
-        if let rating = item?.google_rating, rating > 0 {
+    private var elsewhereSection: some View {
+        let link = RexExternalLink.forItem(item)
+        let rating = item?.google_rating ?? 0
+
+        if rating > 0 || link != nil {
             VStack(alignment: .leading, spacing: RexSpacing.sm) {
-                Text("On Google")
-                    .font(RexFont.text(13, weight: .semibold))
-                    .foregroundStyle(RexColor.mutedForeground)
-                HStack(spacing: RexSpacing.sm) {
-                    Image(systemName: "star.fill")
-                        .font(.system(size: 12))
-                        .foregroundStyle(RexColor.accent)
-                    Text(String(format: "%.1f", rating))
-                        .font(RexFont.text(15, weight: .semibold))
-                        .foregroundStyle(RexColor.foreground)
-                    if let count = item?.google_rating_count, count > 0 {
-                        Text("· \(count) reviews")
-                            .font(RexFont.text(13))
-                            .foregroundStyle(RexColor.mutedForeground)
-                    }
+                if rating > 0 {
+                    Text("On Google")
+                        .font(RexFont.text(13, weight: .semibold))
+                        .foregroundStyle(RexColor.mutedForeground)
                 }
-                .padding(RexSpacing.md)
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .rexCard()
+
+                if let link {
+                    RexOutboundLinkButton(url: link.url) {
+                        elsewhereCard(rating: rating, link: link)
+                    }
+                } else {
+                    elsewhereCard(rating: rating, link: nil)
+                }
             }
             .padding(.top, RexSpacing.lg)
         }
+    }
+
+    /// One card whether or not there's a rating to put in it: a place with a
+    /// Google score shows the score and the way through, a book shows only the
+    /// way through, and both read as the same component.
+    @ViewBuilder
+    private func elsewhereCard(rating: Double, link: RexExternalLink.Destination?) -> some View {
+        HStack(spacing: RexSpacing.sm) {
+            if rating > 0 {
+                Image(systemName: "star.fill")
+                    .font(.system(size: 12))
+                    .foregroundStyle(RexColor.accent)
+                Text(String(format: "%.1f", rating))
+                    .font(RexFont.text(15, weight: .semibold))
+                    .foregroundStyle(RexColor.foreground)
+                if let count = item?.google_rating_count, count > 0 {
+                    Text("· \(count) reviews")
+                        .font(RexFont.text(13))
+                        .foregroundStyle(RexColor.mutedForeground)
+                }
+            } else if let link {
+                Image(systemName: link.symbol)
+                    .font(.system(size: 13))
+                    .foregroundStyle(RexColor.mutedForeground)
+                Text(link.label)
+                    .font(RexFont.text(15, weight: .medium))
+                    .foregroundStyle(RexColor.foreground)
+            }
+
+            Spacer(minLength: RexSpacing.sm)
+
+            // Only where there's somewhere to go. A rating with no link keeps
+            // the card but loses the affordance, rather than promising a tap
+            // that does nothing.
+            if link != nil {
+                Image(systemName: "arrow.up.right")
+                    .font(.system(size: 12, weight: .semibold))
+                    .foregroundStyle(RexColor.mutedForeground)
+            }
+        }
+        .padding(RexSpacing.md)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .contentShape(Rectangle())
+        .rexCard()
     }
 
     private var friendsSection: some View {
@@ -606,3 +649,69 @@ struct ItemDetailView: View {
 
 // The ten-crown picker moved to RexRatingScale.swift as RexRatingPicker,
 // which is the five-tier scale (Do not Rex / Meh / Rex / Loved / Obsessed).
+
+/// Sept 29 — "Google reviews — import or link through to the Google page.
+/// For non-places, use the best thing e.g. Rotten Tomatoes for Films and TV,
+/// Goodreads for books (if this is possible)".
+///
+/// Linking, not importing — and the "if this is possible" is the honest
+/// part of the answer. Rotten Tomatoes licenses its scores through Fandango
+/// and Goodreads closed its API in 2020, so neither score can legitimately be
+/// read and shown as a number. What can be done is land someone on the right
+/// page in one tap. Google is the exception: its rating is already stored on
+/// the item, so that card shows a real figure and now has the link behind it.
+enum RexExternalLink {
+    struct Destination {
+        let label: String
+        let symbol: String
+        let url: URL
+    }
+
+    static func forItem(_ item: RexItem?) -> Destination? {
+        guard let item else { return nil }
+        let query = [item.title, item.subtitle]
+            .compactMap { $0 }
+            .filter { !$0.isEmpty }
+            .joined(separator: " ")
+
+        switch RexCategory(rawValue: item.type) {
+        case .place, .event:
+            // A place found through Google keeps its place id, which opens the
+            // real listing. Anything typed by hand falls back to a search for
+            // the name and address — not guaranteed, but it lands right far
+            // more often than it doesn't.
+            if item.external_source == "google_places", let id = item.external_id, !id.isEmpty {
+                return make("https://www.google.com/maps/search/?api=1&query=\(esc(item.title))&query_place_id=\(esc(id))",
+                            "See on Google Maps", "mappin.and.ellipse")
+            }
+            let place = [item.title, item.address].compactMap { $0 }.joined(separator: " ")
+            return make("https://www.google.com/maps/search/?api=1&query=\(esc(place))",
+                        "See on Google Maps", "mappin.and.ellipse")
+
+        case .movie, .tv:
+            return make("https://www.rottentomatoes.com/search?search=\(esc(item.title))",
+                        "See on Rotten Tomatoes", "film")
+
+        case .book:
+            return make("https://www.goodreads.com/search?q=\(esc(query))",
+                        "See on Goodreads", "books.vertical")
+
+        case .podcast:
+            return make("https://podcasts.apple.com/search?term=\(esc(item.title))",
+                        "See on Apple Podcasts", "mic")
+
+        default:
+            // Recipes, trips and the catch-all have no one obvious home to
+            // send anyone to, so they get no link rather than a bad guess.
+            return nil
+        }
+    }
+
+    private static func make(_ string: String, _ label: String, _ symbol: String) -> Destination? {
+        URL(string: string).map { Destination(label: label, symbol: symbol, url: $0) }
+    }
+
+    private static func esc(_ text: String) -> String {
+        text.addingPercentEncoding(withAllowedCharacters: .alphanumerics) ?? text
+    }
+}

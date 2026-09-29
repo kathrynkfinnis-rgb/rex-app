@@ -915,7 +915,7 @@ final class RexAPI {
         // Sept 15 — "You can't see the product link" (Phoebe). It was saved
         // on every list item and never selected back here, so the item page
         // had nothing to show.
-        let base = "id,type,title,subtitle,image_url,genre,address,recipe_text,link_url"
+        let base = "id,type,title,subtitle,image_url,genre,address,recipe_text,link_url,external_id,external_source"
         if let item = try? await fetchItem(id: id, select: base + ",google_rating,google_rating_count") {
             return item
         }

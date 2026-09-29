@@ -11,7 +11,7 @@ import SwiftUI
 /// differs is asked to agree again (RootView's consent gate), and the new
 /// acceptance is logged in consent_log with a timestamp.
 enum RexLegal {
-    static let version = "2026-09-22"
+    static let version = "2026-09-29"
 }
 
 struct LegalContentView: View {
@@ -61,7 +61,7 @@ struct LegalContentView: View {
 
     // MARK: - Copy
 
-    private static let lastUpdated = "22 September 2026"
+    private static let lastUpdated = "29 September 2026"
 
     // Sept 17 — rewritten from Kathryn's solicitor drafts ("Find Rex",
     // Three Lines Studio Ltd) merged with what the app actually does, which
@@ -156,7 +156,9 @@ struct LegalContentView: View {
     • What you post: recommendations, ratings, notes, photos, trips, lists, blasts, comments, likes, and your friend connections.
     • Places you recommend: addresses and map coordinates, so they can be shown on the map.
     • Your device's location: only if you allow it, and only while you're using the App, to centre the map on where you are. Apple turns the coordinates into an area name for the map's header. It isn't saved to your account, isn't shared with friends, and REX never tracks your location in the background. The App works without it.
-    • Your contacts: only if you choose "Find friends from your contacts". REX reads the email addresses in your contacts on your phone and scrambles each one (a SHA-256 hash) before anything leaves the device. Those scrambled values are compared with REX accounts to show which of your contacts are here, then discarded. We don't store your contacts, names or phone numbers.
+    • Your contacts: only if you choose "Find friends from your contacts". REX reads the email addresses and phone numbers in your contacts on your phone and scrambles each one (a SHA-256 hash) before anything leaves the device. Those scrambled values are compared with REX accounts to show which of your contacts are here, then discarded. We don't store your contacts, their names, their numbers or their addresses.
+
+    • Your own phone number, if you give it: we ask for it once so your friends can find you when they search their contacts, and you can skip it. We store only a scrambled version (a SHA-256 hash of the number in international format) — never the number itself, and it is never shown to anyone. You can remove it at any time in Profile > Edit profile. Being honest about the limits of that: a scrambled phone number is not a secret, because there are few enough possible numbers that someone determined could work through them. What it means is that REX never holds a list of its users' numbers, that nothing travels in the clear, and that the matching service is capped so it can't be used to test long lists of guessed numbers.
     • Imports: text you paste for import, and photos of recipes you choose to import (see section 4).
     • Device and technical data: push notification token if you turn notifications on, device type and operating system, IP address, and basic logs needed to run and secure the service.
     • Safety data: reports you make or that are made about your content, and who you have blocked.

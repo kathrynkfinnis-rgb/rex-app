@@ -21,8 +21,13 @@ struct RexItem: Codable {
     /// coordinates, in itinerary order, to draw a route.
     let lat: Double?
     let lng: Double?
+    /// Sept 29 — where this item came from, so the detail page can link
+    /// back to its Google listing. Optional throughout: plenty of items are
+    /// typed by hand and have no external source at all.
+    let external_id: String?
+    let external_source: String?
 
-    init(id: String, type: String, title: String, subtitle: String?, image_url: String?, genre: String?, address: String? = nil, google_rating: Double? = nil, google_rating_count: Int? = nil, recipe_text: String? = nil, link_url: String? = nil, lat: Double? = nil, lng: Double? = nil) {
+    init(id: String, type: String, title: String, subtitle: String?, image_url: String?, genre: String?, address: String? = nil, google_rating: Double? = nil, google_rating_count: Int? = nil, recipe_text: String? = nil, link_url: String? = nil, lat: Double? = nil, lng: Double? = nil, external_id: String? = nil, external_source: String? = nil) {
         self.id = id
         self.type = type
         self.title = title
@@ -36,6 +41,8 @@ struct RexItem: Codable {
         self.link_url = link_url
         self.lat = lat
         self.lng = lng
+        self.external_id = external_id
+        self.external_source = external_source
     }
 }
 
