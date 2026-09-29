@@ -100,6 +100,18 @@ struct PrivacyDataView: View {
                 // lives in iOS Settings.
                 AffiliateLinksSection()
 
+                // Sept 29 — Talk to Rex writes down what it infers about you
+                // and shapes every later answer with it. Somewhere you can
+                // read that back and delete from it is the difference between
+                // a feature and something nobody would defend once asked.
+                group("Talk to Rex") {
+                    NavigationLink(value: RexMemoryRoute()) {
+                        rowContent(icon: "sparkles", title: "What Rex remembers",
+                                   subtitle: "What it's picked up about you, and how to forget it")
+                    }
+                    .buttonStyle(.plain)
+                }
+
                 group("Safety") {
                     NavigationLink(value: BlockedAccountsRoute()) {
                         rowContent(icon: "hand.raised.slash", title: "Blocked accounts",
@@ -187,6 +199,7 @@ struct PrivacyDataView: View {
         .navigationBarTitleDisplayMode(.inline)
         .sheet(item: $legalSection) { LegalContentView(section: $0) }
         .navigationDestination(for: BlockedAccountsRoute.self) { _ in BlockedAccountsView() }
+        .navigationDestination(for: RexMemoryRoute.self) { _ in RexMemoryView() }
         .fullScreenCover(isPresented: $showingDelete) {
             DeleteAccountView(onDeleted: {
                 showingDelete = false

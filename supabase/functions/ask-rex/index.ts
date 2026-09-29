@@ -182,12 +182,32 @@ Deno.serve(async (req) => {
 
   // New facts are written only when the model says the user stated one — an
   // inference from a single question is usually just the question restated.
-  const newFacts = (answer.facts ?? []).slice(0, 3).filter((f) => f.trim().length >= 3);
+  //
+  // Deduped here rather than by the database. The unique index is on
+  // lower(btrim(fact)), an *expression*, and PostgREST's on_conflict only
+  // understands a column list — so `onConflict: "user_id,fact"` matched
+  // nothing, every insert failed with 42P10, and because the result went
+  // unchecked the whole thing silently wrote nothing at all. The facts we
+  // already fetched for the prompt are exactly what's needed to compare
+  // against, so no extra round trip.
+  const seen = new Set(facts.map((f) => f.trim().toLowerCase()));
+  const newFacts = (answer.facts ?? [])
+    .map((f) => f.trim())
+    .filter((f) => f.length >= 3 && f.length <= 300)
+    .filter((f) => !seen.has(f.toLowerCase()))
+    .slice(0, 3);
+
   if (newFacts.length > 0) {
-    await asUser.from("rex_facts").upsert(
-      newFacts.map((fact) => ({ user_id: userId, fact: fact.trim(), source: "inferred" })),
-      { onConflict: "user_id,fact", ignoreDuplicates: true },
+    const { error: factError } = await asUser.from("rex_facts").insert(
+      // "stated", not "inferred": the prompt only asks for things the person
+      // said outright, so labelling these as Rex's own deductions would tell
+      // someone "Rex worked this out" about a sentence they typed themselves.
+      newFacts.map((fact) => ({ user_id: userId, fact, source: "stated" })),
     );
+    // Never fails the answer — someone asking where to eat should not see an
+    // error because a note about them couldn't be filed — but no longer
+    // silent either, which is how the above went unnoticed.
+    if (factError) console.error("ask-rex fact write failed", factError);
   }
 
   return json({
