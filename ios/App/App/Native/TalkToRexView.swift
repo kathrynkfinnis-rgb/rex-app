@@ -42,7 +42,12 @@ struct TalkToRexView: View {
                     }
 
                     ForEach(answers) { answer in
-                        answerBlock(answer).id(answer.id)
+                        AskRexAnswerBlock(
+                            answer: answer,
+                            onOpenItem: onOpenItem,
+                            onRexThis: { addingFromWeb = $0 }
+                        )
+                        .id(answer.id)
                     }
 
                     // The question stays on screen while Rex thinks about it.
@@ -148,23 +153,6 @@ struct TalkToRexView: View {
         }
     }
 
-    /// True when Rex's line is really the friend's note wearing a hat. Compared
-    /// on words rather than characters, so a reworded half-sentence is caught
-    /// as well as a straight copy: if most of what Rex said is already in the
-    /// note, the note can say it by itself.
-    private func echoesNote(_ why: String, _ note: String?) -> Bool {
-        guard let note, !note.isEmpty else { return false }
-        let words = { (text: String) -> Set<String> in
-            Set(text.lowercased()
-                .split(whereSeparator: { !$0.isLetter && !$0.isNumber })
-                .map(String.init)
-                .filter { $0.count > 3 })
-        }
-        let whyWords = words(why)
-        guard whyWords.count >= 3 else { return false }
-        let shared = whyWords.intersection(words(note))
-        return Double(shared.count) / Double(whyWords.count) > 0.6
-    }
 
     private struct Prompt {
         let text: String
@@ -187,157 +175,6 @@ struct TalkToRexView: View {
         list.append(Prompt(text: "Somewhere for dinner this weekend", emoji: "🍽"))
         list.append(Prompt(text: "Three days in Lisbon with two kids", emoji: "🧳"))
         return list
-    }
-
-    // MARK: - An answer
-
-    @ViewBuilder
-    private func answerBlock(_ answer: AskRexAnswer) -> some View {
-        VStack(alignment: .leading, spacing: RexSpacing.md) {
-            // What they asked, so a scroll-back reads as a conversation.
-            Text(answer.question)
-                .font(RexFont.text(14, weight: .medium))
-                .foregroundStyle(RexColor.primaryForeground)
-                .padding(.horizontal, RexSpacing.md)
-                .padding(.vertical, RexSpacing.sm)
-                .background(RexColor.primary)
-                .clipShape(RoundedRectangle(cornerRadius: RexRadius.card, style: .continuous))
-                .frame(maxWidth: .infinity, alignment: .trailing)
-
-            if !answer.prose.isEmpty {
-                Text(answer.prose)
-                    .font(RexFont.text(15))
-                    .foregroundStyle(RexColor.foreground.opacity(0.9))
-                    .fixedSize(horizontal: false, vertical: true)
-            }
-
-            ForEach(answer.friends) { rec in
-                VStack(alignment: .leading, spacing: 4) {
-                    // Rex's reason sits ABOVE the card and in Rex's voice, so
-                    // it can never be mistaken for the note the friend wrote
-                    // inside it.
-                    //
-                    // And it's dropped when it's just the note again. The
-                    // prompt asks for something the note doesn't say, but the
-                    // first live answer still handed back Danny's own sentence
-                    // verbatim above his own card — which reads as two people
-                    // agreeing when it's one person quoted twice.
-                    if let why = answer.reasons[rec.id], !echoesNote(why, rec.note) {
-                        Text(why)
-                            .font(RexFont.text(12))
-                            .foregroundStyle(RexColor.mutedForeground)
-                            .padding(.leading, 2)
-                    }
-                    // The card draws its own interior taps (author, comments);
-                    // the body of it opens the item, the way the feed does.
-                    RecommendationCardView(rec: rec)
-                        .contentShape(Rectangle())
-                        .onTapGesture { onOpenItem(rec.item_id) }
-                }
-            }
-
-            if !answer.web.isEmpty {
-                VStack(alignment: .leading, spacing: RexSpacing.sm) {
-                    Text(answer.friends.isEmpty
-                         ? "Nobody you know has Rex'd this yet — from the web:"
-                         : "Not Rex'd by anyone yet — from the web:")
-                        .font(RexFont.text(12, weight: .medium))
-                        .foregroundStyle(RexColor.mutedForeground)
-                        .padding(.top, RexSpacing.xs)
-
-                    ForEach(answer.web) { result in
-                        webCard(result)
-                    }
-                }
-            }
-
-            if answer.friends.isEmpty && answer.web.isEmpty {
-                Text("Nothing to go on for that one yet. As your friends Rex more, this gets better.")
-                    .font(RexFont.text(14))
-                    .foregroundStyle(RexColor.mutedForeground)
-                    .fixedSize(horizontal: false, vertical: true)
-            }
-        }
-    }
-
-    /// Deliberately unlike a feed card in every way that carries meaning: no
-    /// rail, no avatar, no rating, a dashed edge and a tint that appears
-    /// nowhere else in REX. Nobody you know has vouched for this.
-    private func webCard(_ result: AskRexWebResult) -> some View {
-        VStack(alignment: .leading, spacing: RexSpacing.sm) {
-            HStack(spacing: 6) {
-                Image(systemName: "globe")
-                    .font(.system(size: 11))
-                Text("From the web · not Rex'd yet")
-                    .font(RexFont.text(11, weight: .medium))
-            }
-            .foregroundStyle(RexColor.mutedForeground)
-
-            Text(result.hit.title)
-                .font(RexFont.display(17, weight: .semibold))
-                .foregroundStyle(RexColor.foreground)
-                .fixedSize(horizontal: false, vertical: true)
-
-            if let subtitle = result.hit.subtitle, !subtitle.isEmpty {
-                Text(subtitle)
-                    .font(RexFont.text(13))
-                    .foregroundStyle(RexColor.mutedForeground)
-                    .lineLimit(2)
-            }
-
-            if let why = result.why, !why.isEmpty {
-                Text(why)
-                    .font(RexFont.text(13))
-                    .foregroundStyle(RexColor.foreground.opacity(0.85))
-                    .fixedSize(horizontal: false, vertical: true)
-            }
-
-            HStack(spacing: RexSpacing.md) {
-                // The whole point of the web tier is that it feeds the thing
-                // that replaces it: try it, rate it, and next time it's a
-                // friend's Rex rather than a stranger's suggestion.
-                Button {
-                    addingFromWeb = result.hit
-                } label: {
-                    HStack(spacing: 5) {
-                        Image(systemName: "plus.circle.fill").font(.system(size: 12))
-                        Text("Rex this").font(RexFont.text(13, weight: .semibold))
-                    }
-                    .foregroundStyle(RexColor.primary)
-                }
-                .buttonStyle(.plain)
-
-                if let link = RexExternalLink.forItem(RexItem(
-                    id: result.hit.externalId,
-                    type: result.category.rawValue,
-                    title: result.hit.title,
-                    subtitle: result.hit.subtitle,
-                    image_url: result.hit.imageURL,
-                    genre: result.hit.genre,
-                    address: result.hit.address,
-                    external_id: result.hit.externalId,
-                    external_source: result.hit.externalSource
-                )) {
-                    RexOutboundLinkButton(url: link.url) {
-                        HStack(spacing: 5) {
-                            Image(systemName: link.symbol).font(.system(size: 12))
-                            Text("Look it up").font(RexFont.text(13, weight: .semibold))
-                        }
-                        .foregroundStyle(RexColor.mutedForeground)
-                    }
-                }
-            }
-            .padding(.top, 2)
-        }
-        .padding(RexSpacing.md)
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .background(RexColor.muted.opacity(0.5))
-        .clipShape(RoundedRectangle(cornerRadius: RexRadius.card, style: .continuous))
-        .overlay(
-            RoundedRectangle(cornerRadius: RexRadius.card, style: .continuous)
-                .strokeBorder(style: StrokeStyle(lineWidth: 1, dash: [4, 3]))
-                .foregroundStyle(RexColor.border)
-        )
     }
 
     private var thinking: some View {
@@ -419,5 +256,197 @@ struct TalkToRexView: View {
         guard friends.isEmpty, let me = RexAPI.shared.currentUserId else { return }
         friends = ((try? await RexAPI.shared.fetchFriendsOf(userId: me)) ?? [])
             .shuffled()
+    }
+}
+
+/// The rendered form of one answer.
+///
+/// Its own view, observing the answer, because the web results arrive after
+/// the rest of it — see AskRex.ask. A struct passed by value couldn't be
+/// updated in place once it was on screen.
+struct AskRexAnswerBlock: View {
+    @ObservedObject var answer: AskRexAnswer
+    var onOpenItem: (String) -> Void
+    var onRexThis: (RexSearchHit) -> Void
+
+    var body: some View { content }
+
+    @ViewBuilder
+    private var content: some View {
+        VStack(alignment: .leading, spacing: RexSpacing.md) {
+            // What they asked, so a scroll-back reads as a conversation.
+            Text(answer.question)
+                .font(RexFont.text(14, weight: .medium))
+                .foregroundStyle(RexColor.primaryForeground)
+                .padding(.horizontal, RexSpacing.md)
+                .padding(.vertical, RexSpacing.sm)
+                .background(RexColor.primary)
+                .clipShape(RoundedRectangle(cornerRadius: RexRadius.card, style: .continuous))
+                .frame(maxWidth: .infinity, alignment: .trailing)
+
+            if !answer.prose.isEmpty {
+                Text(answer.prose)
+                    .font(RexFont.text(15))
+                    .foregroundStyle(RexColor.foreground.opacity(0.9))
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+
+            ForEach(answer.friends) { rec in
+                VStack(alignment: .leading, spacing: 4) {
+                    // Rex's reason sits ABOVE the card and in Rex's voice, so
+                    // it can never be mistaken for the note the friend wrote
+                    // inside it.
+                    //
+                    // And it's dropped when it's just the note again. The
+                    // prompt asks for something the note doesn't say, but the
+                    // first live answer still handed back Danny's own sentence
+                    // verbatim above his own card — which reads as two people
+                    // agreeing when it's one person quoted twice.
+                    if let why = answer.reasons[rec.id], !echoesNote(why, rec.note) {
+                        Text(why)
+                            .font(RexFont.text(12))
+                            .foregroundStyle(RexColor.mutedForeground)
+                            .padding(.leading, 2)
+                    }
+                    // The card draws its own interior taps (author, comments);
+                    // the body of it opens the item, the way the feed does.
+                    RecommendationCardView(rec: rec)
+                        .contentShape(Rectangle())
+                        .onTapGesture { onOpenItem(rec.item_id) }
+                }
+            }
+
+            // Still looking: said plainly, because the alternative is an
+            // answer that appears to have finished with nothing in it.
+            if answer.isResolvingWeb {
+                HStack(spacing: RexSpacing.sm) {
+                    ProgressView().scaleEffect(0.7)
+                    Text("Looking a few more up\u{2026}")
+                        .font(RexFont.text(12))
+                        .foregroundStyle(RexColor.mutedForeground)
+                }
+                .padding(.top, RexSpacing.xs)
+            }
+
+            if !answer.web.isEmpty {
+                VStack(alignment: .leading, spacing: RexSpacing.sm) {
+                    Text(answer.friends.isEmpty
+                         ? "Nobody you know has Rex'd this yet — from the web:"
+                         : "Not Rex'd by anyone yet — from the web:")
+                        .font(RexFont.text(12, weight: .medium))
+                        .foregroundStyle(RexColor.mutedForeground)
+                        .padding(.top, RexSpacing.xs)
+
+                    ForEach(answer.web) { result in
+                        webCardView(result)
+                    }
+                }
+            }
+
+            if answer.friends.isEmpty && answer.web.isEmpty && !answer.isResolvingWeb {
+                Text("Nothing to go on for that one yet. As your friends Rex more, this gets better.")
+                    .font(RexFont.text(14))
+                    .foregroundStyle(RexColor.mutedForeground)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+        }
+    }
+
+    /// Deliberately unlike a feed card in every way that carries meaning: no
+    /// rail, no avatar, no rating, a dashed edge and a tint that appears
+    /// nowhere else in REX. Nobody you know has vouched for this.
+    private func webCardView(_ result: AskRexWebResult) -> some View {
+        VStack(alignment: .leading, spacing: RexSpacing.sm) {
+            HStack(spacing: 6) {
+                Image(systemName: "globe")
+                    .font(.system(size: 11))
+                Text("From the web · not Rex'd yet")
+                    .font(RexFont.text(11, weight: .medium))
+            }
+            .foregroundStyle(RexColor.mutedForeground)
+
+            Text(result.hit.title)
+                .font(RexFont.display(17, weight: .semibold))
+                .foregroundStyle(RexColor.foreground)
+                .fixedSize(horizontal: false, vertical: true)
+
+            if let subtitle = result.hit.subtitle, !subtitle.isEmpty {
+                Text(subtitle)
+                    .font(RexFont.text(13))
+                    .foregroundStyle(RexColor.mutedForeground)
+                    .lineLimit(2)
+            }
+
+            if let why = result.why, !why.isEmpty {
+                Text(why)
+                    .font(RexFont.text(13))
+                    .foregroundStyle(RexColor.foreground.opacity(0.85))
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+
+            HStack(spacing: RexSpacing.md) {
+                // The whole point of the web tier is that it feeds the thing
+                // that replaces it: try it, rate it, and next time it's a
+                // friend's Rex rather than a stranger's suggestion.
+                Button {
+                    onRexThis(result.hit)
+                } label: {
+                    HStack(spacing: 5) {
+                        Image(systemName: "plus.circle.fill").font(.system(size: 12))
+                        Text("Rex this").font(RexFont.text(13, weight: .semibold))
+                    }
+                    .foregroundStyle(RexColor.primary)
+                }
+                .buttonStyle(.plain)
+
+                if let link = RexExternalLink.forItem(RexItem(
+                    id: result.hit.externalId,
+                    type: result.category.rawValue,
+                    title: result.hit.title,
+                    subtitle: result.hit.subtitle,
+                    image_url: result.hit.imageURL,
+                    genre: result.hit.genre,
+                    address: result.hit.address,
+                    external_id: result.hit.externalId,
+                    external_source: result.hit.externalSource
+                )) {
+                    RexOutboundLinkButton(url: link.url) {
+                        HStack(spacing: 5) {
+                            Image(systemName: link.symbol).font(.system(size: 12))
+                            Text("Look it up").font(RexFont.text(13, weight: .semibold))
+                        }
+                        .foregroundStyle(RexColor.mutedForeground)
+                    }
+                }
+            }
+            .padding(.top, 2)
+        }
+        .padding(RexSpacing.md)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(RexColor.muted.opacity(0.5))
+        .clipShape(RoundedRectangle(cornerRadius: RexRadius.card, style: .continuous))
+        .overlay(
+            RoundedRectangle(cornerRadius: RexRadius.card, style: .continuous)
+                .strokeBorder(style: StrokeStyle(lineWidth: 1, dash: [4, 3]))
+                .foregroundStyle(RexColor.border)
+        )
+    }
+
+    /// True when Rex's line is really the friend's note wearing a hat. Compared
+    /// on words rather than characters, so a reworded half-sentence is caught
+    /// as well as a straight copy: if most of what Rex said is already in the
+    /// note, the note can say it by itself.
+    private func echoesNote(_ why: String, _ note: String?) -> Bool {
+        guard let note, !note.isEmpty else { return false }
+        let words = { (text: String) -> Set<String> in
+            Set(text.lowercased()
+                .split(whereSeparator: { !$0.isLetter && !$0.isNumber })
+                .map(String.init)
+                .filter { $0.count > 3 })
+        }
+        let whyWords = words(why)
+        guard whyWords.count >= 3 else { return false }
+        let shared = whyWords.intersection(words(note))
+        return Double(shared.count) / Double(whyWords.count) > 0.6
     }
 }

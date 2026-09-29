@@ -74,6 +74,8 @@ const CORS = {
 const CANDIDATE_LIMIT = 40;
 /** Below this many friend matches, the web tier is offered. */
 const THIN_ANSWER = 5;
+/** Questions per person per rolling 24 hours. See the check in the handler. */
+const DAILY_ASK_LIMIT = 40;
 
 type Candidate = {
   id: string;          // recommendation id
@@ -128,6 +130,23 @@ Deno.serve(async (req) => {
   const question = (body.question ?? "").trim();
   if (!question || question.length > 500) {
     return json({ error: "Ask me something." }, 400);
+  }
+
+  // A ceiling, per person, per rolling day. The cost model assumes about eight
+  // questions a *month* each; nothing enforced that, so one person in a loop —
+  // or one retry bug in the app — could run up a Gemini bill overnight with
+  // nothing between them and Google. Forty is far above honest use and far
+  // below anything that costs real money (about 24p), so this is a runaway
+  // guard nobody using REX normally will ever meet.
+  const dayAgo = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
+  const { count: asksToday } = await asUser
+    .from("rex_asks")
+    .select("id", { count: "exact", head: true })
+    .gte("asked_at", dayAgo);
+  if ((asksToday ?? 0) >= DAILY_ASK_LIMIT) {
+    return json({
+      error: "That's a lot of questions for one day — Rex is having a lie down. Try again tomorrow.",
+    }, 429);
   }
 
   // ---------------------------------------------------------------- retrieve
@@ -209,6 +228,10 @@ Deno.serve(async (req) => {
     // silent either, which is how the above went unnoticed.
     if (factError) console.error("ask-rex fact write failed", factError);
   }
+
+  // Logged only now, after a real answer: nobody should lose quota to our
+  // own outage. Doubles as the usage figure for the KPI dashboard.
+  await asUser.from("rex_asks").insert({ user_id: userId });
 
   return json({
     answer: answer.answer ?? "",

@@ -57,7 +57,15 @@ struct AskRexWebResult: Identifiable {
 }
 
 /// One answer, with everything needed to draw it.
-struct AskRexAnswer: Identifiable {
+///
+/// `web` fills in after the rest. Resolving three search hints means three
+/// round trips to Google Places on top of the model call, which took the
+/// Edinburgh answer to about 25 seconds while the friends' half had been ready
+/// at 8 — so the answer is published as soon as the friends' cards exist, and
+/// the web results append themselves when they arrive. A class rather than a
+/// struct precisely so that later arrival can reach a value already on screen.
+@MainActor
+final class AskRexAnswer: Identifiable, ObservableObject {
     let id = UUID()
     let question: String
     let prose: String
@@ -65,38 +73,69 @@ struct AskRexAnswer: Identifiable {
     /// Why each pick, keyed by recommendation id — Rex's line, kept separate
     /// from the friend's own note so the two are never confused on screen.
     let reasons: [String: String]
-    let web: [AskRexWebResult]
     let friendsWereThin: Bool
+
+    /// Empty until the lookups finish; `isResolvingWeb` is what lets the view
+    /// say "still looking" rather than "nothing found".
+    @Published var web: [AskRexWebResult] = []
+    @Published var isResolvingWeb: Bool
+
+    init(
+        question: String,
+        prose: String,
+        friends: [FeedRecommendation],
+        reasons: [String: String],
+        friendsWereThin: Bool,
+        expectsWeb: Bool
+    ) {
+        self.question = question
+        self.prose = prose
+        self.friends = friends
+        self.reasons = reasons
+        self.friendsWereThin = friendsWereThin
+        self.isResolvingWeb = expectsWeb
+    }
 }
 
 enum AskRex {
-    /// Ask, then turn ids and hints into things that can be drawn.
+    /// Ask, and return as soon as there is something worth showing.
+    ///
+    /// The friends' cards are one database read and come back immediately. The
+    /// web hints are a Places lookup each and are left to finish on their own,
+    /// writing themselves into the answer when they do — so the screen fills in
+    /// rather than sitting on a spinner for the slowest part of the job.
     static func ask(_ question: String, history: [AskRexTurn]) async throws -> AskRexAnswer {
         let reply = try await RexAPI.shared.askRex(question: question, history: history)
 
-        // Both halves at once — the web lookups are several network calls and
-        // there's no reason for the friends' cards to wait behind them.
-        async let friendsTask = RexAPI.shared.fetchRecommendations(
+        let friends = (try? await RexAPI.shared.fetchRecommendations(
             ids: reply.picks.map(\.recommendation_id)
-        )
-        async let webTask = resolve(reply.web)
-
-        let friends = (try? await friendsTask) ?? []
-        let web = await webTask
+        )) ?? []
 
         var reasons: [String: String] = [:]
         for pick in reply.picks {
             if let why = pick.why, !why.isEmpty { reasons[pick.recommendation_id] = why }
         }
 
-        return AskRexAnswer(
+        let answer = await AskRexAnswer(
             question: question,
             prose: reply.answer,
             friends: friends,
             reasons: reasons,
-            web: web,
-            friendsWereThin: reply.friends_were_thin
+            friendsWereThin: reply.friends_were_thin,
+            expectsWeb: !reply.web.isEmpty
         )
+
+        if !reply.web.isEmpty {
+            Task {
+                let resolved = await resolve(reply.web)
+                await MainActor.run {
+                    answer.web = resolved
+                    answer.isResolvingWeb = false
+                }
+            }
+        }
+
+        return answer
     }
 
     /// Look each hint up in the real catalogue. A suggestion that can't be
