@@ -44,26 +44,23 @@ struct RootView: View {
                             })
                         case .username(let suggested, let name):
                             UsernameSetupView(suggestedUsername: suggested, suggestedName: name) {
-                                // Straight on to the tour if they haven't
-                                // had it, rather than dropping them in the
-                                // feed and popping it up a second later.
-                                Task {
-                                    if needsOnboarding() {
-                                        gate = .onboarding
-                                    } else if !RexPushNotifications.hasAsked, await RexPushNotifications.canAsk() {
-                                        gate = .notifications
-                                    } else {
-                                        gate = nil
-                                    }
-                                }
+                                // Straight on to whatever's next, rather than
+                                // dropping them in the feed and popping it up
+                                // a second later.
+                                gate = nil
+                                Task { await checkGates() }
                             }
                         case .onboarding:
                             OnboardingView(onDone: {
                                 markOnboarded()
                                 gate = nil
+                                Task { await checkGates() }
                             })
                         case .notifications:
-                            NotificationsAskView(onDone: { gate = nil })
+                            NotificationsAskView(onDone: {
+                                gate = nil
+                                Task { await checkGates() }
+                            })
                         case .phone(let catchUp):
                             PhoneNumberPromptView(isCatchUp: catchUp) {
                                 gate = nil
