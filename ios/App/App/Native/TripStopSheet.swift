@@ -292,7 +292,7 @@ struct TripStopSheet: View {
         guard picked == nil else { myHits = []; webHits = []; isSearching = false; return }
         isSearching = true
         searchTask = Task {
-            try? await Task.sleep(nanoseconds: 300_000_000)
+            try? await Task.sleep(nanoseconds: 500_000_000)
             guard !Task.isCancelled else { return }
             async let mine = (try? await RexAPI.shared.searchMyRexItems(query: q)) ?? []
             async let web = RexSearch.search(category: .place, query: q)

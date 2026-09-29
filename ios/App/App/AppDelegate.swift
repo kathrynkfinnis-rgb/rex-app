@@ -1,6 +1,6 @@
 import UIKit
 import Capacitor
-import GoogleMaps
+
 
 @UIApplicationMain
 class AppDelegate: UIResponder, UIApplicationDelegate {
@@ -8,38 +8,29 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
     var window: UIWindow?
 
     func application(_ application: UIApplication, didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]?) -> Bool {
-        // Sept 29 — "images on the feed aren't loading".
-        //
-        // They did load; they were just slow enough that the placeholder was
-        // what you saw. The default shared cache is 512KB in memory, and a
-        // single map tile is over 100KB — so scrolling down and back up
-        // re-downloaded every tile that had just been on screen. This holds a
-        // realistic scroll's worth, which is what makes the second look
-        // instant rather than another wait.
-        URLCache.shared = URLCache(
-            memoryCapacity: 64 * 1024 * 1024,
-            diskCapacity: 512 * 1024 * 1024
-        )
-
-        // Google Maps must be keyed before any GMSMapView is created.
-        //
-        // Sept 21, security review: this comment used to claim the key was
-        // iOS-restricted to this bundle id. It wasn't — the same key answered
-        // Places and Geocoding calls from a plain server with no iOS headers
-        // at all, which means anyone who pulls it out of the binary can bill
-        // Places queries to us. Restrict it in the Google Cloud console
-        // (Application restrictions -> iOS apps) before the App Store release.
-        if let key = Bundle.main.object(forInfoDictionaryKey: "GMSApiKey") as? String, !key.isEmpty {
-            GMSServices.provideAPIKey(key)
-        }
         // AsyncImage rides on URLSession.shared, whose default cache is a few
         // hundred KB — barely one thumbnail. Feed photos were re-downloading
         // on every scroll-back for lack of anywhere to keep them. This is the
         // other half of the slow-photos fix alongside downscaling on upload.
+        //
+        // Sept 29: a second, larger URLCache was briefly added above this one
+        // to explain "images on the feed aren't loading" — which was wrong
+        // twice over. It was dead (this line ran after it and won), and the
+        // cache was never the problem: 50MB was already ample. The map tiles
+        // were simply slow to fetch from Google, and they don't come from the
+        // network at all any more. See RexMapSnapshot.
         URLCache.shared = URLCache(
             memoryCapacity: 50 * 1024 * 1024,
             diskCapacity: 300 * 1024 * 1024
         )
+
+        // Sept 29 — the Google Maps SDK is no longer initialised. Nothing
+        // creates a GMSMapView since the map moved to MapKit (see
+        // AppleMapView), and keying the SDK is what starts a Dynamic Maps
+        // billing relationship. Google is still used for place search, but
+        // that goes over REST with its own key and header — it never touched
+        // GMSServices. The package can come out of the project entirely for
+        // the app-size saving whenever someone's in Xcode.
         return true
     }
 

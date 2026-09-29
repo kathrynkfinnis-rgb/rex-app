@@ -45,7 +45,7 @@ struct RexMapView: View {
     }
 
     @State private var selectedPlace: MapPlace?
-    /// See GoogleMapView.fitToPlacesNonce.
+    /// See AppleMapView.fitToPlacesNonce.
     @State private var tripFitNonce = 0
     @State private var userCoordinate: CLLocationCoordinate2D?
     @State private var areaName: String?
@@ -196,7 +196,7 @@ struct RexMapView: View {
             } else if showingList {
                 placesList
             } else {
-                GoogleMapView(
+                AppleMapView(
                     places: visiblePlaces,
                     center: center,
                     radiusMeters: radiusMeters,
@@ -291,7 +291,7 @@ struct RexMapView: View {
         personFilter = nil
         Task {
             focusedTripPlaces = (try? await RexAPI.shared.fetchMapPlaces(forTrip: id, tripName: title)) ?? []
-            // Frame every stop once they've arrived — see GoogleMapView.
+            // Frame every stop once they've arrived — see AppleMapView.
             tripFitNonce += 1
         }
     }

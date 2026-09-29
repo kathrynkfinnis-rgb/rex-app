@@ -433,7 +433,7 @@ struct EditRexView: View {
         let term = address
         guard term.trimmingCharacters(in: .whitespaces).count >= 2 else { addressHits = []; return }
         addressSearchTask = Task {
-            try? await Task.sleep(nanoseconds: 300_000_000)
+            try? await Task.sleep(nanoseconds: 500_000_000)
             if Task.isCancelled { return }
             let results = await RexSearch.search(category: category, query: term)
             if Task.isCancelled { return }

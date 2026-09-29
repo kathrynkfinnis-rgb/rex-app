@@ -54,6 +54,7 @@
 		FEED035B0000000000000000 /* NewCollectionView.swift in Sources */ = {isa = PBXBuildFile; fileRef = FEED035A0000000000000000 /* NewCollectionView.swift */; };
 		FEED037B0000000000000000 /* AppleSignInButton.swift in Sources */ = {isa = PBXBuildFile; fileRef = FEED037A0000000000000000 /* AppleSignInButton.swift */; };
 		FEED058B0000000000000000 /* TripMapTileView.swift in Sources */ = {isa = PBXBuildFile; fileRef = FEED058A0000000000000000 /* TripMapTileView.swift */; };
+		FEED09A10000000000000000 /* RexMapSnapshot.swift in Sources */ = {isa = PBXBuildFile; fileRef = FEED09A00000000000000000 /* RexMapSnapshot.swift */; };
 		FEED059B0000000000000000 /* FriendTagPickerView.swift in Sources */ = {isa = PBXBuildFile; fileRef = FEED059A0000000000000000 /* FriendTagPickerView.swift */; };
 		FEED060B0000000000000000 /* NotificationPreferencesView.swift in Sources */ = {isa = PBXBuildFile; fileRef = FEED060A0000000000000000 /* NotificationPreferencesView.swift */; };
 		FEED062B0000000000000000 /* LegalContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = FEED062A0000000000000000 /* LegalContentView.swift */; };
@@ -88,7 +89,7 @@
 		FEED021B0000000000000000 /* TopRexxersView.swift in Sources */ = {isa = PBXBuildFile; fileRef = FEED021A0000000000000000 /* TopRexxersView.swift */; };
 		FEED020B0000000000000000 /* LikesCommentsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = FEED020A0000000000000000 /* LikesCommentsView.swift */; };
 		FEED019B0000000000000000 /* RexSearch.swift in Sources */ = {isa = PBXBuildFile; fileRef = FEED019A0000000000000000 /* RexSearch.swift */; };
-		FEED018B0000000000000000 /* GoogleMapView.swift in Sources */ = {isa = PBXBuildFile; fileRef = FEED018A0000000000000000 /* GoogleMapView.swift */; };
+		FEED018B0000000000000000 /* AppleMapView.swift in Sources */ = {isa = PBXBuildFile; fileRef = FEED018A0000000000000000 /* AppleMapView.swift */; };
 		FEED017B0000000000000000 /* UserAvatarView.swift in Sources */ = {isa = PBXBuildFile; fileRef = FEED017A0000000000000000 /* UserAvatarView.swift */; };
 		FEED016B0000000000000000 /* TripDetailView.swift in Sources */ = {isa = PBXBuildFile; fileRef = FEED016A0000000000000000 /* TripDetailView.swift */; };
 /* End PBXBuildFile section */
@@ -146,6 +147,7 @@
 		FEED031A0000000000000000 /* AskForRexView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AskForRexView.swift; sourceTree = "<group>"; };
 		FEED030A0000000000000000 /* FeedbackView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FeedbackView.swift; sourceTree = "<group>"; };
 		FEED058A0000000000000000 /* TripMapTileView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TripMapTileView.swift; sourceTree = "<group>"; };
+		FEED09A00000000000000000 /* RexMapSnapshot.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RexMapSnapshot.swift; sourceTree = "<group>"; };
 		FEED059A0000000000000000 /* FriendTagPickerView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FriendTagPickerView.swift; sourceTree = "<group>"; };
 		FEED060A0000000000000000 /* NotificationPreferencesView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NotificationPreferencesView.swift; sourceTree = "<group>"; };
 		FEED061A0000000000000000 /* RexPushNotifications.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RexPushNotifications.swift; sourceTree = "<group>"; };
@@ -178,7 +180,7 @@
 		FEED021A0000000000000000 /* TopRexxersView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TopRexxersView.swift; sourceTree = "<group>"; };
 		FEED020A0000000000000000 /* LikesCommentsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LikesCommentsView.swift; sourceTree = "<group>"; };
 		FEED019A0000000000000000 /* RexSearch.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RexSearch.swift; sourceTree = "<group>"; };
-		FEED018A0000000000000000 /* GoogleMapView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GoogleMapView.swift; sourceTree = "<group>"; };
+		FEED018A0000000000000000 /* AppleMapView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppleMapView.swift; sourceTree = "<group>"; };
 		FEED017A0000000000000000 /* UserAvatarView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UserAvatarView.swift; sourceTree = "<group>"; };
 		FEED016A0000000000000000 /* TripDetailView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TripDetailView.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
@@ -276,6 +278,7 @@
 				FEED027A0000000000000000 /* UserProfileView.swift */,
 				FEED026A0000000000000000 /* TripStopsBuilderView.swift */,
 				FEED058A0000000000000000 /* TripMapTileView.swift */,
+				FEED09A00000000000000000 /* RexMapSnapshot.swift */,
 				FEED059A0000000000000000 /* FriendTagPickerView.swift */,
 				FEED060A0000000000000000 /* NotificationPreferencesView.swift */,
 				FEED061A0000000000000000 /* RexPushNotifications.swift */,
@@ -304,7 +307,7 @@
 				FEED021A0000000000000000 /* TopRexxersView.swift */,
 				FEED020A0000000000000000 /* LikesCommentsView.swift */,
 				FEED019A0000000000000000 /* RexSearch.swift */,
-				FEED018A0000000000000000 /* GoogleMapView.swift */,
+				FEED018A0000000000000000 /* AppleMapView.swift */,
 				FEED017A0000000000000000 /* UserAvatarView.swift */,
 				FEED016A0000000000000000 /* TripDetailView.swift */,
 			);
@@ -440,6 +443,7 @@
 				FEED027B0000000000000000 /* UserProfileView.swift in Sources */,
 				FEED026B0000000000000000 /* TripStopsBuilderView.swift in Sources */,
 				FEED058B0000000000000000 /* TripMapTileView.swift in Sources */,
+				FEED09A10000000000000000 /* RexMapSnapshot.swift in Sources */,
 				FEED059B0000000000000000 /* FriendTagPickerView.swift in Sources */,
 				FEED060B0000000000000000 /* NotificationPreferencesView.swift in Sources */,
 				FEED061B0000000000000000 /* RexPushNotifications.swift in Sources */,
@@ -468,7 +472,7 @@
 				FEED021B0000000000000000 /* TopRexxersView.swift in Sources */,
 				FEED020B0000000000000000 /* LikesCommentsView.swift in Sources */,
 				FEED019B0000000000000000 /* RexSearch.swift in Sources */,
-				FEED018B0000000000000000 /* GoogleMapView.swift in Sources */,
+				FEED018B0000000000000000 /* AppleMapView.swift in Sources */,
 				FEED017B0000000000000000 /* UserAvatarView.swift in Sources */,
 				FEED016B0000000000000000 /* TripDetailView.swift in Sources */,
 			);
