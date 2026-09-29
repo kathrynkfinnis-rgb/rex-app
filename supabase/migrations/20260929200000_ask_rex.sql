@@ -46,15 +46,19 @@ alter table public.rex_facts enable row level security;
 -- Yours and nobody else's — not even friends. What REX has worked out about
 -- you is more revealing than anything you've posted, and none of it was
 -- deliberately shared.
+drop policy if exists "Users read own facts" on public.rex_facts;
 create policy "Users read own facts" on public.rex_facts
   for select to authenticated using (auth.uid() = user_id);
 
+drop policy if exists "Users write own facts" on public.rex_facts;
 create policy "Users write own facts" on public.rex_facts
   for insert to authenticated with check (auth.uid() = user_id);
 
+drop policy if exists "Users update own facts" on public.rex_facts;
 create policy "Users update own facts" on public.rex_facts
   for update to authenticated using (auth.uid() = user_id);
 
+drop policy if exists "Users delete own facts" on public.rex_facts;
 create policy "Users delete own facts" on public.rex_facts
   for delete to authenticated using (auth.uid() = user_id);
 
@@ -105,12 +109,15 @@ create index if not exists rex_suggestions_user_idx
 
 alter table public.rex_suggestions enable row level security;
 
+drop policy if exists "Users read own suggestions" on public.rex_suggestions;
 create policy "Users read own suggestions" on public.rex_suggestions
   for select to authenticated using (auth.uid() = user_id);
 
+drop policy if exists "Users write own suggestions" on public.rex_suggestions;
 create policy "Users write own suggestions" on public.rex_suggestions
   for insert to authenticated with check (auth.uid() = user_id);
 
+drop policy if exists "Users delete own suggestions" on public.rex_suggestions;
 create policy "Users delete own suggestions" on public.rex_suggestions
   for delete to authenticated using (auth.uid() = user_id);
 
