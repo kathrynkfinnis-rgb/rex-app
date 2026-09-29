@@ -311,24 +311,42 @@ struct ContactsFriendFinderView: View {
         guard granted else { stage = .denied; return }
         stage = .working
 
-        let hashes: [String] = await Task.detached(priority: .userInitiated) {
-            var out = Set<String>()
-            let request = CNContactFetchRequest(keysToFetch: [CNContactEmailAddressesKey as CNKeyDescriptor])
+        // Sept 29 — numbers as well as emails. People have their friends'
+        // phone numbers; almost nobody has the address they signed up with,
+        // which is why email-only matching found so few people.
+        let (emailHashes, phoneHashes): ([String], [String]) = await Task.detached(priority: .userInitiated) {
+            var emails = Set<String>()
+            var phones = Set<String>()
+            let request = CNContactFetchRequest(keysToFetch: [
+                CNContactEmailAddressesKey as CNKeyDescriptor,
+                CNContactPhoneNumbersKey as CNKeyDescriptor,
+            ])
             try? store.enumerateContacts(with: request) { contact, _ in
                 for labelled in contact.emailAddresses {
                     let email = (labelled.value as String).trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
                     guard email.contains("@") else { continue }
                     let digest = SHA256.hash(data: Data(email.utf8))
-                    out.insert(digest.map { String(format: "%02x", $0) }.joined())
+                    emails.insert(digest.map { String(format: "%02x", $0) }.joined())
+                }
+                for labelled in contact.phoneNumbers {
+                    if let hash = RexPhone.hashed(labelled.value.stringValue) { phones.insert(hash) }
                 }
             }
-            return Array(out)
+            return (Array(emails), Array(phones))
         }.value
+        let hashes = emailHashes
 
-        contactCount = hashes.count
+        contactCount = max(emailHashes.count, phoneHashes.count)
         do {
-            matches = try await RexAPI.shared.matchContactEmails(hashes: hashes)
+            async let byEmail = RexAPI.shared.matchContactEmails(hashes: hashes)
+            async let byPhone = RexAPI.shared.matchContactPhones(hashes: phoneHashes)
+            // The same person can match on both; keyed by id so they appear once.
+            var merged: [String: FoundPerson] = [:]
+            for person in try await byEmail { merged[person.id] = person }
+            for person in try await byPhone { merged[person.id] = person }
+            matches = merged.values
                 .filter { !RexAPI.shared.hiddenUsers.contains($0.id) }
+                .sorted { $0.name.localizedCaseInsensitiveCompare($1.name) == .orderedAscending }
         } catch {
             errorMessage = error.localizedDescription
         }

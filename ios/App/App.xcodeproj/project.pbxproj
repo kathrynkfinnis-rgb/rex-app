@@ -68,6 +68,7 @@
 		FEED072B0000000000000000 /* FindFriendsViews.swift in Sources */ = {isa = PBXBuildFile; fileRef = FEED072A0000000000000000 /* FindFriendsViews.swift */; };
 		FEED073B0000000000000000 /* PrivacyDataView.swift in Sources */ = {isa = PBXBuildFile; fileRef = FEED073A0000000000000000 /* PrivacyDataView.swift */; };
 		FEED074B0000000000000000 /* ReportBlockViews.swift in Sources */ = {isa = PBXBuildFile; fileRef = FEED074A0000000000000000 /* ReportBlockViews.swift */; };
+		FEED07910000000000000000 /* PhoneNumberSupport.swift in Sources */ = {isa = PBXBuildFile; fileRef = FEED07900000000000000000 /* PhoneNumberSupport.swift */; };
 		FEED07810000000000000000 /* MentionSupport.swift in Sources */ = {isa = PBXBuildFile; fileRef = FEED07800000000000000000 /* MentionSupport.swift */; };
 		FEED07710000000000000000 /* RexKeyboardDismiss.swift in Sources */ = {isa = PBXBuildFile; fileRef = FEED07700000000000000000 /* RexKeyboardDismiss.swift */; };
 		FEED07610000000000000000 /* RexOutboundLinks.swift in Sources */ = {isa = PBXBuildFile; fileRef = FEED07600000000000000000 /* RexOutboundLinks.swift */; };
@@ -159,6 +160,7 @@
 		FEED072A0000000000000000 /* FindFriendsViews.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FindFriendsViews.swift; sourceTree = "<group>"; };
 		FEED073A0000000000000000 /* PrivacyDataView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PrivacyDataView.swift; sourceTree = "<group>"; };
 		FEED074A0000000000000000 /* ReportBlockViews.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ReportBlockViews.swift; sourceTree = "<group>"; };
+		FEED07900000000000000000 /* PhoneNumberSupport.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PhoneNumberSupport.swift; sourceTree = "<group>"; };
 		FEED07800000000000000000 /* MentionSupport.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MentionSupport.swift; sourceTree = "<group>"; };
 		FEED07700000000000000000 /* RexKeyboardDismiss.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RexKeyboardDismiss.swift; sourceTree = "<group>"; };
 		FEED07600000000000000000 /* RexOutboundLinks.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RexOutboundLinks.swift; sourceTree = "<group>"; };
@@ -288,6 +290,7 @@
 				FEED072A0000000000000000 /* FindFriendsViews.swift */,
 				FEED073A0000000000000000 /* PrivacyDataView.swift */,
 				FEED074A0000000000000000 /* ReportBlockViews.swift */,
+				FEED07900000000000000000 /* PhoneNumberSupport.swift */,
 				FEED07800000000000000000 /* MentionSupport.swift */,
 				FEED07700000000000000000 /* RexKeyboardDismiss.swift */,
 				FEED07600000000000000000 /* RexOutboundLinks.swift */,
@@ -450,6 +453,7 @@
 				FEED072B0000000000000000 /* FindFriendsViews.swift in Sources */,
 				FEED073B0000000000000000 /* PrivacyDataView.swift in Sources */,
 				FEED074B0000000000000000 /* ReportBlockViews.swift in Sources */,
+				FEED07910000000000000000 /* PhoneNumberSupport.swift in Sources */,
 				FEED07810000000000000000 /* MentionSupport.swift in Sources */,
 				FEED07710000000000000000 /* RexKeyboardDismiss.swift in Sources */,
 				FEED07610000000000000000 /* RexOutboundLinks.swift in Sources */,

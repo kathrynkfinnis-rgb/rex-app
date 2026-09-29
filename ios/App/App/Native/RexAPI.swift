@@ -2029,6 +2029,38 @@ final class RexAPI {
     /// Hashes of the emails in your contacts in, Rex profiles out. The
     /// hashing happens on the phone (ContactsFriendFinderView); no address
     /// ever leaves it.
+    /// Sept 29 — the phone twin of matchContactEmails. Same batching, same
+    /// cap: the database refuses more than 2,000 hashes a call.
+    func matchContactPhones(hashes: [String]) async throws -> [FoundPerson] {
+        guard !hashes.isEmpty else { return [] }
+        var found: [String: FoundPerson] = [:]
+        var start = 0
+        while start < hashes.count {
+            let batch = Array(hashes[start..<min(start + 2000, hashes.count)])
+            let people = try await callPeopleRPC("match_contact_phones", body: ["_hashes": batch],
+                                                 fallback: "Couldn't check your contacts.")
+            for person in people { found[person.id] = person }
+            start += 2000
+        }
+        return found.values.sorted { $0.name.localizedCaseInsensitiveCompare($1.name) == .orderedAscending }
+    }
+
+    /// Stores the hash of your own number so friends' contact lists can find
+    /// you. The number itself never reaches us — see PhoneNumberSupport.
+    func setMyPhoneHash(_ hash: String?) async throws {
+        let token = try await validToken()
+        var request = URLRequest(url: baseURL.appendingPathComponent("/rest/v1/rpc/set_my_phone_hash"))
+        request.httpMethod = "POST"
+        request.setValue(anonKey, forHTTPHeaderField: "apikey")
+        request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        request.httpBody = try JSONSerialization.data(withJSONObject: ["_hash": hash as Any])
+        let (data, response) = try await URLSession.shared.data(for: request)
+        guard let http = response as? HTTPURLResponse, http.statusCode < 400 else {
+            throw RexAPIError.server(friendlyError(data, fallback: "Couldn't save your number."))
+        }
+    }
+
     func matchContactEmails(hashes: [String]) async throws -> [FoundPerson] {
         guard !hashes.isEmpty else { return [] }
         var found: [String: FoundPerson] = [:]

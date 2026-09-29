@@ -11,12 +11,14 @@ struct RootView: View {
         case username(suggested: String, name: String?)
         case onboarding
         case notifications
+        case phone(catchUp: Bool)
         var id: String {
             switch self {
             case .consent: return "consent"
             case .username: return "username"
             case .onboarding: return "onboarding"
             case .notifications: return "notifications"
+            case .phone(let catchUp): return "phone-\(catchUp)"
             }
         }
     }
@@ -62,6 +64,11 @@ struct RootView: View {
                             })
                         case .notifications:
                             NotificationsAskView(onDone: { gate = nil })
+                        case .phone(let catchUp):
+                            PhoneNumberPromptView(isCatchUp: catchUp) {
+                                gate = nil
+                                Task { await checkGates() }
+                            }
                         }
                     }
             } else {
@@ -121,6 +128,12 @@ struct RootView: View {
             // Already through onboarding before it asked (Danny, and
             // everyone before him) and never asked since: once.
             gate = .notifications
+        } else if !RexPhone.hasBeenAsked {
+            // Sept 29 — a number is what actually makes contact matching
+            // find anyone. Asked once per account, whatever the answer, and
+            // last in the queue so a new sign-up isn't met with a stack of
+            // questions before they've seen the app.
+            gate = .phone(catchUp: !needsOnboarding())
         }
     }
 
