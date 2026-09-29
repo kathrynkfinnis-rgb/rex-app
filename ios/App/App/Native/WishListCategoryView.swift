@@ -20,10 +20,20 @@ struct WishListCategoryView: View {
     private enum ActiveSheet: Identifiable {
         case edit(FeedRecommendation)
         case collection(WantRow)
+        /// Sept 29, Gemma planning Cornwall: "I want to add 'want to try'
+        /// places to a trip, order them by day, and once I'm there scroll
+        /// through and add my take to the ones I actually go to."
+        ///
+        /// Everything that needs existed already — AddToTripView takes an
+        /// item id and creates an unrated stop, which is exactly a place you
+        /// plan to go and haven't been to yet. It was just never offered on a
+        /// want, so a wish list was a dead end.
+        case trip(WantRow)
         var id: String {
             switch self {
             case .edit(let rec): return "edit-\(rec.id)"
             case .collection(let want): return "collection-\(want.id)"
+            case .trip(let want): return "trip-\(want.id)"
             }
         }
     }
@@ -176,6 +186,17 @@ struct WishListCategoryView: View {
                                         systemImage: "folder.badge.plus"
                                     )
                                 }
+                                // Only places and events can be stops on a
+                                // trip — a book you want to read isn't
+                                // somewhere you go.
+                                if want.items.map({ RexCategory(rawValue: $0.type) == .place
+                                        || RexCategory(rawValue: $0.type) == .event }) == true {
+                                    Button {
+                                        activeSheet = .trip(want)
+                                    } label: {
+                                        Label("Add to a trip", systemImage: "suitcase")
+                                    }
+                                }
                             }
                         }
                     }
@@ -202,6 +223,15 @@ struct WishListCategoryView: View {
                         wants[index].list_id = newListId
                     }
                 }
+            case .trip(let want):
+                // The want stays where it is. It's a thing you still haven't
+                // done; the trip stop is the plan to do it, and rating the
+                // stop later is what marks it done.
+                AddToTripView(
+                    itemId: want.item_id,
+                    itemTitle: want.items?.title ?? "This place",
+                    onDone: {}
+                )
             }
         }
         .task { await load() }
