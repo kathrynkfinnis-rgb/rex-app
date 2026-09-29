@@ -15,8 +15,12 @@ struct AddRexView: View {
     /// (see apply(_:)) rather than inventing a second prefill mechanism —
     /// jumping straight past the category picker and the search box into
     /// the already-filled-in form.
-    init(onDone: @escaping () -> Void, initialPlaceHit: RexSearchHit? = nil) {
+    /// `taggingFriend` opens the form with someone already tagged — used
+    /// from a friend's empty page, where the useful thing to do is send them
+    /// something rather than ask the world for a recommendation.
+    init(onDone: @escaping () -> Void, initialPlaceHit: RexSearchHit? = nil, taggingFriend: String? = nil) {
         self.onDone = onDone
+        if let taggingFriend { _taggedFriendIds = State(initialValue: [taggingFriend]) }
         if let hit = initialPlaceHit {
             _category = State(initialValue: .place)
             _picked = State(initialValue: hit)

@@ -53,6 +53,12 @@ struct UserProfileView: View {
 
     /// A friend of yours who has posted nothing — as distinct from someone
     /// you can't see yet, whose Rex are hidden rather than absent.
+    /// "Send Phoebe a Rex" rather than "Send phoebebragg a Rex".
+    private var firstName: String {
+        let name = profile?.display_name ?? route.name
+        return name.split(separator: " ").first.map(String.init) ?? name
+    }
+
     private var isEmptyFriend: Bool {
         recommendations.isEmpty && connection == "friend"
     }
@@ -125,7 +131,7 @@ struct UserProfileView: View {
                             .multilineTextAlignment(.center)
 
                         if isEmptyFriend {
-                            Text("Ask them for one — a blast goes to all your friends, and theirs is the answer you're after.")
+                            Text("Tag them in something you'd recommend — it lands in their notifications, and it's a better nudge than an empty page.")
                                 .font(RexFont.text(13))
                                 .foregroundStyle(RexColor.mutedForeground)
                                 .multilineTextAlignment(.center)
@@ -133,7 +139,7 @@ struct UserProfileView: View {
                             Button {
                                 showingAsk = true
                             } label: {
-                                Label("Ask for a Rex", systemImage: "sparkles")
+                                Label("Send \(firstName) a Rex", systemImage: "paperplane")
                                     .font(RexFont.text(15, weight: .semibold))
                             }
                             .buttonStyle(RexPrimaryButtonStyle())
@@ -199,7 +205,7 @@ struct UserProfileView: View {
             }
         }
         .sheet(isPresented: $showingAsk) {
-            AskForRexView()
+            AddRexView(onDone: { showingAsk = false }, taggingFriend: route.userId)
         }
         .sheet(item: $reporting) { subject in
             ReportSheet(subject: subject, onBlocked: { dismissSelf() })
