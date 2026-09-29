@@ -272,10 +272,24 @@ struct TripStopSheet: View {
     }
 
     private func scheduleSearch() {
-        picked = nil
+        // Sept 29 — "you always have to click twice on the suggestion".
+        //
+        // This used to clear `picked` unconditionally. Tapping a result sets
+        // picked AND the title; setting the title fires this; this wiped
+        // picked; and the results list — which shows whenever nothing is
+        // picked — sprang straight back under the user's finger. The second
+        // tap worked only because the search had settled by then.
+        //
+        // Clearing is still right when someone edits the name after picking,
+        // which is them saying they meant something else. It just isn't right
+        // when the only thing that changed is the title we set ourselves.
+        if title != picked?.title { picked = nil }
         searchTask?.cancel()
         let q = title.trimmingCharacters(in: .whitespaces)
         guard q.count >= 2 else { myHits = []; webHits = []; isSearching = false; return }
+        // Nothing to search for while something is picked — and a result
+        // arriving now would reopen the list.
+        guard picked == nil else { myHits = []; webHits = []; isSearching = false; return }
         isSearching = true
         searchTask = Task {
             try? await Task.sleep(nanoseconds: 300_000_000)
@@ -284,6 +298,8 @@ struct TripStopSheet: View {
             async let web = RexSearch.search(category: .place, query: q)
             let (m, w) = await (mine, web)
             guard !Task.isCancelled else { return }
+            // Picked while this was in flight: the answer is stale.
+            guard picked == nil else { isSearching = false; return }
             myHits = m
             // Anything already in your own list shouldn't also appear as a
             // fresh search result underneath it.

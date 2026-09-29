@@ -30,6 +30,19 @@ struct AddTripStopSheet: View {
     @State private var note = ""
     @State private var picked: RexSearchHit?
     @State private var hits: [RexSearchHit] = []
+    /// Sept 28 — "you always have to click twice on the suggestion".
+    ///
+    /// The list reappearing after a tap has more than one way of happening —
+    /// a search still in flight, a re-render ordering, something in the
+    /// field's own update cycle — and I chased the specific one for longer
+    /// than it was worth. This closes the door on all of them instead: once
+    /// you've picked something, the list stays shut until you actually edit
+    /// the name again, whatever the searches underneath are doing.
+    ///
+    /// "Actually edit" is the important part. Setting the field to the
+    /// picked title is not an edit, so the comparison below is against what
+    /// was picked rather than a flag that anything touching the text clears.
+    @State private var suppressSuggestions = false
     @State private var searchTask: Task<Void, Never>?
     @State private var isSaving = false
     @State private var isGeocoding = false
@@ -85,9 +98,18 @@ struct AddTripStopSheet: View {
                     }
 
                     input("Name", text: $title)
-                        .onChange(of: title) { _, _ in scheduleSearch() }
+                        .onChange(of: title) { _, newValue in
+                            // Typing after a pick means they want to search
+                            // again; setting the field to what they picked
+                            // does not.
+                            if newValue != picked?.title {
+                                picked = nil
+                                suppressSuggestions = false
+                            }
+                            scheduleSearch()
+                        }
 
-                    if picked == nil && !hits.isEmpty {
+                    if !suppressSuggestions, picked == nil, !hits.isEmpty {
                         VStack(spacing: 0) {
                             ForEach(hits.prefix(5)) { hit in
                                 Button {
@@ -101,6 +123,7 @@ struct AddTripStopSheet: View {
                                     // for the late-arrival guard.
                                     searchTask?.cancel()
                                     searchTask = nil
+                                    suppressSuggestions = true
                                     picked = hit
                                     title = hit.title
                                     address = hit.address ?? ""
