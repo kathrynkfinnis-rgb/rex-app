@@ -31,12 +31,22 @@
 //
 // Provider: whichever key is set. Set exactly one of
 //   OPENAI_API_KEY   — uses OPENAI_MODEL, default gpt-5-mini
-//   GEMINI_API_KEY   — uses GEMINI_MODEL, default gemini-2.5-flash
+//   GEMINI_API_KEY   — uses GEMINI_MODEL, default gemini-3.5-flash-lite
+//
 // Both speak near-identical shapes, so switching provider is a secret, not a
 // rewrite. Anthropic is deliberately not wired up by default: Sonnet writes
 // the best copy of the three but costs six times GPT-5 mini for a job that is
 // mostly "pick four of these twenty and say why". Adding it later is one more
 // branch in callModel.
+//
+// On the default model. The plan costed gemini-2.5-flash, which Google has
+// since closed to new accounts; its own error names 3.8-flash as the
+// replacement, but 3.8 shed every request with "high demand" through three
+// retries, so it isn't something to put in front of users yet. Of what does
+// answer, 3.5-flash-lite is both the cheapest and the better behaved: asked
+// where to eat in Liverpool it used two of the friends' actual Rex, where
+// 3.7-flash ignored them and went to the web. At $0.30/$2.50 per million it
+// also lands on the same ~$30/month for 8,000 questions the plan assumed.
 
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "jsr:@supabase/supabase-js@2";
@@ -47,7 +57,12 @@ const ANON_KEY = Deno.env.get("SUPABASE_ANON_KEY")!;
 const OPENAI_KEY = Deno.env.get("OPENAI_API_KEY") ?? "";
 const GEMINI_KEY = Deno.env.get("GEMINI_API_KEY") ?? "";
 const OPENAI_MODEL = Deno.env.get("OPENAI_MODEL") ?? "gpt-5-mini";
-const GEMINI_MODEL = Deno.env.get("GEMINI_MODEL") ?? "gemini-2.5-flash";
+const GEMINI_MODEL = Deno.env.get("GEMINI_MODEL") ?? "gemini-3.5-flash-lite";
+/** Set the ASK_REX_DEBUG secret to have upstream failures come back in the
+ *  response instead of only the friendly line. Off by default: an end user
+ *  should never be shown a provider's error, and those errors sometimes quote
+ *  the request back. Deno.env only reads secrets we set, never the key. */
+const DEBUG = Deno.env.get("ASK_REX_DEBUG") === "1";
 
 const CORS = {
   "Access-Control-Allow-Origin": "*",
@@ -136,7 +151,7 @@ Deno.serve(async (req) => {
     answer = await callModel(prompt);
   } catch (error) {
     console.error("ask-rex model call failed", error);
-    return json({ error: "Rex couldn't answer that just now." }, 502);
+    return json({ error: "Rex couldn't answer that just now.", detail: DEBUG ? String(error).slice(0, 500) : undefined }, 502);
   }
 
   // The model returns ids; only ids that were actually on the shortlist are
@@ -357,8 +372,29 @@ function buildPrompt(input: {
 // ============================================================ the model
 
 async function callModel(prompt: { system: string; user: string }): Promise<ModelAnswer> {
-  const raw = GEMINI_KEY ? await callGemini(prompt) : await callOpenAI(prompt);
+  const raw = await withRetry(() => (GEMINI_KEY ? callGemini(prompt) : callOpenAI(prompt)));
   return parseAnswer(raw);
+}
+
+/** Hosted models are busy sometimes — Gemini answered the very first real
+ *  question with a 503 "high demand". That isn't a failure worth showing
+ *  someone who just asked where to eat, so a couple of quick retries sit
+ *  between them and it.
+ *
+ *  Only for the statuses that mean "try again". A 400 or a 401 will fail the
+ *  same way however many times it is sent, and retrying those would just make
+ *  the person wait longer for the same answer. */
+async function withRetry(call: () => Promise<string>): Promise<string> {
+  const backoffMs = [600, 1800];
+  for (let attempt = 0; ; attempt++) {
+    try {
+      return await call();
+    } catch (error) {
+      const retryable = /\b(429|500|502|503|504)\b/.test(String(error));
+      if (!retryable || attempt >= backoffMs.length) throw error;
+      await new Promise((resolve) => setTimeout(resolve, backoffMs[attempt]));
+    }
+  }
 }
 
 async function callOpenAI(prompt: { system: string; user: string }): Promise<string> {
