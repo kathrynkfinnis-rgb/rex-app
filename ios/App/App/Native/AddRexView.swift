@@ -85,6 +85,16 @@ struct AddRexView: View {
         }
         _tripEntries = State(initialValue: .fromStops(draftStops))
         _originalStopRecIds = State(initialValue: Set(stops.map { $0.id }))
+        // Sept 29 — "when we edit a trip and save it, it saves every single
+        // stop all over again rather than just the new stops". Keeping how
+        // each stop looked on the way in is what makes it possible to write
+        // back only what actually changed.
+        _originalStops = State(initialValue: Dictionary(
+            uniqueKeysWithValues: draftStops.compactMap { stop in
+                stop.existingRecId.map { ($0, stop) }
+            }
+        ))
+        _originalStopOrder = State(initialValue: stops.map { $0.id })
 
         // The date lives in the item's subtitle ("March 2026"); parse it
         // back into the two wheels so editing doesn't silently drop it.
@@ -229,6 +239,13 @@ struct AddRexView: View {
     /// What the trip had when the editor opened, so stops deleted during
     /// the edit can be told from ones that were never there.
     @State private var originalStopRecIds: Set<String> = []
+    /// Each stop as it was when the editor opened, so saving can tell what
+    /// the user actually touched.
+    @State private var originalStops: [String: DraftStop] = [:]
+    /// And the order they were in, so created_at is only re-stamped when
+    /// the itinerary has genuinely been rearranged — re-stamping resets
+    /// every stop's "posted" time, which is visible on every card.
+    @State private var originalStopOrder: [String] = []
     /// Sept 14 — the list equivalents of the three above. "The two edit
     /// buttons take you to different pages — they should be the same":
     /// a list's own page opened an in-place editor while its feed card
@@ -1318,25 +1335,53 @@ struct AddRexView: View {
                 try? await RexAPI.shared.deleteRecommendation(id: removed)
             }
 
-            // created_at drives stop order, so re-stamp every stop onto an
-            // increasing sequence matching the order on screen.
+            // created_at drives stop order, so a rearranged itinerary needs
+            // re-stamping onto an increasing sequence. Only a rearranged one,
+            // though: re-stamping resets every stop's posted time, which shows
+            // on every card, so doing it on every save was rewriting history
+            // for stops nobody had touched.
+            let orderNow = stops.compactMap { $0.existingRecId }
+            let orderChanged = orderNow != originalStopOrder.filter { keptIds.contains($0) }
+                || stops.contains { $0.existingRecId == nil }
             let base = Date().addingTimeInterval(-Double(stops.count))
             let formatter = ISO8601DateFormatter()
             for (index, stop) in stops.enumerated() {
-                postingProgress = "Saving stop \(index + 1) of \(stops.count)…"
                 let stamp = formatter.string(from: base.addingTimeInterval(Double(index)))
                 if let recId = stop.existingRecId, let itemId = stop.existingItemId {
-                    try? await RexAPI.shared.updateItemTitle(itemId: itemId, title: stop.title)
-                    try? await RexAPI.shared.updateItemGenre(itemId: itemId, genre: stop.genre)
-                    try? await RexAPI.shared.updateRecommendation(
-                        id: recId,
-                        rating: stop.rating,
-                        note: stop.note.isEmpty ? nil : stop.note,
-                        photoURLs: [stop.photoURL].compactMap { $0 },
-                        tags: []
-                    )
-                    try? await RexAPI.shared.setTripSection(recommendationId: recId, section: stop.section)
-                    try? await RexAPI.shared.setRecommendationCreatedAt(id: recId, createdAt: stamp)
+                    // Only what actually changed. Five writes per stop on every
+                    // save meant a twenty-stop trip made a hundred requests and
+                    // crawled through "Saving stop 1 of 20…" whether or not
+                    // anything had been edited.
+                    let before = originalStops[recId]
+                    var wrote = false
+                    if before?.title != stop.title {
+                        try? await RexAPI.shared.updateItemTitle(itemId: itemId, title: stop.title)
+                        wrote = true
+                    }
+                    if before?.genre != stop.genre {
+                        try? await RexAPI.shared.updateItemGenre(itemId: itemId, genre: stop.genre)
+                        wrote = true
+                    }
+                    if before?.rating != stop.rating || before?.note != stop.note
+                        || before?.photoURL != stop.photoURL {
+                        try? await RexAPI.shared.updateRecommendation(
+                            id: recId,
+                            rating: stop.rating,
+                            note: stop.note.isEmpty ? nil : stop.note,
+                            photoURLs: [stop.photoURL].compactMap { $0 },
+                            tags: []
+                        )
+                        wrote = true
+                    }
+                    if before?.section != stop.section {
+                        try? await RexAPI.shared.setTripSection(recommendationId: recId, section: stop.section)
+                        wrote = true
+                    }
+                    if orderChanged {
+                        try? await RexAPI.shared.setRecommendationCreatedAt(id: recId, createdAt: stamp)
+                        wrote = true
+                    }
+                    if wrote { postingProgress = "Saving stop \(index + 1) of \(stops.count)…" }
                 } else {
                     let stop = await geocodedIfNeeded(stop)
                     let newItemId = try await RexAPI.shared.createItem(
