@@ -54,6 +54,7 @@
 		FEED035B0000000000000000 /* NewCollectionView.swift in Sources */ = {isa = PBXBuildFile; fileRef = FEED035A0000000000000000 /* NewCollectionView.swift */; };
 		FEED037B0000000000000000 /* AppleSignInButton.swift in Sources */ = {isa = PBXBuildFile; fileRef = FEED037A0000000000000000 /* AppleSignInButton.swift */; };
 		FEED058B0000000000000000 /* TripMapTileView.swift in Sources */ = {isa = PBXBuildFile; fileRef = FEED058A0000000000000000 /* TripMapTileView.swift */; };
+		FEED09E10000000000000000 /* BrowseWithoutAccountView.swift in Sources */ = {isa = PBXBuildFile; fileRef = FEED09E00000000000000000 /* BrowseWithoutAccountView.swift */; };
 		FEED09D10000000000000000 /* RexMemoryView.swift in Sources */ = {isa = PBXBuildFile; fileRef = FEED09D00000000000000000 /* RexMemoryView.swift */; };
 		FEED09C10000000000000000 /* TalkToRexView.swift in Sources */ = {isa = PBXBuildFile; fileRef = FEED09C00000000000000000 /* TalkToRexView.swift */; };
 		FEED09B10000000000000000 /* AskRex.swift in Sources */ = {isa = PBXBuildFile; fileRef = FEED09B00000000000000000 /* AskRex.swift */; };
@@ -150,6 +151,7 @@
 		FEED031A0000000000000000 /* AskForRexView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AskForRexView.swift; sourceTree = "<group>"; };
 		FEED030A0000000000000000 /* FeedbackView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FeedbackView.swift; sourceTree = "<group>"; };
 		FEED058A0000000000000000 /* TripMapTileView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TripMapTileView.swift; sourceTree = "<group>"; };
+		FEED09E00000000000000000 /* BrowseWithoutAccountView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BrowseWithoutAccountView.swift; sourceTree = "<group>"; };
 		FEED09D00000000000000000 /* RexMemoryView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RexMemoryView.swift; sourceTree = "<group>"; };
 		FEED09C00000000000000000 /* TalkToRexView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TalkToRexView.swift; sourceTree = "<group>"; };
 		FEED09B00000000000000000 /* AskRex.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AskRex.swift; sourceTree = "<group>"; };
@@ -284,6 +286,7 @@
 				FEED027A0000000000000000 /* UserProfileView.swift */,
 				FEED026A0000000000000000 /* TripStopsBuilderView.swift */,
 				FEED058A0000000000000000 /* TripMapTileView.swift */,
+				FEED09E00000000000000000 /* BrowseWithoutAccountView.swift */,
 				FEED09D00000000000000000 /* RexMemoryView.swift */,
 				FEED09C00000000000000000 /* TalkToRexView.swift */,
 				FEED09B00000000000000000 /* AskRex.swift */,
@@ -452,6 +455,7 @@
 				FEED027B0000000000000000 /* UserProfileView.swift in Sources */,
 				FEED026B0000000000000000 /* TripStopsBuilderView.swift in Sources */,
 				FEED058B0000000000000000 /* TripMapTileView.swift in Sources */,
+				FEED09E10000000000000000 /* BrowseWithoutAccountView.swift in Sources */,
 				FEED09D10000000000000000 /* RexMemoryView.swift in Sources */,
 				FEED09C10000000000000000 /* TalkToRexView.swift in Sources */,
 				FEED09B10000000000000000 /* AskRex.swift in Sources */,

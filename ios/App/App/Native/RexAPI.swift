@@ -4197,12 +4197,16 @@ final class RexAPI {
     }
 
     /// Explore tab's "trending this week" shelf.
+    /// Oct 1 — also called with no account at all, from the browse-without-
+    /// signing-up screen Apple asked for. The anon key alone is enough: the
+    /// function is granted to anon and returns item facts and a count, never
+    /// who recommended anything. A signed-in caller still sends their token,
+    /// which changes nothing here but keeps the request consistent.
     func fetchTrendingItems(limit: Int = 12) async throws -> [TrendingItem] {
-        let token = try await validToken()
         var request = URLRequest(url: baseURL.appendingPathComponent("/rest/v1/rpc/trending_items_weekly"))
         request.httpMethod = "POST"
         request.setValue(anonKey, forHTTPHeaderField: "apikey")
-        request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+        request.setValue("Bearer \(await (try? validToken()) ?? anonKey)", forHTTPHeaderField: "Authorization")
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
         request.httpBody = try JSONSerialization.data(withJSONObject: ["_limit": limit])
 
@@ -4215,8 +4219,8 @@ final class RexAPI {
     /// Explore tab's REX-curated shelves ("REX Team" picks and anything
     /// credited to an outside source, both written by the three named
     /// curators — see is_rex_curator() in the migration).
+    /// Readable signed-out too — see fetchTrendingItems.
     func fetchEditorialCollections() async throws -> [EditorialCollection] {
-        let token = try await validToken()
         var components = URLComponents(url: baseURL.appendingPathComponent("/rest/v1/editorial_collections"), resolvingAgainstBaseURL: false)!
         components.queryItems = [
             URLQueryItem(name: "select", value: "id,title,source_label,category,editorial_collection_items(id,title,subtitle,image_url,item_id,link_url,sort_order)"),
@@ -4224,7 +4228,7 @@ final class RexAPI {
         ]
         var request = URLRequest(url: components.url!)
         request.setValue(anonKey, forHTTPHeaderField: "apikey")
-        request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+        request.setValue("Bearer \(await (try? validToken()) ?? anonKey)", forHTTPHeaderField: "Authorization")
         let (data, response) = try await URLSession.shared.data(for: request)
         // Best-effort: needs migration 20260816094500 run first.
         guard let http = response as? HTTPURLResponse, http.statusCode < 400 else { return [] }

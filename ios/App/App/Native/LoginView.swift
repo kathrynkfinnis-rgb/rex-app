@@ -6,7 +6,7 @@ import SwiftUI
 struct LoginView: View {
     var onSignedIn: () -> Void
 
-    private enum Screen: Hashable { case signIn, signUp }
+    private enum Screen: Hashable { case signIn, signUp, browse }
 
     @State private var path: [Screen] = []
 
@@ -17,6 +17,11 @@ struct LoginView: View {
                     switch screen {
                     case .signIn: SignInScreen(onSignedIn: onSignedIn)
                     case .signUp: SignUpScreen(onSignedIn: onSignedIn)
+                    case .browse:
+                        BrowseWithoutAccountView(
+                            onSignUp: { path = [.signUp] },
+                            onSignIn: { path = [.signIn] }
+                        )
                     }
                 }
         }
@@ -58,6 +63,15 @@ struct LoginView: View {
 
                     Button("I already have an account") { path = [.signIn] }
                         .buttonStyle(RexSecondaryButtonStyle())
+
+                    // Oct 1 — App Store 5.1.1(v): the Rexperts shelves aren't
+                    // account-based and shouldn't need an account to read.
+                    // Also simply a better first impression than a wall: you
+                    // can see what REX is before being asked to join it.
+                    Button("Have a look around first") { path = [.browse] }
+                        .font(RexFont.text(15, weight: .semibold))
+                        .foregroundStyle(RexColor.mutedForeground)
+                        .padding(.top, RexSpacing.xs)
                 }
 
                 Text("You must be 16 or over. By continuing you agree to the Terms of Service and Privacy Policy.")
