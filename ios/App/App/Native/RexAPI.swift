@@ -1720,13 +1720,13 @@ final class RexAPI {
         var components = URLComponents(url: baseURL.appendingPathComponent("/rest/v1/user_roles"), resolvingAgainstBaseURL: false)!
         components.queryItems = [
             URLQueryItem(name: "select", value: "role"),
-            URLQueryItem(name: "user_id", value: "eq.(userId)"),
+            URLQueryItem(name: "user_id", value: "eq.\(userId)"),
             URLQueryItem(name: "role", value: "eq.admin"),
             URLQueryItem(name: "limit", value: "1"),
         ]
         var request = URLRequest(url: components.url!)
         request.setValue(anonKey, forHTTPHeaderField: "apikey")
-        request.setValue("Bearer (token)", forHTTPHeaderField: "Authorization")
+        request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
         guard let (data, response) = try? await URLSession.shared.data(for: request),
               let http = response as? HTTPURLResponse, http.statusCode < 400,
               let rows = try? JSONSerialization.jsonObject(with: data) as? [[String: Any]]
@@ -4219,6 +4219,144 @@ final class RexAPI {
     /// Explore tab's REX-curated shelves ("REX Team" picks and anything
     /// credited to an outside source, both written by the three named
     /// curators — see is_rex_curator() in the migration).
+    // MARK: - Curating editorial shelves
+
+    /// Oct 1 — "can we find a way to do this for admins in the app, rather
+    /// than via SQL?". Yes, and it should have been this from the start: a
+    /// feature nobody can use without the SQL editor is a feature nobody uses.
+    ///
+    /// Writes are already fenced off by is_rex_curator() in the migration, so
+    /// these need no new permissions — only a screen.
+    func createEditorialCollection(
+        title: String, sourceLabel: String, category: String?, sortOrder: Int
+    ) async throws -> String {
+        let token = try await validToken()
+        var request = URLRequest(url: baseURL.appendingPathComponent("/rest/v1/editorial_collections"))
+        request.httpMethod = "POST"
+        request.setValue(anonKey, forHTTPHeaderField: "apikey")
+        request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        request.setValue("return=representation", forHTTPHeaderField: "Prefer")
+        var body: [String: Any] = [
+            "title": title,
+            "source_label": sourceLabel.isEmpty ? "REX Team" : sourceLabel,
+            "sort_order": sortOrder,
+        ]
+        body["category"] = category.map { $0 as Any } ?? (NSNull() as Any)
+        if let me = currentUserId { body["created_by"] = me }
+        request.httpBody = try JSONSerialization.data(withJSONObject: body)
+
+        let (data, response) = try await URLSession.shared.data(for: request)
+        guard let http = response as? HTTPURLResponse, http.statusCode < 400 else {
+            throw RexAPIError.server(friendlyError(data, fallback: "Couldn't create that shelf."))
+        }
+        struct Row: Codable { let id: String }
+        guard let row = (try? JSONDecoder().decode([Row].self, from: data))?.first else {
+            throw RexAPIError.server("Couldn't create that shelf.")
+        }
+        return row.id
+    }
+
+    func updateEditorialCollection(
+        id: String, title: String, sourceLabel: String, category: String?, sortOrder: Int
+    ) async throws {
+        let token = try await validToken()
+        var components = URLComponents(url: baseURL.appendingPathComponent("/rest/v1/editorial_collections"), resolvingAgainstBaseURL: false)!
+        components.queryItems = [URLQueryItem(name: "id", value: "eq.\(id)")]
+        var request = URLRequest(url: components.url!)
+        request.httpMethod = "PATCH"
+        request.setValue(anonKey, forHTTPHeaderField: "apikey")
+        request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        var body: [String: Any] = [
+            "title": title,
+            "source_label": sourceLabel.isEmpty ? "REX Team" : sourceLabel,
+            "sort_order": sortOrder,
+        ]
+        body["category"] = category.map { $0 as Any } ?? (NSNull() as Any)
+        request.httpBody = try JSONSerialization.data(withJSONObject: body)
+        let (data, response) = try await URLSession.shared.data(for: request)
+        guard let http = response as? HTTPURLResponse, http.statusCode < 400 else {
+            throw RexAPIError.server(friendlyError(data, fallback: "Couldn't save that shelf."))
+        }
+    }
+
+    /// Cascades to its cards — the foreign key says on delete cascade.
+    func deleteEditorialCollection(id: String) async throws {
+        let token = try await validToken()
+        var components = URLComponents(url: baseURL.appendingPathComponent("/rest/v1/editorial_collections"), resolvingAgainstBaseURL: false)!
+        components.queryItems = [URLQueryItem(name: "id", value: "eq.\(id)")]
+        var request = URLRequest(url: components.url!)
+        request.httpMethod = "DELETE"
+        request.setValue(anonKey, forHTTPHeaderField: "apikey")
+        request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+        request.setValue("return=representation", forHTTPHeaderField: "Prefer")
+        let (data, response) = try await URLSession.shared.data(for: request)
+        guard let http = response as? HTTPURLResponse, http.statusCode < 400 else {
+            throw RexAPIError.server(friendlyError(data, fallback: "Couldn't delete that shelf."))
+        }
+        let deleted = (try? JSONSerialization.jsonObject(with: data)) as? [Any]
+        guard (deleted?.count ?? 0) > 0 else {
+            throw RexAPIError.server("Couldn't delete that shelf — you may not be a curator.")
+        }
+    }
+
+    func addEditorialItem(
+        collectionId: String, title: String, subtitle: String?,
+        imageURL: String?, itemId: String?, linkURL: String?, sortOrder: Int
+    ) async throws {
+        let token = try await validToken()
+        var request = URLRequest(url: baseURL.appendingPathComponent("/rest/v1/editorial_collection_items"))
+        request.httpMethod = "POST"
+        request.setValue(anonKey, forHTTPHeaderField: "apikey")
+        request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        var body: [String: Any] = ["collection_id": collectionId, "title": title, "sort_order": sortOrder]
+        body["subtitle"] = subtitle.flatMap { $0.isEmpty ? nil : $0 } ?? (NSNull() as Any)
+        body["image_url"] = imageURL.flatMap { $0.isEmpty ? nil : $0 } ?? (NSNull() as Any)
+        body["item_id"] = itemId.flatMap { $0.isEmpty ? nil : $0 } ?? (NSNull() as Any)
+        body["link_url"] = linkURL.flatMap { $0.isEmpty ? nil : $0 } ?? (NSNull() as Any)
+        request.httpBody = try JSONSerialization.data(withJSONObject: body)
+        let (data, response) = try await URLSession.shared.data(for: request)
+        guard let http = response as? HTTPURLResponse, http.statusCode < 400 else {
+            throw RexAPIError.server(friendlyError(data, fallback: "Couldn't add that."))
+        }
+    }
+
+    func deleteEditorialItem(id: String) async throws {
+        let token = try await validToken()
+        var components = URLComponents(url: baseURL.appendingPathComponent("/rest/v1/editorial_collection_items"), resolvingAgainstBaseURL: false)!
+        components.queryItems = [URLQueryItem(name: "id", value: "eq.\(id)")]
+        var request = URLRequest(url: components.url!)
+        request.httpMethod = "DELETE"
+        request.setValue(anonKey, forHTTPHeaderField: "apikey")
+        request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+        let (data, response) = try await URLSession.shared.data(for: request)
+        guard let http = response as? HTTPURLResponse, http.statusCode < 400 else {
+            throw RexAPIError.server(friendlyError(data, fallback: "Couldn't remove that."))
+        }
+    }
+
+    /// Search REX's own catalogue, so building a shelf is picking things that
+    /// already exist rather than retyping their names and hunting for a photo.
+    func searchCatalogue(_ query: String, limit: Int = 20) async throws -> [RexItem] {
+        let trimmed = query.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard trimmed.count >= 2 else { return [] }
+        let token = try await validToken()
+        var components = URLComponents(url: baseURL.appendingPathComponent("/rest/v1/items"), resolvingAgainstBaseURL: false)!
+        components.queryItems = [
+            URLQueryItem(name: "select", value: "id,type,title,subtitle,image_url,genre,address"),
+            URLQueryItem(name: "title", value: "ilike.*\(trimmed)*"),
+            URLQueryItem(name: "limit", value: "\(limit)"),
+        ]
+        var request = URLRequest(url: components.url!)
+        request.setValue(anonKey, forHTTPHeaderField: "apikey")
+        request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+        let (data, response) = try await URLSession.shared.data(for: request)
+        guard let http = response as? HTTPURLResponse, http.statusCode < 400 else { return [] }
+        return (try? JSONDecoder().decode([RexItem].self, from: data)) ?? []
+    }
+
     /// Readable signed-out too — see fetchTrendingItems.
     func fetchEditorialCollections() async throws -> [EditorialCollection] {
         var components = URLComponents(url: baseURL.appendingPathComponent("/rest/v1/editorial_collections"), resolvingAgainstBaseURL: false)!

@@ -28,6 +28,8 @@ struct ExploreView: View {
     @State private var errorMessage: String?
     @State private var pushedItemId: String?
     @State private var showingTalkToRex = false
+    /// Oct 1 — the three curators get a way in to the shelves they own.
+    @State private var isCurator = false
     @State private var pushedCollection: CollectionRoute?
     @State private var pushedTrip: TripRoute?
     @State private var pushedList: ListRoute?
@@ -165,8 +167,10 @@ struct ExploreView: View {
             .navigationDestination(isPresented: $showingTalkToRex) {
                 TalkToRexView(onOpenItem: { pushedItemId = $0 })
             }
+            .navigationDestination(for: CuratorShelvesRoute.self) { _ in CuratorShelvesView() }
             .refreshable { await load() }
             .task { await load() }
+            .task { isCurator = await RexAPI.shared.isAdmin() }
         }
         .tint(RexColor.primary)
     }
@@ -275,8 +279,37 @@ struct ExploreView: View {
     }
 
     /// Curated by the REX team, plus what the whole app is Rexing this week.
+    /// Only the three named curators see this, and only on the Rexperts tab —
+    /// it's the page the shelves appear on, so it's where editing them
+    /// belongs. is_rex_curator() is the real gate; this is just the door.
+    @ViewBuilder
+    private var curatorBar: some View {
+        if isCurator {
+            NavigationLink(value: CuratorShelvesRoute()) {
+                HStack(spacing: RexSpacing.sm) {
+                    Image(systemName: "square.stack.3d.up")
+                        .font(.system(size: 13))
+                    Text("Manage Rexperts shelves")
+                        .font(RexFont.text(14, weight: .medium))
+                    Spacer(minLength: 0)
+                    Image(systemName: "chevron.right")
+                        .font(.system(size: 11, weight: .semibold))
+                }
+                .foregroundStyle(RexColor.primary)
+                .padding(.horizontal, RexSpacing.md)
+                .frame(height: 44)
+                .background(RexColor.badgeBackground)
+                .clipShape(RoundedRectangle(cornerRadius: RexRadius.input, style: .continuous))
+            }
+            .buttonStyle(.plain)
+            .padding(.horizontal, RexSpacing.page)
+            .padding(.bottom, RexSpacing.md)
+        }
+    }
+
     @ViewBuilder
     private var rexpertsSections: some View {
+        curatorBar
         if visibleEditorial.isEmpty && visibleTrending.isEmpty {
             rexpertsEmptyState
         } else {
