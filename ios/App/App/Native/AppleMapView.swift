@@ -49,6 +49,14 @@ struct AppleMapView: UIViewRepresentable {
     /// wherever the map happened to be sitting.
     var fitToPlacesNonce: Int = 0
 
+    /// Roughly a fifteen-minute walk across. Close enough to recognise your
+    /// own streets, wide enough that a handful of pins are already in frame.
+    static let openingSpanMeters: CLLocationDistance = 2_200
+    /// Below this span the pins are far enough apart to carry an icon; above
+    /// it they would be a wall of overlapping glyphs, so colour alone does the
+    /// work. "Colourful pins on a big view, icons when you zoom in."
+    static let glyphSpanMeters: CLLocationDistance = 6_000
+
     func makeCoordinator() -> Coordinator { Coordinator(self) }
 
     func makeUIView(context: Context) -> MKMapView {
@@ -62,11 +70,15 @@ struct AppleMapView: UIViewRepresentable {
             forAnnotationViewWithReuseIdentifier: Coordinator.pinReuseId
         )
 
+        // Oct 1 — "when we click on the map make it more zoomed in to our
+        // location". radiusMeters is how far out we FETCH (ten miles); it was
+        // also being used to frame the map, so the first thing you saw was a
+        // twenty-mile square with your street invisible in the middle.
         mapView.setRegion(
             MKCoordinateRegion(
                 center: center ?? CLLocationCoordinate2D(latitude: 51.5074, longitude: -0.1278),
-                latitudinalMeters: radiusMeters * 2,
-                longitudinalMeters: radiusMeters * 2
+                latitudinalMeters: Self.openingSpanMeters,
+                longitudinalMeters: Self.openingSpanMeters
             ),
             animated: false
         )
@@ -118,7 +130,8 @@ struct AppleMapView: UIViewRepresentable {
                     title: place.title,
                     subtitle: place.recommenderSummary,
                     coordinate: CLLocationCoordinate2D(latitude: lat, longitude: lng),
-                    tint: markerColor(for: place)
+                    tint: markerColor(for: place),
+                    symbol: rexSubcategorySymbol(genre: place.genre, type: place.type)
                 ))
                 context.coordinator.markersById[place.id] = place
             }
@@ -130,8 +143,8 @@ struct AppleMapView: UIViewRepresentable {
             mapView.setRegion(
                 MKCoordinateRegion(
                     center: center,
-                    latitudinalMeters: radiusMeters * 2,
-                    longitudinalMeters: radiusMeters * 2
+                    latitudinalMeters: Self.openingSpanMeters,
+                    longitudinalMeters: Self.openingSpanMeters
                 ),
                 animated: true
             )
@@ -214,6 +227,8 @@ struct AppleMapView: UIViewRepresentable {
         var didCenter = false
         var lastFocusRequest: MapFocusRequest?
         var lastFitNonce = 0
+        /// Whether the map is currently close enough in to draw icons.
+        var showGlyphs = true
 
         init(_ parent: AppleMapView) { self.parent = parent }
 
@@ -224,8 +239,10 @@ struct AppleMapView: UIViewRepresentable {
                 for: annotation
             ) as? MKMarkerAnnotationView
             view?.markerTintColor = place.tint
-            view?.glyphImage = nil
             view?.glyphText = nil
+            view?.glyphImage = showGlyphs
+                ? UIImage(systemName: place.symbol)
+                : nil
             // The callout is REX's own sheet, not MapKit's bubble — selecting
             // is what opens it, so the built-in callout would be a second,
             // worse version of the same thing.
@@ -249,6 +266,22 @@ struct AppleMapView: UIViewRepresentable {
             parent.onSelect(place)
         }
 
+        /// Flip the glyphs on or off as the map is zoomed, and only redraw
+        /// when the answer actually changes — this fires continuously while
+        /// someone pinches.
+        func mapViewDidChangeVisibleRegion(_ mapView: MKMapView) {
+            let span = mapView.region.span.latitudeDelta * 111_000
+            let shouldShow = span <= AppleMapView.glyphSpanMeters
+            guard shouldShow != showGlyphs else { return }
+            showGlyphs = shouldShow
+            for annotation in mapView.annotations {
+                guard let place = annotation as? RexPlaceAnnotation,
+                      let view = mapView.view(for: annotation) as? MKMarkerAnnotationView
+                else { continue }
+                view.glyphImage = shouldShow ? UIImage(systemName: place.symbol) : nil
+            }
+        }
+
         @objc func handleLongPress(_ gesture: UILongPressGestureRecognizer) {
             guard gesture.state == .began,
                   let mapView = gesture.view as? MKMapView else { return }
@@ -266,12 +299,16 @@ final class RexPlaceAnnotation: NSObject, MKAnnotation {
     let subtitle: String?
     let coordinate: CLLocationCoordinate2D
     let tint: UIColor
+    /// Oct 1 — shown only when the map is zoomed in far enough to read it;
+    /// see Coordinator.showGlyphs.
+    let symbol: String
 
-    init(id: String, title: String?, subtitle: String?, coordinate: CLLocationCoordinate2D, tint: UIColor) {
+    init(id: String, title: String?, subtitle: String?, coordinate: CLLocationCoordinate2D, tint: UIColor, symbol: String) {
         self.id = id
         self.title = title
         self.subtitle = subtitle
         self.coordinate = coordinate
         self.tint = tint
+        self.symbol = symbol
     }
 }

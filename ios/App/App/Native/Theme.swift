@@ -627,6 +627,28 @@ func rexSubcategoryColor(genre: String?, type: String?) -> Color {
     }
 }
 
+/// Oct 1 — "change pins to have icons and colours that match the colours in
+/// the menu". The colour above and this symbol are the same key seen twice:
+/// the filter chips carry both, so a pin reads as its category whether you
+/// are matching it to a chip or just glancing at the map.
+func rexSubcategorySymbol(genre: String?, type: String?) -> String {
+    if RexCategory(rawType: type) == .event { return "ticket.fill" }
+    switch splitGenres(genre).first?.lowercased() {
+    case "restaurant":       return "fork.knife"
+    case "private dining":   return "fork.knife.circle.fill"
+    case "bar":              return "wineglass.fill"
+    case "pub":              return "mug.fill"
+    case "café", "cafe":     return "cup.and.saucer.fill"
+    case "beauty":           return "sparkles"
+    case "accommodation":    return "bed.double.fill"
+    case "shop":             return "bag.fill"
+    case "activity":         return "figure.walk"
+    case "town":             return "building.2.fill"
+    case "for kids":         return "figure.and.child.holdinghands"
+    default:                 return "mappin"
+    }
+}
+
 /// The sub-categories the map offers as filters, in the order the legend
 /// and chip row show them.
 let rexMapSubcategories: [String] = (rexSubcategories[.place] ?? []) + ["Event"]

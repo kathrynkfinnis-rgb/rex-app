@@ -78,13 +78,6 @@ struct CollectionsSectionListView: View {
 
     private func headerRow(_ list: RexList, isMine: Bool) -> some View {
         HStack(spacing: RexSpacing.md) {
-            ZStack {
-                RoundedRectangle(cornerRadius: RexRadius.input, style: .continuous)
-                    .fill(RexColor.badgeBackground)
-                Text(list.emoji ?? "\u{1F4D2}").font(.system(size: 20))
-            }
-            .frame(width: 46, height: 46)
-
             VStack(alignment: .leading, spacing: 2) {
                 Text(list.name)
                     .font(RexFont.display(17, weight: .semibold))
