@@ -54,10 +54,16 @@ struct RecommendationCardView: View {
         // a card with a third of its width spare.
         //
         // Reserve what's actually in the corner, and nothing else.
-        var needed: CGFloat = 0
-        if !rec.isWant, !rec.isBlast, rec.rating > 0 { needed = 30 }
-        if rec.user_id == RexAPI.shared.currentUserId { needed += 36 }
-        return needed
+        //
+        // Oct 1 — "can we get the 100 to go under the …, and keep the title
+        // going across one line to the … as far as possible". They used to
+        // sit side by side, so a card of your own reserved 66pt and pushed
+        // every title into an early wrap. Stacked, the corner is only ever as
+        // wide as the wider of the two.
+        let hasRating = !rec.isWant && !rec.isBlast && rec.rating > 0
+        let isMine = rec.user_id == RexAPI.shared.currentUserId
+        if isMine { return 36 }
+        return hasRating ? 30 : 0
     }
 
     /// The rail down the left edge, and the hairline round the rest: the
@@ -221,10 +227,10 @@ struct RecommendationCardView: View {
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .overlay(alignment: .topTrailing) {
                     cornerLabel
-                        // Clear of the "…" button EditableIfMine floats in
-                        // the same corner on your own cards.
-                        .padding(.trailing, rec.user_id == RexAPI.shared.currentUserId ? 34 : 0)
-                        .padding(.top, 3)
+                        // Below the "…" EditableIfMine floats in this same
+                        // corner, rather than beside it — see
+                        // titleTrailingReserve. 34pt clears the button.
+                        .padding(.top, rec.user_id == RexAPI.shared.currentUserId ? 34 : 3)
                 }
                 .padding(.horizontal, RexSpacing.cardPadding)
                 .padding(.top, RexSpacing.cardPadding)
@@ -239,31 +245,26 @@ struct RecommendationCardView: View {
                         .padding(.leading, RexSpacing.cardPadding)
                 }
 
-                // Sept 29 — "need to be able to see the full username
-                // always". Priority alone wasn't enough: five icons and a
-                // count are genuinely wider than what's left, so on a long
-                // name something had to give and it was always the name.
+                // Oct 1 — "put the icons back in one line with the name and
+                // have the 'now' or '7min ago' under the name. Set a default
+                // length so a really long username turns into a … to allow
+                // the icons to remain where they are."
                 //
-                // So stop making it a contest. ViewThatFits takes the one-row
-                // layout when the whole name fits on it, and drops the icons
-                // onto their own row when it doesn't — the name is never the
-                // thing that gets cut.
-                ViewThatFits(in: .horizontal) {
-                    HStack(spacing: RexSpacing.sm) {
-                        authorRow
-                        Spacer(minLength: RexSpacing.sm)
-                        // Blasts are questions, not Rex — no like/save row.
-                        if !rec.isBlast {
-                            RexCardActions(rec: rec, rexCount: rexCount, onCommentTap: onCommentTap)
-                        }
-                    }
-
-                    VStack(alignment: .leading, spacing: RexSpacing.sm) {
-                        authorRow
-                        if !rec.isBlast {
-                            RexCardActions(rec: rec, rexCount: rexCount, onCommentTap: onCommentTap)
-                                .frame(maxWidth: .infinity, alignment: .leading)
-                        }
+                // On 29 Sept I fixed truncated names by letting the icons drop
+                // to their own row, which worked but moved them about from
+                // card to card. Stacking the time under the name buys back the
+                // width that was the real problem, so one row holds again —
+                // and a genuinely long name now truncates rather than pushing
+                // anything, which keeps the icons in the same place on every
+                // card.
+                HStack(spacing: RexSpacing.sm) {
+                    authorRow
+                    Spacer(minLength: RexSpacing.sm)
+                    // Blasts are questions, not Rex — no like/save row.
+                    if !rec.isBlast {
+                        RexCardActions(rec: rec, rexCount: rexCount, onCommentTap: onCommentTap)
+                            .fixedSize(horizontal: true, vertical: false)
+                            .layoutPriority(1)
                     }
                 }
                 .padding(.horizontal, RexSpacing.cardPadding)
@@ -530,21 +531,22 @@ struct RecommendationCardView: View {
                     name: author.display_name ?? author.username,
                     size: 24
                 )
-                Text(author.display_name ?? author.username)
-                    .font(RexFont.text(13, weight: .medium))
-                    .foregroundStyle(RexColor.foreground)
-                    .lineLimit(1)
-                    // Asks for the width the whole name needs. ViewThatFits
-                    // above is what makes that safe: a name too long for one
-                    // row moves the icons down rather than truncating here.
-                    .fixedSize(horizontal: true, vertical: false)
-
-                if !relativeTime.isEmpty {
-                    Text("· \(relativeTime)")
-                        .font(RexFont.text(12))
-                        .foregroundStyle(RexColor.mutedForeground)
+                // Name over time, which is what frees the width for the icons
+                // to stay on this row — see the footer in body.
+                VStack(alignment: .leading, spacing: 1) {
+                    Text(author.display_name ?? author.username)
+                        .font(RexFont.text(13, weight: .medium))
+                        .foregroundStyle(RexColor.foreground)
                         .lineLimit(1)
-                        .fixedSize()
+                        .truncationMode(.tail)
+
+                    if !relativeTime.isEmpty {
+                        Text(relativeTime)
+                            .font(RexFont.text(11.5))
+                            .foregroundStyle(RexColor.mutedForeground)
+                            .lineLimit(1)
+                            .fixedSize()
+                    }
                 }
             }
             .contentShape(Rectangle())

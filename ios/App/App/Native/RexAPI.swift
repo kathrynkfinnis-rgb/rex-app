@@ -1743,7 +1743,12 @@ final class RexAPI {
         var request = URLRequest(url: baseURL.appendingPathComponent("/rest/v1/rpc/official_account_id"))
         request.httpMethod = "POST"
         request.setValue(anonKey, forHTTPHeaderField: "apikey")
-        request.setValue("Bearer (token)", forHTTPHeaderField: "Authorization")
+        // Oct 1 — the same missing backslash as isAdmin() had, and the reason
+        // build 58 didn't fix "Post as REX": the toggle needs BOTH an admin
+        // and an official account, this call 401'd and returned nil, so the
+        // section stayed hidden even once the admin check was right. Two
+        // separate one-character faults guarding the same feature.
+        request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
         request.httpBody = Data("{}".utf8)
         guard let (data, response) = try? await URLSession.shared.data(for: request),
