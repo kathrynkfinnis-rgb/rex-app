@@ -3527,10 +3527,51 @@ final class RexAPI {
     /// the feed still has no heading in mind and no position to claim, and
     /// a row with a null sort_order sorts to the end (see
     /// fetchCollectionItems), which is where a newly saved one belongs.
+    /// Where a want sits inside its collection. Split out because both
+    /// addToCollection and setCollectionOrder need it, and because the column
+    /// names differ from saved_posts'.
+    private func setWantPlacement(wantId: String, section: String?, sortOrder: Int?) async throws {
+        let token = try await validToken()
+        var components = URLComponents(url: baseURL.appendingPathComponent("/rest/v1/wants"), resolvingAgainstBaseURL: false)!
+        components.queryItems = [URLQueryItem(name: "id", value: "eq.\(wantId)")]
+        var request = URLRequest(url: components.url!)
+        request.httpMethod = "PATCH"
+        request.setValue(anonKey, forHTTPHeaderField: "apikey")
+        request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        var body: [String: Any] = [:]
+        body["list_section"] = (section?.isEmpty ?? true) ? (NSNull() as Any) : section!
+        if let sortOrder { body["list_sort_order"] = sortOrder }
+        request.httpBody = try JSONSerialization.data(withJSONObject: body)
+        let (data, response) = try await URLSession.shared.data(for: request)
+        guard let http = response as? HTTPURLResponse, http.statusCode < 400 else {
+            throw RexAPIError.server(friendlyError(data, fallback: "Couldn't move that."))
+        }
+    }
+
     func addToCollection(
         recommendationId: String, listId: String,
         section: String? = nil, sortOrder: Int? = nil
     ) async throws {
+        // Dragging a want-to-try into another collection. saved_posts.
+        // recommendation_id is a foreign key into recommendations, and a want
+        // has no row there — so this used to insert a bogus key, fail on the
+        // constraint, and (because the caller uses try?) look like nothing had
+        // happened at all.
+        //
+        // A want belongs to exactly one collection, so the honest
+        // interpretation of the drag is a move, not a copy. Its heading goes
+        // with it only if one was given; otherwise it lands unfiled, since a
+        // heading from the old collection rarely means anything in the new one.
+        if recommendationId.hasPrefix("want-") {
+            let wantId = String(recommendationId.dropFirst("want-".count))
+            try await setWantList(wantId: wantId, listId: listId)
+            if section != nil || sortOrder != nil {
+                try await setWantPlacement(wantId: wantId, section: section, sortOrder: sortOrder)
+            }
+            return
+        }
+
         let token = try await validToken()
         guard let userId = currentUserId else { throw RexAPIError.notSignedIn }
         var request = URLRequest(url: baseURL.appendingPathComponent("/rest/v1/saved_posts"))
@@ -3554,6 +3595,19 @@ final class RexAPI {
     func removeFromCollection(recommendationId: String, listId: String) async throws {
         let token = try await validToken()
         guard let userId = currentUserId else { throw RexAPIError.notSignedIn }
+
+        // Taking a want out of a collection isn't a deletion — it's still
+        // something you want to try, it just isn't filed here any more. So
+        // clear where it sat rather than removing the row, which is what
+        // AddWantToListView's "remove from collection" already does.
+        if recommendationId.hasPrefix("want-") {
+            try await setWantList(
+                wantId: String(recommendationId.dropFirst("want-".count)),
+                listId: nil
+            )
+            return
+        }
+
         var components = URLComponents(url: baseURL.appendingPathComponent("/rest/v1/saved_posts"), resolvingAgainstBaseURL: false)!
         components.queryItems = [
             URLQueryItem(name: "user_id", value: "eq.\(userId)"),
@@ -4266,12 +4320,120 @@ final class RexAPI {
         guard let http = response as? HTTPURLResponse, http.statusCode < 400 else {
             throw RexAPIError.server(friendlyError(data, fallback: "Couldn't load that collection."))
         }
-        struct Row: Codable { let id: String; let created_at: String?; let list_id: String?; let recommendation_id: String }
+        // Sept 29 — `section` and `sort_order` were in the select and missing
+        // from this struct, so they were fetched and then thrown away on the
+        // way past. Headings could never survive a reload: 234 saved_posts in
+        // the database, not one with a section on it. The collection page has
+        // had grouping, renaming and an "Add headings & reorder" mode this
+        // whole time, all of it reading a column that always came back nil.
+        struct Row: Codable {
+            let id: String
+            let created_at: String?
+            let list_id: String?
+            let recommendation_id: String
+            let section: String?
+            let sort_order: Int?
+        }
         let rows = (try? JSONDecoder().decode([Row].self, from: data)) ?? []
         let recsById = await fetchRecommendationsByIds(rows.map { $0.recommendation_id })
-        return rows.map {
+        let saved = rows.map {
             SavedPost(id: $0.id, created_at: $0.created_at, list_id: $0.list_id,
-                       recommendation_id: $0.recommendation_id, recommendations: recsById[$0.recommendation_id])
+                       recommendation_id: $0.recommendation_id, recommendations: recsById[$0.recommendation_id],
+                       section: $0.section, sort_order: $0.sort_order)
+        }
+
+        // Sept 29 — "please can you put want-to-trys under sub headings",
+        // which turned out to need them to appear at all first.
+        //
+        // AddWantToListView has written wants.list_id since 18 Sept and 19
+        // rows already carry one, but nothing ever read them back: this page
+        // is built from saved_posts alone, so adding a want to a collection
+        // wrote a row and then showed you nothing. Gemma's Cornwall places
+        // went in here and vanished.
+        //
+        // They come back as SavedPost-shaped rows so the existing grouping,
+        // ordering and rendering work on them unchanged — the only thing that
+        // has to know the difference is whatever writes back, which splits on
+        // the "want-" prefix.
+        let wants = (try? await fetchWants(inCollection: listId)) ?? []
+        return (saved + wants).sorted {
+            switch ($0.sort_order, $1.sort_order) {
+            case let (a?, b?): return a < b
+            case (nil, _?):    return false   // unplaced rows sort last,
+            case (_?, nil):    return true    // matching the server's order
+            default:           return ($0.created_at ?? "") > ($1.created_at ?? "")
+            }
+        }
+    }
+
+    /// The wants filed under one collection, dressed as SavedPosts. See
+    /// fetchCollectionItems for why.
+    private func fetchWants(inCollection listId: String) async throws -> [SavedPost] {
+        let token = try await validToken()
+        var components = URLComponents(url: baseURL.appendingPathComponent("/rest/v1/wants"), resolvingAgainstBaseURL: false)!
+        components.queryItems = [
+            URLQueryItem(name: "select", value: "id,created_at,item_id,list_id,list_section,list_sort_order," +
+                "items(id,type,title,subtitle,image_url,genre,address,lat,lng)"),
+            URLQueryItem(name: "list_id", value: "eq.\(listId)"),
+        ]
+        var request = URLRequest(url: components.url!)
+        request.setValue(anonKey, forHTTPHeaderField: "apikey")
+        request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+
+        let (data, response) = try await URLSession.shared.data(for: request)
+        guard let http = response as? HTTPURLResponse, http.statusCode < 400 else { return [] }
+
+        struct Row: Codable {
+            let id: String
+            let created_at: String?
+            let item_id: String
+            let list_id: String?
+            let list_section: String?
+            let list_sort_order: Int?
+            let items: RexItem?
+        }
+        let rows = (try? JSONDecoder().decode([Row].self, from: data)) ?? []
+        guard !rows.isEmpty else { return [] }
+        let me = currentUserId ?? ""
+        // Without this the card falls back to "Someone" as the author — on
+        // your own want, in your own collection, which reads as though a
+        // stranger put it there. A want in a collection is always yours.
+        let mine = try? await fetchMyProfile()
+        let myProfile = mine.map {
+            RexProfile(username: $0.username, display_name: $0.display_name, avatar_url: $0.avatar_url)
+        }
+        return rows.map { row in
+            // The "want-" prefix is the same one the feed uses, so everything
+            // downstream that already knows a want by its id keeps working —
+            // EditRexView, the card's "Wants to try" chip, all of it.
+            let rec = FeedRecommendation(
+                id: "want-\(row.id)",
+                rating: 0,
+                note: nil,
+                created_at: row.created_at ?? "",
+                photo_url: nil,
+                photo_urls: nil,
+                tags: nil,
+                user_id: me,
+                item_id: row.item_id,
+                items: row.items,
+                profiles: myProfile,
+                creators: nil,
+                trip_section: nil,
+                is_anonymous: false,
+                list_section: row.list_section,
+                show_in_feed: nil,
+                recommendation_tags: nil
+            )
+            return SavedPost(
+                id: "want-\(row.id)",
+                created_at: row.created_at,
+                list_id: row.list_id,
+                recommendation_id: "want-\(row.id)",
+                recommendations: rec,
+                section: row.list_section,
+                sort_order: row.list_sort_order
+            )
         }
     }
 
@@ -5479,17 +5641,27 @@ final class RexAPI {
     func setCollectionOrder(_ entries: [(savedPostId: String, section: String?, sortOrder: Int)]) async throws {
         let token = try await validToken()
         for entry in entries {
-            var components = URLComponents(url: baseURL.appendingPathComponent("/rest/v1/saved_posts"), resolvingAgainstBaseURL: false)!
-            components.queryItems = [URLQueryItem(name: "id", value: "eq.\(entry.savedPostId)")]
+            // A want in a collection is a `wants` row wearing a SavedPost's
+            // clothes (see fetchCollectionItems), so its heading and position
+            // live on different columns of a different table. The "want-"
+            // prefix is the only thing that has to know.
+            let isWant = entry.savedPostId.hasPrefix("want-")
+            let table = isWant ? "/rest/v1/wants" : "/rest/v1/saved_posts"
+            let rowId = isWant
+                ? String(entry.savedPostId.dropFirst("want-".count))
+                : entry.savedPostId
+
+            var components = URLComponents(url: baseURL.appendingPathComponent(table), resolvingAgainstBaseURL: false)!
+            components.queryItems = [URLQueryItem(name: "id", value: "eq.\(rowId)")]
             var request = URLRequest(url: components.url!)
             request.httpMethod = "PATCH"
             request.setValue(anonKey, forHTTPHeaderField: "apikey")
             request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
             request.setValue("application/json", forHTTPHeaderField: "Content-Type")
-            request.httpBody = try JSONSerialization.data(withJSONObject: [
-                "sort_order": entry.sortOrder,
-                "section": (entry.section?.isEmpty ?? true) ? (NSNull() as Any) : entry.section!,
-            ])
+            let section: Any = (entry.section?.isEmpty ?? true) ? (NSNull() as Any) : entry.section!
+            request.httpBody = try JSONSerialization.data(withJSONObject: isWant
+                ? ["list_sort_order": entry.sortOrder, "list_section": section]
+                : ["sort_order": entry.sortOrder, "section": section])
             let (data, response) = try await URLSession.shared.data(for: request)
             guard let http = response as? HTTPURLResponse, http.statusCode < 400 else {
                 throw RexAPIError.server(friendlyError(data, fallback: "Couldn't save the new order."))
@@ -5500,7 +5672,34 @@ final class RexAPI {
     /// A heading is a repeated string, not a row — renaming one means
     /// patching every saved post that carries it, exactly as
     /// renameTripSection does for a trip.
+    /// The wants half of renameCollectionSection. Its own function only
+    /// because it patches a different table with differently-named columns.
+    private func renameWantSection(listId: String, from: String?, to: String?) async throws {
+        let token = try await validToken()
+        var components = URLComponents(url: baseURL.appendingPathComponent("/rest/v1/wants"), resolvingAgainstBaseURL: false)!
+        components.queryItems = [
+            URLQueryItem(name: "list_id", value: "eq.\(listId)"),
+            URLQueryItem(name: "list_section", value: (from?.isEmpty ?? true) ? "is.null" : "eq.\(from!)"),
+        ]
+        var request = URLRequest(url: components.url!)
+        request.httpMethod = "PATCH"
+        request.setValue(anonKey, forHTTPHeaderField: "apikey")
+        request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        request.httpBody = try JSONSerialization.data(withJSONObject: [
+            "list_section": (to?.isEmpty ?? true) ? (NSNull() as Any) : to!,
+        ])
+        // Never blocks the saved_posts rename: a collection with no wants in
+        // it must not fail to rename a heading.
+        _ = try? await URLSession.shared.data(for: request)
+    }
+
     func renameCollectionSection(listId: String, from: String?, to: String?) async throws {
+        // Wants under the same heading have to be renamed too, or a collection
+        // would split into two groups with the same meaning and different
+        // names the moment anyone edited one.
+        try await renameWantSection(listId: listId, from: from, to: to)
+
         let token = try await validToken()
         var components = URLComponents(url: baseURL.appendingPathComponent("/rest/v1/saved_posts"), resolvingAgainstBaseURL: false)!
         components.queryItems = [

@@ -88,6 +88,14 @@ type Candidate = {
   rating: number;
   note: string | null;
   who: string;
+  /// Sept 29 — "make sure it's also searching your own Rex, as well as your
+  /// friends". It always was: the row-level security on recommendations is
+  /// `auth.uid() = user_id OR are_friends(...)`, so your own rows were in the
+  /// shortlist from the first day. What was wrong is that the prompt called
+  /// every one of them "their friends' recommendations", so the model either
+  /// skipped your own or attributed them to somebody else — a Rex of your own
+  /// coming back as though a friend had made it.
+  mine: boolean;
 };
 
 function json(body: unknown, status = 200): Response {
@@ -151,7 +159,7 @@ Deno.serve(async (req) => {
 
   // ---------------------------------------------------------------- retrieve
   const [candidates, facts, alreadySuggested] = await Promise.all([
-    fetchCandidates(asUser, question),
+    fetchCandidates(asUser, question, userId),
     fetchFacts(asUser),
     fetchSuggested(asUser),
   ]);
@@ -253,13 +261,17 @@ Deno.serve(async (req) => {
  *  nothing. When the catalogue is big enough that this starts missing things,
  *  the replacement is pgvector over the same columns — the shape of this
  *  function doesn't change, only the ORDER BY. */
-async function fetchCandidates(db: ReturnType<typeof createClient>, question: string): Promise<Candidate[]> {
+async function fetchCandidates(
+  db: ReturnType<typeof createClient>,
+  question: string,
+  meId: string,
+): Promise<Candidate[]> {
   const types = typesFor(question);
 
   let query = db
     .from("recommendations")
     .select(
-      "id,rating,note,item_id," +
+      "id,rating,note,item_id,user_id," +
         "items!inner(id,type,title,subtitle,genre,address)," +
         "profiles!recommendations_user_id_fkey(username,display_name)",
     )
@@ -291,6 +303,7 @@ async function fetchCandidates(db: ReturnType<typeof createClient>, question: st
       rating: Number(row.rating ?? 0),
       note: (row.note as string) ?? null,
       who: String(who?.display_name ?? who?.username ?? "A friend"),
+      mine: String(row.user_id) === meId,
     };
   });
 }
@@ -354,6 +367,12 @@ function buildPrompt(input: {
     "Never invent an entry and never change what a friend wrote — their note is quoted verbatim",
     "in the app, so paraphrasing it would put words in their mouth.",
     "",
+    "Some entries are the person's own Rex, marked as such. Use them — being reminded of somewhere",
+    "you loved two years ago is one of the best things REX can do — but say so: \"you rated this\",",
+    "not a friend's name. Lead with a friend's where both fit, since the point of REX is other",
+    "people; their own are the better answer when nothing else comes close, or when the question",
+    "is plainly about their own history (\"where did I go in Lisbon?\").",
+    "",
     "If the list genuinely doesn't answer the question, say so plainly and use `web` to name up to",
     "three things you know of that would. Do not state facts about them — no ratings, no addresses,",
     "no opening times. Give a `search_hint` precise enough to find the thing, and the app will look",
@@ -397,7 +416,7 @@ function buildPrompt(input: {
   }
 
   if (input.candidates.length > 0) {
-    lines.push("Their friends' recommendations:");
+    lines.push("Recommendations from them and their friends:");
     for (const c of input.candidates) {
       const bits = [
         `id=${c.id}`,
@@ -405,7 +424,7 @@ function buildPrompt(input: {
         c.subtitle ? `(${c.subtitle})` : "",
         `${c.type}${c.genre ? `/${c.genre}` : ""}`,
         c.address ? `at ${c.address}` : "",
-        `${c.who} rated it ${c.rating}/10`,
+        c.mine ? `they Rex'd this themselves, ${c.rating}/10` : `${c.who} rated it ${c.rating}/10`,
         c.note ? `and said: "${c.note}"` : "",
         input.alreadySuggested.includes(c.item_id) ? "[already suggested before]" : "",
       ].filter(Boolean);
@@ -413,7 +432,7 @@ function buildPrompt(input: {
     }
     lines.push("");
   } else {
-    lines.push("Their friends have nothing Rex'd that fits this. Lean on `web`.");
+    lines.push("Neither they nor their friends have Rex'd anything that fits. Lean on `web`.");
     lines.push("");
   }
 
