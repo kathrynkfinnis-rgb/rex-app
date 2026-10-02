@@ -77,6 +77,23 @@ struct AppleMapView: UIViewRepresentable {
             MKMarkerAnnotationView.self,
             forAnnotationViewWithReuseIdentifier: Coordinator.pinReuseId
         )
+        // Oct 2 — "I still can't see Yikou (and lots of others) even when I'm
+        // right on the place."
+        //
+        // The pin was never missing from the data: Yikou has two published
+        // recommendations and the map had all 973 places in hand. MapKit was
+        // declining to draw it. Unlike Google Maps, which drew every marker
+        // it was given and let them overlap, MapKit declutters — where
+        // annotations collide it picks one and silently drops the rest, which
+        // on a city with a thousand pins means whole streets of them vanish.
+        //
+        // Clustering is the fix, and the better behaviour anyway: colliding
+        // pins now become one bubble with a count, so nothing is ever hidden
+        // — it's either a pin or a number you can tap into.
+        mapView.register(
+            RexClusterAnnotationView.self,
+            forAnnotationViewWithReuseIdentifier: MKMapViewDefaultClusterAnnotationViewReuseIdentifier
+        )
 
         // Oct 1 — "when we click on the map make it more zoomed in to our
         // location". radiusMeters is how far out we FETCH (ten miles); it was
@@ -261,11 +278,31 @@ struct AppleMapView: UIViewRepresentable {
             // name at the top. The title stays set for VoiceOver.
             view?.titleVisibility = .hidden
             view?.subtitleVisibility = .hidden
+            // Everything clusters together: a café hidden behind a pub helps
+            // nobody, and one bubble saying "7" is honest about what's there.
+            view?.clusteringIdentifier = "rex"
             view?.displayPriority = .required
+            view?.collisionMode = .circle
             return view
         }
 
         func mapView(_ mapView: MKMapView, didSelect view: MKAnnotationView) {
+            // Tapping a cluster zooms into it rather than picking one of its
+            // pins arbitrarily — the whole point is that nothing is hidden.
+            if let cluster = view.annotation as? MKClusterAnnotation {
+                mapView.deselectAnnotation(cluster, animated: false)
+                var rect = MKMapRect.null
+                for member in cluster.memberAnnotations {
+                    let point = MKMapPoint(member.coordinate)
+                    rect = rect.union(MKMapRect(x: point.x, y: point.y, width: 0, height: 0))
+                }
+                mapView.setVisibleMapRect(
+                    rect,
+                    edgePadding: UIEdgeInsets(top: 280, left: 60, bottom: 160, right: 60),
+                    animated: true
+                )
+                return
+            }
             guard let annotation = view.annotation as? RexPlaceAnnotation,
                   let place = markersById[annotation.id] else { return }
             // Deselect so tapping the same pin twice works — MapKit otherwise
@@ -318,5 +355,49 @@ final class RexPlaceAnnotation: NSObject, MKAnnotation {
         self.coordinate = coordinate
         self.tint = tint
         self.symbol = symbol
+    }
+}
+
+/// What a group of colliding pins looks like: REX green, the count, and the
+/// same shape language as a single pin so the map reads as one system.
+///
+/// Oct 2 — introduced because MapKit hides annotations that collide, which is
+/// how pins "disappeared" from a map that had them all loaded. A cluster is
+/// the honest alternative to hiding: tap it and it opens out.
+final class RexClusterAnnotationView: MKAnnotationView {
+    override init(annotation: MKAnnotation?, reuseIdentifier: String?) {
+        super.init(annotation: annotation, reuseIdentifier: reuseIdentifier)
+        displayPriority = .required
+        collisionMode = .circle
+        frame = CGRect(x: 0, y: 0, width: 36, height: 36)
+        centerOffset = CGPoint(x: 0, y: -18)
+    }
+
+    required init?(coder: NSCoder) { fatalError("init(coder:) has not been implemented") }
+
+    override func prepareForDisplay() {
+        super.prepareForDisplay()
+        guard let cluster = annotation as? MKClusterAnnotation else { return }
+        let count = cluster.memberAnnotations.count
+
+        image = UIGraphicsImageRenderer(size: CGSize(width: 36, height: 36)).image { _ in
+            UIColor(RexColor.primary).setFill()
+            UIBezierPath(ovalIn: CGRect(x: 0, y: 0, width: 36, height: 36)).fill()
+            UIColor.white.setStroke()
+            let ring = UIBezierPath(ovalIn: CGRect(x: 1, y: 1, width: 34, height: 34))
+            ring.lineWidth = 2
+            ring.stroke()
+
+            let text = count > 99 ? "99+" : "\(count)"
+            let attributes: [NSAttributedString.Key: Any] = [
+                .font: UIFont.systemFont(ofSize: count > 99 ? 12 : 14, weight: .semibold),
+                .foregroundColor: UIColor.white,
+            ]
+            let size = text.size(withAttributes: attributes)
+            text.draw(
+                at: CGPoint(x: (36 - size.width) / 2, y: (36 - size.height) / 2),
+                withAttributes: attributes
+            )
+        }
     }
 }

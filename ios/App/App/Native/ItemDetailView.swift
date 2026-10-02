@@ -12,6 +12,13 @@ struct ItemDetailView: View {
     /// Sept 17 — synopsis and ratings for films, TV and books, fetched from
     /// the catalogue the item came from. See RexSearch.details.
     @State private var details: RexSearch.ItemDetails?
+    /// Oct 2 — "could we have a button here to see more from this author, and
+    /// then a list of other works and who has rex'd if any".
+    @State private var moreByAuthor: [RexSearchHit] = []
+    /// Lowercased title -> the item in REX, for whichever of the author's
+    /// books someone here has actually Rex'd.
+    @State private var authorBookItems: [String: RexItem] = [:]
+    @State private var authorBookRexCounts: [String: Int] = [:]
     @State private var isLoadingDetails = false
     @State private var synopsisExpanded = false
     @State private var recs: [FeedRecommendation] = []
@@ -79,6 +86,7 @@ struct ItemDetailView: View {
                     recipeSection(item: item)
                     yourTakeSection
                     friendsSection
+                    moreByAuthorSection
                     elsewhereSection
                 }
             }
@@ -102,6 +110,8 @@ struct ItemDetailView: View {
             }
         }
         .task { await load() }
+        // Needs the item first, for its author.
+        .task(id: item?.id) { await loadMoreByAuthor() }
     }
 
     private func load() async {
@@ -429,6 +439,130 @@ struct ItemDetailView: View {
             .disabled(isSaving)
         }
         .padding(16)
+    }
+
+    /// More by the same author, Goodreads-style — covers you can run your eye
+    /// along rather than a list to read.
+    ///
+    /// The whole bibliography comes from OpenLibrary, so it includes books
+    /// nobody here has touched; what makes it REX's rather than a catalogue is
+    /// the count underneath. "2 Rex" means someone you know has read it and
+    /// the cover is a door; no count means it's just a book that exists, and
+    /// tapping offers to add it rather than opening a page that isn't there.
+    @ViewBuilder
+    private var moreByAuthorSection: some View {
+        if RexCategory(rawType: item?.type) == .book, !moreByAuthor.isEmpty {
+            VStack(alignment: .leading, spacing: RexSpacing.sm) {
+                HStack(alignment: .firstTextBaseline) {
+                    Text("More by \(primaryAuthor ?? "this author")")
+                        .font(RexFont.display(18, weight: .semibold))
+                        .foregroundStyle(RexColor.foreground)
+                    Spacer(minLength: RexSpacing.sm)
+                    if let author = primaryAuthor {
+                        NavigationLink(value: AuthorRoute(author: author)) {
+                            Text("See all")
+                                .font(RexFont.text(13, weight: .semibold))
+                                .foregroundStyle(RexColor.primary)
+                        }
+                    }
+                }
+
+                ScrollView(.horizontal, showsIndicators: false) {
+                    HStack(alignment: .top, spacing: RexSpacing.md) {
+                        ForEach(moreByAuthor) { book in
+                            authorBookTile(book)
+                        }
+                    }
+                    .padding(.horizontal, 1)
+                }
+            }
+            .padding(.horizontal, 16)
+            .padding(.top, RexSpacing.lg)
+        }
+    }
+
+    private func authorBookTile(_ book: RexSearchHit) -> some View {
+        let existing = authorBookItems[book.title.lowercased()]
+        let count = existing.flatMap { authorBookRexCounts[$0.id] } ?? 0
+
+        return Group {
+            if let existing {
+                NavigationLink(value: existing.id) { authorBookCard(book, rexCount: count) }
+                    .buttonStyle(.plain)
+            } else {
+                authorBookCard(book, rexCount: 0)
+            }
+        }
+    }
+
+    private func authorBookCard(_ book: RexSearchHit, rexCount: Int) -> some View {
+        VStack(alignment: .leading, spacing: 6) {
+            ZStack {
+                RoundedRectangle(cornerRadius: 6, style: .continuous).fill(RexColor.muted)
+                if let cover = book.imageURL, let url = URL(string: cover) {
+                    AsyncImage(url: url) { image in
+                        image.resizable().aspectRatio(contentMode: .fill)
+                    } placeholder: {
+                        Image(systemName: "book").foregroundStyle(RexColor.mutedForeground)
+                    }
+                } else {
+                    Image(systemName: "book").foregroundStyle(RexColor.mutedForeground)
+                }
+            }
+            .frame(width: 92, height: 138)
+            .clipShape(RoundedRectangle(cornerRadius: 6, style: .continuous))
+
+            Text(book.title)
+                .font(RexFont.text(12.5, weight: .medium))
+                .foregroundStyle(RexColor.foreground)
+                .lineLimit(2)
+                .multilineTextAlignment(.leading)
+
+            if rexCount > 0 {
+                HStack(spacing: 3) {
+                    Image("RexDinoLogo")
+                        .resizable().scaledToFit().frame(width: 12, height: 12)
+                    Text("\(rexCount) Rex")
+                        .font(RexFont.text(11, weight: .medium))
+                        .foregroundStyle(RexColor.primary)
+                }
+            } else {
+                Text("Not Rex'd yet")
+                    .font(RexFont.text(11))
+                    .foregroundStyle(RexColor.mutedForeground)
+            }
+        }
+        .frame(width: 92, alignment: .leading)
+    }
+
+    /// A book's subtitle is its author list as OpenLibrary returned it; the
+    /// first name is the one worth building a shelf around.
+    private var primaryAuthor: String? {
+        guard let subtitle = item?.subtitle, !subtitle.isEmpty else { return nil }
+        return subtitle
+            .components(separatedBy: " \u{00B7} ").first?
+            .components(separatedBy: ",").first?
+            .trimmingCharacters(in: .whitespaces)
+    }
+
+    private func loadMoreByAuthor() async {
+        guard RexCategory(rawType: item?.type) == .book,
+              let author = primaryAuthor, !author.isEmpty else { return }
+
+        async let catalogueTask = RexSearch.byAuthor(author)
+        async let mineTask = RexAPI.shared.fetchBooksByAuthor(author)
+        let catalogue = (try? await catalogueTask) ?? []
+        let mine = (try? await mineTask) ?? []
+
+        // The book you are already looking at doesn't belong on its own shelf.
+        let currentTitle = (item?.title ?? "").lowercased()
+        moreByAuthor = catalogue.filter { $0.title.lowercased() != currentTitle }.prefix(12).map { $0 }
+
+        authorBookItems = Dictionary(
+            mine.map { ($0.title.lowercased(), $0) },
+            uniquingKeysWith: { a, _ in a }
+        )
+        authorBookRexCounts = (try? await RexAPI.shared.fetchRexCounts(itemIds: mine.map(\.id))) ?? [:]
     }
 
     /// Public Google rating, deliberately after "What friends say" — friends
