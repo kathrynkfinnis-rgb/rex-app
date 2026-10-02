@@ -73,6 +73,8 @@ struct RexMapView: View {
     @State private var focusedTripPlaces: [MapPlace]?
     @State private var openTrip: TripRoute?
     @State private var showingTripSearch = false
+    /// The place being filed into a trip from its own pin.
+    @State private var addingToTrip: MapPlace?
     /// Which height the place sheet is at — summary, or the full page.
     @State private var placeSheetDetent: PresentationDetent = .height(300)
     /// #106 — a list alongside the map, for when scanning names beats
@@ -283,6 +285,9 @@ struct RexMapView: View {
             }
         }
         .navigationDestination(item: $openTrip) { TripDetailView(route: $0) }
+        .sheet(item: $addingToTrip) { place in
+            AddToTripView(itemId: place.id, itemTitle: place.title, onDone: {})
+        }
         .alert("Couldn't find that place", isPresented: Binding(
             get: { longPressError != nil },
             set: { if !$0 { longPressError = nil } }
@@ -741,6 +746,36 @@ struct RexMapView: View {
                         }
                         Text("· \(place.recommenderSummary)")
                             .font(RexFont.text(13)).foregroundStyle(RexColor.mutedForeground)
+                    }
+
+                    // Oct 2 — "build a trip from Rex is unworkable, it gives
+                    // you a list of every Rex ever done. It should take you to
+                    // the map and you can click on a pin you want to add."
+                    //
+                    // So the map is the builder. Tap a pin, add it to a trip,
+                    // carry on — rather than scrolling a list of everything
+                    // you have ever recommended, out of any geographic order.
+                    //
+                    // A button rather than a long-press on the pin: holding
+                    // the map already means "drop a new place here" (#167),
+                    // and two long-presses a few pixels apart meaning
+                    // different things is a trap.
+                    if RexCategory(rawType: place.type) == .place
+                        || RexCategory(rawType: place.type) == .event {
+                        Button {
+                            addingToTrip = place
+                        } label: {
+                            HStack(spacing: RexSpacing.sm) {
+                                Image(systemName: "suitcase.fill").font(.system(size: 13))
+                                Text("Add to a trip").font(RexFont.text(14, weight: .semibold))
+                            }
+                            .foregroundStyle(RexColor.primary)
+                            .padding(.horizontal, RexSpacing.md)
+                            .padding(.vertical, 9)
+                            .overlay(Capsule().stroke(RexColor.primary.opacity(0.45), lineWidth: 1))
+                        }
+                        .buttonStyle(.plain)
+                        .padding(.top, RexSpacing.xs)
                     }
 
                     // A stop usually belongs to a trip — let people jump to the

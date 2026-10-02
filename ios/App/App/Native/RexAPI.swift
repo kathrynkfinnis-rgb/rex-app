@@ -866,7 +866,11 @@ final class RexAPI {
         components.queryItems = [
             URLQueryItem(name: "select", value: select),
             URLQueryItem(name: "trip_id", value: "is.null"),
-            URLQueryItem(name: "items.type", value: "in.(trip,list)"),
+            // Oct 2 — "when you click on trips at the top of map, only show
+            // trips and not lists". This is only ever called by the map's
+            // "Looking for a trip?" search, and following a list on a map is
+            // meaningless: a list has no stops to draw.
+            URLQueryItem(name: "items.type", value: "eq.trip"),
             URLQueryItem(name: "order", value: "created_at.desc"),
             URLQueryItem(name: "limit", value: "300"),
         ]
@@ -4915,17 +4919,36 @@ final class RexAPI {
             URLQueryItem(name: "select", value: "item_id"),
             URLQueryItem(name: "item_id", value: "in.(\(realItemIds.joined(separator: ",")))"),
             URLQueryItem(name: "trip_id", value: "is.null"),
-            URLQueryItem(name: "limit", value: "2000"),
         ]
-        var request = URLRequest(url: components.url!)
-        request.setValue(anonKey, forHTTPHeaderField: "apikey")
-        request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
 
-        let (data, response) = try await URLSession.shared.data(for: request)
-        guard let http = response as? HTTPURLResponse, http.statusCode < 400 else { return [:] }
+        // Oct 2 — the same 1,000-row cap that was quietly eating the map (see
+        // fetchMapPlaces). This counts rows client-side, so a truncated
+        // response doesn't fail, it just undercounts: a popular item in a long
+        // feed page would show fewer Rex than it has. Paged for the same
+        // reason and bounded the same way.
         struct Row: Codable { let item_id: String }
-        let rows = (try? JSONDecoder().decode([Row].self, from: data)) ?? []
-        return rows.reduce(into: [:]) { counts, row in counts[row.item_id, default: 0] += 1 }
+        var counts: [String: Int] = [:]
+        let pageSize = 1_000
+        var offset = 0
+        while offset < 10_000 {
+            var paged = components
+            paged.queryItems = (components.queryItems ?? []) + [
+                URLQueryItem(name: "limit", value: "\(pageSize)"),
+                URLQueryItem(name: "offset", value: "\(offset)"),
+            ]
+            var request = URLRequest(url: paged.url!)
+            request.setValue(anonKey, forHTTPHeaderField: "apikey")
+            request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+
+            guard let (data, response) = try? await URLSession.shared.data(for: request),
+                  let http = response as? HTTPURLResponse, http.statusCode < 400
+            else { break }
+            let rows = (try? JSONDecoder().decode([Row].self, from: data)) ?? []
+            for row in rows { counts[row.item_id, default: 0] += 1 }
+            if rows.count < pageSize { break }
+            offset += pageSize
+        }
+        return counts
     }
 
     /// Everyone who's Rex'd this item, newest first — the tap target behind
