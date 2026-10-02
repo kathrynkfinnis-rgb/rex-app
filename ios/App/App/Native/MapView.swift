@@ -73,6 +73,8 @@ struct RexMapView: View {
     @State private var focusedTripPlaces: [MapPlace]?
     @State private var openTrip: TripRoute?
     @State private var showingTripSearch = false
+    /// Which height the place sheet is at — summary, or the full page.
+    @State private var placeSheetDetent: PresentationDetent = .height(300)
     /// #106 — a list alongside the map, for when scanning names beats
     /// panning pins around, plus a sort the map itself has no use for.
     @State private var showingList = false
@@ -251,6 +253,7 @@ struct RexMapView: View {
             set: { next in
                 if next == nil {
                     selectedPlace = nil
+                    placeSheetDetent = .height(300)
                     showingTripSearch = false
                     pendingPlaceHit = nil
                 }
@@ -258,9 +261,21 @@ struct RexMapView: View {
         )) { sheet in
             switch sheet {
             case .place(let place):
-                placeSheet(place)
-                    // Compact by default; drag up when a place is on several trips.
-                    .presentationDetents([.height(260), .height(440)])
+                // Oct 2 — "remove the details button and just go straight to
+                // what we see when we click the button, then you swipe up on
+                // the card and it takes you to the page for that place."
+                //
+                // So the sheet is the place now. Resting height is the
+                // summary; drag it to full and it becomes the item's own page,
+                // which is where the button used to send you.
+                Group {
+                    if placeSheetDetent == .large {
+                        ItemDetailView(itemId: place.id, showsTitle: false)
+                    } else {
+                        placeSheet(place)
+                    }
+                }
+                .presentationDetents([.height(300), .large], selection: $placeSheetDetent)
             case .tripSearch:
                 TripSearchView(onSelect: { id, title in followTrip(id: id, title: title) })
             case .newRex(let hit):
@@ -778,11 +793,6 @@ struct RexMapView: View {
                         }
                         .padding(.top, RexSpacing.sm)
                     }
-
-                    NavigationLink(value: place.id) {
-                        Text("View details")
-                    }
-                    .buttonStyle(RexPrimaryButtonStyle())
 
                 }
                 .padding(RexSpacing.page)

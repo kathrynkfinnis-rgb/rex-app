@@ -2,6 +2,11 @@ import SwiftUI
 
 struct ItemDetailView: View {
     let itemId: String
+    /// Oct 2 — "don't need the heading twice here". Inside the map's place
+    /// sheet the item's name is already the first thing in the card, so the
+    /// navigation bar repeating it is noise. Pushed as a page it still wants
+    /// a title, so this is a parameter rather than a removal.
+    var showsTitle: Bool = true
 
     @State private var item: RexItem?
     /// Sept 17 — synopsis and ratings for films, TV and books, fetched from
@@ -79,7 +84,7 @@ struct ItemDetailView: View {
             }
         }
         .background(RexColor.background.ignoresSafeArea())
-        .navigationTitle(item?.title ?? "")
+        .navigationTitle(showsTitle ? (item?.title ?? "") : "")
         .navigationBarTitleDisplayMode(.inline)
         // A drag can drop the keyboard too, so the comment field and its Post
         // button aren't only reachable via the keyboard's own Done button.

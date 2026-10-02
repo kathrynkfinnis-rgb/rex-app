@@ -49,13 +49,21 @@ struct AppleMapView: UIViewRepresentable {
     /// wherever the map happened to be sitting.
     var fitToPlacesNonce: Int = 0
 
-    /// Roughly a fifteen-minute walk across. Close enough to recognise your
-    /// own streets, wide enough that a handful of pins are already in frame.
-    static let openingSpanMeters: CLLocationDistance = 2_200
+    /// Oct 2 — "the new map seems to have deleted lots of stuff, missing many
+    /// pins". Nothing was deleted: this was 2,200m, which is a couple of
+    /// streets, so the map opened on a letterbox and every pin more than a
+    /// few minutes' walk away was simply off-screen. Yikou Cafe, the reported
+    /// example, sits 1.5km south of where the camera landed.
+    ///
+    /// The previous value framed twenty miles and was genuinely too far out.
+    /// Seven kilometres is the honest middle: your own area, a borough's worth
+    /// of pins in frame, and nothing hidden behind the edge of the screen.
+    static let openingSpanMeters: CLLocationDistance = 7_000
     /// Below this span the pins are far enough apart to carry an icon; above
     /// it they would be a wall of overlapping glyphs, so colour alone does the
-    /// work. "Colourful pins on a big view, icons when you zoom in."
-    static let glyphSpanMeters: CLLocationDistance = 6_000
+    /// work. "Colourful pins on a big view, icons when you zoom in." Set
+    /// inside the opening span so one pinch in brings the icons up.
+    static let glyphSpanMeters: CLLocationDistance = 5_000
 
     func makeCoordinator() -> Coordinator { Coordinator(self) }
 
