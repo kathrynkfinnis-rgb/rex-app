@@ -438,12 +438,9 @@ struct ListDetailView: View {
                     .font(RexFont.text(13))
                     .foregroundStyle(RexColor.mutedForeground)
             } else {
-                Text(linkifiedNotes(longNote))
-                    .font(RexFont.text(15))
-                    .foregroundStyle(RexColor.foreground.opacity(0.9))
-                    .tint(RexColor.primary)
-                    .textSelection(.enabled)
-                    .fixedSize(horizontal: false, vertical: true)
+                // Oct 1 — headings and bullets that were already in the text
+                // now survive to the screen. See RexNotesText.
+                RexNotesText(text: longNote)
             }
         }
         .padding(RexSpacing.cardPadding)
