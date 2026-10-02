@@ -2093,6 +2093,10 @@ final class RexAPI {
         guard let userId = currentUserId, let token = try? await validToken() else { return nil }
         var components = URLComponents(url: baseURL.appendingPathComponent("/rest/v1/recommendations"), resolvingAgainstBaseURL: false)!
         components.queryItems = [
+            // See fetchMapPlaces: PostgREST caps at 1,000 rows regardless of
+            // `limit`, so a prolific account's streak was being computed from
+            // its newest thousand Rex only. Harmless for the count shown, but
+            // worth knowing it is a floor rather than a total.
             URLQueryItem(name: "select", value: "created_at"),
             URLQueryItem(name: "user_id", value: "eq.\(userId)"),
             URLQueryItem(name: "trip_id", value: "is.null"),
@@ -5033,15 +5037,49 @@ final class RexAPI {
             // well past any real friend group's total place/event count
             // rather than removed outright, so a single pathological account
             // can't make this unbounded.
-            URLQueryItem(name: "limit", value: "2000"),
         ]
-        var request = URLRequest(url: components.url!)
-        request.setValue(anonKey, forHTTPHeaderField: "apikey")
-        request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
 
-        let (data, response) = try await URLSession.shared.data(for: request)
-        guard let http = response as? HTTPURLResponse, http.statusCode < 400 else {
-            throw RexAPIError.server("Couldn't load the map.")
+        // Oct 2 — "items that were previously on the map have now
+        // disappeared... I still can't see Yikou even when I'm right on the
+        // place."
+        //
+        // PostgREST caps every response at 1,000 rows no matter what `limit`
+        // asks for — the proof is in the Content-Range header it sends back:
+        // `0-999/2555`. So this query, which asked for 2,000 ordered
+        // created_at.desc, only ever received the newest thousand items. Yikou
+        // Cafe was added on 30 July and fell off the end months ago, along
+        // with everything else older than the cut.
+        //
+        // That is why the map looked like it was losing places: every new Rex
+        // pushed an old one out of the window. Nothing was deleted and nothing
+        // to do with the move to MapKit — the rows simply never arrived.
+        //
+        // Paging until a short page comes back is the fix, and the loop is
+        // bounded so a runaway catalogue can't spin here forever.
+        var rows: [MapPlace] = []
+        let pageSize = 1_000
+        var offset = 0
+        while offset < 10_000 {
+            var paged = components
+            paged.queryItems = (components.queryItems ?? []) + [
+                URLQueryItem(name: "limit", value: "\(pageSize)"),
+                URLQueryItem(name: "offset", value: "\(offset)"),
+            ]
+            var request = URLRequest(url: paged.url!)
+            request.setValue(anonKey, forHTTPHeaderField: "apikey")
+            request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+
+            let (data, response) = try await URLSession.shared.data(for: request)
+            guard let http = response as? HTTPURLResponse, http.statusCode < 400 else {
+                // A later page failing shouldn't lose the ones already in
+                // hand — a partial map beats no map.
+                if rows.isEmpty { throw RexAPIError.server("Couldn't load the map.") }
+                break
+            }
+            let page = (try? JSONDecoder().decode([MapPlace].self, from: data)) ?? []
+            rows.append(contentsOf: page)
+            if page.count < pageSize { break }
+            offset += pageSize
         }
         // lat/lng are nullable in the schema even though we need them to
         // place a pin, mostly for Lovable-era Rex predating #135's
@@ -5054,7 +5092,7 @@ final class RexAPI {
         // now happens in the background via repairMissingMapCoords, kicked
         // off by MapView.load() *after* this returns rather than before —
         // this just returns what's already geocoded, immediately.
-        return try JSONDecoder().decode([MapPlace].self, from: data)
+        return rows
     }
 
     /// Fire-and-forget geocode repair for whatever fetchMapPlaces()/
