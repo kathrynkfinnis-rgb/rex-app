@@ -237,6 +237,11 @@ struct AddRexView: View {
     @State private var hits: [RexSearchHit] = []
     @State private var isSearching = false
     @State private var picked: RexSearchHit?
+    /// Oct 3 — the untouched notes, kept while an organised version is on
+    /// screen so "back to how I wrote it" is exact rather than approximate.
+    @State private var notesBeforeOrganising: String?
+    @State private var isOrganisingNotes = false
+    @State private var organiseMessage: String?
     /// Oct 3 — a Rex drawing chosen as a list's cover, when no photo was
     /// uploaded. Stored as the "rex://icon/<asset>" sentinel in the same
     /// image_url column a photo would use.
@@ -799,6 +804,8 @@ struct AddRexView: View {
                         .background(RexColor.card)
                         .clipShape(RoundedRectangle(cornerRadius: 14))
                         .overlay(RoundedRectangle(cornerRadius: 14).stroke(RexColor.border, lineWidth: 1))
+
+                    organiseNotesControls
                 }
                 .padding(.top, RexSpacing.sm)
             } else {
@@ -1936,6 +1943,102 @@ struct AddRexView: View {
     ///
     /// Stored in the same column a photo would use, so every screen that draws
     /// a thumbnail already draws this. See GoogleSafeAsyncImage.iconAssetName.
+    /// Oct 3 — "Let Rex suggest structure for a free-text list ... with a way
+    /// back to the original, since it's the author's text."
+    ///
+    /// The way back is the whole reason this is safe to offer: the untouched
+    /// text is kept in `notesBeforeOrganising` and Undo simply restores it.
+    /// Nothing is saved until the form is posted either way.
+    @ViewBuilder
+    private var organiseNotesControls: some View {
+        let hasEnough = listNotes.components(separatedBy: .newlines)
+            .filter { !$0.trimmingCharacters(in: .whitespaces).isEmpty }.count >= 3
+        if hasEnough {
+            HStack(spacing: RexSpacing.md) {
+                if let notesBeforeOrganising {
+                    Button {
+                        listNotes = notesBeforeOrganising
+                        self.notesBeforeOrganising = nil
+                    } label: {
+                        Label("Back to how I wrote it", systemImage: "arrow.uturn.backward")
+                            .font(RexFont.text(12.5, weight: .semibold))
+                    }
+                    .buttonStyle(.plain)
+                    .foregroundStyle(RexColor.primary)
+                } else {
+                    Button {
+                        Task { await organiseNotes() }
+                    } label: {
+                        if isOrganisingNotes {
+                            HStack(spacing: 5) {
+                                ProgressView().controlSize(.mini)
+                                Text("Reading it…").font(RexFont.text(12.5))
+                            }
+                        } else {
+                            Label("Let Rex add headings and bullets", systemImage: "wand.and.stars")
+                                .font(RexFont.text(12.5, weight: .semibold))
+                        }
+                    }
+                    .buttonStyle(.plain)
+                    .foregroundStyle(RexColor.primary)
+                    .disabled(isOrganisingNotes)
+                }
+                Spacer(minLength: 0)
+            }
+
+            if let organiseMessage {
+                Text(organiseMessage)
+                    .font(RexFont.text(11.5))
+                    .foregroundStyle(RexColor.mutedForeground)
+            } else if notesBeforeOrganising == nil {
+                Text("It only marks headings and bullets \u{2014} your words aren't changed.")
+                    .font(RexFont.text(11.5))
+                    .foregroundStyle(RexColor.mutedForeground)
+            }
+        }
+    }
+
+    /// Applies the marks to this copy of the lines. The server returns line
+    /// numbers, so every word written back here is a word that was already
+    /// there — a heading gains a colon and a bullet gains a dash, which is
+    /// exactly what RexNotesParser already reads when a paste arrives with
+    /// structure in it.
+    private func organiseNotes() async {
+        let original = listNotes
+        let lines = original.components(separatedBy: .newlines)
+        isOrganisingNotes = true
+        organiseMessage = nil
+        defer { isOrganisingNotes = false }
+
+        guard let marks = try? await RexAPI.shared.organiseListStructure(lines: lines) else {
+            organiseMessage = "Couldn't read those notes just now."
+            return
+        }
+        guard !marks.headings.isEmpty || !marks.bullets.isEmpty else {
+            organiseMessage = "Nothing obvious to group \u{2014} left as you wrote it."
+            return
+        }
+
+        let rebuilt = lines.enumerated().map { index, line -> String in
+            let trimmed = line.trimmingCharacters(in: .whitespaces)
+            guard !trimmed.isEmpty else { return line }
+            if marks.headings.contains(index) {
+                // A colon is what the reader treats as a heading, and it's the
+                // least destructive mark available: one character, and the
+                // author's own words are untouched either side of it.
+                return trimmed.hasSuffix(":") ? trimmed : trimmed + ":"
+            }
+            if marks.bullets.contains(index) {
+                return "- " + trimmed
+            }
+            return line
+        }
+
+        notesBeforeOrganising = original
+        listNotes = rebuilt.joined(separator: "\n")
+        organiseMessage = "Grouped into \(marks.headings.count) heading\(marks.headings.count == 1 ? "" : "s"). Undo if it's got it wrong."
+    }
+
     private var listIconURL: String? {
         listIcon.map { "rex://icon/\($0)" }
     }

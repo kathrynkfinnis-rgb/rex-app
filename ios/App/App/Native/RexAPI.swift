@@ -5490,6 +5490,29 @@ final class RexAPI {
         return try JSONDecoder().decode(Response.self, from: data).items
     }
 
+    /// Oct 3 — "Let Rex suggest structure for a free-text list."
+    ///
+    /// Sends the author's lines and gets back line numbers only — never text.
+    /// See the edge function's own note: the point is that nothing the model
+    /// says can change a word the author wrote.
+    func organiseListStructure(lines: [String]) async throws -> (headings: Set<Int>, bullets: Set<Int>) {
+        let token = try await validToken()
+        var request = URLRequest(url: baseURL.appendingPathComponent("/functions/v1/organise-list"))
+        request.httpMethod = "POST"
+        request.setValue(anonKey, forHTTPHeaderField: "apikey")
+        request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        request.httpBody = try JSONSerialization.data(withJSONObject: ["lines": lines])
+
+        let (data, response) = try await URLSession.shared.data(for: request)
+        guard let http = response as? HTTPURLResponse, http.statusCode < 400 else {
+            throw RexAPIError.server(friendlyError(data, fallback: "Couldn't organise those notes."))
+        }
+        struct Response: Codable { let headings: [Int]; let bullets: [Int] }
+        let decoded = try JSONDecoder().decode(Response.self, from: data)
+        return (Set(decoded.headings), Set(decoded.bullets))
+    }
+
     /// #21 — a photo of a recipe (cookbook page, handwritten card,
     /// screenshot) transcribed to plain text. The caller feeds the result
     /// through RexRecipe.parse(), same as "paste whole recipe" — this only
