@@ -174,18 +174,38 @@ struct RexMapView: View {
         .buttonStyle(.plain)
     }
 
-    /// Centre on the user if we have them, otherwise the middle of the pins.
+    /// Centre on the user if we have them, otherwise on where their Rex
+    /// actually are.
+    ///
+    /// Oct 2 — "for me the map always starts in Mali?". It did. This used to
+    /// take the midpoint of the bounding box of every pin, and a collection
+    /// spanning London, Lisbon, Seattle, Vancouver and Athens has its box
+    /// centred in the Atlantic off West Africa. The midpoint of a global
+    /// spread is reliably somewhere nobody has ever been.
+    ///
+    /// The median is the right average here: it lands wherever most of the
+    /// pins are and ignores the handful on another continent, which is what
+    /// "where are my places" means in practice.
     private var center: CLLocationCoordinate2D? {
-        if let userCoordinate { return userCoordinate }
+        // A zero coordinate is what Core Location hands back before it has a
+        // fix, and 0,0 is in the Gulf of Guinea — the same failure wearing a
+        // different hat.
+        if let userCoordinate, CLLocationCoordinate2DIsValid(userCoordinate),
+           abs(userCoordinate.latitude) > 0.0001 || abs(userCoordinate.longitude) > 0.0001 {
+            return userCoordinate
+        }
         let coords = visiblePlaces.compactMap { p -> CLLocationCoordinate2D? in
             guard let lat = p.lat, let lng = p.lng else { return nil }
             return CLLocationCoordinate2D(latitude: lat, longitude: lng)
         }
         guard !coords.isEmpty else { return nil }
-        let lats = coords.map(\.latitude), lngs = coords.map(\.longitude)
+        func median(_ values: [Double]) -> Double {
+            let sorted = values.sorted()
+            return sorted[sorted.count / 2]
+        }
         return CLLocationCoordinate2D(
-            latitude: (lats.min()! + lats.max()!) / 2,
-            longitude: (lngs.min()! + lngs.max()!) / 2
+            latitude: median(coords.map(\.latitude)),
+            longitude: median(coords.map(\.longitude))
         )
     }
 

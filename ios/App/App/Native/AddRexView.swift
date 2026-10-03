@@ -692,10 +692,16 @@ struct AddRexView: View {
                     mode: .list,
                     onEditStop: { entry in activeSheet = .editListItem(entry) },
                     onAddStop: { activeSheet = .addListItem },
-                    // Shares the long-note field: a list that's all writing
-                    // and no items already leads with it on the list's page,
-                    // so this is the way in rather than a second column.
-                    freeText: $listNotes
+                    // Oct 1 — "free text list, the text is coming up twice in
+                    // the first box and again in notes."
+                    //
+                    // It was: this binding and the Notes box further down were
+                    // the same $listNotes, so whatever you typed appeared in
+                    // both, and a long paste read as though it had been
+                    // duplicated. The Notes box below is the one that stays —
+                    // it's labelled, it explains itself, and it's where the
+                    // feature was asked for on 10 Sept.
+                    freeText: nil
                 )
 
                 Button {
