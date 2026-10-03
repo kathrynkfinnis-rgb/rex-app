@@ -1875,7 +1875,7 @@ final class RexAPI {
     /// scratch. Only the second belongs in the feed — see fetchWantsFeed.
     /// Sent only when the column exists, same probe-and-skip the note field
     /// above uses, so this keeps working before the migration is run.
-    func createWant(itemId: String, note: String? = nil, source: String = "save") async throws {
+    func createWant(itemId: String, note: String? = nil, source: String = "save", photoURLs: [String] = []) async throws {
         let token = try await validToken()
         guard let userId = currentUserId else { throw RexAPIError.notSignedIn }
         var request = URLRequest(url: baseURL.appendingPathComponent("/rest/v1/wants"))
@@ -1890,6 +1890,10 @@ final class RexAPI {
         // can't break saving.
         if let note, !note.isEmpty { body["note"] = note }
         if await wantSourceField() { body["source"] = source }
+        // Oct 3 — photos on a want. Sent only when there are some, on the same
+        // reasoning as the note above: a database without the column yet must
+        // still be able to save a want.
+        if !photoURLs.isEmpty { body["photo_urls"] = photoURLs }
         request.httpBody = try JSONSerialization.data(withJSONObject: body)
 
         var urlComponents = URLComponents(url: request.url!, resolvingAgainstBaseURL: false)!
@@ -4450,7 +4454,7 @@ final class RexAPI {
     func fetchEditorialCollections() async throws -> [EditorialCollection] {
         var components = URLComponents(url: baseURL.appendingPathComponent("/rest/v1/editorial_collections"), resolvingAgainstBaseURL: false)!
         components.queryItems = [
-            URLQueryItem(name: "select", value: "id,title,source_label,category,editorial_collection_items(id,title,subtitle,image_url,item_id,link_url,sort_order)"),
+            URLQueryItem(name: "select", value: "id,title,source_label,category,editorial_collection_items(id,title,subtitle,image_url,item_id,link_url,sort_order,items(type))"),
             URLQueryItem(name: "order", value: "sort_order.asc"),
         ]
         var request = URLRequest(url: components.url!)
@@ -4803,7 +4807,8 @@ final class RexAPI {
         let token = try await validToken()
         guard currentUserId != nil else { return [] }
         let noteField = await wantNoteField()
-        let select = "id,created_at,item_id,user_id\(noteField)," +
+        let photosField = await wantPhotosField()
+        let select = "id,created_at,item_id,user_id\(noteField)\(photosField)," +
             "items(id,type,title,subtitle,image_url,genre,address,link_url,recipe_text,lat,lng)"
         struct Row: Codable {
             let id: String
@@ -4811,6 +4816,7 @@ final class RexAPI {
             let item_id: String
             let user_id: String
             let note: String?
+            let photo_urls: [String]?
             let items: RexItem?
         }
 
@@ -4910,7 +4916,9 @@ final class RexAPI {
                 note: row.note,
                 created_at: row.created_at,
                 photo_url: nil,
-                photo_urls: nil,
+                // Oct 3 — a want can carry photos now, and the feed card
+                // already knows how to draw them.
+                photo_urls: row.photo_urls,
                 tags: nil,
                 user_id: row.user_id,
                 item_id: row.item_id,
@@ -4967,6 +4975,28 @@ final class RexAPI {
             .map { $0 < 400 } ?? false
         wantNoteColumn = ok
         return ok ? ",note" : ""
+    }
+
+    /// Same guard again, for wants.photo_urls (3 Oct migration) — so a client
+    /// that gets ahead of the database still loads the feed.
+    private var wantPhotosColumn: Bool?
+
+    private func wantPhotosField() async -> String {
+        if let wantPhotosColumn { return wantPhotosColumn ? ",photo_urls" : "" }
+        guard let token = try? await validToken() else { return "" }
+        var components = URLComponents(url: baseURL.appendingPathComponent("/rest/v1/wants"), resolvingAgainstBaseURL: false)!
+        components.queryItems = [
+            URLQueryItem(name: "select", value: "photo_urls"),
+            URLQueryItem(name: "limit", value: "1"),
+        ]
+        var request = URLRequest(url: components.url!)
+        request.setValue(anonKey, forHTTPHeaderField: "apikey")
+        request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+        let ok = (try? await URLSession.shared.data(for: request))
+            .flatMap { ($0.1 as? HTTPURLResponse)?.statusCode }
+            .map { $0 < 400 } ?? false
+        wantPhotosColumn = ok
+        return ok ? ",photo_urls" : ""
     }
 
     /// How many people have Rex'd each of these items. Counted client-side

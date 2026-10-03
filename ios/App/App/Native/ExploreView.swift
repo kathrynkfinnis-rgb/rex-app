@@ -530,13 +530,36 @@ struct ExploreView: View {
     private func editorialCard(_ item: EditorialCollectionItem) -> some View {
         Group {
             if let itemId = item.item_id {
-                Button { pushedItemId = itemId } label: { editorialCardBody(item) }
+                Button {
+                    // Oct 3 — a trip on a shelf opens its itinerary, not the
+                    // bare item page, which showed the overview and none of
+                    // the stops. TripDetailView is addressed by the trip's
+                    // recommendation, so that's looked up on tap rather than
+                    // fetched for every card on the shelf.
+                    if item.isTrip {
+                        Task { await openTrip(itemId: itemId, title: item.title) }
+                    } else {
+                        pushedItemId = itemId
+                    }
+                } label: { editorialCardBody(item) }
                     .buttonStyle(.plain)
             } else if let linkString = item.link_url, let url = URL(string: linkString) {
                 RexOutboundLinkButton(url: url) { editorialCardBody(item) }
             } else {
                 editorialCardBody(item)
             }
+        }
+    }
+
+    /// Finds the recommendation behind a trip item so its itinerary can open.
+    /// Falls back to the item page rather than doing nothing: a shelf trip
+    /// whose Rex has since been deleted should still open something.
+    private func openTrip(itemId: String, title: String) async {
+        if let recs = try? await RexAPI.shared.fetchRecommendations(forItem: itemId),
+           let trip = recs.first {
+            pushedTrip = TripRoute(recommendationId: trip.id, title: title)
+        } else {
+            pushedItemId = itemId
         }
     }
 

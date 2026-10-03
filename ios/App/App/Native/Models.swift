@@ -460,6 +460,18 @@ struct EditorialCollectionItem: Codable, Identifiable {
     let image_url: String?
     let item_id: String?
     let link_url: String?
+    /// Oct 3 — "If you add a trip to the Rexpert shelves, the card shows just
+    /// the overview not the stops. Should take you to the trip summary page."
+    /// A shelf item only knew its item id, and an item id opens the item page;
+    /// a trip's stops live on its *recommendation*, which is what
+    /// TripDetailView needs. Knowing the type is what lets the tap branch.
+    let items: ItemType?
+
+    struct ItemType: Codable {
+        let type: String
+    }
+
+    var isTrip: Bool { items?.type == "trip" }
 }
 
 // MARK: - Import (#109 "Lists" category, #15/#38 native trip import)

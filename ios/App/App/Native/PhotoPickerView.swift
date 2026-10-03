@@ -1,5 +1,32 @@
 import SwiftUI
 import PhotosUI
+import UniformTypeIdentifiers
+
+/// Oct 3 — drag a photo onto another to reorder. Same shape as the itinerary
+/// builder's ReorderDropDelegate, kept separate rather than generalised
+/// because that one moves ItineraryEntry rows and this one moves strings.
+private struct PhotoReorderDropDelegate: DropDelegate {
+    let target: String
+    @Binding var photoURLs: [String]
+    @Binding var dragging: String?
+
+    func dropEntered(info: DropInfo) {
+        guard let dragging, dragging != target,
+              let from = photoURLs.firstIndex(of: dragging),
+              let to = photoURLs.firstIndex(of: target)
+        else { return }
+        withAnimation(.snappy) {
+            photoURLs.move(fromOffsets: IndexSet(integer: from), toOffset: to > from ? to + 1 : to)
+        }
+    }
+
+    func dropUpdated(info: DropInfo) -> DropProposal? { DropProposal(operation: .move) }
+
+    func performDrop(info: DropInfo) -> Bool {
+        dragging = nil
+        return true
+    }
+}
 
 /// Pick photos from the library and upload them to Supabase storage.
 /// Binds to the signed URLs so the parent form can post them with the Rex.
@@ -10,6 +37,8 @@ struct PhotoPickerView: View {
     @State private var selection: [PhotosPickerItem] = []
     @State private var isUploading = false
     @State private var errorMessage: String?
+    /// Which photo is being dragged, for the reorder.
+    @State private var dragging: String?
 
     var body: some View {
         VStack(alignment: .leading, spacing: RexSpacing.sm) {
@@ -36,7 +65,36 @@ struct PhotoPickerView: View {
                             }
                             .buttonStyle(.plain)
                             .padding(4)
+
+                            // Oct 3 — "Photos can't be reordered after
+                            // upload." The first photo is the one the card
+                            // leads with, so the order is a real decision and
+                            // the only way to change it was to delete
+                            // everything and upload again in the right order.
+                            if photoURLs.first == url, photoURLs.count > 1 {
+                                Text("Cover")
+                                    .font(RexFont.text(9, weight: .semibold))
+                                    .foregroundStyle(.white)
+                                    .padding(.horizontal, 5).padding(.vertical, 2)
+                                    .background(.black.opacity(0.55))
+                                    .clipShape(Capsule())
+                                    .padding(4)
+                                    .frame(width: 78, height: 78, alignment: .bottomLeading)
+                            }
                         }
+                        .opacity(dragging == url ? 0.4 : 1)
+                        .onDrag {
+                            dragging = url
+                            return NSItemProvider(object: url as NSString)
+                        }
+                        .onDrop(
+                            of: [UTType.text],
+                            delegate: PhotoReorderDropDelegate(
+                                target: url,
+                                photoURLs: $photoURLs,
+                                dragging: $dragging
+                            )
+                        )
                     }
 
                     if photoURLs.count < maxPhotos {
@@ -76,9 +134,15 @@ struct PhotoPickerView: View {
                     .font(RexFont.text(12))
                     .foregroundStyle(RexColor.destructive)
             } else {
-                Text(maxPhotos == 1 ? "One photo" : "Up to \(maxPhotos) photos")
-                    .font(RexFont.text(11))
-                    .foregroundStyle(RexColor.mutedForeground)
+                Text(
+                    maxPhotos == 1
+                        ? "One photo"
+                        : photoURLs.count > 1
+                            ? "Up to \(maxPhotos) photos \u{2014} drag to reorder, the first is the cover"
+                            : "Up to \(maxPhotos) photos"
+                )
+                .font(RexFont.text(11))
+                .foregroundStyle(RexColor.mutedForeground)
             }
         }
         .onChange(of: selection) { _, items in

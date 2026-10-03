@@ -798,6 +798,15 @@ struct AddRexView: View {
                 Text("This goes in your friends' feed so they can chime in.")
                     .font(RexFont.text(12))
                     .foregroundStyle(RexColor.mutedForeground)
+
+                // Oct 3 — "Can't add a photo to a want-to-try." A want is the
+                // kind of Rex most likely to start life as a screenshot — a
+                // menu someone sent you, a book cover, a shopfront — and it
+                // was the only kind with nowhere to put one.
+                Text("Photos (optional)")
+                    .font(.system(size: 14, weight: .semibold))
+                    .foregroundStyle(RexColor.foreground)
+                PhotoPickerView(photoURLs: $photoURLs)
             }
 
             if mode == .rated {
@@ -1869,7 +1878,9 @@ struct AddRexView: View {
                     note: note.trimmingCharacters(in: .whitespaces).isEmpty ? nil : note,
                     // Added from scratch, not bookmarked off someone's Rex —
                     // this is the kind that posts to the feed.
-                    source: "add"
+                    source: "add",
+                    // Oct 3 — "Can't add a photo to a want-to-try."
+                    photoURLs: photoURLs
                 )
                 didWant = true
                 lastWantItemId = itemId

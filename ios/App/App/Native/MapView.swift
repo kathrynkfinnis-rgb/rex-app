@@ -58,6 +58,8 @@ struct RexMapView: View {
     /// replacing/joining the old Places-vs-Events chips.
     @State private var subFilter: String?
     @State private var personFilter: String?
+    /// Oct 3 — show only places you've marked want-to-try.
+    @State private var wantsOnly = false
     /// Recommendation id of the trip we're following, if any.
     @State private var tripFilter: String?
     /// Set alongside tripFilter whenever we follow a trip, so the "Following
@@ -137,6 +139,12 @@ struct RexMapView: View {
         // people's Rex, so this is "contains", not "belongs to".
         if let personFilter {
             out = out.filter { $0.recommendations.contains { $0.user_id == personFilter } }
+        }
+        // Oct 3 — a want-to-try filter. A want carries the synthetic "want-"
+        // id fetchMapWants gives it, which is also how the merge in load()
+        // tells the two apart when one place is both.
+        if wantsOnly {
+            out = out.filter { $0.recommendations.contains { $0.id.hasPrefix("want-") } }
         }
         return out
     }
@@ -468,10 +476,18 @@ struct RexMapView: View {
             // a guessing game.
             ScrollView(.horizontal, showsIndicators: false) {
                 HStack(spacing: RexSpacing.sm) {
-                    chip("All", active: subFilter == nil && filter == nil) {
+                    chip("All", active: subFilter == nil && filter == nil && !wantsOnly) {
                         subFilter = nil
                         filter = nil
+                        wantsOnly = false
                     }
+                    // Oct 3 — "a want-to-try filter on the map". Wants have
+                    // been drawn on the map since #153 but never separable
+                    // from places people have actually been, which is the
+                    // distinction you want when you're standing somewhere
+                    // deciding what to do: not "where is good" but "what was
+                    // I meaning to try".
+                    chip("Want to try", active: wantsOnly) { wantsOnly.toggle() }
                     ForEach(rexMapSubcategories, id: \.self) { name in
                         subcategoryChip(name)
                     }

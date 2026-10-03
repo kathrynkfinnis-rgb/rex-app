@@ -166,6 +166,10 @@ private struct EditShelfView: View {
     @State private var isSaving = false
     @State private var errorMessage: String?
     @State private var addingItem = false
+    /// Oct 3 — importing a whole shelf from a document.
+    @State private var importingDoc = false
+    @State private var isImporting = false
+    @State private var importProgress: String?
 
     var body: some View {
         NavigationStack {
@@ -199,9 +203,28 @@ private struct EditShelfView: View {
                                 .font(RexFont.display(17, weight: .semibold))
                                 .foregroundStyle(RexColor.foreground)
                             Spacer()
+                            // Oct 3 — "Also need to be able to update Rexpert
+                            // lists from a doc (like the notes import)." Same
+                            // extractor the Lists import uses; each row it
+                            // finds becomes a catalogue item and then a shelf
+                            // entry, so a shelf can be pasted in rather than
+                            // typed one search at a time.
+                            Button { importingDoc = true } label: {
+                                Label("Import", systemImage: "doc.text")
+                                    .font(RexFont.text(14, weight: .semibold))
+                            }
                             Button { addingItem = true } label: {
                                 Label("Add", systemImage: "plus")
                                     .font(RexFont.text(14, weight: .semibold))
+                            }
+                        }
+
+                        if isImporting {
+                            HStack(spacing: 6) {
+                                ProgressView().controlSize(.small)
+                                Text(importProgress ?? "Adding\u{2026}")
+                                    .font(RexFont.text(12))
+                                    .foregroundStyle(RexColor.mutedForeground)
                             }
                         }
 
@@ -280,6 +303,14 @@ private struct EditShelfView: View {
                     }
                 }
             }
+            .sheet(isPresented: $importingDoc) {
+                ListsImportView(
+                    onDone: { Task { await reloadItems() } },
+                    onExtractedAsList: { _, _, entries in
+                        Task { await importEntries(entries) }
+                    }
+                )
+            }
         }
         .tint(RexColor.primary)
         .onAppear {
@@ -347,6 +378,61 @@ private struct EditShelfView: View {
         isSaving = false
     }
 
+    /// Turns an extracted document into shelf entries. Each row becomes a real
+    /// catalogue item first — createItem reuses an existing row when the place
+    /// or book is already known — so an imported shelf is indistinguishable
+    /// from one built by hand, and nothing on it is a dead title.
+    ///
+    /// One failure doesn't stop the import: a document of forty restaurants
+    /// where the ninth can't be resolved should add the other thirty-nine and
+    /// say so, rather than leaving the curator to work out where it stopped.
+    private func importEntries(_ entries: [ItineraryEntry]) async {
+        guard let shelfId else { return }
+        let stops = entries.resolvedStops
+        guard !stops.isEmpty else { return }
+        isImporting = true
+        defer { isImporting = false; importProgress = nil }
+
+        var added = 0
+        var failed: [String] = []
+        for (index, stop) in stops.enumerated() {
+            importProgress = "Adding \(index + 1) of \(stops.count)…"
+            do {
+                let itemId = try await RexAPI.shared.createItem(
+                    type: stop.type.rawValue,
+                    title: stop.title,
+                    subtitle: stop.subtitle,
+                    address: stop.address,
+                    genre: stop.genre,
+                    externalId: stop.externalId,
+                    externalSource: stop.externalSource,
+                    imageURL: stop.imageURL,
+                    lat: stop.lat,
+                    lng: stop.lng
+                )
+                try await RexAPI.shared.addEditorialItem(
+                    collectionId: shelfId,
+                    title: stop.title,
+                    subtitle: stop.address ?? stop.subtitle,
+                    imageURL: stop.imageURL,
+                    itemId: itemId,
+                    linkURL: nil,
+                    sortOrder: items.count + added + 1
+                )
+                added += 1
+            } catch {
+                failed.append(stop.title)
+            }
+        }
+
+        if !failed.isEmpty {
+            errorMessage = failed.count == 1
+                ? "Added \(added). Couldn't add \(failed[0])."
+                : "Added \(added). Couldn't add \(failed.count): \(failed.prefix(3).joined(separator: ", "))…"
+        }
+        await reloadItems()
+    }
+
     private func reloadItems() async {
         guard let shelfId else { return }
         let all = (try? await RexAPI.shared.fetchEditorialCollections()) ?? []
@@ -380,12 +466,47 @@ private struct AddShelfItemView: View {
     @State private var isSearching = false
     @State private var searchTask: Task<Void, Never>?
     @State private var errorMessage: String?
+    /// Oct 3 — "ensure that you can upload stuff that hasn't been Rex'd
+    /// before." A shelf could only hold things already in REX's own
+    /// catalogue, which means a Rexpert can only recommend what somebody has
+    /// already recommended — the exact opposite of what a curated shelf is
+    /// for. These are the external catalogue's answers, which get created as
+    /// items on the way in.
+    @State private var webResults: [RexSearchHit] = []
+    @State private var searchCategory: RexCategory = .place
+    @State private var isAddingNew = false
+
+    /// What a shelf can hold. Mirrors the categories the Add form offers,
+    /// minus the ones that only make sense as something you made yourself.
+    private let searchableCategories: [RexCategory] = [.place, .book, .movie, .tv, .podcast, .other]
 
     var body: some View {
         NavigationStack {
             ScrollView {
                 VStack(alignment: .leading, spacing: RexSpacing.md) {
-                    TextField("Search places, books, films already in REX", text: $query)
+                    ScrollView(.horizontal, showsIndicators: false) {
+                        HStack(spacing: RexSpacing.sm) {
+                            ForEach(searchableCategories, id: \.self) { category in
+                                Button {
+                                    searchCategory = category
+                                    scheduleSearch()
+                                } label: {
+                                    Text(category.label)
+                                        .font(RexFont.text(13, weight: .semibold))
+                                        .foregroundStyle(searchCategory == category ? RexColor.primaryForeground : RexColor.foreground)
+                                        .padding(.horizontal, RexSpacing.md)
+                                        .padding(.vertical, 7)
+                                        .background(searchCategory == category ? RexColor.primary : RexColor.card)
+                                        .clipShape(Capsule())
+                                        .overlay(Capsule().stroke(RexColor.border, lineWidth: searchCategory == category ? 0 : 1))
+                                }
+                                .buttonStyle(.plain)
+                            }
+                        }
+                        .padding(.horizontal, 1)
+                    }
+
+                    TextField("Search \(searchCategory.label.lowercased())s", text: $query)
                         .font(RexFont.text(15))
                         .padding(.horizontal, RexSpacing.md)
                         .frame(height: 46)
@@ -403,6 +524,13 @@ private struct AddShelfItemView: View {
                         Text(errorMessage)
                             .font(RexFont.text(13))
                             .foregroundStyle(RexColor.destructive)
+                    }
+
+                    if !results.isEmpty {
+                        Text("Already on REX")
+                            .font(RexFont.text(11, weight: .semibold))
+                            .tracking(0.3)
+                            .foregroundStyle(RexColor.mutedForeground)
                     }
 
                     ForEach(results, id: \.id) { item in
@@ -433,6 +561,44 @@ private struct AddShelfItemView: View {
                         }
                         .buttonStyle(.plain)
                     }
+
+                    if !webResults.isEmpty {
+                        Text("Not on REX yet")
+                            .font(RexFont.text(11, weight: .semibold))
+                            .tracking(0.3)
+                            .foregroundStyle(RexColor.mutedForeground)
+                            .padding(.top, RexSpacing.sm)
+
+                        ForEach(webResults, id: \.id) { hit in
+                            Button {
+                                Task { await addNew(hit) }
+                            } label: {
+                                HStack(spacing: RexSpacing.md) {
+                                    VStack(alignment: .leading, spacing: 2) {
+                                        Text(hit.title)
+                                            .font(RexFont.text(14, weight: .medium))
+                                            .foregroundStyle(RexColor.foreground)
+                                            .multilineTextAlignment(.leading)
+                                        if let subtitle = hit.address ?? hit.subtitle, !subtitle.isEmpty {
+                                            Text(subtitle)
+                                                .font(RexFont.text(12))
+                                                .foregroundStyle(RexColor.mutedForeground)
+                                                .lineLimit(1)
+                                        }
+                                    }
+                                    Spacer(minLength: 0)
+                                    Image(systemName: "plus.circle")
+                                        .foregroundStyle(RexColor.primary)
+                                }
+                                .padding(RexSpacing.md)
+                                .frame(maxWidth: .infinity, alignment: .leading)
+                                .background(RexColor.card)
+                                .clipShape(RoundedRectangle(cornerRadius: RexRadius.input, style: .continuous))
+                            }
+                            .buttonStyle(.plain)
+                            .disabled(isAddingNew)
+                        }
+                    }
                 }
                 .padding(RexSpacing.page)
             }
@@ -450,12 +616,58 @@ private struct AddShelfItemView: View {
     private func scheduleSearch() {
         searchTask?.cancel()
         let term = query
+        let category = searchCategory
+        guard term.trimmingCharacters(in: .whitespaces).count >= 2 else {
+            results = []
+            webResults = []
+            isSearching = false
+            return
+        }
         searchTask = Task {
             try? await Task.sleep(nanoseconds: 400_000_000)
             guard !Task.isCancelled else { return }
             isSearching = true
-            results = (try? await RexAPI.shared.searchCatalogue(term)) ?? []
+            // REX's own catalogue and the outside one together, so a shelf
+            // isn't limited to what somebody has already Rex'd.
+            async let mine = (try? await RexAPI.shared.searchCatalogue(term)) ?? []
+            async let web = RexSearch.search(category: category, query: term)
+            let (found, hits) = await (mine, web)
+            guard !Task.isCancelled else { return }
+            results = found
+            // Anything already in REX is offered once, from the first list.
+            let known = Set(found.map { $0.title.lowercased() })
+            webResults = hits.filter { !known.contains($0.title.lowercased()) }.prefix(8).map { $0 }
             isSearching = false
+        }
+    }
+
+    /// Creates the catalogue item first, then shelves it — the same two steps
+    /// posting a Rex takes, so something added here is a real item people can
+    /// open, Rex themselves, and find on the map.
+    private func addNew(_ hit: RexSearchHit) async {
+        isAddingNew = true
+        defer { isAddingNew = false }
+        do {
+            let itemId = try await RexAPI.shared.createItem(
+                type: searchCategory.rawValue,
+                title: hit.title,
+                subtitle: hit.subtitle,
+                address: hit.address,
+                hit: hit
+            )
+            try await RexAPI.shared.addEditorialItem(
+                collectionId: collectionId,
+                title: hit.title,
+                subtitle: hit.address ?? hit.subtitle,
+                imageURL: hit.imageURL,
+                itemId: itemId,
+                linkURL: nil,
+                sortOrder: nextSortOrder
+            )
+            onAdded()
+            dismiss()
+        } catch {
+            errorMessage = error.localizedDescription
         }
     }
 

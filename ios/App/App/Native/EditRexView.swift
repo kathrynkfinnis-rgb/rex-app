@@ -62,6 +62,26 @@ struct EditRexView: View {
     /// splitGenres() reads everywhere. Free-text here rather than
     /// rebuilding that chip picker — same format, editable after the fact.
     @State private var genre: String
+
+    /// Bridges the chips (a set) to `genre` (the comma-joined string the
+    /// database has always held), so the storage format is untouched.
+    private var subcategorySelection: Binding<Set<String>> {
+        Binding(
+            get: { Set(splitGenres(genre)) },
+            set: { genre = $0.sorted().joined(separator: ", ") }
+        )
+    }
+
+    /// The standard chips, plus whatever this item already has that isn't one
+    /// of them. Without that second half, opening the editor on a Rex whose
+    /// subcategory was typed by hand — or set by an import, or renamed since —
+    /// would show it as unselected, and saving would silently drop it.
+    private func chipOptions(_ options: [String]) -> [String] {
+        let existing = splitGenres(genre)
+        return options + existing.filter { current in
+            !options.contains { $0.caseInsensitiveCompare(current) == .orderedSame }
+        }
+    }
     @State private var isSaving = false
     @State private var confirmDelete = false
     @State private var errorMessage: String?
@@ -246,24 +266,21 @@ struct EditRexView: View {
 
                     // #183 — "Type of place"/"Type" at creation (AddRexView's
                     // FlowChips, keyed by rexSubcategories) was write-once
-                    // too. Free-text here rather than rebuilding that chip
-                    // picker, but same category gate and same comma-joined
-                    // format, so a value set either way reads back fine.
+                    // too, so this screen added a free-text box for it.
+                    //
+                    // Oct 3 — "Sub-categories are free text, should be chips.
+                    // They drive the map's pin colours and the filter row, so
+                    // typos quietly produce uncoloured pins." Exactly right,
+                    // and this box was the only way to produce one: the Add
+                    // form has always been chips, so every typo'd subcategory
+                    // in the database came through here. Same chips now, with
+                    // the comma-joined string as the storage format either
+                    // way, so nothing about what's written changes.
                     if case let options = rexOrderedSubcategories(category), !options.isEmpty {
                         VStack(alignment: .leading, spacing: RexSpacing.sm) {
-                            Text("Subcategories").font(RexFont.text(14, weight: .semibold))
-                            TextField("e.g. \(options.first ?? "Type")", text: $genre)
-                                .font(RexFont.text(15))
-                                .padding(RexSpacing.md)
-                                .background(RexColor.card)
-                                .clipShape(RoundedRectangle(cornerRadius: RexRadius.input, style: .continuous))
-                                .overlay(
-                                    RoundedRectangle(cornerRadius: RexRadius.input, style: .continuous)
-                                        .stroke(RexColor.border, lineWidth: 1)
-                                )
-                            Text("Comma separated, same as when you first added it.")
-                                .font(RexFont.text(12))
-                                .foregroundStyle(RexColor.mutedForeground)
+                            Text(category == .place ? "Type of place" : "Type")
+                                .font(RexFont.text(14, weight: .semibold))
+                            FlowChips(options: chipOptions(options), selected: subcategorySelection)
                         }
                     }
 
