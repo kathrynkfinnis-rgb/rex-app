@@ -39,6 +39,16 @@ struct PhotoPickerView: View {
     @State private var errorMessage: String?
     /// Which photo is being dragged, for the reorder.
     @State private var dragging: String?
+    /// Oct 3 — the photo currently open in the cropper.
+    @State private var cropping: CroppingPhoto?
+
+    /// The cropper needs both the full-resolution image and the URL it came
+    /// from, so the result can be swapped into the same slot.
+    private struct CroppingPhoto: Identifiable {
+        let url: String
+        let image: UIImage
+        var id: String { url }
+    }
 
     var body: some View {
         VStack(alignment: .leading, spacing: RexSpacing.sm) {
@@ -65,6 +75,24 @@ struct PhotoPickerView: View {
                             }
                             .buttonStyle(.plain)
                             .padding(4)
+
+                            // Oct 3 — "on the cover photo: allow zoom/crop."
+                            // A cover is shown in a fixed frame, so a photo
+                            // that isn't that shape gets centre-cropped by the
+                            // layout and the subject is as likely as not cut
+                            // out of it. This decides which part survives.
+                            Button {
+                                Task { await beginCrop(url) }
+                            } label: {
+                                Image(systemName: "crop")
+                                    .font(.system(size: 10, weight: .semibold))
+                                    .foregroundStyle(.white)
+                                    .padding(5)
+                                    .background(.black.opacity(0.55), in: Circle())
+                            }
+                            .buttonStyle(.plain)
+                            .padding(4)
+                            .frame(width: 78, height: 78, alignment: .bottomTrailing)
 
                             // Oct 3 — "Photos can't be reordered after
                             // upload." The first photo is the one the card
@@ -148,6 +176,42 @@ struct PhotoPickerView: View {
         .onChange(of: selection) { _, items in
             guard !items.isEmpty else { return }
             Task { await upload(items) }
+        }
+        .sheet(item: $cropping) { photo in
+            PhotoCropView(image: photo.image) { cropped in
+                Task { await replace(photo.url, with: cropped) }
+            }
+        }
+    }
+
+    /// Fetches the photo back so it can be cropped at full resolution rather
+    /// than at the 78pt the picker draws it. The crop replaces the photo in
+    /// place — same position in the list, so a cover stays the cover.
+    private func beginCrop(_ url: String) async {
+        guard let remote = URL(string: url) else { return }
+        isUploading = true
+        defer { isUploading = false }
+        guard let (data, _) = try? await URLSession.shared.data(from: remote),
+              let image = UIImage(data: data) else {
+            errorMessage = "Couldn't open that photo to adjust it."
+            return
+        }
+        cropping = CroppingPhoto(url: url, image: image)
+    }
+
+    /// Uploads the cropped version and swaps it in. A new upload rather than
+    /// an overwrite, so anything already pointing at the old file — a Rex
+    /// posted earlier from the same photo — keeps working.
+    private func replace(_ url: String, with image: UIImage) async {
+        guard let index = photoURLs.firstIndex(of: url) else { return }
+        isUploading = true
+        defer { isUploading = false }
+        guard let jpeg = image.jpegData(compressionQuality: 0.82) else { return }
+        do {
+            let uploaded = try await RexAPI.shared.uploadPhoto(data: jpeg, fileExtension: "jpg")
+            photoURLs[index] = uploaded
+        } catch {
+            errorMessage = error.localizedDescription
         }
     }
 
