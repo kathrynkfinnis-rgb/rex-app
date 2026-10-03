@@ -72,6 +72,9 @@ const CORS = {
 /** How many of a friend's Rex the model is allowed to see. Forty is enough to
  *  choose well from and small enough to keep the bill flat. */
 const CANDIDATE_LIMIT = 40;
+/** When the question names a person, the shortlist is only their Rex, so a
+ *  bigger slice costs the same order of tokens and covers more of their taste. */
+const PERSON_CANDIDATE_LIMIT = 60;
 /** Below this many friend matches, the web tier is offered. */
 const THIN_ANSWER = 5;
 /** Questions per person per rolling 24 hours. See the check in the handler. */
@@ -125,7 +128,7 @@ Deno.serve(async (req) => {
   if (!OPENAI_KEY && !GEMINI_KEY) {
     // Said plainly rather than as a 500, because this is the expected state
     // until someone sets a key, and the app shows it to the user.
-    return json({ error: "Talk to Rex isn't switched on yet." }, 503);
+    return json({ error: "Ask Rex isn't switched on yet." }, 503);
   }
 
   let body: { question?: string; history?: { role: string; text: string }[] };
@@ -158,8 +161,11 @@ Deno.serve(async (req) => {
   }
 
   // ---------------------------------------------------------------- retrieve
+  const people = await fetchPeople(asUser);
+  const about = personIn(question, people, userId);
+
   const [candidates, facts, alreadySuggested] = await Promise.all([
-    fetchCandidates(asUser, question, userId),
+    fetchCandidates(asUser, question, userId, about),
     fetchFacts(asUser),
     fetchSuggested(asUser),
   ]);
@@ -171,6 +177,7 @@ Deno.serve(async (req) => {
     candidates,
     facts,
     alreadySuggested,
+    about,
   });
 
   let answer: ModelAnswer;
@@ -265,6 +272,7 @@ async function fetchCandidates(
   db: ReturnType<typeof createClient>,
   question: string,
   meId: string,
+  about: Person | null,
 ): Promise<Candidate[]> {
   const types = typesFor(question);
 
@@ -279,7 +287,18 @@ async function fetchCandidates(
     .is("list_id", null)
     .gt("rating", 0)
     .order("rating", { ascending: false })
-    .limit(CANDIDATE_LIMIT);
+    .limit(about ? PERSON_CANDIDATE_LIMIT : CANDIDATE_LIMIT);
+
+  // Oct 3 — "'What are Danny's favourite places?' ... It suggests that people
+  // should've left REXs for Danny, but I want his top recommendations."
+  //
+  // The shortlist was never filtered by person, so a question about Danny was
+  // answered from the forty highest-rated Rex belonging to anybody. With none
+  // of Danny's necessarily in there, the model had nothing of his to pick and
+  // reached for the only other reading of the sentence. Naming someone now
+  // restricts the shortlist to their own Rex, highest-rated first, which is
+  // what "their favourites" means.
+  if (about) query = query.eq("user_id", about.id);
 
   if (types.length > 0) query = query.in("items.type", types);
 
@@ -306,6 +325,60 @@ async function fetchCandidates(
       mine: String(row.user_id) === meId,
     };
   });
+}
+
+type Person = { id: string; name: string };
+
+/** Everyone whose Rex this user can see, so a question can name one of them.
+ *  RLS decides the list, so this can only ever return people already visible
+ *  to the caller — naming a stranger finds nobody, which is correct. */
+async function fetchPeople(db: ReturnType<typeof createClient>): Promise<Person[]> {
+  const { data } = await db.from("profiles").select("id,username,display_name").limit(500);
+  return (data ?? []).map((row: Record<string, unknown>) => ({
+    id: String(row.id),
+    name: String(row.display_name ?? row.username ?? ""),
+    username: String(row.username ?? ""),
+  })).filter((p) => p.name || p.username) as Person[];
+}
+
+/** Whether the question is about one person's own recommendations.
+ *
+ *  Matches a full name, a first name, or a username, on word boundaries so
+ *  "Sam" doesn't match "the same place". Possessives are handled by the
+ *  boundary itself: "Danny's" has "Danny" followed by an apostrophe.
+ *
+ *  Deliberately conservative — a wrong match narrows the whole answer to the
+ *  wrong person's Rex, which is far worse than not spotting a name. Anything
+ *  shorter than three letters, or ambiguous between two people, is ignored. */
+function personIn(question: string, people: Person[], meId: string): Person | null {
+  const q = question.toLowerCase();
+  const matches: Person[] = [];
+
+  for (const person of people) {
+    if (person.id === meId) continue;
+    const candidates = new Set<string>();
+    const name = (person.name ?? "").trim().toLowerCase();
+    const username = ((person as { username?: string }).username ?? "").trim().toLowerCase();
+    if (name.length >= 3) {
+      candidates.add(name);
+      const first = name.split(/\s+/)[0];
+      if (first.length >= 3) candidates.add(first);
+    }
+    if (username.length >= 3) candidates.add(username);
+
+    for (const candidate of candidates) {
+      const escaped = candidate.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+      if (new RegExp(`(^|[^a-z0-9])${escaped}($|[^a-z0-9])`, "i").test(q)) {
+        matches.push(person);
+        break;
+      }
+    }
+  }
+
+  // Two people called Sam, and no way to tell which — answering from one of
+  // them at random is worse than answering from everybody.
+  const distinct = new Set(matches.map((p) => p.id));
+  return distinct.size === 1 ? matches[0] : null;
 }
 
 /** Which categories the question is about, so a request for a film isn't
@@ -359,6 +432,7 @@ function buildPrompt(input: {
   candidates: Candidate[];
   facts: string[];
   alreadySuggested: string[];
+  about: Person | null;
 }): { system: string; user: string } {
   const system = [
     "You are Rex, helping someone choose from recommendations their friends have actually made.",
@@ -415,8 +489,30 @@ function buildPrompt(input: {
     lines.push("");
   }
 
+  if (input.about) {
+    const name = input.about.name;
+    lines.push(
+      `This question is about ${name}. Every entry below is ${name}'s own Rex, their ` +
+        `highest-rated first — these are the things ${name} recommends, not things ` +
+        `recommended to ${name}. Answer with ${name}'s own, and say so: "${name} rated this".`,
+    );
+    // Oct 3 — "ask back: 'anywhere in particular?'" Someone asking for a
+    // person's favourites usually has a city or an occasion in mind and
+    // hasn't said it, and a list of their top eight anywhere on earth is a
+    // worse answer than one short question.
+    lines.push(
+      "If they haven't said where or what kind, give two or three of the best and then ask " +
+        "one short question to narrow it — \"anywhere in particular?\" — rather than listing everything.",
+    );
+    lines.push("");
+  }
+
   if (input.candidates.length > 0) {
-    lines.push("Recommendations from them and their friends:");
+    lines.push(
+      input.about
+        ? `${input.about.name}'s Rex:`
+        : "Recommendations from them and their friends:",
+    );
     for (const c of input.candidates) {
       const bits = [
         `id=${c.id}`,
@@ -430,6 +526,15 @@ function buildPrompt(input: {
       ].filter(Boolean);
       lines.push(`- ${bits.join(" ")}`);
     }
+    lines.push("");
+  } else if (input.about) {
+    // Different from "nobody has Rex'd this" — the web tier would answer a
+    // question about a person's taste with strangers' suggestions, which is
+    // not what was asked. Say the true thing instead.
+    lines.push(
+      `${input.about.name} hasn't Rex'd anything that fits. Say so plainly and leave \`web\` empty — ` +
+        "they asked what one particular person likes, and a list from the internet doesn't answer that.",
+    );
     lines.push("");
   } else {
     lines.push("Neither they nor their friends have Rex'd anything that fits. Lean on `web`.");

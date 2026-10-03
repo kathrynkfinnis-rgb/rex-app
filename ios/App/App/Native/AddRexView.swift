@@ -224,6 +224,9 @@ struct AddRexView: View {
     @State private var hits: [RexSearchHit] = []
     @State private var isSearching = false
     @State private var picked: RexSearchHit?
+    /// Oct 3 — lowercased titles of your own Rex matching the current search,
+    /// so a result you've already Rex'd says so before you add it twice.
+    @State private var alreadyRexdTitles: Set<String> = []
     @State private var searchTask: Task<Void, Never>?
     @State private var photoURLs: [String] = []
     @State private var taggedFriendIds: Set<String> = []
@@ -609,7 +612,14 @@ struct AddRexView: View {
             // field nobody knows what to put in. Sept 2: a trip drops it
             // too — "Remove Subtitle" — since the date and the itinerary
             // now say everything the subtitle used to.
-            if category != .list && category != .trip {
+            //
+            // Oct 3 — "I thought we had removed subtitle from Adds?" A place
+            // was still showing it, and it's the same blank field: every
+            // other category labels it something answerable (Author, Year or
+            // director, Venue), while a place got the literal word
+            // "Subtitle" sitting directly above the Address box that holds
+            // the only thing you'd have put in it.
+            if category != .list && category != .trip && category != .place {
                 field(subtitleLabel(for: category), text: $subtitle, placeholder: "Optional")
             }
 
@@ -1004,7 +1014,25 @@ struct AddRexView: View {
                                                     .lineLimit(1)
                                             }
                                         }
-                                        Spacer()
+                                        Spacer(minLength: RexSpacing.sm)
+                                        // Oct 3 — "An already-Rex'd place
+                                        // isn't flagged while typing. It
+                                        // should come up as already Rex'd,
+                                        // like in trips." Trips and lists have
+                                        // shown this since they were built;
+                                        // the main Add form, which is where
+                                        // most Rex are made, never did — so
+                                        // the one screen most likely to
+                                        // produce a duplicate was the one
+                                        // place that didn't warn you.
+                                        if alreadyRexdTitles.contains(hit.title.lowercased()) {
+                                            Text("Already Rex'd")
+                                                .font(RexFont.text(10, weight: .semibold))
+                                                .foregroundStyle(RexColor.badgeForeground)
+                                                .padding(.horizontal, 7).padding(.vertical, 3)
+                                                .background(RexColor.badgeBackground)
+                                                .clipShape(Capsule())
+                                        }
                                     }
                                     .padding(.horizontal, RexSpacing.md)
                                     .padding(.vertical, RexSpacing.sm)
@@ -1084,8 +1112,14 @@ struct AddRexView: View {
         searchTask = Task {
             try? await Task.sleep(nanoseconds: 500_000_000)
             if Task.isCancelled { return }
-            let results = await RexSearch.search(category: category, query: term)
+            // Your own Rex are looked up alongside the catalogue, on the same
+            // debounce, so the badge arrives with the rows rather than
+            // flickering in a moment later.
+            async let catalogue = RexSearch.search(category: category, query: term)
+            async let mine = (try? await RexAPI.shared.searchMyRexItems(query: term)) ?? []
+            let (results, myHits) = await (catalogue, mine)
             if Task.isCancelled { return }
+            let myTitles = Set(myHits.map { $0.hit.title.lowercased() })
             await MainActor.run {
                 // Sept 23 — a result that lands after something was picked is
                 // stale, and putting the list back is what made people tap a
@@ -1093,6 +1127,7 @@ struct AddRexView: View {
                 isSearching = false
                 guard picked == nil else { return }
                 hits = results
+                alreadyRexdTitles = myTitles
             }
         }
     }
@@ -1739,6 +1774,14 @@ struct AddRexView: View {
                     try? await RexAPI.shared.updateLongNote(recommendationId: listRecId, text: listNotes)
                 }
                 var createdItemRecIds: [String] = []
+                // Oct 3 — a list keeps recommendations_unique_list_item, so
+                // the same item twice in one list is refused by the database
+                // and used to take the whole list down with it (see
+                // 20261003100000_trips_can_revisit_a_place.sql for the trip
+                // half of this). A document with the same book or restaurant
+                // named twice is an ordinary thing to import, so the repeat is
+                // dropped here instead of becoming a failed import.
+                var addedItemIds = Set<String>()
                 do {
                     for (index, draftItem) in listItems.enumerated() {
                         postingProgress = listItems.count > 1
@@ -1757,6 +1800,7 @@ struct AddRexView: View {
                             lat: draftItem.lat,
                             lng: draftItem.lng
                         )
+                        guard addedItemIds.insert(childItemId).inserted else { continue }
                         let childRecId = try await RexAPI.shared.createRecommendation(
                             itemId: childItemId,
                             rating: draftItem.rating,

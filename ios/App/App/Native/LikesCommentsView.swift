@@ -34,6 +34,10 @@ struct LikesCommentsView: View {
     /// @username since July; this is the half that lets you write one without
     /// knowing the spelling by heart.
     @State private var friends: [RexProfileDetail] = []
+    /// Oct 3 — who liked this, behind the count.
+    @State private var showingLikers = false
+    @State private var likers: [RexProfileDetail] = []
+    @State private var isLoadingLikers = false
 
     var body: some View {
         VStack(alignment: .leading, spacing: RexSpacing.md) {
@@ -41,18 +45,30 @@ struct LikesCommentsView: View {
                 Button {
                     Task { await toggleLike() }
                 } label: {
-                    HStack(spacing: RexSpacing.sm) {
-                        Image(systemName: likedByMe ? "heart.fill" : "heart")
-                            .font(.system(size: 17))
-                            .foregroundStyle(likedByMe ? RexColor.destructive : RexColor.mutedForeground)
-                        if likeCount > 0 {
-                            Text("\(likeCount)")
-                                .font(RexFont.text(14, weight: .medium))
-                                .foregroundStyle(RexColor.mutedForeground)
-                        }
-                    }
+                    Image(systemName: likedByMe ? "heart.fill" : "heart")
+                        .font(.system(size: 17))
+                        .foregroundStyle(likedByMe ? RexColor.destructive : RexColor.mutedForeground)
                 }
                 .buttonStyle(.plain)
+
+                // Oct 3 — "You can't see who liked a post", twice. The heart
+                // toggles your own like; the number beside it now opens the
+                // list of who, which is the part people were asking for. Two
+                // targets rather than one so tapping the count can't
+                // accidentally unlike the post.
+                if likeCount > 0 {
+                    Button {
+                        showingLikers = true
+                    } label: {
+                        Text("\(likeCount)")
+                            .font(RexFont.text(14, weight: .medium))
+                            .foregroundStyle(RexColor.mutedForeground)
+                            .underline()
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityLabel("See who liked this")
+                    .padding(.leading, -RexSpacing.md)
+                }
 
                 // #130 — this had no action at all, unlike the like button
                 // right next to it: "Clicking on 'comment' isn't
@@ -196,6 +212,67 @@ struct LikesCommentsView: View {
                 }
             }
             Button("Cancel", role: .cancel) { pendingDelete = nil }
+        }
+        .sheet(isPresented: $showingLikers) {
+            NavigationStack {
+                Group {
+                    if isLoadingLikers && likers.isEmpty {
+                        ProgressView().frame(maxWidth: .infinity, maxHeight: .infinity)
+                    } else if likers.isEmpty {
+                        Text("Nobody yet.")
+                            .font(RexFont.text(14))
+                            .foregroundStyle(RexColor.mutedForeground)
+                            .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    } else {
+                        ScrollView {
+                            VStack(spacing: 0) {
+                                ForEach(likers) { profile in
+                                    NavigationLink(value: UserProfileRoute(
+                                        userId: profile.id,
+                                        name: profile.display_name ?? profile.username
+                                    )) {
+                                        HStack(spacing: RexSpacing.md) {
+                                            UserAvatarView(
+                                                url: profile.avatar_url,
+                                                name: profile.display_name ?? profile.username,
+                                                size: 40
+                                            )
+                                            VStack(alignment: .leading, spacing: 1) {
+                                                Text(profile.display_name ?? profile.username)
+                                                    .font(RexFont.text(15, weight: .medium))
+                                                    .foregroundStyle(RexColor.foreground)
+                                                Text("@\(profile.username)")
+                                                    .font(RexFont.text(12))
+                                                    .foregroundStyle(RexColor.mutedForeground)
+                                            }
+                                            Spacer()
+                                            Image(systemName: "chevron.right")
+                                                .font(.system(size: 11, weight: .semibold))
+                                                .foregroundStyle(RexColor.mutedForeground)
+                                        }
+                                        .padding(.horizontal, RexSpacing.page)
+                                        .padding(.vertical, RexSpacing.sm + 2)
+                                        .contentShape(Rectangle())
+                                    }
+                                    .buttonStyle(.plain)
+                                }
+                            }
+                            .padding(.vertical, RexSpacing.sm)
+                        }
+                    }
+                }
+                .background(RexColor.background.ignoresSafeArea())
+                .navigationTitle(likeCount == 1 ? "1 like" : "\(likeCount) likes")
+                .navigationBarTitleDisplayMode(.inline)
+                .navigationDestination(for: UserProfileRoute.self) { UserProfileView(route: $0) }
+            }
+            .presentationDetents([.medium, .large])
+            .tint(RexColor.primary)
+            .task {
+                isLoadingLikers = true
+                likers = (try? await RexAPI.shared.fetchLikers(recommendationId: recommendationId)) ?? []
+                isLoadingLikers = false
+            }
         }
     }
 

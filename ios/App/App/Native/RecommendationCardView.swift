@@ -451,31 +451,48 @@ struct RecommendationCardView: View {
         .clipShape(Capsule())
     }
 
+    /// Oct 3 — "The dino drawing is used as the thumbnail even when there's a
+    /// real image."
+    ///
+    /// Two separate causes, both ending at the dino. The thumbnail only ever
+    /// looked at `item.image_url`, so a Rex whose own photographs were sitting
+    /// right there in the card's carousel still drew the mascot in the corner
+    /// — the photo was on the recommendation, not the catalogue item. And a
+    /// Google Places URL can't be loaded by AsyncImage at all (it needs the
+    /// bundle-id header), so those failed into the mascot too.
+    private func thumbnailURL(item: RexItem) -> URL? {
+        if let urlString = item.image_url, let url = URL(string: urlString) { return url }
+        if let photo = rec.photo_urls?.first, let url = URL(string: photo) { return url }
+        if let photo = rec.photo_url, let url = URL(string: photo) { return url }
+        return nil
+    }
+
     @ViewBuilder
     private func thumbnail(item: RexItem) -> some View {
         Group {
-            if let urlString = item.image_url, let url = URL(string: urlString) {
-                AsyncImage(url: url) { phase in
-                    if let image = phase.image {
-                        image.resizable().aspectRatio(contentMode: .fill)
-                    } else if phase.error != nil {
-                        // Sept 7 — "thumbnails aren't loading well on the
-                        // feed". A dead or slow image URL left a plain grey
-                        // square; the category's own illustration is a much
-                        // better answer than a blank tile, and it's what a
-                        // Rex with no image at all already shows.
-                        Image(category.placeholderImageName)
-                            .resizable()
-                            .aspectRatio(contentMode: .fill)
-                            .background(RexColor.muted)
-                    } else {
-                        RexColor.muted.overlay(ProgressView().controlSize(.mini))
-                    }
+            if let url = thumbnailURL(item: item) {
+                // GoogleSafeAsyncImage, not AsyncImage: see thumbnailURL.
+                GoogleSafeAsyncImage(url: url) { image in
+                    image.resizable().aspectRatio(contentMode: .fill)
+                } placeholder: {
+                    // Sept 7 — "thumbnails aren't loading well on the feed".
+                    // A dead or slow image URL left a plain grey square; the
+                    // category's own illustration is a better answer than a
+                    // blank tile, and it's what a Rex with no image at all
+                    // already shows.
+                    Image(category.placeholderImageName)
+                        .resizable()
+                        .aspectRatio(contentMode: .fill)
+                        .background(RexColor.muted)
                 }
                 // Places added before the URL fix never render — whichever
                 // card sees it first repairs it for everyone, since items
                 // aren't per-user.
-                .task { await RexAPI.shared.repairPlacePhotoIfNeeded(itemId: item.id, imageURL: urlString) }
+                .task {
+                    if let urlString = item.image_url {
+                        await RexAPI.shared.repairPlacePhotoIfNeeded(itemId: item.id, imageURL: urlString)
+                    }
+                }
             } else {
                 // Kathryn's illustrated mascot, one per category, rather
                 // than a plain tinted SF Symbol tile.

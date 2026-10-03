@@ -920,10 +920,49 @@ final class RexAPI {
         // on every list item and never selected back here, so the item page
         // had nothing to show.
         let base = "id,type,title,subtitle,image_url,genre,address,recipe_text,link_url,external_id,external_source"
-        if let item = try? await fetchItem(id: id, select: base + ",google_rating,google_rating_count") {
+        let withRatings = base + ",google_rating,google_rating_count"
+        // Oct 3 — Google Place Details, cached on the row. Tried first and
+        // fallen back from, same as the ratings below it, so the app keeps
+        // working against a database that hasn't had the migration yet.
+        if let item = try? await fetchItem(
+            id: id,
+            select: withRatings + ",summary,opening_hours,google_photo_urls,details_fetched_at"
+        ) {
+            return item
+        }
+        if let item = try? await fetchItem(id: id, select: withRatings) {
             return item
         }
         return try await fetchItem(id: id, select: base)
+    }
+
+    /// Caches one Place Details answer on the item, so the next person to open
+    /// this place — and the next, and this same person tomorrow — costs
+    /// nothing. Deliberately not throwing: failing to cache is not a reason to
+    /// fail the page, which already has everything it needs to render.
+    func saveItemPlaceDetails(itemId: String, details: RexPlaceDetails) async {
+        guard let token = try? await validToken() else { return }
+        var components = URLComponents(url: baseURL.appendingPathComponent("/rest/v1/items"), resolvingAgainstBaseURL: false)!
+        components.queryItems = [URLQueryItem(name: "id", value: "eq.\(itemId)")]
+        var request = URLRequest(url: components.url!)
+        request.httpMethod = "PATCH"
+        request.setValue(anonKey, forHTTPHeaderField: "apikey")
+        request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+
+        var body: [String: Any] = [
+            "details_fetched_at": ISO8601DateFormatter().string(from: Date()),
+        ]
+        // Only write what came back. A place with no editorial summary
+        // shouldn't have its existing one blanked by a later refetch.
+        if let summary = details.summary, !summary.isEmpty { body["summary"] = summary }
+        if !details.openingHours.isEmpty { body["opening_hours"] = details.openingHours }
+        if !details.photoURLs.isEmpty { body["google_photo_urls"] = details.photoURLs }
+        if let rating = details.rating { body["google_rating"] = rating }
+        if let count = details.ratingCount { body["google_rating_count"] = count }
+
+        request.httpBody = try? JSONSerialization.data(withJSONObject: body)
+        _ = try? await URLSession.shared.data(for: request)
     }
 
     private func fetchItem(id: String, select: String) async throws -> RexItem {
@@ -1303,7 +1342,7 @@ final class RexAPI {
             throw RexAPIError.server(friendlyError(
                 data,
                 fallback: http.statusCode == 503
-                    ? "Talk to Rex isn't switched on yet."
+                    ? "Ask Rex isn't switched on yet."
                     : "Rex couldn't answer that just now."
             ))
         }
@@ -3481,6 +3520,43 @@ final class RexAPI {
             result[row.recommendation_id] = entry
         }
         return result
+    }
+
+    /// Oct 3 — "You can't see who liked a post", reported twice.
+    ///
+    /// The count has always been there and never the names, which is the half
+    /// that matters: a like from someone whose taste you trust is a
+    /// recommendation in itself. Deliberately two queries rather than a
+    /// PostgREST embed — recommendation_likes.user_id references auth.users,
+    /// not profiles, so there's no foreign key for an embed to travel along.
+    ///
+    /// A want keeps its likes in want_likes (5 Sept), named by the synthetic
+    /// "want-<id>" the feed hands out.
+    func fetchLikers(recommendationId: String) async throws -> [RexProfileDetail] {
+        let token = try await validToken()
+        let isWant = recommendationId.hasPrefix("want-")
+        let table = isWant ? "want_likes" : "recommendation_likes"
+        let column = isWant ? "want_id" : "recommendation_id"
+        let id = isWant ? String(recommendationId.dropFirst("want-".count)) : recommendationId
+
+        var components = URLComponents(url: baseURL.appendingPathComponent("/rest/v1/\(table)"), resolvingAgainstBaseURL: false)!
+        components.queryItems = [
+            URLQueryItem(name: "select", value: "user_id"),
+            URLQueryItem(name: column, value: "eq.\(id)"),
+            URLQueryItem(name: "limit", value: "200"),
+        ]
+        var request = URLRequest(url: components.url!)
+        request.setValue(anonKey, forHTTPHeaderField: "apikey")
+        request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+
+        let (data, response) = try await URLSession.shared.data(for: request)
+        guard let http = response as? HTTPURLResponse, http.statusCode < 400 else {
+            throw RexAPIError.server(friendlyError(data, fallback: "Couldn't load who liked this."))
+        }
+        struct LikerRow: Codable { let user_id: String }
+        let ids = try JSONDecoder().decode([LikerRow].self, from: data).map(\.user_id)
+        guard !ids.isEmpty else { return [] }
+        return try await fetchProfiles(ids: Array(Set(ids)))
     }
 
     func setLike(recommendationId: String, liked: Bool) async throws {

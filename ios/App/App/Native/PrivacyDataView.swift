@@ -128,7 +128,7 @@ struct PrivacyDataView: View {
                 // and shapes every later answer with it. Somewhere you can
                 // read that back and delete from it is the difference between
                 // a feature and something nobody would defend once asked.
-                group("Talk to Rex") {
+                group("Ask Rex") {
                     NavigationLink(value: RexMemoryRoute()) {
                         rowContent(icon: "sparkles", title: "What Rex remembers",
                                    subtitle: "What it's picked up about you, and how to forget it")

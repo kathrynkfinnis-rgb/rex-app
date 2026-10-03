@@ -1,0 +1,34 @@
+-- Oct 3 — "Bug when posting a trip - partially uploads and then says 'unable
+-- to post Rex'". Harry's golf tour, about fifteen stops.
+--
+-- A trip's stops are posted one at a time, and the first stop that fails takes
+-- the whole trip down (AddRexView rolls back what it has created so far). The
+-- stop that failed was a repeat visit:
+--
+--   CREATE UNIQUE INDEX recommendations_unique_trip_stop
+--     ON public.recommendations (user_id, item_id, trip_id)
+--     WHERE trip_id IS NOT NULL;
+--
+-- createItem deliberately returns the *same* item row for the same place —
+-- that's what makes "also Rex'd by" work — so two visits to one place on one
+-- trip arrive as two recommendations with the same (user_id, item_id,
+-- trip_id), and the second one violates this index. 23505, which the app
+-- reports as "That already exists", and the trip is rolled back.
+--
+-- The index came from #149, where the intent was to stop the same place being
+-- added to a trip twice by accident. But an itinerary isn't a set of places,
+-- it's an ordered list of visits: a golf tour plays two rounds at the same
+-- course, a road trip passes back through the same town, you eat at the place
+-- you liked again on the last night. Fifteen stops across several days makes a
+-- repeat close to certain, which is why long trips failed and short ones
+-- didn't.
+--
+-- So the guard moves out of the database, where it can only refuse, and into
+-- the one place it was actually wanted: RexAPI.addPlaceToTrip (the "add to
+-- trip" button) already looks for an existing stop and returns quietly rather
+-- than inserting a second one, so that path keeps its behaviour with no
+-- constraint behind it.
+--
+-- Lists keep recommendations_unique_list_item: the same book twice in one list
+-- really is a mistake, and nothing legitimate wants it.
+DROP INDEX IF EXISTS public.recommendations_unique_trip_stop;

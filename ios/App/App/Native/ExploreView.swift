@@ -215,7 +215,7 @@ struct ExploreView: View {
                 Image(systemName: "sparkles")
                     .font(.system(size: 14))
                     .foregroundStyle(RexColor.primary)
-                Text("Talk to Rex — ask for anything")
+                Text("Ask Rex — ask for anything")
                     .font(RexFont.text(14))
                     .foregroundStyle(RexColor.mutedForeground)
                 Spacer(minLength: 0)

@@ -422,6 +422,59 @@ enum RexSearch {
         }
     }
 
+    /// Oct 3 — "The Place page: please can we pull photos from Google? ... a
+    /// summary of what it is ie smash burgers, tacos, coffee; opening times."
+    ///
+    /// All three live behind one Place Details call. The field mask below
+    /// deliberately spans three billing tiers — photos (Essentials), the type
+    /// name (Pro), opening hours and the editorial summary (Enterprise) — so
+    /// this is the most expensive single request in the app, and the caller
+    /// must only make it when `items.details_fetched_at` says we've never
+    /// asked about this place before. Once per place, not once per view.
+    static func placeDetails(placeId: String) async -> RexPlaceDetails? {
+        guard !googleKey.isEmpty, !placeId.isEmpty else { return nil }
+        guard let url = URL(string: "https://places.googleapis.com/v1/places/\(placeId)") else { return nil }
+        var request = URLRequest(url: url)
+        request.setValue(googleKey, forHTTPHeaderField: "X-Goog-Api-Key")
+        request.setValue(bundleId, forHTTPHeaderField: "X-Ios-Bundle-Identifier")
+        request.setValue(
+            "photos,primaryTypeDisplayName,editorialSummary," +
+            "regularOpeningHours.weekdayDescriptions,rating,userRatingCount,websiteUri",
+            forHTTPHeaderField: "X-Goog-FieldMask"
+        )
+
+        guard let (data, response) = try? await URLSession.shared.data(for: request),
+              let http = response as? HTTPURLResponse, http.statusCode < 400,
+              let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any]
+        else { return nil }
+
+        // Up to six: enough to swipe through, few enough that the page isn't
+        // mostly stock photography of a menu.
+        let photoURLs = ((json["photos"] as? [[String: Any]]) ?? [])
+            .prefix(6)
+            .compactMap { $0["name"] as? String }
+            .map { "https://places.googleapis.com/v1/\($0)/media?maxWidthPx=1200&key=\(googleKey)" }
+
+        // "smash burgers" if Google has written one, otherwise the primary
+        // type ("Hamburger restaurant"), which is duller but always true.
+        let editorial = (json["editorialSummary"] as? [String: Any])?["text"] as? String
+        let typeName = (json["primaryTypeDisplayName"] as? [String: Any])?["text"] as? String
+        let summary = [editorial, typeName]
+            .compactMap { $0?.trimmingCharacters(in: .whitespaces) }
+            .first { !$0.isEmpty }
+
+        let hours = ((json["regularOpeningHours"] as? [String: Any])?["weekdayDescriptions"] as? [String]) ?? []
+
+        return RexPlaceDetails(
+            summary: summary,
+            openingHours: hours,
+            photoURLs: Array(photoURLs),
+            rating: json["rating"] as? Double,
+            ratingCount: json["userRatingCount"] as? Int,
+            websiteURL: json["websiteUri"] as? String
+        )
+    }
+
     /// #167's long-press-to-add on the map used CLGeocoder's reverse
     /// geocode for "what's at this point", which only ever resolves to a
     /// street address — never the business occupying it, so tapping

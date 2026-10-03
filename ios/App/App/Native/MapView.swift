@@ -75,8 +75,16 @@ struct RexMapView: View {
     @State private var showingTripSearch = false
     /// The place being filed into a trip from its own pin.
     @State private var addingToTrip: MapPlace?
+    /// Oct 3 — editing your own Rex straight from the map's place card. The
+    /// card carries only a stub of each Rex, so the full row is fetched when
+    /// the button is pressed rather than on every pin tap.
+    @State private var editingRec: FeedRecommendation?
+    @State private var isOpeningEditor = false
     /// Which height the place sheet is at — summary, or the full page.
     @State private var placeSheetDetent: PresentationDetent = .height(300)
+    /// Drives the chevron's slow float on the "more below" bar.
+    @State private var nudge: CGFloat = -3
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     /// #106 — a list alongside the map, for when scanning names beats
     /// panning pins around, plus a sort the map itself has no use for.
     @State private var showingList = false
@@ -307,6 +315,13 @@ struct RexMapView: View {
         .navigationDestination(item: $openTrip) { TripDetailView(route: $0) }
         .sheet(item: $addingToTrip) { place in
             AddToTripView(itemId: place.id, itemTitle: place.title, onDone: {})
+        }
+        .sheet(item: $editingRec) { rec in
+            EditRexView(
+                rec: rec,
+                onSaved: { Task { await load() } },
+                onDeleted: { selectedPlace = nil; Task { await load() } }
+            )
         }
         .alert("Couldn't find that place", isPresented: Binding(
             get: { longPressError != nil },
@@ -725,6 +740,20 @@ struct RexMapView: View {
         )
     }
 
+    /// Pulls back the caller's own full recommendation for this place and
+    /// opens the edit sheet on it. Silent on failure beyond clearing the
+    /// spinner: the only ways this fails are a dropped connection or the Rex
+    /// having just been deleted elsewhere, and neither is worth an alert over
+    /// a button they can simply press again.
+    private func openEditor(for place: MapPlace) async {
+        isOpeningEditor = true
+        defer { isOpeningEditor = false }
+        guard let recs = try? await RexAPI.shared.fetchRecommendations(forItem: place.id),
+              let mine = recs.first(where: { $0.user_id == RexAPI.shared.currentUserId })
+        else { return }
+        editingRec = mine
+    }
+
     @ViewBuilder
     private func placeSheet(_ place: MapPlace) -> some View {
         NavigationStack {
@@ -780,23 +809,53 @@ struct RexMapView: View {
                     // the map already means "drop a new place here" (#167),
                     // and two long-presses a few pixels apart meaning
                     // different things is a trap.
-                    if RexCategory(rawType: place.type) == .place
-                        || RexCategory(rawType: place.type) == .event {
-                        Button {
-                            addingToTrip = place
-                        } label: {
-                            HStack(spacing: RexSpacing.sm) {
-                                Image(systemName: "suitcase.fill").font(.system(size: 13))
-                                Text("Add to a trip").font(RexFont.text(14, weight: .semibold))
+                    HStack(spacing: RexSpacing.sm) {
+                        if RexCategory(rawType: place.type) == .place
+                            || RexCategory(rawType: place.type) == .event {
+                            Button {
+                                addingToTrip = place
+                            } label: {
+                                HStack(spacing: RexSpacing.sm) {
+                                    Image(systemName: "suitcase.fill").font(.system(size: 13))
+                                    Text("Add to a trip").font(RexFont.text(14, weight: .semibold))
+                                }
+                                .foregroundStyle(RexColor.primary)
+                                .padding(.horizontal, RexSpacing.md)
+                                .padding(.vertical, 9)
+                                .overlay(Capsule().stroke(RexColor.primary.opacity(0.45), lineWidth: 1))
                             }
-                            .foregroundStyle(RexColor.primary)
-                            .padding(.horizontal, RexSpacing.md)
-                            .padding(.vertical, 9)
-                            .overlay(Capsule().stroke(RexColor.primary.opacity(0.45), lineWidth: 1))
+                            .buttonStyle(.plain)
                         }
-                        .buttonStyle(.plain)
-                        .padding(.top, RexSpacing.xs)
+
+                        // Oct 3 — "Can't edit from the map's place card." The
+                        // full edit sheet did exist on the item page, but only
+                        // under "Your take", which from here means swiping the
+                        // sheet to full height and then scrolling past
+                        // everything else to reach it. If it's your own Rex,
+                        // the edit belongs on the card you're already looking
+                        // at.
+                        if place.recommendations.contains(where: { $0.user_id == RexAPI.shared.currentUserId }) {
+                            Button {
+                                Task { await openEditor(for: place) }
+                            } label: {
+                                HStack(spacing: RexSpacing.sm) {
+                                    if isOpeningEditor {
+                                        ProgressView().controlSize(.mini)
+                                    } else {
+                                        Image(systemName: "pencil").font(.system(size: 13))
+                                    }
+                                    Text("Edit").font(RexFont.text(14, weight: .semibold))
+                                }
+                                .foregroundStyle(RexColor.primary)
+                                .padding(.horizontal, RexSpacing.md)
+                                .padding(.vertical, 9)
+                                .overlay(Capsule().stroke(RexColor.primary.opacity(0.45), lineWidth: 1))
+                            }
+                            .buttonStyle(.plain)
+                            .disabled(isOpeningEditor)
+                        }
                     }
+                    .padding(.top, RexSpacing.xs)
 
                     // A stop usually belongs to a trip — let people jump to the
                     // whole itinerary, or follow it on the map.
@@ -853,9 +912,92 @@ struct RexMapView: View {
                 .padding(RexSpacing.page)
                 .frame(maxWidth: .infinity, alignment: .leading)
             }
+            .safeAreaInset(edge: .bottom, spacing: 0) { moreBelowBar(place) }
             .background(RexColor.background.ignoresSafeArea())
             .navigationDestination(for: String.self) { ItemDetailView(itemId: $0) }
         }
+    }
+
+    /// Oct 3 — "Can we make it clear that more content sits below - maybe even
+    /// show a teaser or add a swipe up icon?"
+    ///
+    /// Dragging the sheet open turns it into the place's own page, which is
+    /// the whole reason the "View details" button could go. But at the resting
+    /// height there was nothing to say so: a short place left a panel of empty
+    /// space under the buttons, which reads as the end of the content rather
+    /// than the start of it.
+    ///
+    /// So a bar sits on the bottom edge, where the content appears to run out.
+    /// It's a button as well as a hint, because someone who has understood the
+    /// affordance shouldn't then have to perform the gesture — and the
+    /// thumbnail, when the place has one, is the teaser: a real piece of the
+    /// page above the fold.
+    @ViewBuilder
+    private func moreBelowBar(_ place: MapPlace) -> some View {
+        Button {
+            withAnimation(.spring(response: 0.35, dampingFraction: 0.86)) {
+                placeSheetDetent = .large
+            }
+        } label: {
+            HStack(spacing: RexSpacing.sm) {
+                if let image = place.image_url, let url = URL(string: image) {
+                    AsyncImage(url: url) { phase in
+                        if case .success(let loaded) = phase {
+                            loaded.resizable().scaledToFill()
+                        } else {
+                            RexColor.badgeBackground
+                        }
+                    }
+                    .frame(width: 38, height: 38)
+                    .clipShape(RoundedRectangle(cornerRadius: 7, style: .continuous))
+                }
+
+                VStack(alignment: .leading, spacing: 1) {
+                    Text("The full page")
+                        .font(RexFont.text(13.5, weight: .semibold))
+                        .foregroundStyle(RexColor.foreground)
+                    // Deliberately describes the gesture rather than listing
+                    // what's up there: a place with no note and no photos
+                    // would make any promise of "notes and photos" a lie.
+                    Text("Swipe up, or tap, to open it")
+                        .font(RexFont.text(11.5))
+                        .foregroundStyle(RexColor.mutedForeground)
+                }
+
+                Spacer(minLength: 0)
+
+                Image(systemName: "chevron.up")
+                    .font(.system(size: 13, weight: .semibold))
+                    .foregroundStyle(RexColor.primary)
+                    .offset(y: nudge)
+            }
+            .padding(.horizontal, RexSpacing.page)
+            .padding(.vertical, RexSpacing.sm + 2)
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .background(alignment: .top) {
+            // A hairline plus a fade, so the content above looks like it
+            // continues under the bar rather than stopping at it.
+            VStack(spacing: 0) {
+                LinearGradient(
+                    colors: [RexColor.background.opacity(0), RexColor.background],
+                    startPoint: .top,
+                    endPoint: .bottom
+                )
+                .frame(height: 14)
+                .offset(y: -14)
+                Rectangle().fill(RexColor.border).frame(height: 0.5)
+            }
+        }
+        .background(RexColor.background)
+        .onAppear {
+            guard !reduceMotion else { return }
+            withAnimation(.easeInOut(duration: 0.9).repeatForever(autoreverses: true)) {
+                nudge = 3
+            }
+        }
+        .accessibilityLabel("Open the full page for \(place.title)")
     }
 
     private func errorState(_ message: String) -> some View {

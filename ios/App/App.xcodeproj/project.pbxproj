@@ -55,6 +55,7 @@
 		FEED037B0000000000000000 /* AppleSignInButton.swift in Sources */ = {isa = PBXBuildFile; fileRef = FEED037A0000000000000000 /* AppleSignInButton.swift */; };
 		FEED058B0000000000000000 /* TripMapTileView.swift in Sources */ = {isa = PBXBuildFile; fileRef = FEED058A0000000000000000 /* TripMapTileView.swift */; };
 		FEED0A010000000000000000 /* RexNotesText.swift in Sources */ = {isa = PBXBuildFile; fileRef = FEED0A000000000000000000 /* RexNotesText.swift */; };
+		FEED0B010000000000000000 /* RexDocumentText.swift in Sources */ = {isa = PBXBuildFile; fileRef = FEED0B000000000000000000 /* RexDocumentText.swift */; };
 		FEED09F10000000000000000 /* CuratorShelvesView.swift in Sources */ = {isa = PBXBuildFile; fileRef = FEED09F00000000000000000 /* CuratorShelvesView.swift */; };
 		FEED09E10000000000000000 /* BrowseWithoutAccountView.swift in Sources */ = {isa = PBXBuildFile; fileRef = FEED09E00000000000000000 /* BrowseWithoutAccountView.swift */; };
 		FEED09D10000000000000000 /* RexMemoryView.swift in Sources */ = {isa = PBXBuildFile; fileRef = FEED09D00000000000000000 /* RexMemoryView.swift */; };
@@ -154,6 +155,7 @@
 		FEED030A0000000000000000 /* FeedbackView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FeedbackView.swift; sourceTree = "<group>"; };
 		FEED058A0000000000000000 /* TripMapTileView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TripMapTileView.swift; sourceTree = "<group>"; };
 		FEED0A000000000000000000 /* RexNotesText.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RexNotesText.swift; sourceTree = "<group>"; };
+		FEED0B000000000000000000 /* RexDocumentText.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RexDocumentText.swift; sourceTree = "<group>"; };
 		FEED09F00000000000000000 /* CuratorShelvesView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CuratorShelvesView.swift; sourceTree = "<group>"; };
 		FEED09E00000000000000000 /* BrowseWithoutAccountView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BrowseWithoutAccountView.swift; sourceTree = "<group>"; };
 		FEED09D00000000000000000 /* RexMemoryView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RexMemoryView.swift; sourceTree = "<group>"; };
@@ -291,6 +293,7 @@
 				FEED026A0000000000000000 /* TripStopsBuilderView.swift */,
 				FEED058A0000000000000000 /* TripMapTileView.swift */,
 				FEED0A000000000000000000 /* RexNotesText.swift */,
+				FEED0B000000000000000000 /* RexDocumentText.swift */,
 				FEED09F00000000000000000 /* CuratorShelvesView.swift */,
 				FEED09E00000000000000000 /* BrowseWithoutAccountView.swift */,
 				FEED09D00000000000000000 /* RexMemoryView.swift */,
@@ -462,6 +465,7 @@
 				FEED026B0000000000000000 /* TripStopsBuilderView.swift in Sources */,
 				FEED058B0000000000000000 /* TripMapTileView.swift in Sources */,
 				FEED0A010000000000000000 /* RexNotesText.swift in Sources */,
+				FEED0B010000000000000000 /* RexDocumentText.swift in Sources */,
 				FEED09F10000000000000000 /* CuratorShelvesView.swift in Sources */,
 				FEED09E10000000000000000 /* BrowseWithoutAccountView.swift in Sources */,
 				FEED09D10000000000000000 /* RexMemoryView.swift in Sources */,
@@ -640,7 +644,7 @@
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CODE_SIGN_ENTITLEMENTS = App/App.entitlements;
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 65;
+				CURRENT_PROJECT_VERSION = 67;
 				DEVELOPMENT_TEAM = X54V2C674U;
 				INFOPLIST_FILE = App/Info.plist;
 				IPHONEOS_DEPLOYMENT_TARGET = 18.0;
@@ -664,7 +668,7 @@
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CODE_SIGN_ENTITLEMENTS = App/App.entitlements;
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 65;
+				CURRENT_PROJECT_VERSION = 67;
 				DEVELOPMENT_TEAM = X54V2C674U;
 				INFOPLIST_FILE = App/Info.plist;
 				IPHONEOS_DEPLOYMENT_TARGET = 18.0;

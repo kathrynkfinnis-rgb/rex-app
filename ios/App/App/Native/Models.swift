@@ -1,5 +1,46 @@
 import Foundation
 
+extension ISO8601DateFormatter {
+    /// Postgres hands back timestamps with fractional seconds ("…T09:12:44.
+    /// 581293+00:00") and the app writes them without, so a parser fixed to
+    /// one shape silently returns nil for the other — which, for a
+    /// "have we fetched this already" check, means fetching again every time.
+    static let rexFlexible: ISO8601DateFormatter = {
+        let formatter = ISO8601DateFormatter()
+        formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+        return formatter
+    }()
+
+    static func rexDate(from string: String) -> Date? {
+        rexFlexible.date(from: string) ?? ISO8601DateFormatter().date(from: string)
+    }
+}
+
+/// What one Place Details call brings back. Stored on the item afterwards, so
+/// the call happens once per place rather than once per view — see
+/// 20261003110000_place_details_from_google.sql.
+struct RexPlaceDetails {
+    let summary: String?
+    let openingHours: [String]
+    let photoURLs: [String]
+    let rating: Double?
+    let ratingCount: Int?
+    let websiteURL: String?
+
+    var isEmpty: Bool {
+        summary == nil && openingHours.isEmpty && photoURLs.isEmpty
+    }
+
+    /// Today's line out of Google's seven, which all read "Monday: 9 am–5 pm".
+    /// Google's array starts on Monday; Calendar's weekday is Sunday-first.
+    var todayHours: String? {
+        guard openingHours.count == 7 else { return nil }
+        let weekday = Calendar.current.component(.weekday, from: Date())
+        let index = (weekday + 5) % 7
+        return openingHours[index]
+    }
+}
+
 struct RexItem: Codable {
     let id: String
     let type: String
@@ -26,8 +67,18 @@ struct RexItem: Codable {
     /// typed by hand and have no external source at all.
     let external_id: String?
     let external_source: String?
+    /// Oct 3 — Google Place Details, fetched once per place and cached here.
+    /// All four are null for anything typed in by hand.
+    let summary: String?
+    let opening_hours: [String]?
+    let google_photo_urls: [String]?
+    let details_fetched_at: String?
 
-    init(id: String, type: String, title: String, subtitle: String?, image_url: String?, genre: String?, address: String? = nil, google_rating: Double? = nil, google_rating_count: Int? = nil, recipe_text: String? = nil, link_url: String? = nil, lat: Double? = nil, lng: Double? = nil, external_id: String? = nil, external_source: String? = nil) {
+    init(id: String, type: String, title: String, subtitle: String?, image_url: String?, genre: String?, address: String? = nil, google_rating: Double? = nil, google_rating_count: Int? = nil, recipe_text: String? = nil, link_url: String? = nil, lat: Double? = nil, lng: Double? = nil, external_id: String? = nil, external_source: String? = nil, summary: String? = nil, opening_hours: [String]? = nil, google_photo_urls: [String]? = nil, details_fetched_at: String? = nil) {
+        self.summary = summary
+        self.opening_hours = opening_hours
+        self.google_photo_urls = google_photo_urls
+        self.details_fetched_at = details_fetched_at
         self.id = id
         self.type = type
         self.title = title

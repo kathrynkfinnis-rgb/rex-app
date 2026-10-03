@@ -1,9 +1,17 @@
 import SwiftUI
+import UniformTypeIdentifiers
 
 /// Entry point for #109 ("Lists" category) and native trip import
-/// (#15/#38): paste in free text — Notes, a Word doc, a blog post, an
-/// itinerary — and have recommendations pulled out of it automatically.
-/// Nothing becomes a real Rex until ImportReviewView is confirmed.
+/// (#15/#38): choose a document — or paste free text — and have
+/// recommendations pulled out of it automatically. Nothing becomes a real Rex
+/// until ImportReviewView is confirmed.
+///
+/// Oct 3 — "want to be able to upload eg. a word doc". This screen has always
+/// said "from Notes, a Word doc, an itinerary, wherever" and then offered
+/// nowhere to put the Word doc; the only route in was select-all-and-paste,
+/// which works in Notes and not in Files. RexDocumentText reads the document
+/// on the phone and fills the box below, so the text is still shown and
+/// editable before anything is sent anywhere.
 struct ListsImportView: View {
     var onDone: () -> Void
     /// Passed straight through to ImportReviewView — see its own doc.
@@ -22,18 +30,55 @@ struct ListsImportView: View {
     @State private var isExtracting = false
     @State private var errorMessage: String?
     @State private var reviewSource: String?
+    @State private var choosingFile = false
+    @State private var isReadingFile = false
+    /// The document the text in the box came from, so it's obvious the import
+    /// worked and which file is sitting there.
+    @State private var importedFileName: String?
 
     var body: some View {
         NavigationStack {
             ScrollView {
                 VStack(alignment: .leading, spacing: RexSpacing.lg) {
-                    Text("Paste in a list of recommendations \u{2014} from Notes, a Word doc, an itinerary, wherever. We'll pull out each one, with your comments kept intact, so you can check them before anything's posted.")
+                    Text("Choose a document, or paste a list of recommendations in \u{2014} from Notes, a Word doc, an itinerary, wherever. We'll pull out each one, with your comments kept intact, so you can check them before anything's posted.")
                         .font(RexFont.text(14))
                         .foregroundStyle(RexColor.mutedForeground)
                     // Same disclosure as recipe photo import.
                     Text("The text is sent to our AI provider (Anthropic) to pick out the recommendations. Rex keeps only what you choose to save.")
                         .font(RexFont.text(11.5))
                         .foregroundStyle(RexColor.mutedForeground)
+
+                    VStack(alignment: .leading, spacing: RexSpacing.xs) {
+                        Button {
+                            choosingFile = true
+                        } label: {
+                            if isReadingFile {
+                                ProgressView().frame(maxWidth: .infinity)
+                            } else {
+                                Label(
+                                    importedFileName == nil ? "Choose a document" : "Choose a different document",
+                                    systemImage: "doc.text"
+                                )
+                                .font(RexFont.text(13.5, weight: .semibold))
+                                .frame(maxWidth: .infinity)
+                            }
+                        }
+                        .buttonStyle(RexSecondaryButtonStyle())
+                        .disabled(isReadingFile || isExtracting)
+
+                        if let importedFileName {
+                            Label(
+                                "Read from \(importedFileName) \u{2014} have a look over it below, then extract.",
+                                systemImage: "checkmark.circle.fill"
+                            )
+                            .font(RexFont.text(12))
+                            .foregroundStyle(RexColor.mutedForeground)
+                        } else {
+                            Text("Word, Pages, PDF, rich text or plain text.")
+                                .font(RexFont.text(12))
+                                .foregroundStyle(RexColor.mutedForeground)
+                        }
+                    }
 
                     TextEditor(text: $text)
                         .font(RexFont.text(15))
@@ -86,6 +131,12 @@ struct ListsImportView: View {
                 .padding(RexSpacing.page)
             }
             .background(RexColor.background.ignoresSafeArea())
+            .fileImporter(
+                isPresented: $choosingFile,
+                allowedContentTypes: RexDocumentText.readableTypes
+            ) { result in
+                load(result)
+            }
             .navigationTitle("Import from doc")
             .rexDismissableKeyboard()
             .navigationBarTitleDisplayMode(.inline)
@@ -109,6 +160,33 @@ struct ListsImportView: View {
             }
         }
         .tint(RexColor.primary)
+    }
+
+    /// Reading happens off the main thread: unzipping a .docx is quick, but
+    /// PDFKit pulling the text out of a long PDF is not, and it shouldn't
+    /// freeze the screen it was started from.
+    private func load(_ result: Result<URL, Error>) {
+        switch result {
+        case .failure(let error):
+            errorMessage = error.localizedDescription
+        case .success(let url):
+            isReadingFile = true
+            errorMessage = nil
+            Task {
+                let outcome = await Task.detached {
+                    Result { try RexDocumentText.extract(from: url) }
+                }.value
+                isReadingFile = false
+                switch outcome {
+                case .success(let extracted):
+                    text = extracted
+                    importedFileName = url.lastPathComponent
+                case .failure(let error):
+                    importedFileName = nil
+                    errorMessage = error.localizedDescription
+                }
+            }
+        }
     }
 
     private func extract() async {

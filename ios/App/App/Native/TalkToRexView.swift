@@ -1,6 +1,9 @@
 import SwiftUI
 
-/// Sept 29 — "Talk to Rex", Kathryn's name for it.
+/// Sept 29 — "Talk to Rex", Kathryn's name for it. Oct 3 — back to "Ask Rex",
+/// which is what it was called first. Only the user-facing strings changed;
+/// the file and the edge function keep their names so the history stays
+/// followable.
 ///
 /// Explore keeps everything it had; this sits above it. The bar on Explore
 /// opens this screen, and this screen opens on prompts rather than an empty
@@ -90,7 +93,7 @@ struct TalkToRexView: View {
             }
         }
         .safeAreaInset(edge: .bottom) { askBar }
-        .navigationTitle("Talk to Rex")
+        .navigationTitle("Ask Rex")
         .navigationBarTitleDisplayMode(.inline)
         .rexDismissableKeyboard()
         .sheet(item: $addingFromWeb) { hit in

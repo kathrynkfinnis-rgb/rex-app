@@ -21,6 +21,11 @@ struct ItemDetailView: View {
     @State private var authorBookRexCounts: [String: Int] = [:]
     @State private var isLoadingDetails = false
     @State private var synopsisExpanded = false
+    /// Oct 3 — Google Place Details for a place: its photos, its one-line
+    /// description and its opening times. Held here only for the fetch that
+    /// populated it; every later visit reads the cached columns off the item.
+    @State private var placeDetails: RexPlaceDetails?
+    @State private var hoursExpanded = false
     @State private var recs: [FeedRecommendation] = []
     @State private var isLoading = true
     @State private var errorMessage: String?
@@ -82,6 +87,7 @@ struct ItemDetailView: View {
             } else if let item {
                 VStack(alignment: .leading, spacing: 0) {
                     header(item: item)
+                    googlePhotosSection
                     communityPhotosSection
                     recipeSection(item: item)
                     yourTakeSection
@@ -112,6 +118,9 @@ struct ItemDetailView: View {
         .task { await load() }
         // Needs the item first, for its author.
         .task(id: item?.id) { await loadMoreByAuthor() }
+        .task(id: item?.id) {
+            if let item { await loadPlaceDetails(item) }
+        }
     }
 
     private func load() async {
@@ -173,6 +182,39 @@ struct ItemDetailView: View {
     private func header(item: RexItem) -> some View {
         let category = RexCategory(rawType: item.type)
         VStack(alignment: .leading, spacing: 12) {
+            // Oct 3 — "rebuild the place page". A place is a photograph
+            // first: you decide whether you want to go by looking at it. A
+            // book or a film keeps the small cover beside the title, because
+            // a portrait cover blown across the width is worse, not better.
+            if usesHeroImage(category: category) {
+                heroImage(item: item, category: category)
+
+                VStack(alignment: .leading, spacing: 4) {
+                    categoryBadge(category)
+
+                    Text(item.title)
+                        .font(.system(size: 24, weight: .semibold, design: .rounded))
+                        .foregroundStyle(RexColor.foreground)
+                        .fixedSize(horizontal: false, vertical: true)
+
+                    if let summary = placeSummary(item: item, category: category) {
+                        Text(summary)
+                            .font(.system(size: 13))
+                            .foregroundStyle(RexColor.mutedForeground)
+                    }
+                    if let address = item.address, !address.isEmpty {
+                        HStack(alignment: .firstTextBaseline, spacing: 3) {
+                            Image(systemName: "mappin").font(.system(size: 10))
+                            Text(address).font(.system(size: 11))
+                                .fixedSize(horizontal: false, vertical: true)
+                        }
+                        .foregroundStyle(RexColor.mutedForeground)
+                    }
+
+                    openingHoursSection
+                        .padding(.top, 2)
+                }
+            } else {
             HStack(alignment: .top, spacing: 14) {
                 Group {
                     if let urlString = item.image_url, let url = URL(string: urlString) {
@@ -194,14 +236,7 @@ struct ItemDetailView: View {
                 .clipShape(RoundedRectangle(cornerRadius: 16))
 
                 VStack(alignment: .leading, spacing: 4) {
-                    HStack(spacing: 3) {
-                        Image(systemName: category.symbol).font(.system(size: 9))
-                        Text(category.label.uppercased()).font(.system(size: 9, weight: .semibold))
-                    }
-                    .foregroundStyle(RexColor.primary)
-                    .padding(.horizontal, 6).padding(.vertical, 2)
-                    .background(RexColor.primary.opacity(0.12))
-                    .clipShape(Capsule())
+                    categoryBadge(category)
 
                     Text(item.title)
                         .font(.system(size: 22, weight: .semibold, design: .rounded))
@@ -219,6 +254,9 @@ struct ItemDetailView: View {
                     }
                 }
             }
+            }
+
+            savedByRow
 
             detailsSection
 
@@ -230,8 +268,29 @@ struct ItemDetailView: View {
                         } else {
                             RexRatingAverageBadge(ratings: recs.map { $0.rating })
                         }
-                        Text("· \(recs.count) Rex\(recs.count == 1 ? "" : "es")")
-                            .font(.system(size: 13)).foregroundStyle(RexColor.mutedForeground)
+                        // The count used to live here too; the row of faces
+                        // above now says it, and saying it twice is noise.
+
+                        // Google's own score has been stored on every place
+                        // picked from search since the beginning and has
+                        // never once been shown. Clearly marked as Google's,
+                        // so it can't be mistaken for what friends thought.
+                        if let googleRating = item.google_rating, googleRating > 0 {
+                            HStack(spacing: 3) {
+                                Image(systemName: "star.fill").font(.system(size: 9))
+                                Text(String(format: "%.1f", googleRating))
+                                    .font(.system(size: 12, weight: .semibold))
+                                if let count = item.google_rating_count, count > 0 {
+                                    Text("(\(count))").font(.system(size: 11))
+                                }
+                                Text("Google").font(.system(size: 10))
+                            }
+                            .foregroundStyle(RexColor.mutedForeground)
+                            .padding(.horizontal, RexSpacing.sm)
+                            .padding(.vertical, 4)
+                            .background(RexColor.badgeBackground)
+                            .clipShape(Capsule())
+                        }
                     }
                 }
 
@@ -290,6 +349,251 @@ struct ItemDetailView: View {
             }
         }
         .padding(16)
+    }
+
+    /// Google's details for this place, whichever way they arrived: the
+    /// columns cached on the item, or the fetch this visit just made.
+    private var effectivePlaceDetails: RexPlaceDetails? {
+        if let placeDetails { return placeDetails }
+        guard let item else { return nil }
+        let cached = RexPlaceDetails(
+            summary: item.summary,
+            openingHours: item.opening_hours ?? [],
+            photoURLs: item.google_photo_urls ?? [],
+            rating: item.google_rating,
+            ratingCount: item.google_rating_count,
+            websiteURL: item.link_url
+        )
+        return cached.isEmpty ? nil : cached
+    }
+
+    /// Fetches Place Details at most once per place, ever — the guard here is
+    /// the whole cost control, so it stays strict: a Google place id, nothing
+    /// cached, and nobody has asked in the last ninety days.
+    private func loadPlaceDetails(_ item: RexItem) async {
+        let category = RexCategory(rawType: item.type)
+        guard category == .place || category == .event,
+              item.external_source == "google_places",
+              let placeId = item.external_id, !placeId.isEmpty
+        else { return }
+
+        if let fetchedAt = item.details_fetched_at,
+           let date = ISO8601DateFormatter.rexDate(from: fetchedAt),
+           date.timeIntervalSinceNow > -90 * 24 * 60 * 60 {
+            return
+        }
+
+        guard let fetched = await RexSearch.placeDetails(placeId: placeId), !fetched.isEmpty else { return }
+        placeDetails = fetched
+        await RexAPI.shared.saveItemPlaceDetails(itemId: item.id, details: fetched)
+    }
+
+    /// Oct 3 — "please can we pull photos from Google?" Google's own photos of
+    /// the place, swipeable. Friends' photos keep their own carousel further
+    /// down: a picture someone you know took there is worth more than the
+    /// listing's, so the two don't get mixed into one undifferentiated reel.
+    @ViewBuilder
+    private var googlePhotosSection: some View {
+        let urls = effectivePlaceDetails?.photoURLs ?? []
+        if urls.count > 1 {
+            VStack(alignment: .leading, spacing: 6) {
+                ScrollView(.horizontal, showsIndicators: false) {
+                    HStack(spacing: 8) {
+                        ForEach(urls.dropFirst(), id: \.self) { urlString in
+                            GoogleSafeAsyncImage(url: URL(string: urlString)) { image in
+                                image.resizable().aspectRatio(contentMode: .fill)
+                            } placeholder: {
+                                RexColor.muted
+                            }
+                            .frame(width: 150, height: 110)
+                            .clipped()
+                            .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+                        }
+                    }
+                    .padding(.horizontal, 16)
+                }
+                Text("Photos from Google")
+                    .font(.system(size: 10))
+                    .foregroundStyle(RexColor.placeholder)
+                    .padding(.horizontal, 16)
+            }
+            .padding(.bottom, RexSpacing.sm)
+        }
+    }
+
+    /// Opening times. Today's line is the one anybody actually wants, so it's
+    /// the one on screen; the rest of the week is a tap away rather than seven
+    /// lines of small print on every place page.
+    @ViewBuilder
+    private var openingHoursSection: some View {
+        if let details = effectivePlaceDetails, !details.openingHours.isEmpty {
+            VStack(alignment: .leading, spacing: 6) {
+                Button {
+                    withAnimation(.snappy) { hoursExpanded.toggle() }
+                } label: {
+                    HStack(spacing: 6) {
+                        Image(systemName: "clock").font(.system(size: 12))
+                        Text(details.todayHours ?? "Opening times")
+                            .font(.system(size: 13))
+                            .lineLimit(1)
+                        Image(systemName: hoursExpanded ? "chevron.up" : "chevron.down")
+                            .font(.system(size: 10, weight: .semibold))
+                        Spacer(minLength: 0)
+                    }
+                    .foregroundStyle(RexColor.foreground.opacity(0.9))
+                    .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+
+                if hoursExpanded {
+                    VStack(alignment: .leading, spacing: 3) {
+                        ForEach(details.openingHours, id: \.self) { line in
+                            Text(line)
+                                .font(.system(size: 12))
+                                .foregroundStyle(RexColor.mutedForeground)
+                        }
+                    }
+                    .padding(.leading, 18)
+                }
+            }
+        }
+    }
+
+    /// A place or an event leads with its photograph; everything else keeps
+    /// the cover-beside-the-title layout that suits a portrait cover.
+    private func usesHeroImage(category: RexCategory) -> Bool {
+        category == .place || category == .event
+    }
+
+    private func categoryBadge(_ category: RexCategory) -> some View {
+        HStack(spacing: 3) {
+            Image(systemName: category.symbol).font(.system(size: 9))
+            Text(category.label.uppercased()).font(.system(size: 9, weight: .semibold))
+        }
+        .foregroundStyle(RexColor.primary)
+        .padding(.horizontal, 6).padding(.vertical, 2)
+        .background(RexColor.primary.opacity(0.12))
+        .clipShape(Capsule())
+    }
+
+    /// The item's own picture if it has one, otherwise the best photo anybody
+    /// has attached to a take on it — which is usually a better photograph of
+    /// the place than the catalogue's, because a friend took it there.
+    private var heroImageURL: URL? {
+        if let urlString = item?.image_url, let url = URL(string: urlString) { return url }
+        if let urlString = effectivePlaceDetails?.photoURLs.first, let url = URL(string: urlString) { return url }
+        return communityPhotoURLs.first.flatMap(URL.init(string:))
+    }
+
+    @ViewBuilder
+    private func heroImage(item: RexItem, category: RexCategory) -> some View {
+        Group {
+            if let url = heroImageURL {
+                // GoogleSafeAsyncImage rather than AsyncImage: a Places photo
+                // URL needs the bundle-id header, and without it loads as a
+                // permanently blank box with no error.
+                GoogleSafeAsyncImage(url: url) { image in
+                    image.resizable().aspectRatio(contentMode: .fill)
+                } placeholder: {
+                    RexColor.muted
+                }
+            } else {
+                // No photograph anywhere: the drawn placeholder, sized down
+                // and centred rather than stretched across the full width,
+                // which is how the dino ends up looking like a mistake.
+                Image(category.placeholderImageName)
+                    .resizable()
+                    .aspectRatio(contentMode: .fit)
+                    .padding(28)
+                    .frame(maxWidth: .infinity)
+                    .background(RexColor.muted)
+            }
+        }
+        .frame(height: 180)
+        .frame(maxWidth: .infinity)
+        .clipped()
+        .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
+    }
+
+    /// One line saying what the thing actually is — the sub-category and the
+    /// town. Built from what's already stored rather than fetched: Google's
+    /// own one-liner would read better ("smash burgers"), but it's a billed
+    /// Place Details call per view, so that's a decision to take separately.
+    private func placeSummary(item: RexItem, category: RexCategory) -> String? {
+        // Google's own line first when we have it — "smash burgers" beats
+        // "Restaurant · Streatham", which is what the fallback below builds.
+        if let summary = effectivePlaceDetails?.summary?.trimmingCharacters(in: .whitespaces),
+           !summary.isEmpty {
+            if let locality = locality(from: item.address) {
+                return "\(summary) \u{00B7} \(locality)"
+            }
+            return summary
+        }
+        var parts: [String] = []
+        if let genre = item.genre?.trimmingCharacters(in: .whitespaces), !genre.isEmpty {
+            parts.append(genre)
+        }
+        if let subtitle = item.subtitle?.trimmingCharacters(in: .whitespaces), !subtitle.isEmpty {
+            parts.append(subtitle)
+        }
+        if let locality = locality(from: item.address) { parts.append(locality) }
+        return parts.isEmpty ? nil : parts.joined(separator: " \u{00B7} ")
+    }
+
+    /// "180 Franciscan Rd, London SW17 8HG, UK" -> "London". Addresses here
+    /// are Google-formatted, so the town is the second-to-last component
+    /// before the country, with the postcode trimmed off.
+    private func locality(from address: String?) -> String? {
+        guard let address else { return nil }
+        let parts = address.components(separatedBy: ",")
+            .map { $0.trimmingCharacters(in: .whitespaces) }
+            .filter { !$0.isEmpty }
+        guard parts.count >= 2 else { return nil }
+        let candidate = parts[parts.count - 2]
+        // Drop a trailing postcode ("London SW17 8HG" -> "London").
+        let words = candidate.components(separatedBy: " ")
+        let town = words.prefix { word in
+            !word.contains(where: \.isNumber)
+        }
+        let result = town.joined(separator: " ")
+        return result.isEmpty ? nil : result
+    }
+
+    /// Oct 3 — "a swipeable 'saved by' row of clickable profile pictures;
+    /// how many people have Rex'd it". The faces were buried under the takes
+    /// at the bottom of the page; who has been is the fastest answer to
+    /// "should I go", so it moves up to sit under the title.
+    @ViewBuilder
+    private var savedByRow: some View {
+        if !recs.isEmpty {
+            VStack(alignment: .leading, spacing: 6) {
+                Text(recs.count == 1 ? "Rex\u{2019}d by" : "Rex\u{2019}d by \(recs.count) people")
+                    .font(.system(size: 11, weight: .semibold))
+                    .tracking(0.3)
+                    .foregroundStyle(RexColor.mutedForeground)
+
+                ScrollView(.horizontal, showsIndicators: false) {
+                    HStack(spacing: RexSpacing.md) {
+                        ForEach(recs) { rec in
+                            let name = rec.profiles?.display_name ?? rec.profiles?.username ?? "Someone"
+                            NavigationLink(value: UserProfileRoute(userId: rec.user_id, name: name)) {
+                                VStack(spacing: 4) {
+                                    UserAvatarView(url: rec.profiles?.avatar_url, name: name, size: 44)
+                                    Text(name.components(separatedBy: " ").first ?? name)
+                                        .font(.system(size: 11))
+                                        .foregroundStyle(RexColor.mutedForeground)
+                                        .lineLimit(1)
+                                }
+                                .frame(width: 58)
+                            }
+                            .buttonStyle(.plain)
+                        }
+                    }
+                    .padding(.horizontal, 1)
+                    .padding(.bottom, 2)
+                }
+            }
+        }
     }
 
     /// #121 — every photo anyone's attached to a take on this item, pooled
