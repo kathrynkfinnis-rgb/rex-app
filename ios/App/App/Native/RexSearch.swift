@@ -120,6 +120,91 @@ enum RexSearch {
         }
     }
 
+    /// Oct 3 — "when someone Rexes something which has multiple branches eg
+    /// Bancone or relais d'entrecôte or mr bao (but less than 20 instances),
+    /// give the option to automatically Rex the others."
+    ///
+    /// Other locations trading under the same name. The name has to match
+    /// almost exactly, because the failure here is embarrassing in a specific
+    /// way: offering to Rex "The Crown" in Doncaster because somebody liked a
+    /// different pub called The Crown in Bristol. A chain is a shared brand,
+    /// not a shared word, so a loose match is worse than no feature.
+    ///
+    /// The twenty cap is hers and it's the right instinct — Pret has hundreds
+    /// of branches and nobody means to recommend all of them.
+    static func branches(of name: String, excludingPlaceId placeId: String?) async -> [RexSearchHit] {
+        guard !googleKey.isEmpty else { return [] }
+        let trimmed = name.trimmingCharacters(in: .whitespaces)
+        guard trimmed.count >= 3 else { return [] }
+
+        var request = URLRequest(url: URL(string: "https://places.googleapis.com/v1/places:searchText")!)
+        request.httpMethod = "POST"
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        request.setValue(googleKey, forHTTPHeaderField: "X-Goog-Api-Key")
+        request.setValue(bundleId, forHTTPHeaderField: "X-Ios-Bundle-Identifier")
+        request.setValue(
+            "places.id,places.displayName,places.formattedAddress,places.location," +
+            "places.primaryTypeDisplayName,places.photos,places.rating,places.userRatingCount",
+            forHTTPHeaderField: "X-Goog-FieldMask"
+        )
+        // No location bias at all: branches of a chain are by definition
+        // somewhere else, and biasing toward here would hide them.
+        request.httpBody = try? JSONSerialization.data(withJSONObject: [
+            "textQuery": trimmed,
+            "pageSize": 20,
+        ])
+
+        guard let (data, response) = try? await URLSession.shared.data(for: request),
+              let http = response as? HTTPURLResponse, http.statusCode < 400,
+              let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+              let results = json["places"] as? [[String: Any]]
+        else { return [] }
+
+        let target = normalizeForChainMatch(trimmed)
+        var seenAddresses = Set<String>()
+        let branches = results.compactMap { place -> RexSearchHit? in
+            guard let id = place["id"] as? String, id != placeId,
+                  let displayName = (place["displayName"] as? [String: Any])?["text"] as? String,
+                  normalizeForChainMatch(displayName) == target,
+                  let address = place["formattedAddress"] as? String,
+                  seenAddresses.insert(address).inserted
+            else { return nil }
+            let location = place["location"] as? [String: Any]
+            let photoName = (place["photos"] as? [[String: Any]])?.first?["name"] as? String
+            return RexSearchHit(
+                externalId: id,
+                externalSource: "google_places",
+                title: displayName,
+                subtitle: nil,
+                imageURL: photoName.map { "https://places.googleapis.com/v1/\($0)/media?maxWidthPx=800&key=\(googleKey)" },
+                genre: (place["primaryTypeDisplayName"] as? [String: Any])?["text"] as? String,
+                address: address,
+                lat: location?["latitude"] as? Double,
+                lng: location?["longitude"] as? Double,
+                googleRating: place["rating"] as? Double,
+                googleRatingCount: place["userRatingCount"] as? Int
+            )
+        }
+        // Her cap. A search that comes back full is probably a big chain
+        // rather than a small one, so say nothing rather than guess.
+        return branches.count >= 20 ? [] : branches
+    }
+
+    /// Chain names carry the branch in them often enough that an exact
+    /// comparison misses real matches — "Bancone Covent Garden" and "Bancone
+    /// Borough Yards" are the same restaurant twice. Comparing the leading
+    /// words only would be too loose; this strips punctuation and the
+    /// boilerplate a listing adds, and otherwise demands the names be equal.
+    private static func normalizeForChainMatch(_ s: String) -> String {
+        var out = s.lowercased()
+            .folding(options: .diacriticInsensitive, locale: nil)
+            .replacingOccurrences(of: "[^a-z0-9 ]", with: "", options: .regularExpression)
+        for filler in [" restaurant", " cafe", " bar", " london", " ltd", " limited"] {
+            if out.hasSuffix(filler) { out = String(out.dropLast(filler.count)) }
+        }
+        return out.trimmingCharacters(in: .whitespaces)
+    }
+
     /// Oct 3 — "When you click on a Rex and it says 'on Google' with a link to
     /// the maps pin, can the same be done with other articles from popular
     /// news sources if they feature?"

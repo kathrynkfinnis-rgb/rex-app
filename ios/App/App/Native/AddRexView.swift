@@ -208,6 +208,13 @@ struct AddRexView: View {
     /// Sept 15 — the Rex just posted, for sharing it from the success
     /// screen, and your running totals for congratulating you on it.
     @State private var lastPostedRecId: String?
+    /// Oct 3 — the item just posted, for the two follow-up offers on the
+    /// success screen (other branches of a small chain, and "is this part of
+    /// a trip?"). Both are places-only and both are ignorable.
+    @State private var lastPostedItemId: String?
+    @State private var chainBranches: [RexSearchHit] = []
+    @State private var showingChains = false
+    @State private var addingToTripItemId: RexItemRef?
     @State private var postStats: (count: Int, weekStreak: Int)?
     @State private var didWant = false
     /// Trips only, for now — see AddRexView's "Save as draft" button.
@@ -1893,11 +1900,78 @@ struct AddRexView: View {
             // was a draft of. Posting is what makes a draft spent, so it's
             // cleared here, where the post actually succeeds.
             TripDraftStore.clear(id: draftId)
+            lastPostedItemId = itemId
             withAnimation { didPost = true }
+            // After the success screen is already up, so the Rex never waits
+            // on a web lookup. If it finds nothing, nothing appears.
+            if category == .place {
+                chainBranches = await RexSearch.branches(
+                    of: title.trimmingCharacters(in: .whitespaces),
+                    excludingPlaceId: picked?.externalId
+                )
+            }
         } catch {
             errorMessage = error.localizedDescription
         }
         isSaving = false
+    }
+
+    private var chainOfferLabel: String {
+        let name = title.trimmingCharacters(in: .whitespaces)
+        if chainBranches.count == 1 { return "There's another \(name) \u{2014} Rex it too?" }
+        return "\(chainBranches.count) other \(name)s \u{2014} Rex them too?"
+    }
+
+    /// Oct 3 — two things worth asking right after a place goes up, both
+    /// optional and both ignorable: whether it belongs on a trip, and whether
+    /// the chain's other branches should go up with it. They live here rather
+    /// than in the form because neither is a decision about the Rex you were
+    /// making — they're only worth asking once it exists.
+    ///
+    /// The sheets hang off this subview rather than the main body: AddRexView's
+    /// modifier chain is long enough that two more pushed the type-checker
+    /// over its limit.
+    @ViewBuilder
+    private var followUpOffers: some View {
+        if didPost, !didWant, !didSaveDraft, category == .place {
+            VStack(spacing: 10) {
+                if !chainBranches.isEmpty {
+                    offerButton(chainOfferLabel, icon: "building.2") { showingChains = true }
+                }
+                if let lastPostedItemId {
+                    offerButton("Is this part of a trip?", icon: "suitcase") {
+                        addingToTripItemId = RexItemRef(id: lastPostedItemId)
+                    }
+                }
+            }
+            .sheet(isPresented: $showingChains) {
+                SmallChainsView(
+                    branches: chainBranches,
+                    originalTitle: title.trimmingCharacters(in: .whitespaces),
+                    originalAddress: address.isEmpty ? picked?.address : address,
+                    rating: rating,
+                    // Offered once: having Rex'd the other branches, the
+                    // prompt has done its job and shouldn't sit there
+                    // inviting a repeat.
+                    onDone: { chainBranches = [] }
+                )
+            }
+            .sheet(item: $addingToTripItemId) { ref in
+                AddToTripView(itemId: ref.id, itemTitle: title, onDone: {})
+            }
+        }
+    }
+
+    private func offerButton(_ label: String, icon: String, action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            Label(label, systemImage: icon)
+                .font(RexFont.text(14, weight: .semibold))
+                .frame(maxWidth: .infinity)
+                .frame(height: 46)
+                .foregroundStyle(RexColor.primary)
+                .overlay(Capsule().stroke(RexColor.primary.opacity(0.45), lineWidth: 1))
+        }
+        .buttonStyle(.plain)
     }
 
     /// Clear the form but keep the category — you're usually adding another of
@@ -2047,6 +2121,14 @@ struct AddRexView: View {
                 }
                 .padding(.top, 8)
             }
+
+            // Oct 3 — two things worth asking right after a place goes up,
+            // both optional and both ignorable: whether it belongs on a trip,
+            // and whether the chain's other branches should go up with it.
+            // They sit here rather than in the form because neither is a
+            // decision about the Rex you were making — they're only worth
+            // asking once it exists.
+            followUpOffers
 
             // People rarely add just one, so offer to go again without
             // having to come back in through the + button.
