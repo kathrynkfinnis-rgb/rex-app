@@ -413,12 +413,10 @@ struct ExploreView: View {
     private func shelfThumbnail(url: String?, symbol: String) -> some View {
         Group {
             if let url, let imageURL = URL(string: url) {
-                AsyncImage(url: imageURL) { phase in
-                    if let image = phase.image {
-                        image.resizable().aspectRatio(contentMode: .fill)
-                    } else {
-                        RexColor.muted
-                    }
+                GoogleSafeAsyncImage(url: imageURL) { image in
+                    image.resizable().aspectRatio(contentMode: .fill)
+                } placeholder: {
+                    RexColor.muted
                 }
             } else {
                 RexColor.muted.overlay(

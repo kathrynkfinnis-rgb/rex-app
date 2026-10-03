@@ -1,5 +1,23 @@
 import SwiftUI
 
+/// Oct 3 — "choose a photo or a Rex-drawn icon as a list thumbnail."
+///
+/// A chosen drawing is stored in the same `image_url` column as a photo,
+/// written as `rex://icon/<AssetName>`. Keeping it in that one column means
+/// every screen that already draws a thumbnail draws this too, without a
+/// second field threaded through the catalogue, the feed, the map and the
+/// collections — and anything that doesn't know the scheme falls through to
+/// the placeholder it would have shown anyway.
+///
+/// A free function rather than a static on GoogleSafeAsyncImage: that type is
+/// generic over its content and placeholder, so calling a static on it means
+/// naming both just to parse a string.
+func rexIconAssetName(_ urlString: String?) -> String? {
+    guard let urlString, urlString.hasPrefix("rex://icon/") else { return nil }
+    let name = String(urlString.dropFirst("rex://icon/".count))
+    return name.isEmpty ? nil : name
+}
+
 /// AsyncImage, except it also handles Google Places photo URLs.
 ///
 /// The Places key is iOS-bundle-restricted, which Google enforces by
@@ -23,9 +41,13 @@ struct GoogleSafeAsyncImage<Content: View, Placeholder: View>: View {
         url?.absoluteString.contains("places.googleapis.com") ?? false
     }
 
+    private var iconName: String? { rexIconAssetName(url?.absoluteString) }
+
     var body: some View {
         Group {
-            if let loadedImage {
+            if let iconName, UIImage(named: iconName) != nil {
+                content(Image(iconName))
+            } else if let loadedImage {
                 content(Image(uiImage: loadedImage))
             } else if isGooglePlacesURL {
                 placeholder()

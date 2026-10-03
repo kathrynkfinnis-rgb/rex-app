@@ -125,7 +125,13 @@ struct AddRexView: View {
         _title = State(initialValue: list.items?.title ?? "")
         _note = State(initialValue: list.note ?? "")
         _rating = State(initialValue: list.rating > 0 ? list.rating : 10)
-        _photoURLs = State(initialValue: [list.items?.image_url].compactMap { $0 })
+        // A cover that's one of Rex's drawings comes back as the sentinel, not
+        // a photo — it belongs in the icon picker, not the photo picker, or
+        // editing a list would show it as a broken grey tile.
+        let existingCover = list.items?.image_url
+        let existingIcon = rexIconAssetName(existingCover)
+        _listIcon = State(initialValue: existingIcon)
+        _photoURLs = State(initialValue: existingIcon == nil ? [existingCover].compactMap { $0 } : [])
         _listNotes = State(initialValue: longNote ?? "")
         if let kind = list.items?.genre, !kind.isEmpty {
             _listKind = State(initialValue: kind)
@@ -231,6 +237,10 @@ struct AddRexView: View {
     @State private var hits: [RexSearchHit] = []
     @State private var isSearching = false
     @State private var picked: RexSearchHit?
+    /// Oct 3 — a Rex drawing chosen as a list's cover, when no photo was
+    /// uploaded. Stored as the "rex://icon/<asset>" sentinel in the same
+    /// image_url column a photo would use.
+    @State private var listIcon: String?
     /// Oct 3 — lowercased titles of your own Rex matching the current search,
     /// so a result you've already Rex'd says so before you add it twice.
     @State private var alreadyRexdTitles: Set<String> = []
@@ -702,6 +712,7 @@ struct AddRexView: View {
                     Text("Cover photo").font(.system(size: 14, weight: .semibold))
                         .foregroundStyle(RexColor.foreground)
                     PhotoPickerView(photoURLs: $photoURLs, maxPhotos: 1)
+                    rexIconPicker
                 }
 
                 TripItineraryBuilderView(
@@ -1490,7 +1501,7 @@ struct AddRexView: View {
             postingProgress = "Saving list…"
             try await RexAPI.shared.updateItemTitle(itemId: listItemId, title: title.trimmingCharacters(in: .whitespaces))
             try await RexAPI.shared.updateItemGenre(itemId: listItemId, genre: listKind)
-            try await RexAPI.shared.updateItemImageURL(itemId: listItemId, imageURL: photoURLs.first)
+            try await RexAPI.shared.updateItemImageURL(itemId: listItemId, imageURL: photoURLs.first ?? listIconURL)
             try await RexAPI.shared.updateRecommendation(
                 id: listRecId,
                 rating: rating,
@@ -1692,7 +1703,7 @@ struct AddRexView: View {
                 // all), promote whatever photo the post itself carries
                 // instead of leaving every card on the generic placeholder
                 // icon. A real photo, when there is one, beats no photo.
-                imageURL: (picked?.imageURL?.isEmpty ?? true) ? photoURLs.first : nil,
+                imageURL: (picked?.imageURL?.isEmpty ?? true) ? (photoURLs.first ?? listIconURL) : nil,
                 recipeText: category == .recipe && !recipeText.isEmpty ? recipeText : nil
             )
             // Trip stops become their own Rex, linked to the trip.
@@ -1914,6 +1925,57 @@ struct AddRexView: View {
             errorMessage = error.localizedDescription
         }
         isSaving = false
+    }
+
+    /// Oct 3 — "choose a photo or a Rex-drawn icon as a list thumbnail."
+    ///
+    /// Most lists have no obvious photograph — a list of baby essentials, or
+    /// books to read — and the generic list drawing on every one of them makes
+    /// Collections look like a filing cabinet. Picking the drawing that suits
+    /// the list is the cheap version of a cover, and it costs no upload.
+    ///
+    /// Stored in the same column a photo would use, so every screen that draws
+    /// a thumbnail already draws this. See GoogleSafeAsyncImage.iconAssetName.
+    private var listIconURL: String? {
+        listIcon.map { "rex://icon/\($0)" }
+    }
+
+    @ViewBuilder
+    private var rexIconPicker: some View {
+        let icons = RexCategory.allCases.map(\.placeholderImageName)
+        VStack(alignment: .leading, spacing: RexSpacing.xs) {
+            Text(photoURLs.isEmpty ? "Or pick one of Rex's drawings." : "A photo wins over a drawing.")
+                .font(RexFont.text(11.5))
+                .foregroundStyle(RexColor.mutedForeground)
+
+            ScrollView(.horizontal, showsIndicators: false) {
+                HStack(spacing: RexSpacing.sm) {
+                    ForEach(icons, id: \.self) { icon in
+                        let isPicked = listIcon == icon
+                        Button {
+                            // Picking the same one again clears it, so there's
+                            // always a way back to no cover at all.
+                            listIcon = isPicked ? nil : icon
+                        } label: {
+                            Image(icon)
+                                .resizable()
+                                .aspectRatio(contentMode: .fit)
+                                .padding(6)
+                                .frame(width: 56, height: 56)
+                                .background(RexColor.card)
+                                .clipShape(RoundedRectangle(cornerRadius: RexRadius.input, style: .continuous))
+                                .overlay(
+                                    RoundedRectangle(cornerRadius: RexRadius.input, style: .continuous)
+                                        .stroke(isPicked ? RexColor.primary : RexColor.border,
+                                                lineWidth: isPicked ? 2 : 1)
+                                )
+                        }
+                        .buttonStyle(.plain)
+                    }
+                }
+                .padding(.horizontal, 1)
+            }
+        }
     }
 
     private var chainOfferLabel: String {

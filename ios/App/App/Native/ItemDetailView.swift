@@ -223,12 +223,12 @@ struct ItemDetailView: View {
             HStack(alignment: .top, spacing: 14) {
                 Group {
                     if let urlString = item.image_url, let url = URL(string: urlString) {
-                        AsyncImage(url: url) { phase in
-                            if let image = phase.image {
-                                image.resizable().aspectRatio(contentMode: .fill)
-                            } else {
-                                RexColor.muted
-                            }
+                        // GoogleSafeAsyncImage, so a Places photo loads and a
+                        // chosen Rex drawing ("rex://icon/…") draws.
+                        GoogleSafeAsyncImage(url: url) { image in
+                            image.resizable().aspectRatio(contentMode: .fill)
+                        } placeholder: {
+                            RexColor.muted
                         }
                     } else {
                         Image(category.placeholderImageName)
