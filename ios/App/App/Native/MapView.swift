@@ -83,7 +83,10 @@ struct RexMapView: View {
     @State private var editingRec: FeedRecommendation?
     @State private var isOpeningEditor = false
     /// Which height the place sheet is at — summary, or the full page.
-    @State private var placeSheetDetent: PresentationDetent = .height(300)
+    @State private var placeSheetDetent: PresentationDetent = .fraction(0.5)
+    /// Oct 3 — the catalogue row behind the open pin, for the content the
+    /// resting card now shows: its photos, what it is, and today's hours.
+    @State private var sheetItem: RexItem?
     /// Drives the chevron's slow float on the "more below" bar.
     @State private var nudge: CGFloat = -3
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
@@ -291,7 +294,7 @@ struct RexMapView: View {
             set: { next in
                 if next == nil {
                     selectedPlace = nil
-                    placeSheetDetent = .height(300)
+                    placeSheetDetent = .fraction(0.5)
                     showingTripSearch = false
                     pendingPlaceHit = nil
                 }
@@ -313,7 +316,7 @@ struct RexMapView: View {
                         placeSheet(place)
                     }
                 }
-                .presentationDetents([.height(300), .large], selection: $placeSheetDetent)
+                .presentationDetents([.fraction(0.5), .large], selection: $placeSheetDetent)
             case .tripSearch:
                 TripSearchView(onSelect: { id, title in followTrip(id: id, title: title) })
             case .newRex(let hit):
@@ -761,6 +764,51 @@ struct RexMapView: View {
     /// spinner: the only ways this fails are a dropped connection or the Rex
     /// having just been deleted elsewhere, and neither is worth an alert over
     /// a button they can simply press again.
+    /// "3 Rex · Restaurant" — who, then what. The recommender summary comes
+    /// first because on this app the people are the point.
+    private func placeStandfirst(_ place: MapPlace) -> String {
+        var parts: [String] = []
+        if place.recommendations.count > 1 {
+            parts.append("\(place.recommendations.count) Rex")
+        } else {
+            parts.append(place.recommenderSummary)
+        }
+        if let genre = place.genre?.trimmingCharacters(in: .whitespaces), !genre.isEmpty {
+            parts.append(splitGenres(genre).first ?? genre)
+        }
+        return parts.joined(separator: " \u{00B7} ")
+    }
+
+    /// Google's photos first, then anything a friend attached — same order the
+    /// item page uses, so the two screens agree about this place.
+    private var sheetPhotoURLs: [String] {
+        let google = sheetItem?.google_photo_urls ?? []
+        let own = [sheetItem?.image_url].compactMap { $0 }
+        let combined = google.isEmpty ? own : google
+        return Array(combined.prefix(8))
+    }
+
+    private var sheetDetails: RexPlaceDetails? {
+        guard let sheetItem else { return nil }
+        let details = RexPlaceDetails(
+            summary: sheetItem.summary,
+            openingHours: sheetItem.opening_hours ?? [],
+            photoURLs: sheetItem.google_photo_urls ?? [],
+            rating: sheetItem.google_rating,
+            ratingCount: sheetItem.google_rating_count,
+            websiteURL: sheetItem.link_url
+        )
+        return details.isEmpty ? nil : details
+    }
+
+    /// The cached Google details for whichever pin is open. One fetch per pin
+    /// tap, reading columns already filled in by the item page — this never
+    /// calls Google itself, so opening pins costs nothing.
+    private func loadSheetItem(_ place: MapPlace) async {
+        sheetItem = nil
+        sheetItem = try? await RexAPI.shared.fetchItem(id: place.id)
+    }
+
     private func openEditor(for place: MapPlace) async {
         isOpeningEditor = true
         defer { isOpeningEditor = false }
@@ -782,35 +830,78 @@ struct RexMapView: View {
             // Scrolling keeps it inside whatever detent it's in.
             ScrollView {
                 VStack(alignment: .leading, spacing: RexSpacing.md) {
-                    HStack(spacing: 4) {
-                        Image(systemName: RexCategory(rawType: place.type).symbol).font(.system(size: 9))
-                        Text(RexCategory(rawType: place.type).label.uppercased())
-                            .font(.system(size: 10, weight: .semibold)).tracking(0.6)
-                    }
-                    .foregroundStyle(RexColor.badgeForeground)
-                    .padding(.horizontal, RexSpacing.sm).padding(.vertical, 3)
-                    .background(RexColor.badgeBackground)
-                    .clipShape(Capsule())
-
+                    // Oct 3 — "can we have something like this so you can see a
+                    // bit of the content and then it's a swipe up motion."
+                    //
+                    // The resting card used to open with a category chip and a
+                    // title, which is a label rather than an answer, and left
+                    // a panel of blank sheet under it. It now leads with the
+                    // things that decide whether you go: who rated it, what it
+                    // is, whether it's open, and what it looks like. The photo
+                    // strip runs deliberately off the right edge and is cut by
+                    // the bottom of the detent, so there is never a moment
+                    // where the card looks finished.
                     Text(place.title)
-                        .font(RexFont.display(22, weight: .semibold))
+                        .font(RexFont.display(24, weight: .semibold))
                         .foregroundStyle(RexColor.foreground)
+                        .lineLimit(2)
+                        .fixedSize(horizontal: false, vertical: true)
 
-                    if let address = place.address, !address.isEmpty {
-                        Text(address)
-                            .font(RexFont.text(13))
-                            .foregroundStyle(RexColor.mutedForeground)
-                            .lineLimit(2)
-                    }
-
-                    HStack(spacing: 6) {
+                    HStack(spacing: RexSpacing.sm) {
                         if place.recommendations.count == 1 {
                             RexRatingBadge(raw: place.recommendations[0].rating)
                         } else {
                             RexRatingAverageBadge(ratings: place.recommendations.map { $0.rating })
                         }
-                        Text("· \(place.recommenderSummary)")
-                            .font(RexFont.text(13)).foregroundStyle(RexColor.mutedForeground)
+                        Text(placeStandfirst(place))
+                            .font(RexFont.text(13))
+                            .foregroundStyle(RexColor.mutedForeground)
+                            .lineLimit(1)
+                    }
+
+                    if let hours = sheetDetails?.todayHours {
+                        HStack(spacing: 5) {
+                            Image(systemName: "clock").font(.system(size: 11))
+                            Text(hours)
+                                .font(RexFont.text(13))
+                                .lineLimit(1)
+                        }
+                        .foregroundStyle(RexColor.mutedForeground)
+                    }
+
+                    if !sheetPhotoURLs.isEmpty {
+                        ScrollView(.horizontal, showsIndicators: false) {
+                            HStack(spacing: 6) {
+                                ForEach(sheetPhotoURLs, id: \.self) { urlString in
+                                    GoogleSafeAsyncImage(url: URL(string: urlString)) { image in
+                                        image.resizable().aspectRatio(contentMode: .fill)
+                                    } placeholder: {
+                                        RexColor.muted
+                                    }
+                                    .frame(width: 128, height: 118)
+                                    .clipped()
+                                    .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
+                                }
+                            }
+                        }
+                        // Out to the sheet's own edges, so the strip is
+                        // visibly cut off rather than politely inset.
+                        .padding(.horizontal, -RexSpacing.page)
+                        .padding(.horizontal, RexSpacing.page)
+                    }
+
+                    if let summary = sheetItem?.summary, !summary.isEmpty {
+                        Text(summary)
+                            .font(RexFont.text(13))
+                            .foregroundStyle(RexColor.foreground.opacity(0.9))
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
+
+                    if let address = place.address, !address.isEmpty {
+                        Text(address)
+                            .font(RexFont.text(12))
+                            .foregroundStyle(RexColor.mutedForeground)
+                            .lineLimit(2)
                     }
 
                     // Oct 2 — "build a trip from Rex is unworkable, it gives
@@ -928,6 +1019,7 @@ struct RexMapView: View {
                 .padding(RexSpacing.page)
                 .frame(maxWidth: .infinity, alignment: .leading)
             }
+            .task(id: place.id) { await loadSheetItem(place) }
             .safeAreaInset(edge: .bottom, spacing: 0) { moreBelowBar(place) }
             .background(RexColor.background.ignoresSafeArea())
             .navigationDestination(for: String.self) { ItemDetailView(itemId: $0) }
