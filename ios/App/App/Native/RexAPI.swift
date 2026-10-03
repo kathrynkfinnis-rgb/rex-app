@@ -1533,7 +1533,17 @@ final class RexAPI {
     /// already a stop on this exact trip (recommendations_unique_trip_stop,
     /// same partial-index reasoning as upsertRecommendation's own comment).
     /// Re-adding an existing stop should just be a no-op, not an error.
-    func addPlaceToTrip(itemId: String, tripId: String) async throws {
+    /// The headings already used on a trip, in itinerary order — so adding a
+    /// pin to "Day 2" means picking the day rather than retyping it.
+    func tripSections(tripId: String) async throws -> [String] {
+        let stops = try await fetchTripStops(tripRecommendationId: tripId)
+        var seen = Set<String>()
+        return stops.compactMap { $0.trip_section }
+            .map { $0.trimmingCharacters(in: .whitespaces) }
+            .filter { !$0.isEmpty && seen.insert($0).inserted }
+    }
+
+    func addPlaceToTrip(itemId: String, tripId: String, section: String? = nil) async throws {
         let token = try await validToken()
         guard let userId = currentUserId else { throw RexAPIError.notSignedIn }
 
@@ -1553,7 +1563,7 @@ final class RexAPI {
            let rows = try? JSONDecoder().decode([[String: String]].self, from: lookupData), !rows.isEmpty {
             return // already a stop on this trip — nothing to do
         }
-        try await createRecommendation(itemId: itemId, rating: 0, note: nil, tripId: tripId)
+        try await createRecommendation(itemId: itemId, rating: 0, note: nil, tripId: tripId, tripSection: section)
     }
 
     /// Creates a new item (manual entry — no external search match) and returns its id.

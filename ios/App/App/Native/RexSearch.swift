@@ -120,6 +120,90 @@ enum RexSearch {
         }
     }
 
+    /// Oct 3 — "When you click on a Rex and it says 'on Google' with a link to
+    /// the maps pin, can the same be done with other articles from popular
+    /// news sources if they feature?"
+    ///
+    /// Same Programmable Search the product lookup uses, restricted to
+    /// publications worth surfacing. The restriction is the whole point: an
+    /// unfiltered web search for a restaurant returns its own site, three
+    /// aggregators and a delivery app, none of which is "it was written
+    /// about". A named list is blunt but honest — a result either is from
+    /// somewhere recognisable or it doesn't appear.
+    static func articles(about title: String, near locality: String?) async -> [RexArticle] {
+        guard !cseApiKey.isEmpty, !cseEngineId.isEmpty else { return [] }
+
+        let query = [title, locality, "review"].compactMap { $0 }.joined(separator: " ")
+        var components = URLComponents(string: "https://www.googleapis.com/customsearch/v1")!
+        components.queryItems = [
+            URLQueryItem(name: "key", value: cseApiKey),
+            URLQueryItem(name: "cx", value: cseEngineId),
+            URLQueryItem(name: "q", value: query),
+            URLQueryItem(name: "num", value: "10"),
+        ]
+        guard let url = components.url,
+              let (data, response) = try? await URLSession.shared.data(from: url),
+              let http = response as? HTTPURLResponse, http.statusCode < 400,
+              let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+              let items = json["items"] as? [[String: Any]]
+        else { return [] }
+
+        var seen = Set<String>()
+        return items.compactMap { item -> RexArticle? in
+            guard let headline = item["title"] as? String,
+                  let link = item["link"] as? String,
+                  let host = URL(string: link)?.host?.lowercased()
+            else { return nil }
+            let bare = host.hasPrefix("www.") ? String(host.dropFirst(4)) : host
+            guard let publication = Self.publications[bare] else { return nil }
+            // One piece per publication — five Guardian results about the same
+            // restaurant is a worse answer than five different papers.
+            guard seen.insert(publication).inserted else { return nil }
+            return RexArticle(
+                publication: publication,
+                headline: headline,
+                snippet: item["snippet"] as? String,
+                url: link
+            )
+        }
+    }
+
+    /// Hand-kept, deliberately. Anything automatic ("does the domain look like
+    /// a newspaper?") puts SEO filler next to the Guardian and quietly makes
+    /// the feature untrustworthy — which for a section headed "written about"
+    /// is the only thing that matters.
+    private static let publications: [String: String] = [
+        "theguardian.com": "The Guardian",
+        "thetimes.co.uk": "The Times",
+        "telegraph.co.uk": "The Telegraph",
+        "ft.com": "Financial Times",
+        "standard.co.uk": "Evening Standard",
+        "independent.co.uk": "The Independent",
+        "bbc.co.uk": "BBC",
+        "bbc.com": "BBC",
+        "timeout.com": "Time Out",
+        "theinfatuation.com": "The Infatuation",
+        "squaremeal.co.uk": "SquareMeal",
+        "hardens.com": "Harden's",
+        "michelin.com": "Michelin Guide",
+        "guide.michelin.com": "Michelin Guide",
+        "nytimes.com": "The New York Times",
+        "newyorker.com": "The New Yorker",
+        "condenasttraveller.com": "Condé Nast Traveller",
+        "cntraveller.com": "Condé Nast Traveller",
+        "nationalgeographic.com": "National Geographic",
+        "lonelyplanet.com": "Lonely Planet",
+        "eater.com": "Eater",
+        "bonappetit.com": "Bon Appétit",
+        "observer.co.uk": "The Observer",
+        "esquire.com": "Esquire",
+        "gq-magazine.co.uk": "GQ",
+        "vogue.co.uk": "Vogue",
+        "harpersbazaar.com": "Harper's Bazaar",
+        "delicious.com.au": "delicious.",
+        "greatbritishchefs.com": "Great British Chefs",
+    ]
+
     // MARK: - Providers
 
     /// OpenLibrary — no key, generous quota.
@@ -159,8 +243,20 @@ enum RexSearch {
         async let authorHits: [RexSearchHit] = words >= 2 ? openLibrary("author=\(esc(q))") : []
         async let generalHits: [RexSearchHit] = words >= 2 ? openLibrary("q=\(esc(q))") : []
 
+        // Sept 27 — "A new popular book couldn't be found." OpenLibrary is
+        // thin on very recent titles: a novel out this season often isn't
+        // filed yet under any of the four passes above, and no amount of
+        // re-ranking finds a record that isn't there. Google Books has them,
+        // and is already trusted here for synopses and ratings — this is the
+        // same source doing the same job one step earlier. Appended rather
+        // than merged in front, so OpenLibrary still wins the dedupe for
+        // anything both know about, and its edition data keeps deciding
+        // which printing to show.
+        async let googleHits = googleBooks(q)
+
         let all = (try await titleHits) + (try await bareTitleHits)
             + (try await authorHits) + (try await generalHits)
+            + (await googleHits)
 
         var best: [String: RexSearchHit] = [:]
         var order: [String] = []
@@ -182,6 +278,41 @@ enum RexSearch {
             score(left, target: target) > score(right, target: target)
         }
         return Array(ranked.prefix(15))
+    }
+
+    /// Google Books as a second book source, for the recent titles
+    /// OpenLibrary hasn't catalogued. Unkeyed, same as the details lookup
+    /// further down this file; a failure returns nothing rather than throwing,
+    /// because it's a supplement and book search must not start failing if
+    /// Google rate-limits us.
+    private static func googleBooks(_ q: String) async -> [RexSearchHit] {
+        guard let url = URL(string: "https://www.googleapis.com/books/v1/volumes?q=\(esc(q))&maxResults=10&printType=books"),
+              let (data, response) = try? await URLSession.shared.data(from: url),
+              let http = response as? HTTPURLResponse, http.statusCode < 400,
+              let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+              let items = json["items"] as? [[String: Any]]
+        else { return [] }
+
+        return items.compactMap { volume -> RexSearchHit? in
+            guard let id = volume["id"] as? String,
+                  let info = volume["volumeInfo"] as? [String: Any],
+                  let title = info["title"] as? String
+            else { return nil }
+            let authors = (info["authors"] as? [String])?.joined(separator: ", ")
+            // Google's thumbnails come back as http and with a curl page the
+            // cover is half-hidden behind; both are fixable in the URL.
+            let cover = ((info["imageLinks"] as? [String: Any])?["thumbnail"] as? String)?
+                .replacingOccurrences(of: "http://", with: "https://")
+                .replacingOccurrences(of: "&edge=curl", with: "")
+            return RexSearchHit(
+                externalId: id,
+                externalSource: "google_books",
+                title: title,
+                subtitle: authors,
+                imageURL: cover,
+                genre: (info["categories"] as? [String])?.first
+            )
+        }
     }
 
     /// Ranking, because OpenLibrary's own relevance is not good enough to

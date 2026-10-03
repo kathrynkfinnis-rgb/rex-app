@@ -1,5 +1,16 @@
 import Foundation
 
+/// Oct 3 — press coverage under "On Google": one piece per publication, from
+/// a hand-kept list of titles worth showing. See RexSearch.articles.
+struct RexArticle: Identifiable {
+    let publication: String
+    let headline: String
+    let snippet: String?
+    let url: String
+
+    var id: String { url }
+}
+
 extension ISO8601DateFormatter {
     /// Postgres hands back timestamps with fractional seconds ("…T09:12:44.
     /// 581293+00:00") and the app writes them without, so a parser fixed to

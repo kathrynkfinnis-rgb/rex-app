@@ -26,6 +26,8 @@ struct ItemDetailView: View {
     /// populated it; every later visit reads the cached columns off the item.
     @State private var placeDetails: RexPlaceDetails?
     @State private var hoursExpanded = false
+    /// Oct 3 — press coverage, under "On Google".
+    @State private var articles: [RexArticle] = []
     @State private var recs: [FeedRecommendation] = []
     @State private var isLoading = true
     @State private var errorMessage: String?
@@ -120,6 +122,9 @@ struct ItemDetailView: View {
         .task(id: item?.id) { await loadMoreByAuthor() }
         .task(id: item?.id) {
             if let item { await loadPlaceDetails(item) }
+        }
+        .task(id: item?.id) {
+            if let item { await loadArticles(item) }
         }
     }
 
@@ -893,9 +898,65 @@ struct ItemDetailView: View {
                 } else {
                     elsewhereCard(rating: rating, link: nil)
                 }
+                articlesSection
             }
             .padding(.top, RexSpacing.lg)
+        } else {
+            articlesSection.padding(.top, RexSpacing.lg)
         }
+    }
+
+    /// Oct 3 — "can the same be done with other articles from popular news
+    /// sources if they feature?" Sits directly under "On Google" and reads the
+    /// same way: somewhere else this has been written about, and the way
+    /// through to it.
+    @ViewBuilder
+    private var articlesSection: some View {
+        if !articles.isEmpty {
+            VStack(alignment: .leading, spacing: RexSpacing.sm) {
+                Text("Written about")
+                    .font(RexFont.text(13, weight: .semibold))
+                    .foregroundStyle(RexColor.mutedForeground)
+                    .padding(.top, RexSpacing.sm)
+
+                ForEach(articles) { article in
+                    RexOutboundLinkButton(url: URL(string: article.url)!) {
+                        VStack(alignment: .leading, spacing: 3) {
+                            Text(article.publication.uppercased())
+                                .font(.system(size: 9, weight: .semibold))
+                                .tracking(0.5)
+                                .foregroundStyle(RexColor.primary)
+                            Text(article.headline)
+                                .font(RexFont.text(14, weight: .medium))
+                                .foregroundStyle(RexColor.foreground)
+                                .multilineTextAlignment(.leading)
+                                .lineLimit(2)
+                            if let snippet = article.snippet, !snippet.isEmpty {
+                                Text(snippet)
+                                    .font(RexFont.text(12))
+                                    .foregroundStyle(RexColor.mutedForeground)
+                                    .multilineTextAlignment(.leading)
+                                    .lineLimit(2)
+                            }
+                        }
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .padding(RexSpacing.md)
+                        .rexCard()
+                    }
+                }
+            }
+        }
+    }
+
+    /// Only for places and events, and only once — a web search per item page
+    /// view would be both slow and pointless, since the answer barely changes.
+    private func loadArticles(_ item: RexItem) async {
+        let category = RexCategory(rawType: item.type)
+        guard category == .place || category == .event, articles.isEmpty else { return }
+        articles = await RexSearch.articles(
+            about: item.title,
+            near: locality(from: item.address)
+        )
     }
 
     /// One card whether or not there's a rating to put in it: a place with a

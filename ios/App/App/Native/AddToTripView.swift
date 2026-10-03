@@ -27,6 +27,9 @@ struct AddToTripView: View {
     @State private var showingNewTrip = false
     @State private var newTripTitle = ""
     @State private var isCreatingTrip = false
+    /// Oct 3 — which trip is waiting on a heading, and that trip's headings.
+    @State private var choosingSectionFor: FeedRecommendation?
+    @State private var tripSections: [String] = []
 
     var body: some View {
         NavigationStack {
@@ -50,7 +53,7 @@ struct AddToTripView: View {
                     } else {
                         ForEach(trips) { trip in
                             Button {
-                                Task { await add(to: trip) }
+                                Task { await choose(trip) }
                             } label: {
                                 HStack(spacing: RexSpacing.md) {
                                     Image(systemName: "bag")
@@ -147,6 +150,36 @@ struct AddToTripView: View {
             }
         }
         .tint(RexColor.primary)
+        .sheet(item: $choosingSectionFor) { trip in
+            NavigationStack {
+                ScrollView {
+                    VStack(alignment: .leading, spacing: RexSpacing.sm) {
+                        Text("Which part of \(trip.items?.title ?? "the trip")?")
+                            .font(RexFont.text(14))
+                            .foregroundStyle(RexColor.mutedForeground)
+                            .padding(.bottom, RexSpacing.xs)
+
+                        ForEach(tripSections, id: \.self) { section in
+                            sectionButton(section, trip: trip)
+                        }
+                        // Always offered: a trip with headings can still have
+                        // stops that sit above them.
+                        sectionButton(nil, trip: trip)
+                    }
+                    .padding(RexSpacing.page)
+                }
+                .background(RexColor.background.ignoresSafeArea())
+                .navigationTitle("Add to…")
+                .navigationBarTitleDisplayMode(.inline)
+                .toolbar {
+                    ToolbarItem(placement: .topBarLeading) {
+                        Button("Cancel") { choosingSectionFor = nil }
+                    }
+                }
+            }
+            .presentationDetents([.medium])
+            .tint(RexColor.primary)
+        }
         .task { await load() }
     }
 
@@ -156,11 +189,52 @@ struct AddToTripView: View {
         isLoading = false
     }
 
-    private func add(to trip: FeedRecommendation) async {
+    /// Oct 3 — "You can already add a pin to a trip. Choosing which day it
+    /// lands under is the missing half." A trip with headings gets a second
+    /// step; one without goes straight in, because offering a choice of
+    /// nothing is just an extra tap.
+    private func sectionButton(_ section: String?, trip: FeedRecommendation) -> some View {
+        Button {
+            choosingSectionFor = nil
+            Task { await add(to: trip, section: section) }
+        } label: {
+            HStack(spacing: RexSpacing.sm) {
+                Image(systemName: section == nil ? "list.bullet" : "calendar")
+                    .font(.system(size: 13))
+                    .foregroundStyle(RexColor.primary)
+                Text(section ?? "No heading")
+                    .font(RexFont.text(15, weight: .medium))
+                    .foregroundStyle(RexColor.foreground)
+                Spacer()
+                Image(systemName: "chevron.right")
+                    .font(.system(size: 11, weight: .semibold))
+                    .foregroundStyle(RexColor.mutedForeground)
+            }
+            .padding(RexSpacing.md)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .contentShape(Rectangle())
+            .rexCard()
+        }
+        .buttonStyle(.plain)
+    }
+
+    private func choose(_ trip: FeedRecommendation) async {
+        busyId = trip.id
+        let sections = (try? await RexAPI.shared.tripSections(tripId: trip.id)) ?? []
+        busyId = nil
+        if sections.isEmpty {
+            await add(to: trip, section: nil)
+        } else {
+            tripSections = sections
+            choosingSectionFor = trip
+        }
+    }
+
+    private func add(to trip: FeedRecommendation, section: String?) async {
         busyId = trip.id
         errorMessage = nil
         do {
-            try await RexAPI.shared.addPlaceToTrip(itemId: itemId, tripId: trip.id)
+            try await RexAPI.shared.addPlaceToTrip(itemId: itemId, tripId: trip.id, section: section)
             addedId = trip.id
             // A beat so "added" actually registers before the sheet closes,
             // rather than the checkmark flashing and vanishing instantly.
