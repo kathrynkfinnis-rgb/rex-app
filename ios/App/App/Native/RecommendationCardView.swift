@@ -31,6 +31,10 @@ struct RecommendationCardView: View {
     var onViewTripOnMap: ((String, String) -> Void)? = nil
 
     @State private var noteExpanded = false
+    /// How tall the note wants to be, and how tall it is allowed to be — the
+    /// difference is whether it has been cut off. See noteIsClipped.
+    @State private var fullNoteHeight: CGFloat = 0
+    @State private var shownNoteHeight: CGFloat = 0
 
     private var category: RexCategory { RexCategory(rawType: rec.items?.type) }
 
@@ -43,6 +47,12 @@ struct RecommendationCardView: View {
     /// is gone). Reserving width for it is what keeps a long title wrapping
     /// short of the label instead of running underneath it, which is what
     /// the 9 Sept screenshots were showing.
+    /// A couple of points of slack, so a rounding difference between the two
+    /// measurements doesn't put "Read more" under a note that isn't clipped.
+    private var noteIsClipped: Bool {
+        fullNoteHeight > shownNoteHeight + 2
+    }
+
     private var titleTrailingReserve: CGFloat {
         // Sept 29 — "the title should run to the end of the card".
         //
@@ -184,6 +194,17 @@ struct RecommendationCardView: View {
                         }
 
                         // Why.
+                        //
+                        // Oct 4 — "want to be able to expand the review in the
+                        // feed rather than having to open the card."
+                        //
+                        // It could already, but only past 140 characters — a
+                        // guess at how much fills three lines. A note of 110
+                        // characters on a narrow card overflows three lines
+                        // just as easily, and those got the ellipsis with no
+                        // "Read more" and no tap: truncated with no way to see
+                        // the rest. The gate is now whether the text is
+                        // actually clipped, measured rather than guessed.
                         if let note = rec.note, !note.isEmpty {
                             VStack(alignment: .leading, spacing: 2) {
                                 Text(linkified("\u{201C}\(note)\u{201D}"))
@@ -192,20 +213,52 @@ struct RecommendationCardView: View {
                                     .tint(RexColor.primary)
                                     .lineLimit(noteExpanded ? nil : 3)
                                     .fixedSize(horizontal: false, vertical: true)
-                                if !noteExpanded, note.count > 140 {
+                                    .background {
+                                        // The same text, unclamped and
+                                        // invisible, purely to find out how
+                                        // tall it wants to be.
+                                        Text(linkified("\u{201C}\(note)\u{201D}"))
+                                            .font(RexFont.text(14))
+                                            .fixedSize(horizontal: false, vertical: true)
+                                            .background {
+                                                GeometryReader { full in
+                                                    Color.clear.preference(
+                                                        key: NoteHeightKey.self,
+                                                        value: full.size.height
+                                                    )
+                                                }
+                                            }
+                                            .hidden()
+                                    }
+                                    .overlay {
+                                        GeometryReader { shown in
+                                            Color.clear.preference(
+                                                key: NoteShownHeightKey.self,
+                                                value: shown.size.height
+                                            )
+                                        }
+                                    }
+                                if !noteExpanded, noteIsClipped {
                                     Text("Read more")
                                         .font(RexFont.text(12, weight: .semibold))
                                         .foregroundStyle(RexColor.primary)
                                 }
                             }
+                            .onPreferenceChange(NoteHeightKey.self) { fullNoteHeight = $0 }
+                            .onPreferenceChange(NoteShownHeightKey.self) { shownNoteHeight = $0 }
                             .contentShape(Rectangle())
                             .onTapGesture {
-                                if note.count > 140 {
+                                if noteIsClipped || noteExpanded {
                                     withAnimation(.snappy) { noteExpanded.toggle() }
                                 }
                             }
-                            // Long enough to expand, or carrying a link to tap.
-                            .allowsHitTesting(note.count > 140 || note.contains("http") || note.contains("www."))
+                            // Clipped (so there's something to open), already
+                            // open (so there's something to close), or
+                            // carrying a link to tap.
+                            .allowsHitTesting(
+                                noteIsClipped || noteExpanded
+                                    || note.contains("http") || note.contains("www.")
+                            )
                         }
 
                         TaggedFriendsRow(friends: rec.taggedFriends)
@@ -598,5 +651,22 @@ struct RecommendationCardView: View {
                 .font(RexFont.text(13, weight: .medium))
                 .foregroundStyle(RexColor.foreground)
         }
+    }
+}
+
+/// The note's natural height, and the height it was given. Two keys rather
+/// than one because they are measured in different places and SwiftUI would
+/// otherwise reduce them together.
+private struct NoteHeightKey: PreferenceKey {
+    static var defaultValue: CGFloat = 0
+    static func reduce(value: inout CGFloat, nextValue: () -> CGFloat) {
+        value = max(value, nextValue())
+    }
+}
+
+private struct NoteShownHeightKey: PreferenceKey {
+    static var defaultValue: CGFloat = 0
+    static func reduce(value: inout CGFloat, nextValue: () -> CGFloat) {
+        value = max(value, nextValue())
     }
 }
