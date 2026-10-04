@@ -44,6 +44,12 @@ struct AppleMapView: UIViewRepresentable {
     /// While a filter is on, every pin is drawn in that filter's colour: they
     /// all match it, and the colour then says why the pin is there.
     var highlightGenre: String? = nil
+    /// Oct 4 — "on the map, if you're looking at a particular country, a
+    /// bubble comes up with any trips inputted for that country." The view
+    /// needs to know what is on screen to answer that, and nothing reported it
+    /// before. Called as the camera settles rather than continuously — see the
+    /// delegate, which fires on every frame of a pinch.
+    var onRegionChange: ((MKCoordinateRegion) -> Void)? = nil
     /// Bumped whenever the camera should frame every pin currently shown —
     /// following a trip, so all its stops are on screen at once rather than
     /// wherever the map happened to be sitting.
@@ -315,6 +321,7 @@ struct AppleMapView: UIViewRepresentable {
         /// when the answer actually changes — this fires continuously while
         /// someone pinches.
         func mapViewDidChangeVisibleRegion(_ mapView: MKMapView) {
+            reportRegion(mapView)
             let span = mapView.region.span.latitudeDelta * 111_000
             let shouldShow = span <= AppleMapView.glyphSpanMeters
             guard shouldShow != showGlyphs else { return }
@@ -325,6 +332,21 @@ struct AppleMapView: UIViewRepresentable {
                 else { continue }
                 view.glyphImage = shouldShow ? UIImage(systemName: place.symbol) : nil
             }
+        }
+
+        /// Coalesced: this delegate method fires continuously while someone
+        /// pans or pinches, and recomputing which trips are on screen at sixty
+        /// hertz would be absurd for something that only changes when the
+        /// camera stops.
+        private var regionWork: DispatchWorkItem?
+
+        private func reportRegion(_ mapView: MKMapView) {
+            guard let report = parent.onRegionChange else { return }
+            regionWork?.cancel()
+            let region = mapView.region
+            let work = DispatchWorkItem { report(region) }
+            regionWork = work
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.35, execute: work)
         }
 
         @objc func handleLongPress(_ gesture: UILongPressGestureRecognizer) {

@@ -1,5 +1,6 @@
 import SwiftUI
 import CoreLocation
+import MapKit
 
 /// Places and events on a Google map, matching the web app's basemap.
 /// Opens centred on the user with a 10-mile radius; falls back to fitting the
@@ -60,6 +61,9 @@ struct RexMapView: View {
     @State private var personFilter: String?
     /// Oct 3 — show only places you've marked want-to-try.
     @State private var wantsOnly = false
+    /// Oct 4 — what the camera is currently looking at, so the map can offer
+    /// the trips that belong to wherever you have panned to.
+    @State private var visibleRegion: MKCoordinateRegion?
     /// Recommendation id of the trip we're following, if any.
     @State private var tripFilter: String?
     /// Set alongside tripFilter whenever we follow a trip, so the "Following
@@ -247,9 +251,11 @@ struct RexMapView: View {
                     onSelect: { selectedPlace = $0 },
                     onLongPress: { coordinate in Task { await resolveLongPress(coordinate) } },
                     highlightGenre: subFilter,
+                    onRegionChange: { visibleRegion = $0 },
                     fitToPlacesNonce: tripFitNonce
                 )
                 .ignoresSafeArea(edges: .bottom)
+                .overlay(alignment: .bottom) { tripsInViewBar }
             }
 
             if isResolvingLongPress {
@@ -766,6 +772,77 @@ struct RexMapView: View {
     /// a button they can simply press again.
     /// "3 Rex · Restaurant" — who, then what. The recommender summary comes
     /// first because on this app the people are the point.
+    /// Oct 4 — "on the map, if you're looking at a particular country, a bubble
+    /// comes up with any trips inputted for that country?"
+    ///
+    /// Region rather than country: a country is a shape REX doesn't hold, and
+    /// "the trips with stops in what I'm looking at" is both easier to compute
+    /// and closer to what someone means — pan to the south of France and the
+    /// French trips are what you want, not everything filed under France.
+    ///
+    /// Only while zoomed out past a city. Closer in, the pins themselves are
+    /// the answer and a bar over them is in the way.
+    private var tripsInView: [(id: String, title: String, stops: Int)] {
+        guard tripFilter == nil, let region = visibleRegion else { return [] }
+        let span = region.span.latitudeDelta * 111_000
+        guard span > 60_000, span < 4_000_000 else { return [] }
+
+        let halfLat = region.span.latitudeDelta / 2
+        let halfLng = region.span.longitudeDelta / 2
+        var counts: [String: Int] = [:]
+        for place in visiblePlaces {
+            guard let lat = place.lat, let lng = place.lng,
+                  abs(lat - region.center.latitude) <= halfLat,
+                  abs(lng - region.center.longitude) <= halfLng
+            else { continue }
+            for tripId in place.tripIds { counts[tripId, default: 0] += 1 }
+        }
+        return counts.compactMap { id, stops in
+            guard let title = tripTitles[id] else { return nil }
+            return (id: id, title: title, stops: stops)
+        }
+        .sorted { $0.stops > $1.stops }
+        .prefix(4)
+        .map { $0 }
+    }
+
+    @ViewBuilder
+    private var tripsInViewBar: some View {
+        let trips = tripsInView
+        if !trips.isEmpty, selectedPlace == nil, !showingList {
+            ScrollView(.horizontal, showsIndicators: false) {
+                HStack(spacing: RexSpacing.sm) {
+                    ForEach(trips, id: \.id) { trip in
+                        Button {
+                            followTrip(id: trip.id, title: trip.title)
+                        } label: {
+                            HStack(spacing: 6) {
+                                Image(systemName: "suitcase.fill").font(.system(size: 11))
+                                Text(trip.title)
+                                    .font(RexFont.text(13, weight: .semibold))
+                                    .lineLimit(1)
+                                Text("\(trip.stops)")
+                                    .font(RexFont.text(11, weight: .semibold))
+                                    .foregroundStyle(RexColor.mutedForeground)
+                            }
+                            .foregroundStyle(RexColor.foreground)
+                            .padding(.horizontal, RexSpacing.md)
+                            .padding(.vertical, 9)
+                            .background(RexColor.card, in: Capsule())
+                            .overlay(Capsule().stroke(RexColor.border, lineWidth: 1))
+                            .shadow(color: .black.opacity(0.12), radius: 6, y: 2)
+                        }
+                        .buttonStyle(.plain)
+                    }
+                }
+                .padding(.horizontal, RexSpacing.page)
+            }
+            .padding(.bottom, RexSpacing.lg)
+            .transition(.move(edge: .bottom).combined(with: .opacity))
+            .animation(.snappy, value: trips.map(\.id))
+        }
+    }
+
     private func placeStandfirst(_ place: MapPlace) -> String {
         var parts: [String] = []
         if place.recommendations.count > 1 {
