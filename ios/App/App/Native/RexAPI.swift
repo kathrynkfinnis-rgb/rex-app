@@ -1616,6 +1616,23 @@ final class RexAPI {
             return existingId
         }
 
+        // Oct 4 — "Rexes for the same place didn't combine." The two checks
+        // above both need something the other row also has: the same Google
+        // place id, or coordinates on both. A place typed in by hand has
+        // neither, so it starts a second item row for somewhere that already
+        // existed — and then the Rex count, the "also Rex'd by" and the map
+        // pin all split in two.
+        //
+        // Same name at the same address is the one remaining signal that is
+        // safe on its own: an address match is far stronger than a name match,
+        // which is why this requires both and won't fire without an address.
+        if (type == "place" || type == "event"),
+           let address = (address ?? hit?.address)?.trimmingCharacters(in: .whitespaces),
+           !address.isEmpty,
+           let existingId = await findItemByAddress(type: type, title: title, address: address) {
+            return existingId
+        }
+
         var request = URLRequest(url: baseURL.appendingPathComponent("/rest/v1/items"))
         request.httpMethod = "POST"
         request.setValue(anonKey, forHTTPHeaderField: "apikey")
@@ -1741,6 +1758,41 @@ final class RexAPI {
             return candidate.id
         }
         return nil
+    }
+
+    /// The same name at the same address. Used only when neither an external
+    /// id nor coordinates were available to match on — see createItem.
+    private func findItemByAddress(type: String, title: String, address: String) async -> String? {
+        guard let token = try? await validToken() else { return nil }
+        // Postgres ilike on the first line of the address: enough to find the
+        // candidates, with the real comparison done below on both fields.
+        let firstLine = address.components(separatedBy: ",").first?
+            .trimmingCharacters(in: .whitespaces) ?? address
+        guard firstLine.count >= 4 else { return nil }
+
+        var components = URLComponents(url: baseURL.appendingPathComponent("/rest/v1/items"), resolvingAgainstBaseURL: false)!
+        components.queryItems = [
+            URLQueryItem(name: "select", value: "id,title,address"),
+            URLQueryItem(name: "type", value: "eq.\(type)"),
+            URLQueryItem(name: "address", value: "ilike.*\(firstLine)*"),
+            URLQueryItem(name: "limit", value: "25"),
+        ]
+        guard let url = components.url else { return nil }
+        var request = URLRequest(url: url)
+        request.setValue(anonKey, forHTTPHeaderField: "apikey")
+        request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+        guard let (data, response) = try? await URLSession.shared.data(for: request),
+              let http = response as? HTTPURLResponse, http.statusCode < 400
+        else { return nil }
+
+        struct Candidate: Codable { let id: String; let title: String; let address: String? }
+        let candidates = (try? JSONDecoder().decode([Candidate].self, from: data)) ?? []
+        let targetTitle = Self.normalizeForMatch(title)
+        let targetAddress = Self.normalizeForMatch(address)
+        return candidates.first {
+            Self.normalizeForMatch($0.title) == targetTitle
+                && Self.normalizeForMatch($0.address ?? "") == targetAddress
+        }?.id
     }
 
     private static func normalizeForMatch(_ s: String) -> String {
