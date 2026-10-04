@@ -5559,7 +5559,10 @@ final class RexAPI {
             row["raw_note"] = item.note.map { String($0.prefix(2000)) } ?? NSNull()
             row["raw_rating"] = item.rating.map { max(1, min(10, $0)) } ?? NSNull()
             row["suggested_type"] = item.type ?? NSNull()
-            let section = item.section?.trimmingCharacters(in: .whitespaces)
+            // resolvedSection keeps a two-level document's shape — see
+            // ExtractedRec. "Appendix · Hotels" rather than a bare "Hotels"
+            // that reads like another day of the trip.
+            let section = item.resolvedSection
             row["raw_section"] = (section?.isEmpty == false ? String(section!.prefix(120)) : nil) ?? NSNull()
             let url = item.url?.trimmingCharacters(in: .whitespaces)
             row["raw_url"] = (url?.isEmpty == false ? String(url!.prefix(2000)) : nil) ?? NSNull()

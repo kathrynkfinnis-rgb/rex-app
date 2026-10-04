@@ -41,7 +41,12 @@ const EXTRACTION_TOOL = {
             section: {
               type: ["string", "null"],
               description:
-                "The heading this item sat under in the source document, e.g. 'Brunch', 'Museums', 'Day 1'. Null if the document has no headings.",
+                "The nearest heading above this item, copied verbatim, e.g. 'Brunch', 'Museums', 'Day 1'. Null if the document has no headings.",
+            },
+            parent_section: {
+              type: ["string", "null"],
+              description:
+                "The heading ABOVE that one, when the document has two levels — e.g. 'Itinerary' or 'Appendix' over 'Day 1' or 'Hotels'. Null when there is only one level of heading.",
             },
             url: {
               type: ["string", "null"],
@@ -73,11 +78,25 @@ For each distinct recommendation, output:
   only right when the item really is somewhere you go. If an item is a
   physical product, a gift, or anything bought rather than visited, and none
   of the categories fit, use "other".
-- section: the heading this item appeared under, copied verbatim (e.g. "Brunch", "Museums", "Day 2"). Use the nearest heading above the item. null if the document has no headings.
+- section: the nearest heading above the item, copied verbatim (e.g. "Brunch", "Museums", "Day 2"). null if the document has no headings.
+- parent_section: the heading above THAT one, when the document has two levels. null when it has only one.
 - url: a link written next to or attached to the item. null if none.
 
 Preserve the document's own structure: if it is organised under headings, every
 item must carry the heading it belongs to, so an itinerary keeps its shape.
+
+Documents are often not one single list. A trip plan very commonly runs an
+itinerary by day and then a reference section at the back — hotels, places to
+eat, things to book — organised by category rather than by day. Both halves
+matter and they are not the same kind of grouping, so do not force the second
+half into the days: an item under "Hotels" in an appendix has section "Hotels"
+and parent_section "Appendix", not the day it happened to follow in the file.
+
+Read the whole document and work out its skeleton before extracting anything.
+When a heading introduces a group of groups ("Itinerary", "Appendix",
+"Where to stay"), that is a parent_section; the headings inside it are
+sections. When there is only one level, use section alone and leave
+parent_section null.
 
 Skip lines that aren't specific works or places. Skip duplicates. Never invent items.
 

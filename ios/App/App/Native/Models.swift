@@ -498,7 +498,35 @@ struct ExtractedRec: Codable {
     let rating: Double?
     let type: String?
     let section: String?
+    /// Oct 4 — "if you have an itinerary for golf and travel then hotel and
+    /// food options in the appendix, it does not extract correctly."
+    ///
+    /// A trip plan usually isn't one list: an itinerary by day, then a
+    /// reference section at the back grouped by category. Those are two
+    /// different kinds of grouping, and with only one `section` field the
+    /// second one was flattened into the days. This carries the level above,
+    /// so "Hotels" in an appendix stays distinguishable from a day.
+    let parent_section: String?
     let url: String?
+
+    /// What the rest of the app files this item under. A heading inside a
+    /// named part of the document keeps both, because "Hotels" on its own
+    /// reads like a day of the trip once it's in an itinerary.
+    var resolvedSection: String? {
+        let section = self.section?.trimmingCharacters(in: .whitespaces)
+        let parent = parent_section?.trimmingCharacters(in: .whitespaces)
+        switch (section?.isEmpty == false ? section : nil, parent?.isEmpty == false ? parent : nil) {
+        case let (section?, parent?):
+            // Not when the model has repeated itself, which it sometimes does
+            // on a document with one level.
+            return section.caseInsensitiveCompare(parent) == .orderedSame
+                ? section
+                : "\(parent) \u{00B7} \(section)"
+        case let (section?, nil): return section
+        case let (nil, parent?): return parent
+        case (nil, nil): return nil
+        }
+    }
 }
 
 /// A row in import_staging — an extracted recommendation waiting to be
