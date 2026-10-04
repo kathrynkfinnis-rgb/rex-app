@@ -97,7 +97,10 @@ enum RexSearch {
             URLQueryItem(name: "q", value: q),
             URLQueryItem(name: "num", value: "5"),
         ]
-        let (data, response) = try await URLSession.shared.data(from: components.url!)
+        // Same bundle header as articles() — see the note there.
+        var request = URLRequest(url: components.url!)
+        request.setValue(bundleId, forHTTPHeaderField: "X-Ios-Bundle-Identifier")
+        let (data, response) = try await URLSession.shared.data(for: request)
         guard let http = response as? HTTPURLResponse, http.statusCode < 400 else { return [] }
         guard let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
               let items = json["items"] as? [[String: Any]]
@@ -226,8 +229,15 @@ enum RexSearch {
             URLQueryItem(name: "q", value: query),
             URLQueryItem(name: "num", value: "10"),
         ]
-        guard let url = components.url,
-              let (data, response) = try? await URLSession.shared.data(from: url),
+        guard let url = components.url else { return [] }
+        // The bundle id goes on every Programmable Search request for the same
+        // reason it goes on a Places one: it lets the key be restricted to this
+        // app rather than usable by anyone who extracts it from the binary.
+        // Google ignores the header on an unrestricted key, so sending it
+        // always is free.
+        var request = URLRequest(url: url)
+        request.setValue(bundleId, forHTTPHeaderField: "X-Ios-Bundle-Identifier")
+        guard let (data, response) = try? await URLSession.shared.data(for: request),
               let http = response as? HTTPURLResponse, http.statusCode < 400,
               let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
               let items = json["items"] as? [[String: Any]]
