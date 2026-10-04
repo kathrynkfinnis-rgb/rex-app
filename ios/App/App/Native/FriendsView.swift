@@ -329,7 +329,14 @@ struct FriendsView: View {
             let profile = RexProfileDetail(id: s.id, username: s.username, display_name: s.display_name, avatar_url: s.avatar_url)
             personRow(
                 profile,
-                subtitle: s.mutual_count == 1 ? "1 mutual friend" : "\(s.mutual_count) mutual friends"
+                // Oct 4 — suggestions now include active accounts as well as
+                // friends-of-friends, so a new account sees somebody rather
+                // than an empty screen. Those arrive with no mutuals, and
+                // "0 mutual friends" is a worse line than saying nothing —
+                // it reads as a reason not to add them.
+                subtitle: s.mutual_count == 0
+                    ? "On Rex"
+                    : s.mutual_count == 1 ? "1 mutual friend" : "\(s.mutual_count) mutual friends"
             ) {
                 let pending = pendingActionIds.contains(profile.id)
                 Button {
