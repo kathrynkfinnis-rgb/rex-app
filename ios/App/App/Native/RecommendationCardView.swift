@@ -144,6 +144,12 @@ struct RecommendationCardView: View {
                                     .font(RexFont.text(13))
                                     .foregroundStyle(RexColor.mutedForeground)
                                     .lineLimit(1)
+                                    // Oct 3 — "author line needs to be
+                                    // truncated so doesn't interfere with the
+                                    // rating." The title reserved room for the
+                                    // corner and the line under it didn't, so
+                                    // a long author ran straight under the 100.
+                                    .padding(.trailing, titleTrailingReserve)
                             }
                         }
 
@@ -306,20 +312,37 @@ struct RecommendationCardView: View {
         }
     }
 
+    /// Oct 3 — "Place shouldn't be across two lines. The tags are all
+    /// jumbled."
+    ///
+    /// A plain HStack given more chips than fit doesn't overflow, it squeezes:
+    /// SwiftUI shrinks each child until the words inside them wrap, so "PLACE"
+    /// broke across two lines and the sub-category pills ended up different
+    /// heights. Each chip holds its natural width now and the row scrolls
+    /// instead, which is also how the map's own filter row behaves — a chip is
+    /// either legible or it isn't there.
     private func tagRow(item: RexItem) -> some View {
-        HStack(spacing: RexSpacing.xs) {
-            categoryBadge
-            ForEach(splitGenres(item.genre).prefix(3), id: \.self) { genre in
-                Text(genre)
-                    .font(.system(size: 11, weight: .medium))
-                    .foregroundStyle(RexColor.mutedForeground)
-                    .padding(.horizontal, RexSpacing.sm)
-                    .padding(.vertical, 3)
-                    .background(RexColor.muted)
-                    .clipShape(Capsule())
-                    .lineLimit(1)
+        ScrollView(.horizontal, showsIndicators: false) {
+            HStack(spacing: RexSpacing.xs) {
+                categoryBadge
+                    .fixedSize()
+                ForEach(splitGenres(item.genre).prefix(3), id: \.self) { genre in
+                    Text(genre)
+                        .font(.system(size: 11, weight: .medium))
+                        .foregroundStyle(RexColor.mutedForeground)
+                        .lineLimit(1)
+                        .fixedSize()
+                        .padding(.horizontal, RexSpacing.sm)
+                        .padding(.vertical, 3)
+                        .background(RexColor.muted)
+                        .clipShape(Capsule())
+                }
             }
+            .padding(.trailing, RexSpacing.sm)
         }
+        // The chips are a label, not a control — a drag on them should still
+        // swipe the card away.
+        .scrollDisabled(splitGenres(item.genre).count <= 2)
     }
 
     private func hasMedia(item: RexItem) -> Bool {
