@@ -202,10 +202,11 @@ struct ItemDetailView: View {
                         .foregroundStyle(RexColor.foreground)
                         .fixedSize(horizontal: false, vertical: true)
 
-                    if let summary = placeSummary(item: item, category: category) {
+                    if let summary = standfirst(item: item, category: category) {
                         Text(summary)
                             .font(.system(size: 13))
                             .foregroundStyle(RexColor.mutedForeground)
+                            .fixedSize(horizontal: false, vertical: true)
                     }
                     if let address = item.address, !address.isEmpty {
                         HStack(alignment: .firstTextBaseline, spacing: 3) {
@@ -216,7 +217,7 @@ struct ItemDetailView: View {
                         .foregroundStyle(RexColor.mutedForeground)
                     }
 
-                    openingHoursSection
+                    heroFacts(item: item, category: category)
                         .padding(.top, 2)
                 }
             } else {
@@ -464,10 +465,75 @@ struct ItemDetailView: View {
         }
     }
 
-    /// A place or an event leads with its photograph; everything else keeps
-    /// the cover-beside-the-title layout that suits a portrait cover.
+    /// Oct 4 — every page opens with a picture across the width now, not just
+    /// places. What differs is how: a place uses its photograph and a film its
+    /// backdrop still, both of which are landscape and fill the frame; a book
+    /// or a podcast has only a portrait cover, which is floated on a tinted
+    /// ground rather than stretched, because a stretched cover looks like a
+    /// mistake rather than a design.
+    ///
+    /// A list keeps the old layout — its "cover" is often one of Rex's own
+    /// drawings, which is a small illustration and not a photograph.
     private func usesHeroImage(category: RexCategory) -> Bool {
-        category == .place || category == .event
+        category != .list && category != .other
+    }
+
+    /// Whether the hero image is landscape and should fill the frame, or
+    /// portrait and should sit in the middle of it.
+    private func heroFills(category: RexCategory) -> Bool {
+        if category == .place || category == .event || category == .recipe { return true }
+        // A film or programme only fills when TMDB actually gave us a
+        // backdrop; without one we are back to the poster, which is portrait.
+        return (category == .movie || category == .tv) && details?.backdropURL != nil
+    }
+
+    /// One line saying what it is, under the title. Google's description for a
+    /// place; for everything else the opening of the synopsis, which is the
+    /// nearest equivalent — with the whole thing still further down the page.
+    private func standfirst(item: RexItem, category: RexCategory) -> String? {
+        if category == .place || category == .event {
+            return placeSummary(item: item, category: category)
+        }
+        guard let synopsis = details?.synopsis?.trimmingCharacters(in: .whitespacesAndNewlines),
+              !synopsis.isEmpty else { return nil }
+        // First sentence, unless that is already most of it.
+        if synopsis.count <= 180 { return synopsis }
+        if let stop = synopsis.firstIndex(where: { $0 == "." || $0 == "!" || $0 == "?" }) {
+            let sentence = String(synopsis[...stop])
+            if sentence.count >= 40 { return sentence }
+        }
+        return String(synopsis.prefix(180)) + "\u{2026}"
+    }
+
+    /// The hard facts under the standfirst: hours for a place, certificate and
+    /// running time for a film, author and year for a book.
+    @ViewBuilder
+    private func heroFacts(item: RexItem, category: RexCategory) -> some View {
+        if category == .place || category == .event {
+            openingHoursSection
+        } else {
+            HStack(spacing: RexSpacing.sm) {
+                if let certificate = details?.certificate {
+                    Text(certificate)
+                        .font(.system(size: 10, weight: .semibold))
+                        .foregroundStyle(RexColor.mutedForeground)
+                        .padding(.horizontal, 5).padding(.vertical, 1)
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 3)
+                                .stroke(RexColor.mutedForeground.opacity(0.6), lineWidth: 1)
+                        )
+                }
+                let line = [item.subtitle, details?.facts]
+                    .compactMap { $0?.isEmpty == false ? $0 : nil }
+                    .joined(separator: " \u{00B7} ")
+                if !line.isEmpty {
+                    Text(line)
+                        .font(.system(size: 12.5))
+                        .foregroundStyle(RexColor.mutedForeground)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+            }
+        }
     }
 
     private func categoryBadge(_ category: RexCategory) -> some View {
@@ -484,7 +550,17 @@ struct ItemDetailView: View {
     /// The item's own picture if it has one, otherwise the best photo anybody
     /// has attached to a take on it — which is usually a better photograph of
     /// the place than the catalogue's, because a friend took it there.
+    /// The portrait cover, for the categories whose only image is one.
+    private var portraitHeroURL: URL? {
+        guard let urlString = item?.image_url, !urlString.isEmpty else { return nil }
+        return URL(string: urlString)
+    }
+
     private var heroImageURL: URL? {
+        // A film's backdrop beats its poster for a full-width frame; the
+        // poster is portrait and would be cropped to a band of somebody's
+        // chin.
+        if let backdrop = details?.backdropURL, let url = URL(string: backdrop) { return url }
         if let urlString = item?.image_url, let url = URL(string: urlString) { return url }
         if let urlString = effectivePlaceDetails?.photoURLs.first, let url = URL(string: urlString) { return url }
         return communityPhotoURLs.first.flatMap(URL.init(string:))
@@ -493,7 +569,20 @@ struct ItemDetailView: View {
     @ViewBuilder
     private func heroImage(item: RexItem, category: RexCategory) -> some View {
         Group {
-            if let url = heroImageURL {
+            if !heroFills(category: category), let url = portraitHeroURL {
+                // A portrait cover, floated rather than stretched. The tinted
+                // ground is the category's own colour at low opacity, which
+                // keeps a shelf of book pages from all looking identical
+                // without needing to sample the artwork.
+                GoogleSafeAsyncImage(url: url) { image in
+                    image.resizable().aspectRatio(contentMode: .fit)
+                } placeholder: {
+                    Image(category.placeholderImageName).resizable().aspectRatio(contentMode: .fit)
+                }
+                .padding(.vertical, 12)
+                .frame(maxWidth: .infinity)
+                .background(category.tintColor.opacity(0.18))
+            } else if let url = heroImageURL {
                 // GoogleSafeAsyncImage rather than AsyncImage: a Places photo
                 // URL needs the bundle-id header, and without it loads as a
                 // permanently blank box with no error.
@@ -1126,24 +1215,10 @@ struct ItemDetailView: View {
                     }
                 }
 
-                if details.facts != nil || details.certificate != nil {
-                    HStack(spacing: RexSpacing.sm) {
-                        // Oct 4 — the certificate, where TMDB has it for the UK.
-                        if let certificate = details.certificate {
-                            Text(certificate)
-                                .font(.system(size: 10, weight: .semibold))
-                                .foregroundStyle(RexColor.mutedForeground)
-                                .padding(.horizontal, 5).padding(.vertical, 1)
-                                .overlay(
-                                    RoundedRectangle(cornerRadius: 3)
-                                        .stroke(RexColor.mutedForeground.opacity(0.6), lineWidth: 1)
-                                )
-                        }
-                        if let facts = details.facts {
-                            Text(facts).font(RexFont.text(12)).foregroundStyle(RexColor.mutedForeground)
-                        }
-                    }
-                }
+                // The certificate and the running time moved up into the
+                // header on 4 Oct, where every category's hard facts now sit.
+                // Leaving them here too would say the same thing twice on the
+                // same screen.
 
                 // Oct 4 — "can we do the same thing we did for places with
                 // films and TV? Ie cast and length." Same shape as the

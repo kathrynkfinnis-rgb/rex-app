@@ -934,6 +934,10 @@ enum RexSearch {
         /// "15", "PG", "TV-MA" — the certificate for the viewer's own country
         /// where TMDB has it.
         var certificate: String?
+        /// Oct 4 — the landscape still TMDB holds alongside the portrait
+        /// poster. A film page opens with a picture across the width, the way
+        /// a place page does, and this is the only landscape image a film has.
+        var backdropURL: String?
         var isEmpty: Bool {
             synopsis == nil && ratings.isEmpty && facts == nil && cast.isEmpty
         }
@@ -1018,6 +1022,9 @@ enum RexSearch {
         }
 
         out.certificate = certificate(from: json, kind: kind)
+        if let path = json["backdrop_path"] as? String, !path.isEmpty {
+            out.backdropURL = "https://image.tmdb.org/t/p/w780\(path)"
+        }
 
         // The imdb_id here is what lets OMDb find the same title.
         let imdbId = json["imdb_id"] as? String ?? json["external_ids"] as? String
