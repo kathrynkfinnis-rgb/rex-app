@@ -568,6 +568,13 @@ struct ItemDetailView: View {
     /// how many people have Rex'd it". The faces were buried under the takes
     /// at the bottom of the page; who has been is the fastest answer to
     /// "should I go", so it moves up to sit under the title.
+    /// Whoever Rex'd it first, then everyone since. `recs` comes back
+    /// newest-first from fetchRecommendations(forItem:), and the person who
+    /// found a place before anyone else is the one worth leading with.
+    private var orderedRexers: [FeedRecommendation] {
+        recs.reversed()
+    }
+
     @ViewBuilder
     private var savedByRow: some View {
         if !recs.isEmpty {
@@ -579,11 +586,30 @@ struct ItemDetailView: View {
 
                 ScrollView(.horizontal, showsIndicators: false) {
                     HStack(spacing: RexSpacing.md) {
-                        ForEach(recs) { rec in
+                        // Oct 3 — "the first person to Rex something should
+                        // have a little number one next to it and on the left
+                        // of the thumbnails of profile pictures so that there
+                        // is an incentive to be the 1st to Rex something."
+                        //
+                        // `recs` arrives newest-first, so the first to Rex it
+                        // is the last row; drawn first here, with the badge.
+                        ForEach(orderedRexers) { rec in
                             let name = rec.profiles?.display_name ?? rec.profiles?.username ?? "Someone"
+                            let isFirst = rec.id == recs.last?.id && recs.count > 1
                             NavigationLink(value: UserProfileRoute(userId: rec.user_id, name: name)) {
                                 VStack(spacing: 4) {
                                     UserAvatarView(url: rec.profiles?.avatar_url, name: name, size: 44)
+                                        .overlay(alignment: .topLeading) {
+                                            if isFirst {
+                                                Text("1")
+                                                    .font(.system(size: 10, weight: .bold))
+                                                    .foregroundStyle(RexColor.primaryForeground)
+                                                    .frame(width: 17, height: 17)
+                                                    .background(RexColor.primary, in: Circle())
+                                                    .overlay(Circle().stroke(RexColor.background, lineWidth: 1.5))
+                                                    .offset(x: -3, y: -3)
+                                            }
+                                        }
                                     Text(name.components(separatedBy: " ").first ?? name)
                                         .font(.system(size: 11))
                                         .foregroundStyle(RexColor.mutedForeground)

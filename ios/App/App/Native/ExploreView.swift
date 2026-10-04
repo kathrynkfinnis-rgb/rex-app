@@ -94,9 +94,14 @@ struct ExploreView: View {
             .filter { filter == nil || $0 == filter }
             .compactMap { category in
                 guard let recs = byCategory[category], !recs.isEmpty else { return nil }
-                return (category, recs.sorted { $0.count > $1.count }.prefix(10).map { $0 })
+                return (category, recs.sorted { $0.count > $1.count }.prefix(shelfLimit).map { $0 })
             }
     }
+
+    /// Oct 3 — "can we increase the limit on the scroll here to 20 items?"
+    /// Ten was a guess from when there was barely anything to show; a shelf
+    /// that runs out after ten reads as though the app has nothing more.
+    private let shelfLimit = 20
 
     /// Where your friends have been lately — trips get their own shelf
     /// rather than sitting in the per-category rows, because a trip is the
@@ -104,7 +109,7 @@ struct ExploreView: View {
     private var recentTrips: [FeedRecommendation] {
         recentRex
             .filter { RexCategory(rawType: $0.items?.type) == .trip && !$0.isWant && !$0.isBlast }
-            .prefix(10)
+            .prefix(shelfLimit)
             .map { $0 }
     }
 
@@ -121,7 +126,7 @@ struct ExploreView: View {
             .filter { filter == nil || $0 == filter }
             .compactMap { category in
                 guard let recs = byCategory[category], !recs.isEmpty else { return nil }
-                return (category, Array(recs.prefix(10)))
+                return (category, Array(recs.prefix(shelfLimit)))
             }
     }
 
