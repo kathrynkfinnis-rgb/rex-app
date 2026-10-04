@@ -927,7 +927,23 @@ enum RexSearch {
         var ratings: [(source: String, value: String, detail: String?)] = []
         /// "1h 58m · Drama, Romance" / "3 seasons" / "384 pages"
         var facts: String?
-        var isEmpty: Bool { synopsis == nil && ratings.isEmpty && facts == nil }
+        /// Oct 4 — "can we do the same thing we did for places with films and
+        /// TV? Ie cast and length." Length was already in `facts`; the cast
+        /// is what was missing, and it's the part people actually scan for.
+        var cast: [CastMember] = []
+        /// "15", "PG", "TV-MA" — the certificate for the viewer's own country
+        /// where TMDB has it.
+        var certificate: String?
+        var isEmpty: Bool {
+            synopsis == nil && ratings.isEmpty && facts == nil && cast.isEmpty
+        }
+    }
+
+    struct CastMember: Identifiable, Hashable {
+        let name: String
+        let role: String?
+        let imageURL: String?
+        var id: String { name + (role ?? "") }
     }
 
     static func details(type: RexCategory, externalId: String?, externalSource: String?,
@@ -956,8 +972,12 @@ enum RexSearch {
 
     private static func tmdbDetails(id: String, kind: String, title: String) async -> ItemDetails {
         var out = ItemDetails()
+        // credits and the certificate ride along on the same request rather
+        // than costing two more — TMDB charges nothing either way, but a
+        // detail page that fires three calls feels like one that fires three.
+        let fields = kind == "movie" ? "credits,release_dates" : "credits,content_ratings"
         guard !tmdbKey.isEmpty,
-              let json = try? await getJSON("https://api.themoviedb.org/3/\(kind)/\(id)?api_key=\(tmdbKey)") else { return out }
+              let json = try? await getJSON("https://api.themoviedb.org/3/\(kind)/\(id)?api_key=\(tmdbKey)&append_to_response=\(fields)") else { return out }
 
         if let overview = json["overview"] as? String, !overview.isEmpty { out.synopsis = overview }
 
@@ -981,12 +1001,53 @@ enum RexSearch {
         if !genres.isEmpty { facts.append(genres.prefix(3).joined(separator: ", ")) }
         if !facts.isEmpty { out.facts = facts.joined(separator: " \u{00B7} ") }
 
+        // Billing order is TMDB's own, which is the order the credits run in —
+        // so the first few are the people someone would recognise.
+        if let credits = json["credits"] as? [String: Any],
+           let cast = credits["cast"] as? [[String: Any]] {
+            out.cast = cast.prefix(12).compactMap { member in
+                guard let name = member["name"] as? String, !name.isEmpty else { return nil }
+                let role = (member["character"] as? String).flatMap { $0.isEmpty ? nil : $0 }
+                let path = member["profile_path"] as? String
+                return CastMember(
+                    name: name,
+                    role: role,
+                    imageURL: path.map { "https://image.tmdb.org/t/p/w185\($0)" }
+                )
+            }
+        }
+
+        out.certificate = certificate(from: json, kind: kind)
+
         // The imdb_id here is what lets OMDb find the same title.
         let imdbId = json["imdb_id"] as? String ?? json["external_ids"] as? String
         if let extra = await omdbRatings(imdbId: imdbId, title: title) {
             out.ratings.append(contentsOf: extra)
         }
         return out
+    }
+
+    /// TMDB files certificates per country under two different shapes
+    /// depending on whether it's a film or a programme. GB first because
+    /// that's where REX is being used, then US as the usual fallback.
+    private static func certificate(from json: [String: Any], kind: String) -> String? {
+        let preferred = ["GB", "US"]
+        if kind == "movie" {
+            let results = (json["release_dates"] as? [String: Any])?["results"] as? [[String: Any]] ?? []
+            for country in preferred {
+                guard let entry = results.first(where: { $0["iso_3166_1"] as? String == country }),
+                      let dates = entry["release_dates"] as? [[String: Any]] else { continue }
+                if let rating = dates.compactMap({ $0["certification"] as? String })
+                    .first(where: { !$0.isEmpty }) { return rating }
+            }
+            return nil
+        }
+        let results = (json["content_ratings"] as? [String: Any])?["results"] as? [[String: Any]] ?? []
+        for country in preferred {
+            if let entry = results.first(where: { $0["iso_3166_1"] as? String == country }),
+               let rating = entry["rating"] as? String, !rating.isEmpty { return rating }
+        }
+        return nil
     }
 
     /// Only if a key is configured — otherwise silently nothing, and the

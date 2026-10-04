@@ -1100,8 +1100,71 @@ struct ItemDetailView: View {
                     }
                 }
 
-                if let facts = details.facts {
-                    Text(facts).font(RexFont.text(12)).foregroundStyle(RexColor.mutedForeground)
+                if details.facts != nil || details.certificate != nil {
+                    HStack(spacing: RexSpacing.sm) {
+                        // Oct 4 — the certificate, where TMDB has it for the UK.
+                        if let certificate = details.certificate {
+                            Text(certificate)
+                                .font(.system(size: 10, weight: .semibold))
+                                .foregroundStyle(RexColor.mutedForeground)
+                                .padding(.horizontal, 5).padding(.vertical, 1)
+                                .overlay(
+                                    RoundedRectangle(cornerRadius: 3)
+                                        .stroke(RexColor.mutedForeground.opacity(0.6), lineWidth: 1)
+                                )
+                        }
+                        if let facts = details.facts {
+                            Text(facts).font(RexFont.text(12)).foregroundStyle(RexColor.mutedForeground)
+                        }
+                    }
+                }
+
+                // Oct 4 — "can we do the same thing we did for places with
+                // films and TV? Ie cast and length." Same shape as the
+                // place page's row of who Rex'd it, deliberately: a row of
+                // faces is how you recognise a film, and the two pages
+                // should feel like the same app.
+                if !details.cast.isEmpty {
+                    VStack(alignment: .leading, spacing: 6) {
+                        Text("Cast")
+                            .font(.system(size: 11, weight: .semibold))
+                            .tracking(0.3)
+                            .foregroundStyle(RexColor.mutedForeground)
+                        ScrollView(.horizontal, showsIndicators: false) {
+                            HStack(spacing: RexSpacing.md) {
+                                ForEach(details.cast) { member in
+                                    VStack(spacing: 4) {
+                                        AsyncImage(url: member.imageURL.flatMap(URL.init(string:))) { phase in
+                                            if let image = phase.image {
+                                                image.resizable().aspectRatio(contentMode: .fill)
+                                            } else {
+                                                RexColor.muted.overlay(
+                                                    Image(systemName: "person.fill")
+                                                        .font(.system(size: 16))
+                                                        .foregroundStyle(RexColor.placeholder)
+                                                )
+                                            }
+                                        }
+                                        .frame(width: 54, height: 54)
+                                        .clipShape(Circle())
+                                        Text(member.name)
+                                            .font(.system(size: 11, weight: .medium))
+                                            .foregroundStyle(RexColor.foreground)
+                                            .lineLimit(1)
+                                        if let role = member.role {
+                                            Text(role)
+                                                .font(.system(size: 10))
+                                                .foregroundStyle(RexColor.mutedForeground)
+                                                .lineLimit(1)
+                                        }
+                                    }
+                                    .frame(width: 68)
+                                }
+                            }
+                            .padding(.horizontal, 1)
+                        }
+                    }
+                    .padding(.top, RexSpacing.xs)
                 }
 
                 if let synopsis = details.synopsis {
