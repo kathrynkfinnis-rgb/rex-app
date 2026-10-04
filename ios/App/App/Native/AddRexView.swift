@@ -217,6 +217,8 @@ struct AddRexView: View {
     /// stops there are.
     @State private var postingProgress: String?
     @State private var anonymous = false
+    /// Oct 4 — post it without putting it in anybody's feed.
+    @State private var hiddenFromFeed = false
     /// Sept 18 — "a Rex profile, that we can start automatically posting
     /// recommendations to keep the feed interesting". Admins only, and only
     /// visible once the REX account actually exists on this project.
@@ -908,6 +910,26 @@ struct AddRexView: View {
                             .font(.system(size: 14, weight: .semibold))
                             .foregroundStyle(RexColor.foreground)
                         Text("Your name won't show. It still counts toward your Rex.")
+                            .font(RexFont.text(12))
+                            .foregroundStyle(RexColor.mutedForeground)
+                    }
+                }
+                .tint(RexColor.primary)
+
+                // Oct 4 — "want a 'hide from feed' toggle on all cards."
+                //
+                // show_in_feed has existed on the table since lists were
+                // built, where every imported item is hidden so one document
+                // doesn't post forty cards. It was never offered for an
+                // ordinary Rex, so the only way to record something privately
+                // was not to record it. Keeping a note of somewhere you went
+                // isn't always an announcement.
+                Toggle(isOn: $hiddenFromFeed) {
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text("Keep it off the feed")
+                            .font(.system(size: 14, weight: .semibold))
+                            .foregroundStyle(RexColor.foreground)
+                        Text("Still yours, still on your map and in your collections — just not announced.")
                             .font(RexFont.text(12))
                             .foregroundStyle(RexColor.mutedForeground)
                     }
@@ -1931,6 +1953,10 @@ struct AddRexView: View {
                     // A trip's cover photo is a thumbnail, not a card photo —
                     // see the trip branch above.
                     photoURLs: category == .trip ? [] : photoURLs,
+                    // Oct 4 — nil rather than true when it isn't hidden, so a
+                    // database without the column still takes the insert; see
+                    // createRecommendation, which only sends what it's given.
+                    showInFeed: hiddenFromFeed ? false : nil,
                     anonymous: anonymous,
                     // Always: the success screen shares the new Rex.
                     returningId: true,

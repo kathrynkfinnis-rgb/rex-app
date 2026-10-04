@@ -396,7 +396,7 @@ struct FeedView: View {
                                         onViewTripOnMap: onViewTripOnMap
                                     )
                                 }
-                                .modifier(EditableIfMine(rec: rec, onEdit: { activeSheet = .edit($0) }))
+                                .modifier(EditableIfMine(rec: rec, onEdit: { activeSheet = .edit($0) }, onChanged: { Task { await loadFeed() } }))
                                 // No .draggable() here: Collections isn't
                                 // visible at the same time as the feed (they're
                                 // different tabs), so there's never a drop
@@ -1288,6 +1288,8 @@ struct EditableIfMine: ViewModifier {
     /// feed drives every sheet it can show through one modifier now (see
     /// ActiveSheet), so there's no single `editing` state left to bind to.
     let onEdit: (FeedRecommendation) -> Void
+    /// Called after hiding or unhiding, so the list it sits in can reload.
+    var onChanged: (() -> Void)? = nil
 
     private var isMine: Bool { rec.user_id == RexAPI.shared.currentUserId }
 
@@ -1295,7 +1297,29 @@ struct EditableIfMine: ViewModifier {
         if isMine {
             content
                 .overlay(alignment: .topTrailing) {
-                    Button { onEdit(rec) } label: {
+                    // Oct 4 — "want a 'hide from feed' toggle on all cards."
+                    // The "…" was a single button straight into the editor;
+                    // it's a menu now, so hiding something you've already
+                    // posted doesn't mean opening a form to do it.
+                    Menu {
+                        Button { onEdit(rec) } label: {
+                            Label("Edit", systemImage: "pencil")
+                        }
+                        Button {
+                            Task {
+                                try? await RexAPI.shared.updateShowInFeed(
+                                    recommendationId: rec.id,
+                                    showInFeed: rec.show_in_feed == false
+                                )
+                                onChanged?()
+                            }
+                        } label: {
+                            Label(
+                                rec.show_in_feed == false ? "Put back on the feed" : "Hide from the feed",
+                                systemImage: rec.show_in_feed == false ? "eye" : "eye.slash"
+                            )
+                        }
+                    } label: {
                         // Sept 7 — "the edit button is too small, I can't get
                         // it to work 8/10 times". The visible circle is only
                         // ~26pt and sat inside a 10pt margin, well under the
@@ -1318,7 +1342,7 @@ struct EditableIfMine: ViewModifier {
                             .contentShape(Rectangle())
                     }
                     .buttonStyle(.plain)
-                    .accessibilityLabel("Edit")
+                    .accessibilityLabel("More")
                     .padding(2)
                 }
         } else {

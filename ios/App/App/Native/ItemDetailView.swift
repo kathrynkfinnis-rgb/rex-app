@@ -35,6 +35,9 @@ struct ItemDetailView: View {
     @State private var rating: Double = 10
     @State private var note: String = ""
     @State private var isSaving = false
+    /// Oct 4 — whether the note is being edited. A take you've already written
+    /// shows as text until you ask to change it.
+    @State private var isEditingNote = false
     /// "When you click into a 'want to try', you should be able to add to
     /// want to try — at the moment, on a TV want, I click in and can only
     /// rate, not add to want to try." A want is its own table/row, separate
@@ -176,6 +179,8 @@ struct ItemDetailView: View {
             do {
                 try await RexAPI.shared.upsertRecommendation(itemId: itemId, rating: rating, note: note)
                 recs = try await RexAPI.shared.fetchRecommendations(forItem: itemId)
+                // Back to reading it, now that it's written.
+                isEditingNote = false
             } catch {
                 errorMessage = error.localizedDescription
             }
@@ -266,6 +271,15 @@ struct ItemDetailView: View {
 
             detailsSection
 
+            // Oct 4 — "the Google reviews line is corrupted on place cards."
+            // It wasn't corrupted, it was crushed: this was one HStack holding
+            // the rating, the Google score and up to three buttons, and SwiftUI
+            // answers an overfull HStack by shrinking every child until the
+            // words inside break — "Obsessed" across two lines, "Google" down
+            // the side a letter at a time. Each item keeps its natural width
+            // now and the row scrolls, the same fix the feed card's tag row
+            // needed.
+            ScrollView(.horizontal, showsIndicators: false) {
             HStack(spacing: RexSpacing.md) {
                 if !recs.isEmpty {
                     HStack(spacing: 6) {
@@ -290,6 +304,7 @@ struct ItemDetailView: View {
                                     Text("(\(count))").font(.system(size: 11))
                                 }
                                 Text("Google").font(.system(size: 10))
+                                    .lineLimit(1)
                             }
                             .foregroundStyle(RexColor.mutedForeground)
                             .padding(.horizontal, RexSpacing.sm)
@@ -352,6 +367,10 @@ struct ItemDetailView: View {
                     }
                     .buttonStyle(.plain)
                 }
+            }
+            // Each pill keeps its natural width; the row scrolls if they
+            // don't all fit.
+            .fixedSize(horizontal: true, vertical: false)
             }
         }
         .padding(16)
@@ -842,12 +861,55 @@ struct ItemDetailView: View {
 
             RexRatingPicker(value: $rating)
 
-            TextField("What did you love about it?", text: $note, axis: .vertical)
-                .lineLimit(3...5)
+            // Oct 4 — "don't need to see my review in the text box here (on
+            // all pages, not just films) — would rather see my comment and
+            // then be able to press a three dot edit button to edit it."
+            //
+            // A take you have already written is something to read, not a form
+            // field waiting for input. An editable box makes the page look
+            // unfinished every time you open it, and puts a keyboard one
+            // mistaken tap away from your own words. Written takes read as
+            // text; the box comes back when you ask for it, or when there is
+            // nothing there yet.
+            if let myRec, !(myRec.note ?? "").isEmpty, !isEditingNote {
+                HStack(alignment: .top, spacing: RexSpacing.sm) {
+                    Text("\u{201C}\(myRec.note ?? "")\u{201D}")
+                        .font(RexFont.text(15))
+                        .foregroundStyle(RexColor.foreground.opacity(0.9))
+                        .fixedSize(horizontal: false, vertical: true)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                    Menu {
+                        Button {
+                            note = myRec.note ?? ""
+                            isEditingNote = true
+                        } label: {
+                            Label("Edit what I wrote", systemImage: "pencil")
+                        }
+                        Button {
+                            activeSheet = .edit(myRec)
+                        } label: {
+                            Label("Edit the details", systemImage: "slider.horizontal.3")
+                        }
+                    } label: {
+                        Image(systemName: "ellipsis")
+                            .font(.system(size: 15, weight: .semibold))
+                            .foregroundStyle(RexColor.mutedForeground)
+                            .frame(width: 32, height: 28)
+                            .contentShape(Rectangle())
+                    }
+                }
                 .padding(12)
                 .background(RexColor.card)
                 .clipShape(RoundedRectangle(cornerRadius: 14))
                 .overlay(RoundedRectangle(cornerRadius: 14).stroke(RexColor.border, lineWidth: 1))
+            } else {
+                TextField("What did you love about it?", text: $note, axis: .vertical)
+                    .lineLimit(3...14)
+                    .padding(12)
+                    .background(RexColor.card)
+                    .clipShape(RoundedRectangle(cornerRadius: 14))
+                    .overlay(RoundedRectangle(cornerRadius: 14).stroke(RexColor.border, lineWidth: 1))
+            }
 
             Button(action: save) {
                 if isSaving {
