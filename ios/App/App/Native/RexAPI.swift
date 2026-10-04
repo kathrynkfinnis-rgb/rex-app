@@ -1144,7 +1144,7 @@ final class RexAPI {
                 lat: row.items.lat,
                 lng: row.items.lng
             )
-            return MyRexHit(hit: hit, rating: row.rating ?? 0, note: row.note)
+            return MyRexHit(hit: hit, rating: row.rating ?? 0, note: row.note, itemId: row.items.id, type: row.items.type)
         }
     }
 
@@ -3995,7 +3995,11 @@ final class RexAPI {
     /// to whatever the underlying constraint happens to be called.
     func fetchRequestComments(requestId: String) async throws -> [RequestComment] {
         let token = try await validToken()
-        let select = "id,request_id,user_id,body,created_at\(await blastReplyField())"
+        // Oct 3 — "when you reply to a blast, you should be able to tag REX to
+        // the response." The column has been on the table since the start and
+        // was never read or written; this is both halves.
+        let select = "id,request_id,user_id,body,created_at,suggested_item_id," +
+            "items(id,type,title,subtitle,image_url,genre,address)\(await blastReplyField())"
         var components = URLComponents(url: baseURL.appendingPathComponent("/rest/v1/request_comments"), resolvingAgainstBaseURL: false)!
         components.queryItems = [
             URLQueryItem(name: "select", value: select),
@@ -4123,7 +4127,12 @@ final class RexAPI {
 
     /// #132 — reply to a blast. suggested_item_id is left null; the compose
     /// UI is plain text only for now (see RequestComment's doc comment).
-    func createRequestComment(requestId: String, body text: String, parentId: String? = nil) async throws {
+    func createRequestComment(
+        requestId: String,
+        body text: String,
+        parentId: String? = nil,
+        suggestedItemId: String? = nil
+    ) async throws {
         let token = try await validToken()
         guard let userId = currentUserId else { throw RexAPIError.notSignedIn }
         var request = URLRequest(url: baseURL.appendingPathComponent("/rest/v1/request_comments"))
@@ -4133,6 +4142,7 @@ final class RexAPI {
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
         var body: [String: Any] = ["request_id": requestId, "user_id": userId, "body": text]
         if let parentId { body["parent_id"] = parentId }
+        if let suggestedItemId { body["suggested_item_id"] = suggestedItemId }
         request.httpBody = try JSONSerialization.data(withJSONObject: body)
 
         let (data, response) = try await URLSession.shared.data(for: request)

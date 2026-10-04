@@ -389,6 +389,11 @@ struct RequestComment: Codable, Identifiable {
     /// Sept 7 — set when this is a reply to another suggestion rather than
     /// a suggestion of its own. One level only; see the migration.
     var parent_id: String?
+    /// Oct 3 — "when you reply to a blast, you should be able to tag REX to
+    /// the response." A reply that names somewhere is useful; a reply that
+    /// attaches the actual Rex is the thing the blast was asking for.
+    var suggested_item_id: String?
+    var items: RexItem?
     /// Filled in after fetch, the same way notifications fill in their actor.
     var likeCount: Int = 0
     var likedByMe: Bool = false
@@ -558,6 +563,11 @@ struct MyRexHit: Identifiable {
     let hit: RexSearchHit
     let rating: Double
     let note: String?
+    /// Oct 3 — the catalogue row behind it. RexSearchHit keys itself by
+    /// external id where there is one, so it can't be used as an item id, and
+    /// attaching a Rex to a blast reply needs the real one.
+    var itemId: String = ""
+    var type: String = "place"
 
     var id: String { hit.id }
 }

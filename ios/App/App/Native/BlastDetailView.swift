@@ -21,6 +21,9 @@ struct BlastDetailView: View {
     @State private var isLoading = true
     @State private var errorMessage: String?
     @State private var draft = ""
+    /// Oct 3 — one of your own Rex, attached to the reply.
+    @State private var attachedRex: RexItem?
+    @State private var choosingRex = false
     @State private var isSending = false
 
     var body: some View {
@@ -94,6 +97,40 @@ struct BlastDetailView: View {
                     Text(response.body)
                         .font(RexFont.text(14))
                         .foregroundStyle(RexColor.foreground.opacity(0.9))
+
+                    if let item = response.items {
+                        NavigationLink(value: item.id) {
+                            HStack(spacing: RexSpacing.sm) {
+                                Image(systemName: RexCategory(rawType: item.type).symbol)
+                                    .font(.system(size: 11))
+                                VStack(alignment: .leading, spacing: 1) {
+                                    Text(item.title)
+                                        .font(RexFont.text(13, weight: .semibold))
+                                        .lineLimit(1)
+                                    if let sub = item.address ?? item.subtitle, !sub.isEmpty {
+                                        Text(sub)
+                                            .font(RexFont.text(11))
+                                            .foregroundStyle(RexColor.mutedForeground)
+                                            .lineLimit(1)
+                                    }
+                                }
+                                Spacer(minLength: 0)
+                                Image(systemName: "chevron.right")
+                                    .font(.system(size: 10, weight: .semibold))
+                                    .foregroundStyle(RexColor.mutedForeground)
+                            }
+                            .foregroundStyle(RexColor.foreground)
+                            .padding(RexSpacing.sm + 2)
+                            .background(RexColor.card)
+                            .clipShape(RoundedRectangle(cornerRadius: RexRadius.input, style: .continuous))
+                            .overlay(
+                                RoundedRectangle(cornerRadius: RexRadius.input, style: .continuous)
+                                    .stroke(RexColor.border, lineWidth: 1)
+                            )
+                        }
+                        .buttonStyle(.plain)
+                        .padding(.top, 4)
+                    }
                 }
                 Spacer(minLength: RexSpacing.sm)
             }
@@ -181,7 +218,47 @@ struct BlastDetailView: View {
     }
 
     private var composer: some View {
-        HStack(spacing: RexSpacing.sm) {
+        VStack(spacing: RexSpacing.sm) {
+            // Oct 3 — "when you reply to a blast, you should be able to tag
+            // REX to the response." A reply that names somewhere is useful; a
+            // reply that attaches the actual Rex is what the blast was asking
+            // for, and it carries the rating, the note and the way through to
+            // the place.
+            if let attached = attachedRex {
+                HStack(spacing: RexSpacing.sm) {
+                    Image(systemName: RexCategory(rawType: attached.type).symbol)
+                        .font(.system(size: 12))
+                        .foregroundStyle(RexColor.primary)
+                    Text(attached.title)
+                        .font(RexFont.text(13, weight: .medium))
+                        .lineLimit(1)
+                    Spacer(minLength: 0)
+                    Button {
+                        attachedRex = nil
+                    } label: {
+                        Image(systemName: "xmark.circle.fill")
+                            .font(.system(size: 15))
+                            .foregroundStyle(RexColor.mutedForeground)
+                    }
+                    .buttonStyle(.plain)
+                }
+                .padding(.horizontal, RexSpacing.md)
+                .padding(.vertical, RexSpacing.sm)
+                .background(RexColor.badgeBackground)
+                .clipShape(RoundedRectangle(cornerRadius: RexRadius.input, style: .continuous))
+            }
+
+            HStack(spacing: RexSpacing.sm) {
+            Button {
+                choosingRex = true
+            } label: {
+                Image(systemName: attachedRex == nil ? "plus.circle" : "checkmark.circle.fill")
+                    .font(.system(size: 20))
+                    .foregroundStyle(RexColor.primary)
+            }
+            .buttonStyle(.plain)
+            .accessibilityLabel("Attach one of your Rex")
+
             TextField("Suggest something…", text: $draft, axis: .vertical)
                 .font(RexFont.text(15))
                 .lineLimit(1...4)
@@ -208,9 +285,15 @@ struct BlastDetailView: View {
             .frame(width: 40, height: 40)
             .background(RexColor.primary)
             .clipShape(Circle())
-            .disabled(isSending || draft.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+            // An attached Rex is a complete answer on its own — the words are
+            // optional once you've pointed at the thing.
+            .disabled(isSending || (draft.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty && attachedRex == nil))
+            }
         }
         .padding(RexSpacing.page)
+        .sheet(isPresented: $choosingRex) {
+            AttachRexSheet { picked in attachedRex = picked }
+        }
     }
 
     private func load() async {
@@ -226,12 +309,20 @@ struct BlastDetailView: View {
 
     private func send() async {
         let trimmed = draft.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !trimmed.isEmpty else { return }
+        guard !trimmed.isEmpty || attachedRex != nil else { return }
         isSending = true
         do {
-            try await RexAPI.shared.createRequestComment(requestId: route.requestId, body: trimmed, parentId: replyingTo?.id)
+            try await RexAPI.shared.createRequestComment(
+                requestId: route.requestId,
+                // A reply that's only an attached Rex still needs a body, and
+                // the item's own name is the honest thing to put there.
+                body: trimmed.isEmpty ? (attachedRex?.title ?? trimmed) : trimmed,
+                parentId: replyingTo?.id,
+                suggestedItemId: attachedRex?.id
+            )
             replyingTo = nil
             draft = ""
+            attachedRex = nil
             await load()
         } catch {
             errorMessage = error.localizedDescription
