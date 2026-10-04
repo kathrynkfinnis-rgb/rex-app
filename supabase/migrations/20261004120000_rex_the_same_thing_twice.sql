@@ -1,0 +1,18 @@
+-- Oct 4 — "allow you to add another review so if you go twice, or the podcast
+-- she listened to a specific episode that you want to Rex."
+--
+-- recommendations_unique_standalone allows one standalone Rex per person per
+-- item, so a second visit to a restaurant you already Rex'd was refused with
+-- "that already exists". That constraint is right about one thing — it stops a
+-- double tap creating two identical cards — and wrong about the more
+-- interesting case: going back two years later and feeling differently is not
+-- a mistake, it is the most useful thing a recommendation app could record.
+--
+-- The guard moves into the app, where it can ask rather than refuse: posting a
+-- second Rex of something you have already Rex'd now says so and offers to
+-- update the first one instead. A constraint can only say no.
+--
+-- The trip and list indexes stay. Those contexts are a set — the same place
+-- twice in one list really is a mistake — and the trip one was already dropped
+-- on 3 October for its own reason (an itinerary revisits places).
+DROP INDEX IF EXISTS public.recommendations_unique_standalone;

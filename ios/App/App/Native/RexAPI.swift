@@ -1479,6 +1479,36 @@ final class RexAPI {
     /// explicitly instead (trip_id/list_id both null) and PATCHes it if
     /// found, so re-rating something you've already Rex'd on its own still
     /// updates in place rather than erroring or duplicating.
+    /// Oct 4 — your own earlier standalone Rex of this item, if there is one.
+    ///
+    /// Posting a second Rex of the same thing is allowed now (a second visit,
+    /// a different episode), so the app asks instead of the database refusing —
+    /// and to ask, it has to know what the first one said.
+    func existingStandaloneRex(itemId: String) async -> FeedRecommendation? {
+        guard let userId = currentUserId, let token = try? await validToken() else { return nil }
+        let select = "id,rating,note,created_at,photo_url,photo_urls,tags,user_id,item_id,trip_id," +
+            "items(id,type,title,subtitle,image_url,genre,address,link_url,recipe_text,lat,lng)," +
+            "profiles!recommendations_user_id_fkey(username,display_name,avatar_url)"
+        var components = URLComponents(url: baseURL.appendingPathComponent("/rest/v1/recommendations"), resolvingAgainstBaseURL: false)!
+        components.queryItems = [
+            URLQueryItem(name: "select", value: select),
+            URLQueryItem(name: "user_id", value: "eq.\(userId)"),
+            URLQueryItem(name: "item_id", value: "eq.\(itemId)"),
+            URLQueryItem(name: "trip_id", value: "is.null"),
+            URLQueryItem(name: "list_id", value: "is.null"),
+            URLQueryItem(name: "order", value: "created_at.desc"),
+            URLQueryItem(name: "limit", value: "1"),
+        ]
+        guard let url = components.url else { return nil }
+        var request = URLRequest(url: url)
+        request.setValue(anonKey, forHTTPHeaderField: "apikey")
+        request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+        guard let (data, response) = try? await URLSession.shared.data(for: request),
+              let http = response as? HTTPURLResponse, http.statusCode < 400
+        else { return nil }
+        return (try? JSONDecoder().decode([FeedRecommendation].self, from: data))?.first
+    }
+
     func upsertRecommendation(itemId: String, rating: Double, note: String?) async throws {
         let token = try await validToken()
         guard let userId = currentUserId else { throw RexAPIError.notSignedIn }

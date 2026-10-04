@@ -262,6 +262,13 @@ struct AddRexView: View {
     @State private var picked: RexSearchHit?
     /// Oct 3 — the untouched notes, kept while an organised version is on
     /// screen so "back to how I wrote it" is exact rather than approximate.
+    /// Oct 4 — an earlier Rex of this same thing, found at post time. Holding
+    /// it here is what lets the prompt quote what you said last time.
+    @State private var existingRex: FeedRecommendation?
+    @State private var confirmedSecondRex = false
+    /// The earlier Rex, opened in the editor when they'd rather change it than
+    /// add a second.
+    @State private var editingExisting: FeedRecommendation?
     @State private var notesBeforeOrganising: String?
     @State private var isOrganisingNotes = false
     @State private var organiseMessage: String?
@@ -650,6 +657,8 @@ struct AddRexView: View {
                 }
                 .buttonStyle(.plain)
             }
+
+            secondRexPrompt
 
             if !searchFirst {
             // A list's "kind" chip already says what it's about — a second,
@@ -1902,6 +1911,19 @@ struct AddRexView: View {
 
             switch mode {
             case .rated:
+                // Oct 4 — "allow you to add another review so if you go twice,
+                // or the podcast she listened to a specific episode."
+                //
+                // The database used to refuse this outright. It is allowed now,
+                // so the asking moves here: a second Rex of the same thing is
+                // usually deliberate (you went back) and occasionally a slip,
+                // and only the person knows which. Skipped once they have
+                // answered, so confirming doesn't ask again.
+                if !confirmedSecondRex, let earlier = await RexAPI.shared.existingStandaloneRex(itemId: itemId) {
+                    existingRex = earlier
+                    isSaving = false
+                    return
+                }
                 let newRecId = try await RexAPI.shared.createRecommendation(
                     itemId: itemId,
                     rating: rating,
@@ -2071,6 +2093,12 @@ struct AddRexView: View {
         organiseMessage = "Grouped into \(marks.headings.count) heading\(marks.headings.count == 1 ? "" : "s"). Undo if it's got it wrong."
     }
 
+    /// "2 months ago". Same formatter DraftsView uses.
+    private func relativeDate(_ iso: String) -> String {
+        guard let date = ISO8601DateFormatter.rexDate(from: iso) else { return "before" }
+        return RelativeDateTimeFormatter().localizedString(for: date, relativeTo: Date())
+    }
+
     private var listIconURL: String? {
         listIcon.map { "rex://icon/\($0)" }
     }
@@ -2128,6 +2156,44 @@ struct AddRexView: View {
     /// The sheets hang off this subview rather than the main body: AddRexView's
     /// modifier chain is long enough that two more pushed the type-checker
     /// over its limit.
+    /// Oct 4 — asked when you post a Rex of something you have already Rex'd.
+    /// Quotes what you said last time, because "you've Rex'd this before" is
+    /// not enough to decide on: whether you meant to add another depends on
+    /// what the first one was.
+    @ViewBuilder
+    private var secondRexPrompt: some View {
+        Color.clear
+            .frame(height: 0)
+            .confirmationDialog(
+                existingRex.map { earlier in
+                    let when = relativeDate(earlier.created_at)
+                    return "You Rex'd \(title) \(when)."
+                } ?? "",
+                isPresented: Binding(
+                    get: { existingRex != nil },
+                    set: { if !$0 { existingRex = nil } }
+                ),
+                titleVisibility: .visible
+            ) {
+                Button("Add another Rex") {
+                    confirmedSecondRex = true
+                    let posting = existingRex
+                    existingRex = nil
+                    if let category { Task { await post(category: category) } }
+                    _ = posting
+                }
+                Button("Open the one I wrote") {
+                    editingExisting = existingRex
+                    existingRex = nil
+                }
+                Button("Cancel", role: .cancel) { existingRex = nil }
+            } message: {
+                if let note = existingRex?.note, !note.isEmpty {
+                    Text("\u{201C}\(note)\u{201D}")
+                }
+            }
+    }
+
     @ViewBuilder
     private var followUpOffers: some View {
         if didPost, !didWant, !didSaveDraft, category == .place {
@@ -2155,6 +2221,9 @@ struct AddRexView: View {
             }
             .sheet(item: $addingToTripItemId) { ref in
                 AddToTripView(itemId: ref.id, itemTitle: title, onDone: {})
+            }
+            .sheet(item: $editingExisting) { rec in
+                EditRexView(rec: rec, onSaved: { onDone() }, onDeleted: { onDone() })
             }
         }
     }
