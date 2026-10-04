@@ -212,9 +212,15 @@ struct ExploreView: View {
             showingTalkToRex = true
         } label: {
             HStack(spacing: RexSpacing.sm) {
-                Image(systemName: "sparkles")
-                    .font(.system(size: 14))
-                    .foregroundStyle(RexColor.primary)
+                // Oct 3 — "should be 'ask Rex' and should have the dino
+                // icon." The name changed and the icon didn't follow; a
+                // sparkle is the generic mark every app uses for a model,
+                // which is precisely what this isn't — the answers come from
+                // people you know.
+                Image("RexDinoLogo")
+                    .resizable()
+                    .aspectRatio(contentMode: .fit)
+                    .frame(width: 20, height: 20)
                 Text("Ask Rex — ask for anything")
                     .font(RexFont.text(14))
                     .foregroundStyle(RexColor.mutedForeground)

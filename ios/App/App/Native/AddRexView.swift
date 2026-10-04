@@ -837,8 +837,15 @@ struct AddRexView: View {
 
             if mode == .want {
                 Text("Why? (optional)").font(.system(size: 14, weight: .semibold)).foregroundStyle(RexColor.foreground)
+                // Oct 4 — "a little buggy when I was typing in my
+                // descriptions — if I went over two lines of text I couldn't
+                // scroll down and see what I was writing as I was typing."
+                // The box stopped growing after four lines and then scrolled
+                // its own contents under the caret. Letting it grow to twelve
+                // means almost nothing hits the ceiling, and the form scrolls
+                // to follow it the way it does for every other field.
                 TextField("Who told you about it, what caught your eye…", text: $note, axis: .vertical)
-                    .lineLimit(2...4)
+                    .lineLimit(2...12)
                     .padding(12)
                     .background(RexColor.card)
                     .clipShape(RoundedRectangle(cornerRadius: 14))
@@ -862,8 +869,10 @@ struct AddRexView: View {
                 RexRatingPicker(value: $rating)
 
                 Text("Note").font(.system(size: 14, weight: .semibold)).foregroundStyle(RexColor.foreground)
+                // See the note box above — a description that outgrew five
+                // lines started scrolling under the caret.
                 TextField("What did you love about it?", text: $note, axis: .vertical)
-                    .lineLimit(3...5)
+                    .lineLimit(3...14)
                     .padding(12)
                     .background(RexColor.card)
                     .clipShape(RoundedRectangle(cornerRadius: 14))

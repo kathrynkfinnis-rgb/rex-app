@@ -316,9 +316,11 @@ struct EditRexView: View {
 
                     VStack(alignment: .leading, spacing: RexSpacing.sm) {
                         Text("Note").font(RexFont.text(14, weight: .semibold))
+                        // Oct 4 — same ceiling problem as the Add form's
+                        // note box: past six lines it scrolled under the caret.
                         TextField("What did you think?", text: $note, axis: .vertical)
                             .font(RexFont.text(15))
-                            .lineLimit(3...6)
+                            .lineLimit(3...14)
                             .padding(RexSpacing.md)
                             .background(RexColor.card)
                             .clipShape(RoundedRectangle(cornerRadius: RexRadius.input, style: .continuous))

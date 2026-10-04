@@ -60,9 +60,10 @@ struct TripStopSheet: View {
                     searchResults
 
                     field("Why are you Rexing it?") {
+                        // Oct 4 — see AddRexView's note box.
                         TextField("Best carbonara in Rome, book ahead", text: $note, axis: .vertical)
                             .textFieldStyle(.plain)
-                            .lineLimit(2...4)
+                            .lineLimit(2...12)
                     }
 
                     VStack(alignment: .leading, spacing: RexSpacing.xs) {
