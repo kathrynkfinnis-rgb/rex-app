@@ -31,7 +31,11 @@ struct TalkToRexView: View {
     @State private var pending: String?
     @State private var errorMessage: String?
     @State private var friends: [FoundPerson] = []
-    @State private var addingFromWeb: RexSearchHit?
+    /// Oct 3 — "this is a podcast, not a place … and now this podcast has
+    /// saved as a place." The category was known all along (AskRexWebResult
+    /// carries it) and simply wasn't passed on, so every web suggestion
+    /// opened the add form as a place.
+    @State private var addingFromWeb: AskRexWebResult?
     @FocusState private var focused: Bool
 
     @Environment(\.dismiss) private var dismiss
@@ -96,8 +100,12 @@ struct TalkToRexView: View {
         .navigationTitle("Ask Rex")
         .navigationBarTitleDisplayMode(.inline)
         .rexDismissableKeyboard()
-        .sheet(item: $addingFromWeb) { hit in
-            AddRexView(onDone: {}, initialPlaceHit: hit)
+        .sheet(item: $addingFromWeb) { result in
+            AddRexView(
+                onDone: {},
+                initialPlaceHit: result.hit,
+                initialCategory: result.category
+            )
         }
         .task { await loadFriends() }
     }
@@ -270,7 +278,7 @@ struct TalkToRexView: View {
 struct AskRexAnswerBlock: View {
     @ObservedObject var answer: AskRexAnswer
     var onOpenItem: (String) -> Void
-    var onRexThis: (RexSearchHit) -> Void
+    var onRexThis: (AskRexWebResult) -> Void
 
     var body: some View { content }
 
@@ -392,7 +400,7 @@ struct AskRexAnswerBlock: View {
                 // that replaces it: try it, rate it, and next time it's a
                 // friend's Rex rather than a stranger's suggestion.
                 Button {
-                    onRexThis(result.hit)
+                    onRexThis(result)
                 } label: {
                     HStack(spacing: 5) {
                         Image(systemName: "plus.circle.fill").font(.system(size: 12))

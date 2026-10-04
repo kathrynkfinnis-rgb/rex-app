@@ -18,14 +18,37 @@ struct AddRexView: View {
     /// `taggingFriend` opens the form with someone already tagged — used
     /// from a friend's empty page, where the useful thing to do is send them
     /// something rather than ask the world for a recommendation.
-    init(onDone: @escaping () -> Void, initialPlaceHit: RexSearchHit? = nil, taggingFriend: String? = nil) {
+    /// Oct 3 — "This is a podcast, not a place, but I found it through the
+    /// Ask Rex function and it has pre-filled it as if it is a place… and now
+    /// this podcast has saved as a place."
+    ///
+    /// The parameter was named initialPlaceHit and hard-coded `.place`,
+    /// because the only caller was the map, where everything is a place. Ask
+    /// Rex then reused it for every kind of suggestion it makes, so a podcast,
+    /// a film or a book arrived here as a place and saved as one — wrong
+    /// category, wrong icon, and a pin on the map for a podcast.
+    ///
+    /// `initialCategory` carries the kind through. It still defaults to
+    /// `.place` so the map's call is unchanged.
+    init(
+        onDone: @escaping () -> Void,
+        initialPlaceHit: RexSearchHit? = nil,
+        initialCategory: RexCategory = .place,
+        taggingFriend: String? = nil
+    ) {
         self.onDone = onDone
         if let taggingFriend { _taggedFriendIds = State(initialValue: [taggingFriend]) }
         if let hit = initialPlaceHit {
-            _category = State(initialValue: .place)
+            _category = State(initialValue: initialCategory)
             _picked = State(initialValue: hit)
             _title = State(initialValue: hit.title)
-            _address = State(initialValue: hit.address ?? "")
+            // Only a place or an event has an address field to fill; a book's
+            // "address" would be nonsense, and its subtitle is the author.
+            if initialCategory == .place || initialCategory == .event {
+                _address = State(initialValue: hit.address ?? "")
+            } else if let subtitle = hit.subtitle, !subtitle.isEmpty {
+                _subtitle = State(initialValue: subtitle)
+            }
         }
     }
 

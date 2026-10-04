@@ -146,13 +146,20 @@ struct LikesCommentsView: View {
             }
 
             HStack(spacing: RexSpacing.sm) {
-                TextField("Add a comment…", text: $draft)
+                // Oct 4 — "when you comment need to expand the comment bubble
+                // down not across." It was a single-line field with a fixed
+                // 42pt height, so a comment longer than the box scrolled
+                // sideways under the cursor and you could only ever see the
+                // tail of what you'd written.
+                TextField("Add a comment…", text: $draft, axis: .vertical)
                     .font(RexFont.text(14))
                     .focused($draftFocused)
+                    .lineLimit(1...6)
                     .submitLabel(.send)
                     .onSubmit { Task { await post() } }
                     .padding(.horizontal, RexSpacing.md)
-                    .frame(height: 42)
+                    .padding(.vertical, 11)
+                    .frame(minHeight: 42)
                     .background(RexColor.card)
                     .clipShape(RoundedRectangle(cornerRadius: RexRadius.input, style: .continuous))
                     .overlay(
