@@ -1973,7 +1973,13 @@ final class RexAPI {
     /// scratch. Only the second belongs in the feed — see fetchWantsFeed.
     /// Sent only when the column exists, same probe-and-skip the note field
     /// above uses, so this keeps working before the migration is run.
-    func createWant(itemId: String, note: String? = nil, source: String = "save", photoURLs: [String] = []) async throws {
+    func createWant(
+        itemId: String,
+        note: String? = nil,
+        source: String = "save",
+        photoURLs: [String] = [],
+        showInFeed: Bool? = nil
+    ) async throws {
         let token = try await validToken()
         guard let userId = currentUserId else { throw RexAPIError.notSignedIn }
         var request = URLRequest(url: baseURL.appendingPathComponent("/rest/v1/wants"))
@@ -1992,6 +1998,9 @@ final class RexAPI {
         // reasoning as the note above: a database without the column yet must
         // still be able to save a want.
         if !photoURLs.isEmpty { body["photo_urls"] = photoURLs }
+        // Oct 5 — same guard as the note and the photos: only sent when it
+        // has something to say, so a database without the column still saves.
+        if let showInFeed { body["show_in_feed"] = showInFeed }
         request.httpBody = try JSONSerialization.data(withJSONObject: body)
 
         var urlComponents = URLComponents(url: request.url!, resolvingAgainstBaseURL: false)!
@@ -4979,6 +4988,11 @@ final class RexAPI {
         // to be wrong on — a card too many, rather than a friend's new want
         // that nobody ever sees.
         if await wantSourceField() { ownerFilter.append(("or", "(source.is.null,source.neq.save)")) }
+        // Oct 5 — a want kept off the feed stays off it. Same shape as the
+        // recommendations query: absent or true shows, explicit false hides.
+        if await wantShowInFeedField() {
+            ownerFilter.append(("show_in_feed", "not.is.false"))
+        }
         let categoryFilter: [(String, String)] = ownerFilter + (category.map { [("items.type", "eq.\($0)")] } ?? [])
         let rows: [Row]
         let profilesById: [String: RexProfile]
@@ -5083,6 +5097,27 @@ final class RexAPI {
             .map { $0 < 400 } ?? false
         wantNoteColumn = ok
         return ok ? ",note" : ""
+    }
+
+    /// Same guard again, for wants.show_in_feed (5 Oct migration).
+    private var wantShowInFeedColumn: Bool?
+
+    private func wantShowInFeedField() async -> Bool {
+        if let wantShowInFeedColumn { return wantShowInFeedColumn }
+        guard let token = try? await validToken() else { return false }
+        var components = URLComponents(url: baseURL.appendingPathComponent("/rest/v1/wants"), resolvingAgainstBaseURL: false)!
+        components.queryItems = [
+            URLQueryItem(name: "select", value: "show_in_feed"),
+            URLQueryItem(name: "limit", value: "1"),
+        ]
+        var request = URLRequest(url: components.url!)
+        request.setValue(anonKey, forHTTPHeaderField: "apikey")
+        request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+        let ok = (try? await URLSession.shared.data(for: request))
+            .flatMap { ($0.1 as? HTTPURLResponse)?.statusCode }
+            .map { $0 < 400 } ?? false
+        wantShowInFeedColumn = ok
+        return ok
     }
 
     /// Same guard again, for wants.photo_urls (3 Oct migration) — so a client

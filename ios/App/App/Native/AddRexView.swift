@@ -2004,7 +2004,11 @@ struct AddRexView: View {
                     // this is the kind that posts to the feed.
                     source: "add",
                     // Oct 3 — "Can't add a photo to a want-to-try."
-                    photoURLs: photoURLs
+                    photoURLs: photoURLs,
+                    // Oct 5 — and a want can be kept off the feed like
+                    // anything else. Wants keep their own table, so this is
+                    // their own column rather than recommendations'.
+                    showInFeed: hiddenFromFeed ? false : nil
                 )
                 didWant = true
                 lastWantItemId = itemId
