@@ -309,33 +309,172 @@ let rexListKinds: [String] = ["Book", "Place", "Trip", "Film & TV", "Recipe", "M
 
 /// Subcategories per category, mirroring src/lib/categories.ts. Stored
 /// comma-separated in items.genre.
+/// Oct 5 — "for each category, please propose a sensible list of sub
+/// categories … at the moment they don't make any sense, for example
+/// 'mujeres en china' is the third subcategory when you filter by books."
+///
+/// These are now taken from the catalogues REX actually reads, rather than
+/// guessed: films and TV are TMDB's own genre lists verbatim, podcasts are
+/// Apple's top-level categories, places follow what Google returns as a
+/// primary type, and books follow the shape Goodreads and BISAC share. That
+/// matters because every item arriving from a catalogue carries that
+/// catalogue's words — so a list built from the same vocabulary can absorb
+/// them (see rexNormalisedGenres) instead of accumulating library index terms
+/// beside them.
+///
+/// Recipes, trips and events have no catalogue behind them, so those stay as
+/// written: there is nothing to reconcile with.
 let rexSubcategories: [RexCategory: [String]] = [
-    // Sept 15 — "Don't think private dining should be so far up the list
-    // as it's so niche. Restaurant, pub, cafe etc." and "Bar vs pub? Or
-    // both" (Danny). Everyday first, niche last, and Pub in its own right —
-    // a British pub isn't a bar. This is only the starting order: see
-    // rexOrderedSubcategories, which moves your own most-used up.
-    .place: ["Restaurant", "Pub", "Bar", "Café", "Shop", "Activity",
-             "Accommodation", "Town", "For kids", "Beauty", "Private dining", "Other"],
+    // Google's primaryTypeDisplayName leads with cuisine ("European
+    // Restaurant", "Thai Restaurant", "Cocktail Bar"), which is too fine to
+    // filter by and would give one chip per cuisine. These are the shapes
+    // those collapse into — see rexNormalisedGenres.
+    //
+    // Sept 15 — "Don't think private dining should be so far up the list as
+    // it's so niche. Restaurant, pub, cafe etc." Everyday first, niche last.
+    .place: ["Restaurant", "Pub", "Bar", "Café", "Bakery", "Accommodation",
+             "Shop", "Museum & gallery", "Outdoors", "Activity",
+             "Beauty & spa", "For kids", "Other"],
     .trip: ["City break", "Beach", "Road trip", "Countryside", "Ski", "Adventure",
             "Family", "Weekend away", "Honeymoon", "Work trip", "For kids", "Other"],
     .recipe: ["Salad", "Soup", "Pasta", "Rice & grains", "Meat", "Fish & seafood",
               "Vegetarian", "Vegan", "Breakfast", "Dessert", "Baking", "Snack",
               "Drink", "Sauce & dressing", "For kids", "Other"],
-    .book: ["Fiction", "Non-fiction", "Thriller", "Mystery", "Sci-fi", "Fantasy",
-            "Romance", "Biography", "History", "Business", "Self-help", "Poetry",
-            "For kids", "Other"],
-    .movie: ["Action", "Comedy", "Drama", "Thriller", "Horror", "Sci-fi",
-             "Documentary", "Romance", "Animation", "For kids", "Other"],
-    .tv: ["Drama", "Comedy", "Documentary", "Reality", "Crime", "Sci-fi",
-          "For kids", "Sport", "Other"],
-    .podcast: ["Comedy", "News", "History", "Business", "Interview", "True crime",
-               "Society", "Sport", "Tech", "For kids", "Other"],
+    // Fiction and Non-fiction first because they are the division people
+    // actually browse by; the rest follow the genres Goodreads and BISAC
+    // agree on.
+    .book: ["Fiction", "Non-fiction", "Literary fiction", "Thriller",
+            "Mystery & crime", "Sci-fi", "Fantasy", "Romance",
+            "Historical fiction", "Biography & memoir", "History", "Business",
+            "Science", "Self-help", "Poetry", "Cookery", "Travel",
+            "Young adult", "For kids", "Other"],
+    // TMDB's film genres, in their words so they map one to one — except
+    // "Science Fiction", which is written the way people say it.
+    .movie: ["Action", "Adventure", "Animation", "Comedy", "Crime",
+             "Documentary", "Drama", "Family", "Fantasy", "History", "Horror",
+             "Music", "Mystery", "Romance", "Sci-fi", "Thriller", "War",
+             "Western", "For kids", "Other"],
+    // TMDB's television genres, same reasoning.
+    .tv: ["Action & adventure", "Animation", "Comedy", "Crime", "Documentary",
+          "Drama", "Family", "Mystery", "News", "Reality", "Sci-fi & fantasy",
+          "Soap", "Talk", "War & politics", "Western", "Sport", "For kids", "Other"],
+    // Apple Podcasts' top-level categories, which is what every podcast
+    // directory keys off.
+    .podcast: ["Arts", "Business", "Comedy", "Education", "Fiction",
+               "Health & fitness", "History", "Leisure", "Music", "News",
+               "Science", "Society & culture", "Sport", "Technology",
+               "True crime", "TV & film", "For kids", "Other"],
     .event: ["Concert", "Exhibition", "Theatre", "Comedy", "Sport", "Talk",
              "Festival", "Film", "For kids", "Other"],
     .other: ["Product", "Gadget", "App", "Newsletter", "Video", "Article", "Game",
              "Tradesperson", "Beauty", "Gardener", "Cleaner", "Childcare",
              "Health & fitness", "Other service", "Hidden gem", "For kids", "Other"],
+]
+
+/// Turns whatever a catalogue called something into our own words, dropping
+/// anything that doesn't correspond.
+///
+/// This is the half that actually fixes "mujeres en china". The filter row
+/// only offering curated values stops the nonsense being *shown*; this stops
+/// it being *stored*, so an item's own card says "Fiction" rather than a
+/// library index term, and two copies of the same genre under different names
+/// stop existing.
+///
+/// Deliberately conservative: a string that doesn't map is dropped rather than
+/// guessed at. An unfiled item is a small loss; one filed under the wrong
+/// genre is a wrong answer that looks right.
+func rexNormalisedGenres(_ raw: String?, for category: RexCategory) -> String? {
+    let curated = rexSubcategories[category] ?? []
+    guard !curated.isEmpty else { return raw }
+
+    var out: [String] = []
+    for piece in (raw ?? "").split(separator: ",") {
+        let term = piece.trimmingCharacters(in: .whitespaces).lowercased()
+        guard !term.isEmpty else { continue }
+
+        // Already one of ours, whatever the casing.
+        if let exact = curated.first(where: { $0.lowercased() == term }) {
+            if !out.contains(exact) { out.append(exact) }
+            continue
+        }
+        if let mapped = rexGenreSynonyms[term] ?? rexGenreByWord(term, in: curated),
+           curated.contains(mapped) {
+            if !out.contains(mapped) { out.append(mapped) }
+        }
+    }
+    return out.isEmpty ? nil : out.joined(separator: ", ")
+}
+
+/// A term that ends in one of ours — "european restaurant", "cocktail bar",
+/// "coffee shop" — belongs to it. Google's place types are built this way, so
+/// one rule covers almost all of them without listing every cuisine on earth.
+private func rexGenreByWord(_ term: String, in curated: [String]) -> String? {
+    for option in curated where option != "Other" {
+        let word = option.lowercased()
+        if term.hasSuffix(" \(word)") || term.hasPrefix("\(word) ") { return option }
+    }
+    return nil
+}
+
+/// The ones a rule can't reach: different words for the same thing.
+private let rexGenreSynonyms: [String: String] = [
+    // Films and TV
+    "science fiction": "Sci-fi",
+    "sci-fi & fantasy": "Sci-fi & fantasy",
+    "action & adventure": "Action & adventure",
+    "war & politics": "War & politics",
+    "kids": "For kids",
+    "children": "For kids",
+    "children's": "For kids",
+    "tv movie": "Other",
+    // Places — Google's own vocabulary
+    "cafe": "Café",
+    "coffee shop": "Café",
+    "coffee": "Café",
+    "cocktail bar": "Bar",
+    "wine bar": "Bar",
+    "night club": "Bar",
+    "hotel": "Accommodation",
+    "lodging": "Accommodation",
+    "bed & breakfast": "Accommodation",
+    "guest house": "Accommodation",
+    "art gallery": "Museum & gallery",
+    "museum": "Museum & gallery",
+    "park": "Outdoors",
+    "national park": "Outdoors",
+    "hiking area": "Outdoors",
+    "beach": "Outdoors",
+    "scenic spot": "Outdoors",
+    "tourist attraction": "Activity",
+    "spa": "Beauty & spa",
+    "beauty salon": "Beauty & spa",
+    "hair salon": "Beauty & spa",
+    "store": "Shop",
+    "food": "Restaurant",
+    "point of interest": "Other",
+    // Books
+    "nonfiction": "Non-fiction",
+    "non fiction": "Non-fiction",
+    "juvenile fiction": "For kids",
+    "juvenile nonfiction": "For kids",
+    "biography": "Biography & memoir",
+    "memoir": "Biography & memoir",
+    "autobiography": "Biography & memoir",
+    "detective and mystery stories": "Mystery & crime",
+    "mystery": "Mystery & crime",
+    "crime": "Mystery & crime",
+    "thrillers": "Thriller",
+    "cooking": "Cookery",
+    "self-help": "Self-help",
+    "young adult fiction": "Young adult",
+    // Podcasts
+    "society & culture": "Society & culture",
+    "health & fitness": "Health & fitness",
+    "tv & film": "TV & film",
+    "sports": "Sport",
+    "technology": "Technology",
+    "true crime": "True crime",
+    "kids & family": "For kids",
 ]
 
 /// All categories in the order the web app shows them. .list is native

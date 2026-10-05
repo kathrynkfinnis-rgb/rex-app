@@ -1677,11 +1677,17 @@ final class RexAPI {
             body["external_id"] = hit.externalId
             body["external_source"] = hit.externalSource
             body["image_url"] = hit.imageURL ?? NSNull()
-            body["genre"] = hit.genre ?? NSNull()
+            // Oct 5 — a catalogue's own words, translated into ours. Without
+            // this the genre column accumulated OpenLibrary subjects
+            // ("mujeres en china") and Google's cuisine-level types
+            // ("European Restaurant") alongside the sub-categories people
+            // actually pick, and nothing could filter across the two.
+            body["genre"] = rexNormalisedGenres(hit.genre, for: RexCategory(rawType: type)) ?? NSNull()
             body["lat"] = hit.lat ?? NSNull()
             body["lng"] = hit.lng ?? NSNull()
         }
-        // An explicit subcategory choice wins over whatever the catalogue guessed.
+        // An explicit subcategory choice wins over whatever the catalogue
+        // guessed — it's already one of ours, so it needs no translating.
         if let genre, !genre.isEmpty { body["genre"] = genre }
         if let linkURL, !linkURL.isEmpty { body["link_url"] = linkURL }
         if let externalId { body["external_id"] = externalId }
