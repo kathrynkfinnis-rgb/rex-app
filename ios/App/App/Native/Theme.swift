@@ -343,11 +343,22 @@ let rexSubcategories: [RexCategory: [String]] = [
     // Fiction and Non-fiction first because they are the division people
     // actually browse by; the rest follow the genres Goodreads and BISAC
     // agree on.
-    .book: ["Fiction", "Non-fiction", "Literary fiction", "Thriller",
-            "Mystery & crime", "Sci-fi", "Fantasy", "Romance",
-            "Historical fiction", "Biography & memoir", "History", "Business",
-            "Science", "Self-help", "Poetry", "Cookery", "Travel",
-            "Young adult", "For kids", "Other"],
+    // Oct 5 — Kathryn's own list, in her order: the seven fiction genres
+    // first, then the five non-fiction ones. "One level below fiction" was
+    // the ask, and these are the shelves people actually browse by.
+    //
+    // The ones after them are kept rather than chosen: Poetry, Cookery and
+    // the rest were already here and nothing asked for them to go. Fiction
+    // and Non-fiction come last on purpose — a book the catalogue only
+    // classifies broadly still needs somewhere to sit, but leading with them
+    // is what produced a row with Fiction and nothing else.
+    .book: ["Fantasy", "Science fiction", "Romance", "Mystery",
+            "Thriller & suspense", "Historical fiction", "Horror",
+            "Biography & memoir", "Self-help", "History", "True crime",
+            "Essays & journalism",
+            "Literary fiction", "Poetry", "Cookery", "Travel", "Business",
+            "Science", "Young adult", "For kids",
+            "Fiction", "Non-fiction", "Other"],
     // TMDB's film genres, in their words so they map one to one — except
     // "Science Fiction", which is written the way people say it.
     .movie: ["Action", "Adventure", "Animation", "Comedy", "Crime",
@@ -435,10 +446,22 @@ private func termContainsWord(_ term: String, _ needle: String) -> Bool {
 /// Words that give a heading away, and what they mean in our vocabulary.
 /// Ordered specific-before-broad only for readability; the matching is a set.
 private let rexGenreNeedles: [(String, String)] = [
-    ("thriller", "Thriller"), ("thrillers", "Thriller"), ("suspense", "Thriller"),
-    ("mystery", "Mystery & crime"), ("mysteries", "Mystery & crime"),
-    ("crime", "Mystery & crime"), ("detective", "Mystery & crime"),
+    ("thriller", "Thriller & suspense"), ("thrillers", "Thriller & suspense"),
+    ("suspense", "Thriller & suspense"),
+    ("mystery", "Mystery"), ("mysteries", "Mystery"), ("detective", "Mystery"),
+    ("true crime", "True crime"),
+    ("crime", "Mystery"),
+    ("essays", "Essays & journalism"), ("journalism", "Essays & journalism"),
+    ("reportage", "Essays & journalism"),
+    ("horror", "Horror"), ("ghost stories", "Horror"),
+    ("science fiction", "Science fiction"), ("sci fi", "Science fiction"),
+    // Books and films name the same genres differently — TMDB says "Sci-fi"
+    // and "Thriller" where the book list says "Science fiction" and "Thriller
+    // & suspense". Both spellings are listed, and the loop only takes the one
+    // that exists in the category being filed, so each gets its own word.
     ("science fiction", "Sci-fi"), ("sci fi", "Sci-fi"),
+    ("thriller", "Thriller"), ("thrillers", "Thriller"),
+    ("mystery", "Mystery"), ("crime", "Crime"),
     ("fantasy", "Fantasy"),
     ("romance", "Romance"), ("love stories", "Romance"),
     ("historical fiction", "Historical fiction"),
@@ -458,7 +481,7 @@ private let rexGenreNeedles: [(String, String)] = [
     ("nonfiction", "Non-fiction"),
     // Film and TV headings travel the same way.
     ("documentary", "Documentary"), ("comedy", "Comedy"), ("drama", "Drama"),
-    ("horror", "Horror"), ("animation", "Animation"), ("western", "Western"),
+    ("animation", "Animation"), ("western", "Western"),
     ("adventure", "Adventure"), ("action", "Action"), ("war", "War"),
     ("music", "Music"),
 ]
@@ -477,7 +500,7 @@ private func rexGenreByWord(_ term: String, in curated: [String]) -> String? {
 /// The ones a rule can't reach: different words for the same thing.
 private let rexGenreSynonyms: [String: String] = [
     // Films and TV
-    "science fiction": "Sci-fi",
+    "science fiction": "Science fiction",
     "sci-fi & fantasy": "Sci-fi & fantasy",
     "action & adventure": "Action & adventure",
     "war & politics": "War & politics",
@@ -518,10 +541,10 @@ private let rexGenreSynonyms: [String: String] = [
     "biography": "Biography & memoir",
     "memoir": "Biography & memoir",
     "autobiography": "Biography & memoir",
-    "detective and mystery stories": "Mystery & crime",
-    "mystery": "Mystery & crime",
-    "crime": "Mystery & crime",
-    "thrillers": "Thriller",
+    "detective and mystery stories": "Mystery",
+    "mystery": "Mystery",
+    "crime": "Mystery",
+    "thrillers": "Thriller & suspense",
     "cooking": "Cookery",
     "self-help": "Self-help",
     "young adult fiction": "Young adult",
