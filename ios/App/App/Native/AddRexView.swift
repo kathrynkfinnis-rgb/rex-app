@@ -2424,10 +2424,12 @@ struct AddRexView: View {
             // "Could you also add an option to share with friends or post to
             // WhatsApp etc?" — the system share sheet covers WhatsApp,
             // Messages, Instagram and the rest in one button.
-            if isRealPost, let shareURL {
-                ShareLink(
-                    item: shareURL,
-                    message: Text(RexShareLink.message("I just Rex'd \u{201C}\(title)\u{201D}", url: shareURL))
+            if isRealPost, let shareURL, let recId = lastPostedRecId {
+                RexShareButton(
+                    kind: category == .trip ? "trip" : "rec",
+                    targetId: recId,
+                    fallbackURL: shareURL,
+                    message: RexShareLink.message("I just Rex'd \u{201C}\(title)\u{201D}", url: shareURL)
                 ) {
                     Label("Share with friends", systemImage: "square.and.arrow.up")
                         .font(RexFont.text(16, weight: .semibold))

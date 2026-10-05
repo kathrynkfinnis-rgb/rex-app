@@ -7,7 +7,8 @@
           { "/": "/r/*", "comment": "A shared Rex" },
           { "/": "/t/*", "comment": "A shared trip" },
           { "/": "/c/*", "comment": "A shared collection" },
-          { "/": "/w/*", "comment": "A shared want-to-try" }
+          { "/": "/w/*", "comment": "A shared want-to-try" },
+          { "/": "/s/*", "comment": "A short link to any of the above" }
         ]
       }
     ]

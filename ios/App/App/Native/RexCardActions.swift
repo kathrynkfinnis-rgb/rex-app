@@ -39,6 +39,17 @@ struct RexCardActions: View {
         return RexShareLink.url(recommendationId: rec.id, type: rec.items?.type)
     }
 
+    /// A trip lives at /t/ rather than /r/, so the code has to carry which
+    /// page it leads to — share_links.kind, matching the migration's check.
+    private var shareKind: String {
+        if rec.isWant { return "want" }
+        return RexCategory(rawType: rec.items?.type) == .trip ? "trip" : "rec"
+    }
+
+    private var shareTargetId: String {
+        rec.isWant ? String(rec.id.dropFirst("want-".count)) : rec.id
+    }
+
     private var shareText: String {
         let title = rec.items?.title ?? "this"
         let who = rec.profiles?.display_name ?? rec.profiles?.username ?? "A friend"
@@ -138,12 +149,16 @@ struct RexCardActions: View {
             // held back — it's a question put to your friends, and a public
             // page for one would be addressed to nobody.
             if !rec.isBlast, let shareURL {
-                ShareLink(item: shareURL, message: Text(shareText)) {
+                RexShareButton(
+                    kind: shareKind,
+                    targetId: shareTargetId,
+                    fallbackURL: shareURL,
+                    message: shareText
+                ) {
                     Image(systemName: "paperplane")
                         .font(.system(size: 15))
                         .foregroundStyle(RexColor.mutedForeground)
                 }
-                .buttonStyle(.plain)
                 .accessibilityLabel("Share with friends")
             }
         }

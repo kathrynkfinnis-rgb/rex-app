@@ -334,7 +334,12 @@ struct CollectionDetailView: View {
                     }
 
                     if let shareURL {
-                        ShareLink(item: shareURL, message: Text(shareText)) {
+                        RexShareButton(
+                            kind: "list",
+                            targetId: route.listId,
+                            fallbackURL: shareURL,
+                            message: shareText
+                        ) {
                             Label("Share", systemImage: "square.and.arrow.up")
                         }
                     } else {

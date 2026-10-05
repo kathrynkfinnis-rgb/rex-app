@@ -1160,6 +1160,19 @@ struct FeedView: View {
             } else {
                 path.append(NotificationsRoute())
             }
+        case .shareCode(let code):
+            // Resolve, then hand straight back to this same function with
+            // whatever it turned out to be — a short link is an alias, not a
+            // fifth kind of destination.
+            guard let (kind, id) = await RexAPI.shared.resolveShareCode(code) else {
+                path.append(NotificationsRoute())
+                return
+            }
+            switch kind {
+            case "want": pushRouter.pending = .want(id)
+            case "list": pushRouter.pending = .collection(id)
+            default: pushRouter.pending = .recommendation(id)
+            }
         case .friendship(let friendshipId):
             // The other person in that friendship — the one the notification
             // was about. If we can't resolve it (declined, or withdrawn), the

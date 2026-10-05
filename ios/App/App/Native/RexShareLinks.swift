@@ -24,6 +24,14 @@ enum RexShareLink {
         URL(string: "\(site)/c/\(listId)")
     }
 
+    /// Oct 5 — "and can we truncate the link?" The short form of every link
+    /// above: find-rex.com/s/k3n9pqd rather than sixty characters of UUID.
+    /// The page it leads to is the same one, via a redirect — see
+    /// src/routes/s.$code.tsx.
+    static func shortURL(code: String) -> URL? {
+        URL(string: "\(site)/s/\(code)")
+    }
+
     /// Oct 5 — "want to be able to send 'want to try' via WhatsApp." The
     /// share icon was hidden on want cards until this page existed, because a
     /// want is not a recommendation and /r/<id> would have 404'd on one.

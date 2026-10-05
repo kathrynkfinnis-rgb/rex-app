@@ -38,6 +38,10 @@ final class RexPushRouter: ObservableObject {
         case collection(String)
         /// A friend request or acceptance, by friendship row id — see route().
         case friendship(String)
+        /// A short link. The code says nothing about what it points at until
+        /// it's resolved, which needs the network — so it travels as itself
+        /// and whoever handles it does the lookup.
+        case shareCode(String)
         /// Something we don't have a screen for, or a notification with no
         /// entity at all. The notifications list is the honest answer: it
         /// always has the thing that was tapped in it.
@@ -98,6 +102,7 @@ final class RexPushRouter: ObservableObject {
         case "r", "t": pending = .recommendation(id)
         case "c": pending = .collection(id)
         case "w": pending = .want(id)
+        case "s": pending = .shareCode(id)
         default: return false
         }
         return true

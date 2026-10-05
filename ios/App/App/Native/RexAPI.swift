@@ -5428,6 +5428,50 @@ final class RexAPI {
         return Dictionary(uniqueKeysWithValues: rows.map { ($0.id, $0.item_id) })
     }
 
+    /// Oct 5 — the short code for something being shared, minting one the
+    /// first time. Best-effort: nil means the caller shares the long link,
+    /// which is what happens offline and before the migration has run.
+    ///
+    /// Stable per target, so a link already sent to somebody keeps working
+    /// and two people sharing one Rex produce the same address for it.
+    func shareCode(kind: String, targetId: String) async -> String? {
+        guard let token = try? await validToken() else { return nil }
+        var request = URLRequest(url: baseURL.appendingPathComponent("/rest/v1/rpc/mint_share_code"))
+        request.httpMethod = "POST"
+        request.setValue(anonKey, forHTTPHeaderField: "apikey")
+        request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        request.httpBody = try? JSONSerialization.data(
+            withJSONObject: ["_kind": kind, "_id": targetId]
+        )
+
+        guard let (data, response) = try? await URLSession.shared.data(for: request),
+              let http = response as? HTTPURLResponse, http.statusCode < 400
+        else { return nil }
+        // The function returns a bare JSON string.
+        guard let code = try? JSONDecoder().decode(String.self, from: data),
+              !code.isEmpty else { return nil }
+        return code
+    }
+
+    /// What a /s/<code> link points at: a kind and an id, nothing more.
+    func resolveShareCode(_ code: String) async -> (kind: String, id: String)? {
+        guard let token = try? await validToken() else { return nil }
+        var request = URLRequest(url: baseURL.appendingPathComponent("/rest/v1/rpc/resolve_share_code"))
+        request.httpMethod = "POST"
+        request.setValue(anonKey, forHTTPHeaderField: "apikey")
+        request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        request.httpBody = try? JSONSerialization.data(withJSONObject: ["_code": code])
+
+        guard let (data, response) = try? await URLSession.shared.data(for: request),
+              let http = response as? HTTPURLResponse, http.statusCode < 400
+        else { return nil }
+        struct Row: Codable { let kind: String; let target_id: String }
+        guard let row = (try? JSONDecoder().decode([Row].self, from: data))?.first else { return nil }
+        return (row.kind, row.target_id)
+    }
+
     func fetchMapPlaces() async throws -> [MapPlace] {
         let token = try await validToken()
         // "the map doesn't even load" (Aug 26/27) — the embedded profiles(...)

@@ -85,6 +85,7 @@
 		FEED07710000000000000000 /* RexKeyboardDismiss.swift in Sources */ = {isa = PBXBuildFile; fileRef = FEED07700000000000000000 /* RexKeyboardDismiss.swift */; };
 		FEED07610000000000000000 /* RexOutboundLinks.swift in Sources */ = {isa = PBXBuildFile; fileRef = FEED07600000000000000000 /* RexOutboundLinks.swift */; };
 		FEED07510000000000000000 /* RexShareLinks.swift in Sources */ = {isa = PBXBuildFile; fileRef = FEED07500000000000000000 /* RexShareLinks.swift */; };
+		FEED10010000000000000000 /* RexShareButton.swift in Sources */ = {isa = PBXBuildFile; fileRef = FEED10000000000000000000 /* RexShareButton.swift */; };
 		FEED064B0000000000000000 /* RexersSheetView.swift in Sources */ = {isa = PBXBuildFile; fileRef = FEED064A0000000000000000 /* RexersSheetView.swift */; };
 		FEED065B0000000000000000 /* PhotoFullScreenView.swift in Sources */ = {isa = PBXBuildFile; fileRef = FEED065A0000000000000000 /* PhotoFullScreenView.swift */; };
 		FEED031B0000000000000000 /* AskForRexView.swift in Sources */ = {isa = PBXBuildFile; fileRef = FEED031A0000000000000000 /* AskForRexView.swift */; };
@@ -189,6 +190,7 @@
 		FEED07700000000000000000 /* RexKeyboardDismiss.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RexKeyboardDismiss.swift; sourceTree = "<group>"; };
 		FEED07600000000000000000 /* RexOutboundLinks.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RexOutboundLinks.swift; sourceTree = "<group>"; };
 		FEED07500000000000000000 /* RexShareLinks.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RexShareLinks.swift; sourceTree = "<group>"; };
+		FEED10000000000000000000 /* RexShareButton.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RexShareButton.swift; sourceTree = "<group>"; };
 		FEED064A0000000000000000 /* RexersSheetView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RexersSheetView.swift; sourceTree = "<group>"; };
 		FEED065A0000000000000000 /* PhotoFullScreenView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PhotoFullScreenView.swift; sourceTree = "<group>"; };
 		FEED029A0000000000000000 /* RecipeEditorView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RecipeEditorView.swift; sourceTree = "<group>"; };
@@ -331,6 +333,7 @@
 				FEED07700000000000000000 /* RexKeyboardDismiss.swift */,
 				FEED07600000000000000000 /* RexOutboundLinks.swift */,
 				FEED07500000000000000000 /* RexShareLinks.swift */,
+				FEED10000000000000000000 /* RexShareButton.swift */,
 				FEED064A0000000000000000 /* RexersSheetView.swift */,
 				FEED065A0000000000000000 /* PhotoFullScreenView.swift */,
 				FEED025A0000000000000000 /* PhotoCarouselView.swift */,
@@ -506,6 +509,7 @@
 				FEED07710000000000000000 /* RexKeyboardDismiss.swift in Sources */,
 				FEED07610000000000000000 /* RexOutboundLinks.swift in Sources */,
 				FEED07510000000000000000 /* RexShareLinks.swift in Sources */,
+				FEED10010000000000000000 /* RexShareButton.swift in Sources */,
 				FEED064B0000000000000000 /* RexersSheetView.swift in Sources */,
 				FEED065B0000000000000000 /* PhotoFullScreenView.swift in Sources */,
 				FEED063B0000000000000000 /* BuildTripFromRexView.swift in Sources */,
