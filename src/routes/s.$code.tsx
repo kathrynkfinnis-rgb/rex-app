@@ -12,12 +12,6 @@ import { supabase } from "@/integrations/supabase/client";
 // That matters more than it looks: WhatsApp fetches the link to build its
 // preview, and it follows a 302 but would make nothing of a page that
 // redirects itself after loading.
-const PATH_FOR_KIND: Record<string, string> = {
-  rec: "/r",
-  trip: "/t",
-  want: "/w",
-  list: "/c",
-};
 
 export const Route = createFileRoute("/s/$code")({
   loader: async ({ params }) => {
@@ -28,10 +22,23 @@ export const Route = createFileRoute("/s/$code")({
     if (error || !data || !Array.isArray(data) || data.length === 0) throw notFound();
 
     const { kind, target_id } = data[0] as { kind: string; target_id: string };
-    const path = PATH_FOR_KIND[kind];
-    if (!path || !target_id) throw notFound();
+    if (!target_id) throw notFound();
 
-    throw redirect({ to: `${path}/$id`, params: { id: target_id } });
+    // Spelled out rather than built from a lookup: the router types each
+    // route path as a literal, so a computed string isn't a route it knows.
+    const to = { id: target_id };
+    switch (kind) {
+      case "rec":
+        throw redirect({ to: "/r/$id", params: to });
+      case "trip":
+        throw redirect({ to: "/t/$id", params: to });
+      case "want":
+        throw redirect({ to: "/w/$id", params: to });
+      case "list":
+        throw redirect({ to: "/c/$id", params: to });
+      default:
+        throw notFound();
+    }
   },
   // Never rendered — the loader always either redirects or throws notFound.
   component: () => null,
