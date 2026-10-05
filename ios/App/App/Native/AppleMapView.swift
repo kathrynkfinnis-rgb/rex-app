@@ -280,30 +280,64 @@ struct AppleMapView: UIViewRepresentable {
         /// Whether the map is currently close enough in to draw icons.
         var showGlyphs = true
 
+        static let ghostReuseId = "rex.ghost"
+        private static var ghostCache: [UIColor: UIImage] = [:]
+
+        /// A dashed ring in the chain's colour, on nothing. Small on purpose:
+        /// it should read as a note on the map rather than compete with the
+        /// pins for places somebody has actually been to.
+        static func ghostImage(tint: UIColor) -> UIImage {
+            if let cached = ghostCache[tint] { return cached }
+            let size = CGSize(width: 18, height: 18)
+            let image = UIGraphicsImageRenderer(size: size).image { context in
+                let rect = CGRect(origin: .zero, size: size).insetBy(dx: 2.5, dy: 2.5)
+                let path = UIBezierPath(ovalIn: rect)
+                UIColor.white.withAlphaComponent(0.85).setFill()
+                path.fill()
+                path.lineWidth = 2
+                path.setLineDash([3, 2.5], count: 2, phase: 0)
+                tint.setStroke()
+                path.stroke()
+                _ = context
+            }
+            ghostCache[tint] = image
+            return image
+        }
+
         init(_ parent: AppleMapView) { self.parent = parent }
 
         func mapView(_ mapView: MKMapView, viewFor annotation: MKAnnotation) -> MKAnnotationView? {
             guard let place = annotation as? RexPlaceAnnotation else { return nil }
+
+            // Oct 5 — "a branch nobody's been to should read as 'here, but
+            // nobody vouches for it' at a glance" — and the first attempt
+            // didn't. It was the same teardrop marker in a paler colour, which
+            // on a light basemap reads as a pin that hasn't finished loading
+            // rather than a different kind of thing.
+            //
+            // A different shape says it instead: a small dashed ring, which
+            // nothing else on the map uses. Shape carries at a glance in a way
+            // tint never does, and it keeps working for anyone who can't
+            // separate the two colours.
+            if place.isUnvisitedBranch {
+                let ring = mapView.dequeueReusableAnnotationView(
+                    withIdentifier: Self.ghostReuseId
+                ) ?? MKAnnotationView(annotation: annotation, reuseIdentifier: Self.ghostReuseId)
+                ring.annotation = annotation
+                ring.image = Self.ghostImage(tint: place.tint)
+                ring.canShowCallout = false
+                // Always loses a collision with a real recommendation.
+                ring.displayPriority = .defaultLow
+                ring.collisionMode = .circle
+                return ring
+            }
+
             let view = mapView.dequeueReusableAnnotationView(
                 withIdentifier: Self.pinReuseId,
                 for: annotation
             ) as? MKMarkerAnnotationView
-            // Oct 5 — a branch nobody has been to is drawn hollow: the
-            // chain's colour on a pale ground rather than filled with it. It
-            // has to be legible as "here, but unvouched" at a glance, because
-            // a pin that looks like a recommendation is one as far as anybody
-            // reading the map is concerned.
-            if place.isUnvisitedBranch {
-                view?.markerTintColor = UIColor(RexColor.card)
-                view?.glyphTintColor = place.tint
-                view?.alpha = 0.9
-                view?.displayPriority = .defaultLow
-            } else {
-                view?.markerTintColor = place.tint
-                view?.glyphTintColor = .white
-                view?.alpha = 1
-                view?.displayPriority = .defaultHigh
-            }
+            view?.markerTintColor = place.tint
+            view?.glyphTintColor = .white
             view?.glyphText = nil
             view?.glyphImage = showGlyphs
                 ? UIImage(systemName: place.symbol)

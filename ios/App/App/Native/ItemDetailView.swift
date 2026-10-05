@@ -75,6 +75,12 @@ struct ItemDetailView: View {
     /// already had one (#133), the full item page never did.
     @Environment(\.viewOnMap) private var viewOnMap
 
+    /// Whether anybody other than you has said something about this.
+    private var othersHaveSpoken: Bool {
+        recs.contains { $0.user_id != RexAPI.shared.currentUserId && !($0.note ?? "").isEmpty }
+            || recs.contains { $0.user_id != RexAPI.shared.currentUserId && $0.rating > 0 }
+    }
+
     private var myRec: FeedRecommendation? {
         recs.first { $0.user_id == RexAPI.shared.currentUserId }
     }
@@ -100,10 +106,35 @@ struct ItemDetailView: View {
                     googlePhotosSection
                     communityPhotosSection
                     recipeSection(item: item)
-                    yourTakeSection
-                    friendsSection
-                    // Oct 5 — context below the people. Cast, then other work
-                    // by the same author, then where else it exists.
+                    // Oct 5 — "if you are opening a friend's Rex, perhaps the
+                    // box to Rex it yourself should be below the friend's
+                    // review?"
+                    //
+                    // Yes, and it's the stronger half of the ask. You open a
+                    // friend's recommendation to read what they said; a form
+                    // asking what *you* think, before you've been told
+                    // anything, is the app talking over them. When somebody
+                    // else has already said something, they go first.
+                    //
+                    // When nobody has, your own box leads — there is nothing
+                    // to read, and an empty "What friends say" above a form is
+                    // a worse opening than the form.
+                    if othersHaveSpoken {
+                        friendsSection
+                        yourTakeSection
+                    } else {
+                        yourTakeSection
+                        friendsSection
+                    }
+                    // Context below the people. Cast, then other work by the
+                    // same author, then where else it exists.
+                    // Oct 5 — the synopsis and the outside world's scores moved
+                    // down here from the header. They are the longest thing on
+                    // the page and they were sitting between you and the
+                    // reviews; nobody opens a friend's Rex to read a synopsis
+                    // first.
+                    detailsSection
+                        .padding(.horizontal, 16)
                     chainSection
                     castSection
                     moreByAuthorSection
@@ -270,9 +301,9 @@ struct ItemDetailView: View {
                         .font(.system(size: 22, weight: .semibold, design: .rounded))
                         .foregroundStyle(RexColor.foreground)
 
-                    if let subtitle = item.subtitle, !subtitle.isEmpty {
-                        Text(subtitle).font(.system(size: 13)).foregroundStyle(RexColor.mutedForeground)
-                    }
+                    // Author, year, running time, certificate — one line,
+                    // where the hero layout gave them two.
+                    heroFacts(item: item, category: category)
                     if let address = item.address, !address.isEmpty {
                         HStack(spacing: 3) {
                             Image(systemName: "mappin").font(.system(size: 10))
@@ -286,7 +317,6 @@ struct ItemDetailView: View {
 
             savedByRow
 
-            detailsSection
 
             // Oct 4 — "the Google reviews line is corrupted on place cards."
             // It wasn't corrupted, it was crushed: this was one HStack holding
@@ -501,17 +531,22 @@ struct ItemDetailView: View {
         }
     }
 
-    /// Oct 4 — every page opens with a picture across the width now, not just
-    /// places. What differs is how: a place uses its photograph and a film its
-    /// backdrop still, both of which are landscape and fill the frame; a book
-    /// or a podcast has only a portrait cover, which is floated on a tinted
-    /// ground rather than stretched, because a stretched cover looks like a
-    /// mistake rather than a design.
+    /// Oct 5 — "for the book page (and TV and film), can we please go back to
+    /// having the image as a thumbnail next to the title and author. I
+    /// basically want to compress the info so that you see the reviews in the
+    /// screen you open."
     ///
-    /// A list keeps the old layout — its "cover" is often one of Rex's own
-    /// drawings, which is a small illustration and not a photograph.
+    /// Yesterday every page opened with a picture across the width. For a
+    /// place that is right — you decide whether to go by looking at it. For a
+    /// book it isn't: the cover is decoration you have usually already seen,
+    /// and 180pt of it pushes the only thing you came for below the fold.
+    ///
+    /// So the hero belongs to the categories whose picture is the information:
+    /// a place, an event, a recipe. Everything else goes back to the cover
+    /// beside the title, which costs 76pt instead of 180 and leaves the first
+    /// review on the opening screen.
     private func usesHeroImage(category: RexCategory) -> Bool {
-        category != .list && category != .other
+        category == .place || category == .event || category == .recipe
     }
 
     /// Whether the hero image is landscape and should fill the frame, or
