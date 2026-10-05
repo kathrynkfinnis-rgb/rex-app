@@ -277,6 +277,16 @@ struct RexNotification: Codable, Identifiable {
     }
 
     var linkedTitle: String? { data?["title"]?.stringValue }
+    /// Oct 5 — "can't click through 'want to try' on the notification
+    /// screen." A want's notifications carry entity_type 'want' (the like
+    /// trigger added on 3 October, and want comments before it), and the
+    /// notification row only knew how to open a 'recommendation' — so they
+    /// fell through to the plain, untappable case.
+    var linkedWantId: String? {
+        guard entity_type == "want", let id = entity_id else { return nil }
+        return id
+    }
+
     var linksToFriends: Bool {
         entity_type == "friendship" || type == "friend_request" || type == "friend_accepted"
     }

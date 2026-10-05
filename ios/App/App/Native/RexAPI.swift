@@ -5357,6 +5357,28 @@ final class RexAPI {
         return Dictionary(uniqueKeysWithValues: rows.map { ($0.id, $0.item_id) })
     }
 
+    /// Oct 5 — the item behind each of these wants, so a notification about
+    /// one can open the thing it is about. Same shape as the recommendation
+    /// lookup above, against the table wants actually live in.
+    func fetchItemIds(forWants wantIds: [String]) async -> [String: String] {
+        guard !wantIds.isEmpty, let token = try? await validToken() else { return [:] }
+        var components = URLComponents(url: baseURL.appendingPathComponent("/rest/v1/wants"), resolvingAgainstBaseURL: false)!
+        components.queryItems = [
+            URLQueryItem(name: "select", value: "id,item_id"),
+            URLQueryItem(name: "id", value: "in.(\(wantIds.joined(separator: ",")))"),
+        ]
+        guard let url = components.url else { return [:] }
+        var request = URLRequest(url: url)
+        request.setValue(anonKey, forHTTPHeaderField: "apikey")
+        request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+        guard let (data, response) = try? await URLSession.shared.data(for: request),
+              let http = response as? HTTPURLResponse, http.statusCode < 400
+        else { return [:] }
+        struct Row: Codable { let id: String; let item_id: String }
+        let rows = (try? JSONDecoder().decode([Row].self, from: data)) ?? []
+        return Dictionary(uniqueKeysWithValues: rows.map { ($0.id, $0.item_id) })
+    }
+
     func fetchMapPlaces() async throws -> [MapPlace] {
         let token = try await validToken()
         // "the map doesn't even load" (Aug 26/27) — the embedded profiles(...)

@@ -20,6 +20,8 @@ struct NotificationsView: View {
     /// id, not an item id, and PostgREST can't embed it directly since it's
     /// polymorphic (could be a recommendation, a friendship, or a request).
     @State private var recItemIds: [String: String] = [:]
+    /// Oct 5 — the same, for wants, which live in their own table.
+    @State private var wantItemIds: [String: String] = [:]
     /// Friend request currently mid-Accept/Decline, so its buttons can show a
     /// spinner and the row can't be double-tapped.
     @State private var respondingId: String?
@@ -165,6 +167,11 @@ struct NotificationsView: View {
             }
             .buttonStyle(.plain)
         } else if let recId = n.linkedRecommendationId, let itemId = recItemIds[recId] {
+            NavigationLink(value: itemId) { rowContent(n) }.buttonStyle(.plain)
+        } else if let wantId = n.linkedWantId, let itemId = wantItemIds[wantId] {
+            // Oct 5 — a want has no page of its own, so the thing it is about
+            // is the honest destination: somebody liked your want-to-try, and
+            // tapping it shows you what they liked.
             NavigationLink(value: itemId) { rowContent(n) }.buttonStyle(.plain)
         } else if n.linksToFriends, let actorId = n.actor_id {
             // Oct 4 — "clicking on this notification should take you to the
@@ -321,6 +328,8 @@ struct NotificationsView: View {
             // non-tappable rather than the whole screen erroring out.
             let recIds = Array(Set(notifications.compactMap(\.linkedRecommendationId)))
             recItemIds = (try? await RexAPI.shared.fetchItemIds(forRecommendations: recIds)) ?? [:]
+            let wantIds = Array(Set(notifications.compactMap(\.linkedWantId)))
+            wantItemIds = await RexAPI.shared.fetchItemIds(forWants: wantIds)
             // Sept 15 — "These notifications should change now that they have
             // been actioned" (Danny). He'd accepted the requests from the
             // Friends screen, but these rows only ever knew about answers
