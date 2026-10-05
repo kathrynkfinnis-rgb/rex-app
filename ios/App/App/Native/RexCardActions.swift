@@ -30,7 +30,13 @@ struct RexCardActions: View {
     /// public page on find-rex.com: the Rex itself, whoever posted it, and a
     /// way in for someone who hasn't got the app yet.
     private var shareURL: URL? {
-        RexShareLink.url(recommendationId: rec.id, type: rec.items?.type)
+        // Oct 5 — "want to be able to send 'want to try' via WhatsApp."
+        // A want's feed row carries the want's own id behind a "want-" prefix
+        // (FeedRecommendation.isWant), and /w/<id> is its public page.
+        if rec.isWant {
+            return RexShareLink.wantURL(wantId: String(rec.id.dropFirst("want-".count)))
+        }
+        return RexShareLink.url(recommendationId: rec.id, type: rec.items?.type)
     }
 
     private var shareText: String {
@@ -38,7 +44,10 @@ struct RexCardActions: View {
         let who = rec.profiles?.display_name ?? rec.profiles?.username ?? "A friend"
         // Oct 5 — the link and the invitation come from RexShareLink.message
         // so every share in the app reads the same in a chat thread.
-        return RexShareLink.message("\(who) Rex'd \(title) on REX", url: shareURL)
+        let lead = rec.isWant
+            ? "\(who) wants to try \(title) on REX"
+            : "\(who) Rex'd \(title) on REX"
+        return RexShareLink.message(lead, url: shareURL)
     }
 
     var body: some View {
@@ -124,12 +133,11 @@ struct RexCardActions: View {
                 Task { await toggleWant() }
             }
 
-            // `/r/$id` is a real public page, but it's built specifically
-            // for a recommendation id — a want has no equivalent page
-            // (that'd need a web-side route + RPC of its own), so sharing
-            // one right now would just hand out a dead link. Held back for
-            // wants until that exists, rather than ship a broken share.
-            if !rec.isWant, let shareURL {
+            // A want shares too now: /w/<id> renders it the same way /r/<id>
+            // renders a Rex, so the link is live either way. A blast is still
+            // held back — it's a question put to your friends, and a public
+            // page for one would be addressed to nobody.
+            if !rec.isBlast, let shareURL {
                 ShareLink(item: shareURL, message: Text(shareText)) {
                     Image(systemName: "paperplane")
                         .font(.system(size: 15))

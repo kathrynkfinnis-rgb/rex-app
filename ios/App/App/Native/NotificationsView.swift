@@ -178,9 +178,14 @@ struct NotificationsView: View {
             // person's profile not to the friends page." It said somebody
             // accepted your request, and then showed you a list of everybody;
             // the one person it was about is what you wanted.
+            // The actor join can come back empty — a stranger's profile row is
+            // invisible until you're connected. Passing "Profile" as a stand-in
+            // name put that literal word in the title, the avatar and the empty
+            // state, which made a tap that had worked look like one that
+            // hadn't. UserProfileView looks the real name up; it needs none.
             NavigationLink(value: UserProfileRoute(
                 userId: actorId,
-                name: n.actor?.display_name ?? n.actor?.username ?? "Profile"
+                name: n.actor?.display_name ?? n.actor?.username ?? ""
             )) { rowContent(n) }.buttonStyle(.plain)
         } else if n.linksToFriends {
             NavigationLink(value: FriendsRoute()) { rowContent(n) }.buttonStyle(.plain)
@@ -195,7 +200,20 @@ struct NotificationsView: View {
     /// respondToFriendRequest(id:) expects.
     private func friendRequestRow(_ n: RexNotification) -> some View {
         VStack(alignment: .leading, spacing: RexSpacing.md) {
-            rowContentInner(n)
+            // Oct 5 — "you can't click on said friend once you have accepted.
+            // I want to go to their profile like in other notifications."
+            // The Accept/Decline buttons are the row's job, so the row itself
+            // was never a link — which left the one notification that names a
+            // person as the only one you couldn't tap through to them from.
+            // Only the content is the link; the buttons below stay buttons.
+            if let actorId = n.actor_id {
+                NavigationLink(value: UserProfileRoute(
+                    userId: actorId,
+                    name: n.actor?.display_name ?? n.actor?.username ?? ""
+                )) { rowContentInner(n) }.buttonStyle(.plain)
+            } else {
+                rowContentInner(n)
+            }
 
             if let accepted = respondedOutcome[n.id] {
                 Label(accepted ? "You\u{2019}re friends" : "No longer pending",

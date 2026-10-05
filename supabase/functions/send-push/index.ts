@@ -244,6 +244,11 @@ Deno.serve(async (req: Request) => {
           alert: { body: notifCopy(notification.type, actorName, notification.data ?? {}) },
           sound: "default",
         },
+        // `type` and `actor_id` are here so the app can route a tap without
+        // having to infer the destination from entity_type alone — a friendship
+        // notification's entity_id is the friendship row, not the person.
+        type: notification.type,
+        actor_id: notification.actor_id ?? null,
         entity_type: notification.entity_type,
         entity_id: notification.entity_id,
       }),

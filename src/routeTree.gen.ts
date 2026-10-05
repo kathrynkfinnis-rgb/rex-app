@@ -30,6 +30,7 @@ import { Route as AuthenticatedYouRouteImport } from './routes/_authenticated/yo
 import { Route as CIdRouteImport } from './routes/c.$id'
 import { Route as RIdRouteImport } from './routes/r.$id'
 import { Route as TIdRouteImport } from './routes/t.$id'
+import { Route as WIdRouteImport } from './routes/w.$id'
 import { Route as AuthenticatedAskIndexRouteImport } from './routes/_authenticated/ask.index'
 import { Route as AuthenticatedAskIdRouteImport } from './routes/_authenticated/ask.$id'
 import { Route as AuthenticatedGroupIdRouteImport } from './routes/_authenticated/group.$id'
@@ -146,6 +147,11 @@ const TIdRoute = TIdRouteImport.update({
   path: '/t/$id',
   getParentRoute: () => rootRouteImport,
 } as any)
+const WIdRoute = WIdRouteImport.update({
+  id: '/w/$id',
+  path: '/w/$id',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const AuthenticatedAskIndexRoute = AuthenticatedAskIndexRouteImport.update({
   id: '/ask/',
   path: '/ask/',
@@ -204,6 +210,7 @@ export interface FileRoutesByFullPath {
   '/c/$id': typeof CIdRoute
   '/r/$id': typeof RIdRoute
   '/t/$id': typeof TIdRoute
+  '/w/$id': typeof WIdRoute
   '/ask/$id': typeof AuthenticatedAskIdRoute
   '/group/$id': typeof AuthenticatedGroupIdRoute
   '/item/$id': typeof AuthenticatedItemIdRoute
@@ -233,6 +240,7 @@ export interface FileRoutesByTo {
   '/c/$id': typeof CIdRoute
   '/r/$id': typeof RIdRoute
   '/t/$id': typeof TIdRoute
+  '/w/$id': typeof WIdRoute
   '/ask/$id': typeof AuthenticatedAskIdRoute
   '/group/$id': typeof AuthenticatedGroupIdRoute
   '/item/$id': typeof AuthenticatedItemIdRoute
@@ -264,6 +272,7 @@ export interface FileRoutesById {
   '/c/$id': typeof CIdRoute
   '/r/$id': typeof RIdRoute
   '/t/$id': typeof TIdRoute
+  '/w/$id': typeof WIdRoute
   '/_authenticated/ask/$id': typeof AuthenticatedAskIdRoute
   '/_authenticated/group/$id': typeof AuthenticatedGroupIdRoute
   '/_authenticated/item/$id': typeof AuthenticatedItemIdRoute
@@ -295,6 +304,7 @@ export interface FileRouteTypes {
     | '/c/$id'
     | '/r/$id'
     | '/t/$id'
+    | '/w/$id'
     | '/ask/$id'
     | '/group/$id'
     | '/item/$id'
@@ -324,6 +334,7 @@ export interface FileRouteTypes {
     | '/c/$id'
     | '/r/$id'
     | '/t/$id'
+    | '/w/$id'
     | '/ask/$id'
     | '/group/$id'
     | '/item/$id'
@@ -354,6 +365,7 @@ export interface FileRouteTypes {
     | '/c/$id'
     | '/r/$id'
     | '/t/$id'
+    | '/w/$id'
     | '/_authenticated/ask/$id'
     | '/_authenticated/group/$id'
     | '/_authenticated/item/$id'
@@ -370,6 +382,7 @@ export interface RootRouteChildren {
   CIdRoute: typeof CIdRoute
   RIdRoute: typeof RIdRoute
   TIdRoute: typeof TIdRoute
+  WIdRoute: typeof WIdRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -521,6 +534,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof TIdRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/w/$id': {
+      id: '/w/$id'
+      path: '/w/$id'
+      fullPath: '/w/$id'
+      preLoaderRoute: typeof WIdRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/_authenticated/ask/': {
       id: '/_authenticated/ask/'
       path: '/ask'
@@ -634,6 +654,7 @@ const rootRouteChildren: RootRouteChildren = {
   CIdRoute: CIdRoute,
   RIdRoute: RIdRoute,
   TIdRoute: TIdRoute,
+  WIdRoute: WIdRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)

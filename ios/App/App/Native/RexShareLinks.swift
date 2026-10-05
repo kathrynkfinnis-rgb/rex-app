@@ -24,6 +24,13 @@ enum RexShareLink {
         URL(string: "\(site)/c/\(listId)")
     }
 
+    /// Oct 5 — "want to be able to send 'want to try' via WhatsApp." The
+    /// share icon was hidden on want cards until this page existed, because a
+    /// want is not a recommendation and /r/<id> would have 404'd on one.
+    static func wantURL(wantId: String) -> URL? {
+        URL(string: "\(site)/w/\(wantId)")
+    }
+
     /// Oct 5 — "when you share something on WhatsApp it should always have a
     /// 'to see more, join Rex' with a short link."
     ///

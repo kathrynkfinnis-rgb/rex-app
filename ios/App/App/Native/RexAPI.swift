@@ -23,10 +23,31 @@ enum RexAPIError: LocalizedError {
 /// picks a friendly line for the Postgres error codes worth naming and
 /// otherwise just returns the fallback, never the raw JSON.
 private func friendlyError(_ data: Data, fallback: String) -> String {
-    guard let obj = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
-          let code = obj["code"] as? String else {
+    guard let obj = try? JSONSerialization.jsonObject(with: data) as? [String: Any] else {
         return fallback
     }
+
+    // Oct 5 — "import doc function still not working… now carries this error
+    // message", showing the generic fallback.
+    //
+    // This only ever looked for a Postgres error code, which an edge function
+    // doesn't have one of. So extract-recommendations would report exactly
+    // what went wrong — "AI extraction failed [401]", "ANTHROPIC_API_KEY not
+    // configured" — and the app replaced it with "Couldn't read
+    // recommendations out of that text", which blames the document for a
+    // problem the document had nothing to do with. The functions all answer
+    // with { error }, PostgREST with { message }; either is better than a
+    // guess, and the fallback still covers a response with neither.
+    guard let code = obj["code"] as? String else {
+        for key in ["error", "message"] {
+            if let detail = obj[key] as? String,
+               !detail.trimmingCharacters(in: .whitespaces).isEmpty {
+                return detail
+            }
+        }
+        return fallback
+    }
+
     switch code {
     case "23505": return "\(fallback) That already exists."
     case "23514": return "\(fallback) One of the values wasn't valid — please try again."

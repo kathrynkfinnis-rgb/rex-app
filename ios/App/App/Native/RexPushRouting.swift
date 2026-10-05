@@ -36,6 +36,8 @@ final class RexPushRouter: ObservableObject {
         case blast(String)
         /// A shared collection, by list id.
         case collection(String)
+        /// A friend request or acceptance, by friendship row id — see route().
+        case friendship(String)
         /// Something we don't have a screen for, or a notification with no
         /// entity at all. The notifications list is the honest answer: it
         /// always has the thing that was tapped in it.
@@ -66,7 +68,13 @@ final class RexPushRouter: ObservableObject {
         // destination be the item it is about.
         case "want": pending = .want(entityId)
         case "item": pending = .item(entityId)
-        case "user", "profile", "friendship": pending = .profile(entityId)
+        case "user", "profile": pending = .profile(entityId)
+        // Oct 5 — "got a new friend request. But it just took me to the home
+        // page." A friendship notification's entity_id is the friendship ROW's
+        // id, not a user's, so sending it to .profile asked for a profile that
+        // doesn't exist and the push went nowhere. The row knows both people;
+        // whoever handles this works out which of them isn't you.
+        case "friendship": pending = .friendship(entityId)
         case "request", "blast": pending = .blast(entityId)
         case "list", "collection": pending = .collection(entityId)
         default: pending = .notifications
@@ -89,6 +97,7 @@ final class RexPushRouter: ObservableObject {
         // needs once it knows what kind of item is behind it.
         case "r", "t": pending = .recommendation(id)
         case "c": pending = .collection(id)
+        case "w": pending = .want(id)
         default: return false
         }
         return true

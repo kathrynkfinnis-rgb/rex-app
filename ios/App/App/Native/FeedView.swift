@@ -1160,6 +1160,21 @@ struct FeedView: View {
             } else {
                 path.append(NotificationsRoute())
             }
+        case .friendship(let friendshipId):
+            // The other person in that friendship — the one the notification
+            // was about. If we can't resolve it (declined, or withdrawn), the
+            // notifications list still says what happened.
+            guard let me = RexAPI.shared.currentUserId else {
+                path.append(NotificationsRoute())
+                return
+            }
+            if let f = (try? await RexAPI.shared.fetchFriendships())?
+                .first(where: { $0.id == friendshipId }),
+               let other = [f.requester_id, f.addressee_id].first(where: { $0 != me }) {
+                path.append(UserProfileRoute(userId: other, name: ""))
+            } else {
+                path.append(NotificationsRoute())
+            }
         case .collection(let listId):
             // The collection loads its own name, so the link doesn't need one.
             path.append(CollectionRoute(listId: listId, name: "Collection", isMine: false))

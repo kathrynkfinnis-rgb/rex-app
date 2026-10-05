@@ -6,7 +6,8 @@
         "components": [
           { "/": "/r/*", "comment": "A shared Rex" },
           { "/": "/t/*", "comment": "A shared trip" },
-          { "/": "/c/*", "comment": "A shared collection" }
+          { "/": "/c/*", "comment": "A shared collection" },
+          { "/": "/w/*", "comment": "A shared want-to-try" }
         ]
       }
     ]
