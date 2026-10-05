@@ -104,6 +104,24 @@ struct CompactItemRow: View {
             if rec.rating > 0 {
                 RexRatingBadge(raw: rec.rating, compact: true)
             }
+            // Oct 5 — "when I upload a list, I want to be able to embed the
+            // hyperlinks (as a precursor to getting affiliate revenue)."
+            //
+            // A link reached the item page and nowhere else, so on a list of
+            // products — which is exactly where the link is the point — you
+            // had to open each row to find it. Through RexOutboundLinkButton,
+            // which is what routes a tap via the affiliate redirect.
+            if let link = rec.items?.link_url,
+               let url = URL(string: link),
+               url.scheme?.hasPrefix("http") == true {
+                RexOutboundLinkButton(url: url) {
+                    Image(systemName: "arrow.up.right.square")
+                        .font(.system(size: 14))
+                        .foregroundStyle(RexColor.primary)
+                        .frame(width: 30, height: 30)
+                        .contentShape(Rectangle())
+                }
+            }
             Image(systemName: "chevron.right")
                 .font(.system(size: 11, weight: .semibold))
                 .foregroundStyle(RexColor.placeholder)

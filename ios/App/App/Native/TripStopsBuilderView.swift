@@ -127,7 +127,17 @@ extension Array where Element == ItineraryEntry {
                 rating: row.raw_rating ?? 0,
                 note: row.raw_note ?? "",
                 section: current,
-                photoURL: nil
+                photoURL: nil,
+                // Oct 5 — "when I upload a list, I want to be able to embed
+                // the hyperlinks. This is currently not working."
+                //
+                // The extractor returns a url per item and the staging row
+                // keeps it, and the batch approval path has always passed it
+                // on. This path — the one an import actually takes now, where
+                // the document fills the Add form rather than posting itself —
+                // built a DraftStop without it, so every link was dropped
+                // between the document and the saved item.
+                linkURL: row.raw_url
             )
             out.append(ItineraryEntry(kind: .stop(stop)))
         }
