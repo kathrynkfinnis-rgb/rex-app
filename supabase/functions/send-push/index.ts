@@ -184,11 +184,19 @@ Deno.serve(async (req: Request) => {
     }
   }
 
-  const { data: tokens } = await supabase
+  const { data: tokenRows } = await supabase
     .from("push_tokens")
     .select("device_token")
     .eq("user_id", notification.user_id);
-  if (!tokens || tokens.length === 0) {
+  // Oct 5 — "we are currently getting double push notifications."
+  //
+  // One push goes out per device token, so the same token stored twice is two
+  // identical notifications on one phone. There is a unique index on
+  // (user_id, device_token), but a token can still arrive twice across
+  // reinstalls, and this costs nothing to be certain about.
+  const tokens = [...new Set((tokenRows ?? []).map((t) => t.device_token).filter(Boolean))]
+    .map((device_token) => ({ device_token }));
+  if (tokens.length === 0) {
     return new Response(JSON.stringify({ skipped: "no device token" }), { status: 200 });
   }
 
@@ -215,6 +223,17 @@ Deno.serve(async (req: Request) => {
         authorization: `bearer ${jwt}`,
         "apns-topic": bundleId,
         "apns-push-type": "alert",
+        // Oct 5 — the other half of "we are getting double push
+        // notifications", and the half that holds whatever the cause.
+        //
+        // Deduplicating tokens fixes one source; a Database Webhook
+        // registered twice, or retried, would still deliver the same
+        // notification twice and no amount of care inside this function would
+        // know. A collapse id is APNs' own answer: two pushes carrying the
+        // same one replace each other on the device rather than stacking, so
+        // one event is one notification however many times we are asked to
+        // send it. The notification's own id is exactly that key.
+        ...(notification.id ? { "apns-collapse-id": String(notification.id).slice(0, 64) } : {}),
       },
       body: JSON.stringify({
         aps: {
