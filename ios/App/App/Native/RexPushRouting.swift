@@ -26,11 +26,16 @@ final class RexPushRouter: ObservableObject {
     @Published var pending: Destination?
 
     enum Destination: Equatable {
-        /// A Rex, a want, a trip — anything with an item behind it.
+        /// A Rex, a trip — anything with an item behind it.
         case recommendation(String)
+        /// A want-to-try. It has no page of its own, so whoever handles this
+        /// looks up the item it is about; the id here is the want's.
+        case want(String)
         case item(String)
         case profile(String)
         case blast(String)
+        /// A shared collection, by list id.
+        case collection(String)
         /// Something we don't have a screen for, or a notification with no
         /// entity at all. The notifications list is the honest answer: it
         /// always has the thing that was tapped in it.
@@ -53,12 +58,40 @@ final class RexPushRouter: ObservableObject {
 
         switch entityType {
         case "recommendation": pending = .recommendation(entityId)
-        case "want": pending = .recommendation("want-\(entityId)")
+        // Oct 5 — "please can you fix want to try". This used to encode the
+        // want id into a recommendation id with a "want-" prefix, which the
+        // feed then recognised and answered by opening the notifications list
+        // — so tapping a push about your want-to-try went nowhere in
+        // particular. A want is its own kind of thing; saying so lets the
+        // destination be the item it is about.
+        case "want": pending = .want(entityId)
         case "item": pending = .item(entityId)
         case "user", "profile", "friendship": pending = .profile(entityId)
         case "request", "blast": pending = .blast(entityId)
+        case "list", "collection": pending = .collection(entityId)
         default: pending = .notifications
         }
+    }
+
+    /// Oct 5 — a find-rex.com link tapped in WhatsApp, now that the app claims
+    /// those domains. The paths are the web routes' own (src/routes/r.$id,
+    /// t.$id, c.$id), so a link always opens the same thing whether or not the
+    /// person has the app; anything else is left to Safari rather than
+    /// swallowed, which is why this reports whether it handled the URL.
+    @discardableResult
+    func route(from url: URL) -> Bool {
+        let parts = url.path.split(separator: "/").map(String.init)
+        guard parts.count >= 2, !parts[1].isEmpty else { return false }
+        let id = parts[1]
+
+        switch parts[0] {
+        // A trip is a recommendation too — the feed sorts out which screen it
+        // needs once it knows what kind of item is behind it.
+        case "r", "t": pending = .recommendation(id)
+        case "c": pending = .collection(id)
+        default: return false
+        }
+        return true
     }
 }
 

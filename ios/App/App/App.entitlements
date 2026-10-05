@@ -6,6 +6,11 @@
 	<array>
 		<string>Default</string>
 	</array>
+	<key>com.apple.developer.associated-domains</key>
+	<array>
+		<string>applinks:find-rex.com</string>
+		<string>applinks:www.find-rex.com</string>
+	</array>
 	<key>aps-environment</key>
 	<string>development</string>
 </dict>

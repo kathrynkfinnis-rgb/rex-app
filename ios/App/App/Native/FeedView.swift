@@ -1149,13 +1149,21 @@ struct FeedView: View {
             path.append(BlastRoute(requestId: requestId, title: "Blast"))
         case .notifications:
             path.append(NotificationsRoute())
-        case .recommendation(let recId):
-            // A want has no page of its own; its notification goes to the list
-            // rather than a dead end.
-            guard !recId.hasPrefix("want-") else {
+        case .want(let wantId):
+            // Oct 5 — "please can you fix want to try." A want has no page of
+            // its own, so the item it is about is the destination: somebody
+            // liked your want-to-try, and tapping it shows you what they liked.
+            // This used to land on the notifications list, which is where you
+            // had just tapped from.
+            if let itemId = await RexAPI.shared.fetchItemIds(forWants: [wantId])[wantId] {
+                path.append(itemId)
+            } else {
                 path.append(NotificationsRoute())
-                return
             }
+        case .collection(let listId):
+            // The collection loads its own name, so the link doesn't need one.
+            path.append(CollectionRoute(listId: listId, name: "Collection", isMine: false))
+        case .recommendation(let recId):
             if let rec = (try? await RexAPI.shared.fetchRecommendations(ids: [recId]))?.first {
                 if RexCategory(rawType: rec.items?.type) == .trip {
                     path.append(TripRoute(recommendationId: rec.id, title: rec.items?.title ?? "Trip"))
