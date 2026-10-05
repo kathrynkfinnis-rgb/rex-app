@@ -84,12 +84,16 @@ struct RexItem: Codable {
     let opening_hours: [String]?
     let google_photo_urls: [String]?
     let details_fetched_at: String?
+    /// Oct 5 — the brand domain shared by branches of one chain. Null for
+    /// anywhere that isn't part of one.
+    let chain_key: String?
 
-    init(id: String, type: String, title: String, subtitle: String?, image_url: String?, genre: String?, address: String? = nil, google_rating: Double? = nil, google_rating_count: Int? = nil, recipe_text: String? = nil, link_url: String? = nil, lat: Double? = nil, lng: Double? = nil, external_id: String? = nil, external_source: String? = nil, summary: String? = nil, opening_hours: [String]? = nil, google_photo_urls: [String]? = nil, details_fetched_at: String? = nil) {
+    init(id: String, type: String, title: String, subtitle: String?, image_url: String?, genre: String?, address: String? = nil, google_rating: Double? = nil, google_rating_count: Int? = nil, recipe_text: String? = nil, link_url: String? = nil, lat: Double? = nil, lng: Double? = nil, external_id: String? = nil, external_source: String? = nil, summary: String? = nil, opening_hours: [String]? = nil, google_photo_urls: [String]? = nil, details_fetched_at: String? = nil, chain_key: String? = nil) {
         self.summary = summary
         self.opening_hours = opening_hours
         self.google_photo_urls = google_photo_urls
         self.details_fetched_at = details_fetched_at
+        self.chain_key = chain_key
         self.id = id
         self.type = type
         self.title = title

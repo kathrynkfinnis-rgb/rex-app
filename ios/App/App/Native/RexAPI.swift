@@ -926,7 +926,7 @@ final class RexAPI {
         // working against a database that hasn't had the migration yet.
         if let item = try? await fetchItem(
             id: id,
-            select: withRatings + ",summary,opening_hours,google_photo_urls,details_fetched_at"
+            select: withRatings + ",summary,opening_hours,google_photo_urls,details_fetched_at,chain_key"
         ) {
             return item
         }
@@ -1479,6 +1479,30 @@ final class RexAPI {
     /// explicitly instead (trip_id/list_id both null) and PATCHes it if
     /// found, so re-rating something you've already Rex'd on its own still
     /// updates in place rather than erroring or duplicating.
+    /// Oct 5 — the other branches of this place already in REX.
+    ///
+    /// Only reads what's here; it never asks Google. A branch nobody has put
+    /// in REX yet is found separately (RexSearch.chainBranches), because that
+    /// one does cost a call.
+    func chainSiblings(chainKey: String, excludingItemId: String) async -> [RexItem] {
+        guard let token = try? await validToken() else { return [] }
+        var components = URLComponents(url: baseURL.appendingPathComponent("/rest/v1/items"), resolvingAgainstBaseURL: false)!
+        components.queryItems = [
+            URLQueryItem(name: "select", value: "id,type,title,subtitle,image_url,genre,address,lat,lng"),
+            URLQueryItem(name: "chain_key", value: "eq.\(chainKey)"),
+            URLQueryItem(name: "id", value: "neq.\(excludingItemId)"),
+            URLQueryItem(name: "limit", value: "25"),
+        ]
+        guard let url = components.url else { return [] }
+        var request = URLRequest(url: url)
+        request.setValue(anonKey, forHTTPHeaderField: "apikey")
+        request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+        guard let (data, response) = try? await URLSession.shared.data(for: request),
+              let http = response as? HTTPURLResponse, http.statusCode < 400
+        else { return [] }
+        return (try? JSONDecoder().decode([RexItem].self, from: data)) ?? []
+    }
+
     /// Oct 4 — your own earlier standalone Rex of this item, if there is one.
     ///
     /// Posting a second Rex of the same thing is allowed now (a second visit,
@@ -1683,6 +1707,12 @@ final class RexAPI {
             // ("European Restaurant") alongside the sub-categories people
             // actually pick, and nothing could filter across the two.
             body["genre"] = rexNormalisedGenres(hit.genre, for: RexCategory(rawType: type)) ?? NSNull()
+            // Oct 5 — which chain this belongs to, if any. The brand's own
+            // domain, never its name: see RexSearch.chainKey for why a name
+            // can't tell Bancone City from the Crown in Doncaster.
+            if let key = RexSearch.chainKey(name: hit.title, websiteURL: hit.websiteURL) {
+                body["chain_key"] = key
+            }
             body["lat"] = hit.lat ?? NSNull()
             body["lng"] = hit.lng ?? NSNull()
         }

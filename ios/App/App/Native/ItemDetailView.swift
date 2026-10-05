@@ -26,6 +26,11 @@ struct ItemDetailView: View {
     /// populated it; every later visit reads the cached columns off the item.
     @State private var placeDetails: RexPlaceDetails?
     @State private var hoursExpanded = false
+    /// Oct 5 — other branches of this chain: those already in REX, and those
+    /// Google knows about that nobody has Rex'd.
+    @State private var chainBranchesHere: [RexItem] = []
+    @State private var chainBranchesElsewhere: [RexSearchHit] = []
+    @State private var addingBranch: RexSearchHit?
     /// Oct 3 — press coverage, under "On Google".
     @State private var articles: [RexArticle] = []
     @State private var recs: [FeedRecommendation] = []
@@ -99,6 +104,7 @@ struct ItemDetailView: View {
                     friendsSection
                     // Oct 5 — context below the people. Cast, then other work
                     // by the same author, then where else it exists.
+                    chainSection
                     castSection
                     moreByAuthorSection
                     elsewhereSection
@@ -131,6 +137,14 @@ struct ItemDetailView: View {
         }
         .task(id: item?.id) {
             if let item { await loadArticles(item) }
+        }
+        .task(id: item?.id) {
+            if let item { await loadChain(item) }
+        }
+        .sheet(item: $addingBranch) { branch in
+            // Rexing a branch is posting a Rex like any other — you say what
+            // you thought, because you are the one who went.
+            AddRexView(onDone: { Task { await load() } }, initialPlaceHit: branch)
         }
     }
 
@@ -739,6 +753,93 @@ struct ItemDetailView: View {
             .padding(.horizontal, 16)
             .padding(.top, RexSpacing.lg)
         }
+    }
+
+
+    /// Oct 5 — "if someone posts a small chain restaurant, can we Rex the
+    /// whole chain but make it clear where the actual Rex was… and if two
+    /// people Rex different venues of the same chain, can we flag that?"
+    ///
+    /// Nobody Rexes anywhere they haven't been. Instead a place knows its
+    /// siblings, so this can say how many people rate the chain and where —
+    /// which is the question underneath both halves of the ask. A branch
+    /// nobody has been to is listed plainly as that, and tapping it opens the
+    /// branch rather than claiming anything about it.
+    @ViewBuilder
+    private var chainSection: some View {
+        if !chainBranchesHere.isEmpty || !chainBranchesElsewhere.isEmpty {
+            VStack(alignment: .leading, spacing: RexSpacing.sm) {
+                Text(chainHeadline)
+                    .font(.system(size: 11, weight: .semibold))
+                    .tracking(0.3)
+                    .foregroundStyle(RexColor.mutedForeground)
+
+                ForEach(chainBranchesHere, id: \.id) { branch in
+                    NavigationLink(value: branch.id) {
+                        chainRow(title: branch.title, detail: branch.address, rexd: true)
+                    }
+                    .buttonStyle(.plain)
+                }
+
+                ForEach(chainBranchesElsewhere, id: \.id) { branch in
+                    Button {
+                        addingBranch = branch
+                    } label: {
+                        chainRow(title: branch.title, detail: branch.address, rexd: false)
+                    }
+                    .buttonStyle(.plain)
+                }
+            }
+            .padding(.horizontal, 16)
+            .padding(.top, RexSpacing.lg)
+        }
+    }
+
+    private var chainHeadline: String {
+        let known = chainBranchesHere.count + 1
+        if chainBranchesHere.isEmpty { return "Other branches" }
+        return "This chain \u{2014} \(known) branch\(known == 1 ? "" : "es") Rex'd by your friends"
+    }
+
+    private func chainRow(title: String, detail: String?, rexd: Bool) -> some View {
+        HStack(spacing: RexSpacing.sm) {
+            Image(systemName: rexd ? "mappin.circle.fill" : "mappin.circle")
+                .font(.system(size: 15))
+                .foregroundStyle(rexd ? RexColor.primary : RexColor.mutedForeground)
+            VStack(alignment: .leading, spacing: 1) {
+                Text(title)
+                    .font(RexFont.text(13.5, weight: .medium))
+                    .foregroundStyle(RexColor.foreground)
+                    .lineLimit(1)
+                Text(rexd ? (detail ?? "") : "Nobody's been to this one yet")
+                    .font(RexFont.text(11))
+                    .foregroundStyle(RexColor.mutedForeground)
+                    .lineLimit(1)
+            }
+            Spacer(minLength: 0)
+            Image(systemName: rexd ? "chevron.right" : "plus")
+                .font(.system(size: 11, weight: .semibold))
+                .foregroundStyle(RexColor.mutedForeground)
+        }
+        .padding(RexSpacing.sm + 2)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .contentShape(Rectangle())
+        .rexCard()
+    }
+
+    /// Branches already in REX, and branches Google knows about that nobody
+    /// has Rex'd. Fetched only for a place that belongs to a chain, so an
+    /// ordinary restaurant costs nothing.
+    private func loadChain(_ item: RexItem) async {
+        guard let key = item.chain_key, !key.isEmpty else { return }
+        chainBranchesHere = await RexAPI.shared.chainSiblings(chainKey: key, excludingItemId: item.id)
+        let known = Set(chainBranchesHere.map { $0.title.lowercased() } + [item.title.lowercased()])
+        let found = await RexSearch.chainBranches(
+            name: item.title,
+            key: key,
+            excludingPlaceId: item.external_id
+        )
+        chainBranchesElsewhere = found.filter { !known.contains($0.title.lowercased()) }
     }
 
     @ViewBuilder

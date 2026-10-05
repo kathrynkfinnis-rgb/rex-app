@@ -18,6 +18,9 @@ struct RexSearchHit: Identifiable, Hashable {
     /// #73/#103 — the web page a "Other"/Stuff search result came from.
     /// Nil for every other category; only productLookup() sets this.
     let productURL: String?
+    /// Oct 5 — the place's own website, from Google. Only used to work out
+    /// which chain it belongs to; see chainKey.
+    let websiteURL: String?
 
     var id: String { "\(externalSource):\(externalId)" }
 
@@ -26,7 +29,7 @@ struct RexSearchHit: Identifiable, Hashable {
         subtitle: String? = nil, imageURL: String? = nil, genre: String? = nil,
         address: String? = nil, lat: Double? = nil, lng: Double? = nil,
         googleRating: Double? = nil, googleRatingCount: Int? = nil,
-        productURL: String? = nil
+        productURL: String? = nil, websiteURL: String? = nil
     ) {
         self.externalId = externalId
         self.externalSource = externalSource
@@ -40,6 +43,7 @@ struct RexSearchHit: Identifiable, Hashable {
         self.googleRating = googleRating
         self.googleRatingCount = googleRatingCount
         self.productURL = productURL
+        self.websiteURL = websiteURL
     }
 }
 
@@ -191,6 +195,116 @@ enum RexSearch {
         // Her cap. A search that comes back full is probably a big chain
         // rather than a small one, so say nothing rather than guess.
         return branches.count >= 20 ? [] : branches
+    }
+
+
+    // MARK: - Chains
+
+    /// Oct 5 — what makes two places branches of one thing.
+    ///
+    /// The brand's own web domain, never the name. A name cannot distinguish
+    /// Bancone Covent Garden and Bancone City from the Crown in Blackheath and
+    /// the Crown in Doncaster, and no amount of cleverness will make it: one
+    /// pair is a business with five sites, the other is thirty pubs with
+    /// thirty landlords. A domain can tell them apart, because the business
+    /// has one website.
+    ///
+    /// Checked against what Google returns today: Bancone's five branches all
+    /// give bancone.co.uk, while eight results for "The Crown" give seven
+    /// different domains.
+    ///
+    /// The second guard is here: the domain has to look like this place's own
+    /// brand. Several Crowns point at greeneking.co.uk or vintageinn.co.uk —
+    /// a pub group's site, not a chain's — and without this they would bind
+    /// into one. "bancone.co.uk" belongs to Bancone; "greeneking.co.uk" does
+    /// not belong to the Crown.
+    static func chainKey(name: String, websiteURL: String?) -> String? {
+        guard let websiteURL, let host = URL(string: websiteURL)?.host?.lowercased() else { return nil }
+        let domain = host.hasPrefix("www.") ? String(host.dropFirst(4)) : host
+        guard looksLikeOwnBrand(name: name, domain: domain) else { return nil }
+        return domain
+    }
+
+    private static func looksLikeOwnBrand(name: String, domain: String) -> Bool {
+        // The name up to its first separator is the brand; what follows is
+        // usually the branch ("Mr Bao - Taiwanese Restaurant Peckham").
+        let brand = lettersOnly(name.split(whereSeparator: { "-–—,|·".contains($0) }).first.map(String.init) ?? name)
+        let label = lettersOnly(domain.split(separator: ".").first.map(String.init) ?? domain)
+        guard brand.count >= 4, label.count >= 4 else { return false }
+        return brand.hasPrefix(label) || label.hasPrefix(brand) || brand.contains(label)
+    }
+
+    private static func lettersOnly(_ s: String) -> String {
+        s.lowercased()
+            .folding(options: .diacriticInsensitive, locale: nil)
+            .replacingOccurrences(of: "[^a-z0-9]", with: "", options: .regularExpression)
+    }
+
+    /// The other branches of whatever this place belongs to.
+    ///
+    /// Returns nothing unless at least two places share the brand's domain —
+    /// a single pub with its own website is not a chain of one — and nothing
+    /// for anything with twenty or more, which is a big chain nobody means to
+    /// recommend wholesale.
+    static func chainBranches(name: String, key: String, excludingPlaceId: String?) async -> [RexSearchHit] {
+        guard !googleKey.isEmpty else { return [] }
+        var request = URLRequest(url: URL(string: "https://places.googleapis.com/v1/places:searchText")!)
+        request.httpMethod = "POST"
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        request.setValue(googleKey, forHTTPHeaderField: "X-Goog-Api-Key")
+        request.setValue(bundleId, forHTTPHeaderField: "X-Ios-Bundle-Identifier")
+        request.setValue(
+            "places.id,places.displayName,places.formattedAddress,places.location," +
+            "places.primaryTypeDisplayName,places.photos,places.rating,places.userRatingCount," +
+            "places.websiteUri",
+            forHTTPHeaderField: "X-Goog-FieldMask"
+        )
+        request.httpBody = try? JSONSerialization.data(withJSONObject: [
+            "textQuery": name.trimmingCharacters(in: .whitespaces),
+            "pageSize": 20,
+        ])
+
+        guard let (data, response) = try? await URLSession.shared.data(for: request),
+              let http = response as? HTTPURLResponse, http.statusCode < 400,
+              let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+              let results = json["places"] as? [[String: Any]]
+        else { return [] }
+
+        var seenAddresses = Set<String>()
+        var branches: [RexSearchHit] = []
+        var matchesIncludingThisOne = 0
+
+        for place in results {
+            guard let placeName = (place["displayName"] as? [String: Any])?["text"] as? String,
+                  chainKey(name: placeName, websiteURL: place["websiteUri"] as? String) == key
+            else { continue }
+            matchesIncludingThisOne += 1
+
+            guard let id = place["id"] as? String, id != excludingPlaceId,
+                  let address = place["formattedAddress"] as? String,
+                  seenAddresses.insert(address).inserted
+            else { continue }
+            let location = place["location"] as? [String: Any]
+            let photoName = (place["photos"] as? [[String: Any]])?.first?["name"] as? String
+            branches.append(RexSearchHit(
+                externalId: id,
+                externalSource: "google_places",
+                title: placeName,
+                subtitle: nil,
+                imageURL: photoName.map { "https://places.googleapis.com/v1/\($0)/media?maxWidthPx=800&key=\(googleKey)" },
+                genre: (place["primaryTypeDisplayName"] as? [String: Any])?["text"] as? String,
+                address: address,
+                lat: location?["latitude"] as? Double,
+                lng: location?["longitude"] as? Double,
+                googleRating: place["rating"] as? Double,
+                googleRatingCount: place["userRatingCount"] as? Int
+            ))
+        }
+
+        // One place sharing its own domain is not a chain; twenty is one
+        // nobody means to recommend wholesale.
+        guard matchesIncludingThisOne >= 2, matchesIncludingThisOne < 20 else { return [] }
+        return branches
     }
 
     /// Oct 5 — the brand, allowing for the branch being written into the name.
@@ -626,7 +740,9 @@ enum RexSearch {
         request.setValue(bundleId, forHTTPHeaderField: "X-Ios-Bundle-Identifier")
         request.setValue(
             "places.id,places.displayName,places.formattedAddress,places.location," +
-            "places.primaryTypeDisplayName,places.photos,places.rating,places.userRatingCount",
+            "places.primaryTypeDisplayName,places.photos,places.rating,places.userRatingCount," +
+            // Oct 5 — the website is how a chain is recognised. See chainKey.
+            "places.websiteUri",
             forHTTPHeaderField: "X-Goog-FieldMask"
         )
         // Text Search (New) defaults to biasing toward wherever Google
@@ -673,7 +789,9 @@ enum RexSearch {
                 lat: loc?["latitude"] as? Double,
                 lng: loc?["longitude"] as? Double,
                 googleRating: p["rating"] as? Double,
-                googleRatingCount: p["userRatingCount"] as? Int
+                googleRatingCount: p["userRatingCount"] as? Int,
+                productURL: nil,
+                websiteURL: p["websiteUri"] as? String
             )
         }
     }
