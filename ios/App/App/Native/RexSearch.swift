@@ -168,7 +168,7 @@ enum RexSearch {
         let branches = results.compactMap { place -> RexSearchHit? in
             guard let id = place["id"] as? String, id != placeId,
                   let displayName = (place["displayName"] as? [String: Any])?["text"] as? String,
-                  normalizeForChainMatch(displayName) == target,
+                  isSameChain(normalizeForChainMatch(displayName), as: target),
                   let address = place["formattedAddress"] as? String,
                   seenAddresses.insert(address).inserted
             else { return nil }
@@ -191,6 +191,36 @@ enum RexSearch {
         // Her cap. A search that comes back full is probably a big chain
         // rather than a small one, so say nothing rather than guess.
         return branches.count >= 20 ? [] : branches
+    }
+
+    /// Oct 5 — the brand, allowing for the branch being written into the name.
+    ///
+    /// Requiring the two names to be equal looked safe and was useless:
+    /// Bancone's six branches are "Bancone Covent Garden", "Bancone City",
+    /// "Bancone Golden Square" and so on, so searching for Bancone matched
+    /// none of them. The only chains an exact rule could find were the ones
+    /// whose branches share one name — which are the big ones the twenty cap
+    /// deliberately excludes. So it found nothing, ever.
+    ///
+    /// One name being the start of the other is the signal that actually
+    /// describes a chain. The word boundary stops "Bancone" matching
+    /// "Banconese", and five characters minimum keeps the shortest names out.
+    ///
+    /// It is not airtight, and the honest limit is worth writing down: this
+    /// matches "The Crown" to "The Crown Inn Doncaster", which are two
+    /// different pubs. No rule over names alone can tell those apart from
+    /// Bancone and Bancone City. What makes that acceptable is the screen it
+    /// feeds: every branch is listed with its address and nothing is ticked,
+    /// so a wrong suggestion costs a line somebody ignores. The alternative
+    /// tried first — demanding the names be equal — was airtight and found
+    /// nothing at all, because a chain small enough to be worth offering is
+    /// exactly the kind that writes the branch into the name.
+    private static func isSameChain(_ candidate: String, as target: String) -> Bool {
+        if candidate == target { return true }
+        let (shorter, longer) = candidate.count < target.count
+            ? (candidate, target) : (target, candidate)
+        guard shorter.count >= 5 else { return false }
+        return longer.hasPrefix(shorter + " ")
     }
 
     /// Chain names carry the branch in them often enough that an exact
