@@ -2260,7 +2260,35 @@ final class RexAPI {
         guard let http = response as? HTTPURLResponse, http.statusCode < 400 else {
             throw RexAPIError.server("Couldn't load profiles.")
         }
-        return try JSONDecoder().decode([RexProfileDetail].self, from: data)
+        let direct = try JSONDecoder().decode([RexProfileDetail].self, from: data)
+
+        // Oct 5 — the profiles policy only returns yourself, your friends and
+        // anyone you already have a friendship row with, so a stranger comes
+        // back missing rather than refused: 200 OK, one fewer row, nothing to
+        // notice. That left a stranger's profile page with no name to show at
+        // the exact moment you were deciding whether to add them. Anyone the
+        // table wouldn't hand over is looked up through profile_basics, which
+        // returns the same four columns search already gives out.
+        let missing = ids.filter { id in !direct.contains { $0.id == id } }
+        guard !missing.isEmpty else { return direct }
+        return direct + ((try? await profileBasics(ids: missing)) ?? [])
+    }
+
+    /// Name, username and avatar for people the profiles table won't return.
+    /// Best-effort by design: before the 5 October migration the function
+    /// doesn't exist, and the page falls back to the name it was opened with.
+    private func profileBasics(ids: [String]) async throws -> [RexProfileDetail] {
+        let token = try await validToken()
+        var request = URLRequest(url: baseURL.appendingPathComponent("/rest/v1/rpc/profile_basics"))
+        request.httpMethod = "POST"
+        request.setValue(anonKey, forHTTPHeaderField: "apikey")
+        request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        request.httpBody = try JSONSerialization.data(withJSONObject: ["_ids": ids])
+
+        let (data, response) = try await URLSession.shared.data(for: request)
+        guard let http = response as? HTTPURLResponse, http.statusCode < 400 else { return [] }
+        return (try? JSONDecoder().decode([RexProfileDetail].self, from: data)) ?? []
     }
 
     /// #128 — this used to SELECT /rest/v1/profiles directly with an

@@ -1141,7 +1141,10 @@ struct FeedView: View {
         case .item(let itemId):
             path.append(itemId)
         case .profile(let userId):
-            path.append(UserProfileRoute(userId: userId, name: "Profile"))
+            // A push carries a user id and no name. Passing a placeholder put the
+            // literal word "Profile" in the title, the avatar and the empty state;
+            // UserProfileView fetches the real one and says nothing until it has it.
+            path.append(UserProfileRoute(userId: userId, name: ""))
         case .blast(let requestId):
             path.append(BlastRoute(requestId: requestId, title: "Blast"))
         case .notifications:

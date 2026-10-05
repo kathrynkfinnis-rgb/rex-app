@@ -54,8 +54,18 @@ struct UserProfileView: View {
     /// A friend of yours who has posted nothing — as distinct from someone
     /// you can't see yet, whose Rex are hidden rather than absent.
     /// "Send Phoebe a Rex" rather than "Send phoebebragg a Rex".
+    /// Their name, as best we know it. The route carries one so the page has
+    /// a title the instant it opens; a push notification carries only a user
+    /// id and passes none, and then the only honest thing to say until the
+    /// profile lands is nothing in particular.
+    private var displayName: String {
+        if let loaded = profile?.display_name, !loaded.isEmpty { return loaded }
+        if !route.name.isEmpty { return route.name }
+        return "This person"
+    }
+
     private var firstName: String {
-        let name = profile?.display_name ?? route.name
+        let name = displayName
         return name.split(separator: " ").first.map(String.init) ?? name
     }
 
@@ -123,8 +133,8 @@ struct UserProfileView: View {
                             .accessibilityHidden(true)
                         Text(recommendations.isEmpty
                              ? (connection == "none" || connection == "requested" || connection == "requested_you"
-                                ? "Add \(profile?.display_name ?? route.name) as a friend to see their Rex."
-                                : "\(profile?.display_name ?? route.name) hasn’t Rex’d anything yet.")
+                                ? "Add \(displayName) as a friend to see their Rex."
+                                : "\(displayName) hasn’t Rex’d anything yet.")
                              : "Nothing in this category.")
                             .font(RexFont.text(14))
                             .foregroundStyle(RexColor.mutedForeground)
@@ -182,14 +192,14 @@ struct UserProfileView: View {
             .padding(.bottom, RexSpacing.xxxl)
         }
         .background(RexColor.background.ignoresSafeArea())
-        .navigationTitle(profile?.display_name ?? route.name)
+        .navigationTitle(displayName)
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
             ToolbarItem(placement: .topBarTrailing) {
                 if route.userId != RexAPI.shared.currentUserId {
                     Menu {
                         Button {
-                            reporting = .person(route.userId, name: profile?.display_name ?? route.name)
+                            reporting = .person(route.userId, name: displayName)
                         } label: {
                             Label("Report", systemImage: "flag")
                         }
@@ -210,14 +220,14 @@ struct UserProfileView: View {
         .sheet(item: $reporting) { subject in
             ReportSheet(subject: subject, onBlocked: { dismissSelf() })
         }
-        .alert("Block \(profile?.display_name ?? route.name)?", isPresented: $confirmingBlock) {
+        .alert("Block \(displayName)?", isPresented: $confirmingBlock) {
             Button("Cancel", role: .cancel) {}
             Button("Block", role: .destructive) { Task { await block() } }
         } message: {
             Text("You won't see each other's Rex, and any friendship between you ends. They aren't told.")
         }
         .navigationDestination(isPresented: $showingTheirFriends) {
-            FriendsOfView(userId: route.userId, name: profile?.display_name ?? route.name)
+            FriendsOfView(userId: route.userId, name: displayName)
         }
         .sheet(item: $addingToCollection) { rec in
             AddToCollectionView(rec: rec) { addingToCollection = nil }
@@ -270,12 +280,12 @@ struct UserProfileView: View {
         HStack(spacing: RexSpacing.lg) {
             UserAvatarView(
                 url: profile?.avatar_url,
-                name: profile?.display_name ?? route.name,
+                name: displayName,
                 size: 64
             )
 
             VStack(alignment: .leading, spacing: 3) {
-                Text(profile?.display_name ?? route.name)
+                Text(displayName)
                     .font(RexFont.display(22, weight: .semibold))
                     .foregroundStyle(RexColor.foreground)
                 if let username = profile?.username {
@@ -513,13 +523,24 @@ struct UserProfileView: View {
     private func load() async {
         isLoading = true
         errorMessage = nil
+        // Oct 5 — "why would this be the page for trying to request a new
+        // friend": a stranger's profile opened with no name, no avatar, no
+        // username — just the word "Profile" and an Add friend button.
+        //
+        // All four of these used to be awaited together inside the do block
+        // below, so when one threw, none of them landed. A stranger's Rex and
+        // lists are hidden by design, so for exactly the person you most need
+        // this page for — someone you aren't friends with yet — the throw took
+        // their name down with it. Who they are is fetched on its own now and
+        // survives whatever the rest does, because deciding whether to send a
+        // friend request means seeing who you'd be sending it to.
+        profile = (try? await RexAPI.shared.fetchProfiles(ids: [route.userId]))?.first
+
         do {
-            async let profileTask = RexAPI.shared.fetchProfiles(ids: [route.userId])
             async let recsTask = RexAPI.shared.fetchRecommendations(forUser: route.userId)
             async let listsTask = RexAPI.shared.fetchLists(forUser: route.userId)
             async let followedTask = RexAPI.shared.fetchFollowedLists()
-            let (profiles, recs, lists, followedLists) = try await (profileTask, recsTask, listsTask, followedTask)
-            profile = profiles.first
+            let (recs, lists, followedLists) = try await (recsTask, listsTask, followedTask)
             recommendations = RexAPI.shared.filterHidden(recs)
             theirLists = lists
             myFollowedListIds = Set(followedLists.map { $0.id })
