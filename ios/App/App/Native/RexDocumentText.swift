@@ -223,6 +223,20 @@ private final class WordMLReader: NSObject, XMLParserDelegate {
     private var isListItem = false
     private var pendingLink: String?
 
+    /// Oct 5 — the golf tour agenda, which is mostly tables: an overview table,
+    /// a driving-distances table, and a hotel table per night with columns for
+    /// name, stars, price and why to stay there.
+    ///
+    /// Every cell in Word is its own paragraph, so flattening paragraph-by-
+    /// paragraph turned one hotel into four unrelated lines — "Vaughan Lodge",
+    /// "★★★★", "€180–€320", then the description — with nothing to say they
+    /// belonged together. That is what "if you have an itinerary and then hotel
+    /// options in the appendix, it does not extract correctly" looks like from
+    /// the extractor's side: it can see the hotels and the prices, but not
+    /// which price is whose. A row collected and joined keeps them together.
+    private var rowCells: [String]?
+    private var cellLines: [String] = []
+
     init(links: [String: String]) {
         self.links = links
     }
@@ -251,6 +265,11 @@ private final class WordMLReader: NSObject, XMLParserDelegate {
         case "w:hyperlink", "text:a":
             if let id = attributes["r:id"] { pendingLink = links[id] }
             if let href = attributes["xlink:href"] { pendingLink = href }
+        case "w:tr", "table:table-row":
+            rowCells = []
+            cellLines = []
+        case "w:tc", "table:table-cell":
+            cellLines = []
         default:
             break
         }
@@ -281,6 +300,21 @@ private final class WordMLReader: NSObject, XMLParserDelegate {
         case "w:p", "text:p":
             insideTextRun = false
             emitParagraph()
+        case "w:tc", "table:table-cell":
+            // A cell can hold several paragraphs; they're one value.
+            let cell = cellLines.joined(separator: " ").trimmingCharacters(in: .whitespaces)
+            cellLines = []
+            if rowCells != nil { rowCells?.append(cell) }
+        case "w:tr", "table:table-row":
+            let cells = (rowCells ?? []).filter { !$0.isEmpty }
+            rowCells = nil
+            cellLines = []
+            // A one-cell row is just a line; only a real row needs separators.
+            if cells.count == 1 {
+                lines.append(cells[0])
+            } else if !cells.isEmpty {
+                lines.append(cells.joined(separator: " | "))
+            }
         default:
             break
         }
@@ -290,7 +324,8 @@ private final class WordMLReader: NSObject, XMLParserDelegate {
         let line = paragraph.trimmingCharacters(in: .whitespacesAndNewlines)
         paragraph = ""
         guard !line.isEmpty else {
-            lines.append("")
+            // A blank paragraph inside a cell is spacing, not a paragraph break.
+            if rowCells == nil { lines.append("") }
             return
         }
         // Word carries "this was a bullet" as list numbering rather than as a
@@ -298,7 +333,12 @@ private final class WordMLReader: NSObject, XMLParserDelegate {
         // extractor and RexNotesParser read dashes.
         let alreadyMarked = ["-", "\u{2013}", "\u{2014}", "\u{2022}", "*", "\u{00B7}"]
             .contains { line.hasPrefix($0) }
-        lines.append(isListItem && !alreadyMarked ? "- \(line)" : line)
+        let decorated = isListItem && !alreadyMarked ? "- \(line)" : line
+        if rowCells == nil {
+            lines.append(decorated)
+        } else {
+            cellLines.append(decorated)
+        }
     }
 }
 
