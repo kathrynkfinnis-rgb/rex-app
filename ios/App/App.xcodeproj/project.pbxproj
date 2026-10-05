@@ -59,6 +59,7 @@
 		FEED0C010000000000000000 /* SmallChainsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = FEED0C000000000000000000 /* SmallChainsView.swift */; };
 		FEED0D010000000000000000 /* PhotoCropView.swift in Sources */ = {isa = PBXBuildFile; fileRef = FEED0D000000000000000000 /* PhotoCropView.swift */; };
 		FEED0E010000000000000000 /* AttachRexSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = FEED0E000000000000000000 /* AttachRexSheet.swift */; };
+		FEED0F010000000000000000 /* RexPushRouting.swift in Sources */ = {isa = PBXBuildFile; fileRef = FEED0F000000000000000000 /* RexPushRouting.swift */; };
 		FEED09F10000000000000000 /* CuratorShelvesView.swift in Sources */ = {isa = PBXBuildFile; fileRef = FEED09F00000000000000000 /* CuratorShelvesView.swift */; };
 		FEED09E10000000000000000 /* BrowseWithoutAccountView.swift in Sources */ = {isa = PBXBuildFile; fileRef = FEED09E00000000000000000 /* BrowseWithoutAccountView.swift */; };
 		FEED09D10000000000000000 /* RexMemoryView.swift in Sources */ = {isa = PBXBuildFile; fileRef = FEED09D00000000000000000 /* RexMemoryView.swift */; };
@@ -162,6 +163,7 @@
 		FEED0C000000000000000000 /* SmallChainsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SmallChainsView.swift; sourceTree = "<group>"; };
 		FEED0D000000000000000000 /* PhotoCropView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PhotoCropView.swift; sourceTree = "<group>"; };
 		FEED0E000000000000000000 /* AttachRexSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AttachRexSheet.swift; sourceTree = "<group>"; };
+		FEED0F000000000000000000 /* RexPushRouting.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RexPushRouting.swift; sourceTree = "<group>"; };
 		FEED09F00000000000000000 /* CuratorShelvesView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CuratorShelvesView.swift; sourceTree = "<group>"; };
 		FEED09E00000000000000000 /* BrowseWithoutAccountView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BrowseWithoutAccountView.swift; sourceTree = "<group>"; };
 		FEED09D00000000000000000 /* RexMemoryView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RexMemoryView.swift; sourceTree = "<group>"; };
@@ -303,6 +305,7 @@
 				FEED0C000000000000000000 /* SmallChainsView.swift */,
 				FEED0D000000000000000000 /* PhotoCropView.swift */,
 				FEED0E000000000000000000 /* AttachRexSheet.swift */,
+				FEED0F000000000000000000 /* RexPushRouting.swift */,
 				FEED09F00000000000000000 /* CuratorShelvesView.swift */,
 				FEED09E00000000000000000 /* BrowseWithoutAccountView.swift */,
 				FEED09D00000000000000000 /* RexMemoryView.swift */,
@@ -478,6 +481,7 @@
 				FEED0C010000000000000000 /* SmallChainsView.swift in Sources */,
 				FEED0D010000000000000000 /* PhotoCropView.swift in Sources */,
 				FEED0E010000000000000000 /* AttachRexSheet.swift in Sources */,
+				FEED0F010000000000000000 /* RexPushRouting.swift in Sources */,
 				FEED09F10000000000000000 /* CuratorShelvesView.swift in Sources */,
 				FEED09E10000000000000000 /* BrowseWithoutAccountView.swift in Sources */,
 				FEED09D10000000000000000 /* RexMemoryView.swift in Sources */,

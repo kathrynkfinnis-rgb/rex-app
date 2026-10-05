@@ -53,6 +53,10 @@ struct MainTabView: View {
 
     @State private var selection = 0
     @State private var showingAddRex = false
+    /// Oct 5 — a tapped push notification. The feed owns the stack that can
+    /// reach every destination, so this only has to make sure that tab is the
+    /// one on screen; FeedView does the rest.
+    @ObservedObject private var pushRouter = RexPushRouter.shared
     /// Bumped when the add-a-Rex sheet dismisses, so Feed picks up
     /// whatever was just posted — same purpose as feedPopSignal/
     /// mapRefreshSignal below, just for this one.
@@ -196,6 +200,12 @@ struct MainTabView: View {
                 }
                 .ignoresSafeArea(edges: .bottom)
         )
+        // Oct 5 — whatever a tapped notification points at opens inside the
+        // feed's navigation stack, so the feed has to be the visible tab
+        // before FeedView pushes onto it.
+        .onChange(of: pushRouter.pending) { _, destination in
+            if destination != nil { selection = 0 }
+        }
     }
 
     private func tabButton(index: Int, title: String, icon: String) -> some View {

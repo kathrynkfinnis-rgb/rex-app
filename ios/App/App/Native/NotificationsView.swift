@@ -166,6 +166,15 @@ struct NotificationsView: View {
             .buttonStyle(.plain)
         } else if let recId = n.linkedRecommendationId, let itemId = recItemIds[recId] {
             NavigationLink(value: itemId) { rowContent(n) }.buttonStyle(.plain)
+        } else if n.linksToFriends, let actorId = n.actor_id {
+            // Oct 4 — "clicking on this notification should take you to the
+            // person's profile not to the friends page." It said somebody
+            // accepted your request, and then showed you a list of everybody;
+            // the one person it was about is what you wanted.
+            NavigationLink(value: UserProfileRoute(
+                userId: actorId,
+                name: n.actor?.display_name ?? n.actor?.username ?? "Profile"
+            )) { rowContent(n) }.buttonStyle(.plain)
         } else if n.linksToFriends {
             NavigationLink(value: FriendsRoute()) { rowContent(n) }.buttonStyle(.plain)
         } else {

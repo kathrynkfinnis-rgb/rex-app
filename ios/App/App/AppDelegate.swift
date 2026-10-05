@@ -31,6 +31,15 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
         // that goes over REST with its own key and header — it never touched
         // GMSServices. The package can come out of the project entirely for
         // the app-size saving whenever someone's in Xcode.
+
+        // Oct 5 — "when I click on a push notification, it takes you to the
+        // feed not the notification." Nothing was listening: the app
+        // registered for push and handled the token but never set a
+        // notification-centre delegate, so a tap just launched the app
+        // wherever it last was. Set before the first view exists, because a
+        // cold launch from a notification delivers the tap immediately.
+        RexNotificationDelegate.shared.register()
+
         return true
     }
 

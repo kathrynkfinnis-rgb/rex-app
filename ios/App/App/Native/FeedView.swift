@@ -26,6 +26,11 @@ struct FeedView: View {
     var onViewTripOnMap: ((String, String) -> Void)? = nil
 
     @State private var path = NavigationPath()
+    /// Oct 5 — where a tapped push notification wants to go. The feed owns the
+    /// navigation stack that can reach all of it, so MainTabView switches to
+    /// this tab and hands the destination over rather than trying to drive a
+    /// stack it doesn't own.
+    @ObservedObject private var pushRouter = RexPushRouter.shared
 
     @State private var recommendations: [FeedRecommendation] = []
     @State private var isLoading = true
@@ -598,6 +603,10 @@ struct FeedView: View {
             await loadFeed()
             myProfile = try? await RexAPI.shared.fetchMyProfile()
         }
+        // A tap can land before any of this exists — a cold launch from a
+        // notification routes before the first view appears — so handle
+        // whatever is already pending as well as anything that arrives later.
+        .task(id: pushRouter.pending) { await handlePushDestination() }
         .sheet(item: $activeSheet) { sheet in
             switch sheet {
             case .report(let subject):
@@ -1116,6 +1125,45 @@ struct FeedView: View {
                 for (id, count) in newCounts { rexCounts[id] = count }
             }
             isLoadingFiltered = false
+        }
+    }
+
+    /// Oct 5 — opens whatever a tapped notification pointed at.
+    ///
+    /// A recommendation id isn't an item id, and ItemDetailView takes the
+    /// latter — passing the wrong one is what used to 404, which is why
+    /// NotificationsView resolves it too. Same resolution here.
+    private func handlePushDestination() async {
+        guard let destination = pushRouter.pending else { return }
+        pushRouter.pending = nil
+
+        switch destination {
+        case .item(let itemId):
+            path.append(itemId)
+        case .profile(let userId):
+            path.append(UserProfileRoute(userId: userId, name: "Profile"))
+        case .blast(let requestId):
+            path.append(BlastRoute(requestId: requestId, title: "Blast"))
+        case .notifications:
+            path.append(NotificationsRoute())
+        case .recommendation(let recId):
+            // A want has no page of its own; its notification goes to the list
+            // rather than a dead end.
+            guard !recId.hasPrefix("want-") else {
+                path.append(NotificationsRoute())
+                return
+            }
+            if let rec = (try? await RexAPI.shared.fetchRecommendations(ids: [recId]))?.first {
+                if RexCategory(rawType: rec.items?.type) == .trip {
+                    path.append(TripRoute(recommendationId: rec.id, title: rec.items?.title ?? "Trip"))
+                } else {
+                    path.append(rec.item_id)
+                }
+            } else {
+                // Deleted, or not visible to us any more. The notifications
+                // list is the honest fallback — it still says what happened.
+                path.append(NotificationsRoute())
+            }
         }
     }
 
