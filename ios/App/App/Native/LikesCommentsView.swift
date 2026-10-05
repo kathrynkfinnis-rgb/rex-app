@@ -34,6 +34,25 @@ struct LikesCommentsView: View {
     /// @username since July; this is the half that lets you write one without
     /// knowing the spelling by heart.
     @State private var friends: [RexProfileDetail] = []
+    /// Oct 5 — the comment being replied to, if any.
+    @State private var replyingTo: RexComment?
+
+    /// Comments in reading order: each top-level comment followed by its
+    /// replies, oldest first. A reply whose parent has since been deleted is
+    /// kept rather than hidden — losing somebody's words because the comment
+    /// above them went is worse than a slightly orphaned line.
+    private var threadedComments: [RexComment] {
+        let replies = Dictionary(grouping: comments.filter { $0.parent_id != nil }) { $0.parent_id! }
+        let known = Set(comments.map(\.id))
+        var out: [RexComment] = []
+        for comment in comments {
+            let isOrphan = comment.parent_id.map { !known.contains($0) } ?? false
+            guard comment.parent_id == nil || isOrphan else { continue }
+            out.append(comment)
+            out.append(contentsOf: replies[comment.id] ?? [])
+        }
+        return out
+    }
     /// Oct 3 — who liked this, behind the count.
     @State private var showingLikers = false
     @State private var likers: [RexProfileDetail] = []
@@ -97,40 +116,12 @@ struct LikesCommentsView: View {
 
             if !comments.isEmpty {
                 VStack(alignment: .leading, spacing: RexSpacing.md) {
-                    ForEach(comments) { comment in
-                        HStack(alignment: .top, spacing: RexSpacing.sm) {
-                            UserAvatarView(
-                                url: comment.profiles?.avatar_url,
-                                name: comment.profiles?.display_name ?? comment.profiles?.username ?? "?",
-                                size: 26
-                            )
-                            VStack(alignment: .leading, spacing: 2) {
-                                Text(comment.profiles?.display_name ?? comment.profiles?.username ?? "Someone")
-                                    .font(RexFont.text(13, weight: .semibold))
-                                    .foregroundStyle(RexColor.foreground)
-                                if editingId == comment.id {
-                                    editor(for: comment)
-                                } else {
-                                    MentionedText(text: comment.body)
-                                }
-                            }
-                            Spacer()
-                        }
-                        // Your own comments only. A long press is where the
-                        // app already puts "things you can do to this" —
-                        // same as a card in the feed.
-                        .contextMenu {
-                            if comment.user_id == RexAPI.shared.currentUserId, editingId == nil {
-                                Button {
-                                    editDraft = comment.body
-                                    editingId = comment.id
-                                    editFocused = true
-                                } label: { Label("Edit", systemImage: "pencil") }
-                                Button(role: .destructive) {
-                                    pendingDelete = comment
-                                } label: { Label("Delete", systemImage: "trash") }
-                            }
-                        }
+                    // Oct 5 — "enable replies to comments (like in
+                    // Instagram)." Threaded one level: every reply sits under
+                    // the comment it answers, and a reply to a reply joins the
+                    // same group rather than indenting again.
+                    ForEach(threadedComments) { comment in
+                        commentRow(comment)
                     }
                 }
             } else if !isLoading {
@@ -143,6 +134,20 @@ struct LikesCommentsView: View {
                 MentionPicker(query: query, friends: friends) { friend in
                     draft = MentionDraft.complete(draft, with: friend.username)
                 }
+            }
+
+            if let replyingTo {
+                HStack(spacing: 6) {
+                    Image(systemName: "arrowshape.turn.up.left.fill").font(.system(size: 10))
+                    Text("Replying to \(replyingTo.profiles?.display_name ?? replyingTo.profiles?.username ?? "someone")")
+                        .font(RexFont.text(11.5))
+                    Spacer(minLength: 0)
+                    Button { self.replyingTo = nil } label: {
+                        Image(systemName: "xmark.circle.fill").font(.system(size: 13))
+                    }
+                    .buttonStyle(.plain)
+                }
+                .foregroundStyle(RexColor.mutedForeground)
             }
 
             HStack(spacing: RexSpacing.sm) {
@@ -387,6 +392,58 @@ struct LikesCommentsView: View {
         }
     }
 
+
+    /// Oct 5 — one comment. Extracted from the body because the thread,
+    /// the reply button and the context menu together took the type-checker
+    /// past its limit inside the ForEach.
+    @ViewBuilder
+    private func commentRow(_ comment: RexComment) -> some View {
+        let isReply = comment.parent_id != nil
+        let name = comment.profiles?.display_name ?? comment.profiles?.username ?? "Someone"
+        HStack(alignment: .top, spacing: RexSpacing.sm) {
+            UserAvatarView(
+                url: comment.profiles?.avatar_url,
+                name: name,
+                size: isReply ? 22 : 26
+            )
+            VStack(alignment: .leading, spacing: 2) {
+                Text(name)
+                    .font(RexFont.text(13, weight: .semibold))
+                    .foregroundStyle(RexColor.foreground)
+                if editingId == comment.id {
+                    editor(for: comment)
+                } else {
+                    MentionedText(text: comment.body)
+                    Button {
+                        replyingTo = comment
+                        draftFocused = true
+                    } label: {
+                        Text("Reply")
+                            .font(RexFont.text(11.5, weight: .semibold))
+                            .foregroundStyle(RexColor.mutedForeground)
+                    }
+                    .buttonStyle(.plain)
+                }
+            }
+            Spacer(minLength: 0)
+        }
+        .padding(.leading, isReply ? 26 : 0)
+        // Your own comments only. A long press is where the app already puts
+        // "things you can do to this" — same as a card in the feed.
+        .contextMenu {
+            if comment.user_id == RexAPI.shared.currentUserId, editingId == nil {
+                Button {
+                    editDraft = comment.body
+                    editingId = comment.id
+                    editFocused = true
+                } label: { Label("Edit", systemImage: "pencil") }
+                Button(role: .destructive) {
+                    pendingDelete = comment
+                } label: { Label("Delete", systemImage: "trash") }
+            }
+        }
+    }
+
     private func post() async {
         let text = draft.trimmingCharacters(in: .whitespaces)
         guard !text.isEmpty else { return }
@@ -397,8 +454,15 @@ struct LikesCommentsView: View {
                 draft = ""
                 comments = (try? await RexAPI.shared.fetchWantComments(wantId: wantId)) ?? comments
             } else {
-                try await RexAPI.shared.addComment(recommendationId: recommendationId, body: text)
+                try await RexAPI.shared.addComment(
+                    recommendationId: recommendationId,
+                    body: text,
+                    // One level: replying to a reply joins its parent's thread
+                    // rather than starting a deeper one.
+                    parentId: replyingTo?.parent_id ?? replyingTo?.id
+                )
                 draft = ""
+                replyingTo = nil
                 comments = (try? await RexAPI.shared.fetchComments(recommendationId: recommendationId)) ?? comments
             }
         } catch {

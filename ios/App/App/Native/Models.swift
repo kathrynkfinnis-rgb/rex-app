@@ -237,6 +237,7 @@ struct RexNotification: Codable, Identifiable {
         case "rec_like": return "\(who) liked your Rex"
         case "rec_saved": return "\(who) added your Rex to their collection"
         case "rec_comment": return "\(who) commented: \"\(preview)\""
+        case "rec_comment_thread": return "\(who) also commented: \"\(preview)\""
         case "friend_request": return "\(who) sent you a friend request"
         case "friend_accepted": return "\(who) accepted your friend request"
         case "blast_new": return "\(who) put out a blast: \"\(title)\""
@@ -432,6 +433,11 @@ struct RexComment: Codable, Identifiable {
     let created_at: String
     let user_id: String
     let profiles: RexProfile?
+    /// Oct 5 — "enable replies to comments (like in Instagram)." One level
+    /// only, same as blast replies: a reply to a reply hangs off the same
+    /// parent, because a thread that nests forever is unreadable on a phone
+    /// and the conversation is the same one either way.
+    var parent_id: String?
 }
 
 /// A weekly leaderboard entry from the top_rexxers_weekly RPC.

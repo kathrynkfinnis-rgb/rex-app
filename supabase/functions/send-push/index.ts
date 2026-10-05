@@ -49,6 +49,9 @@ const SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 const PREF_COLUMN: Record<string, string> = {
   rec_like: "rec_like",
   rec_comment: "rec_comment",
+  // Oct 5 — a reply in a thread you're part of. Shares the rec_comment
+  // preference: to whoever receives it, it is the same kind of event.
+  rec_comment_thread: "rec_comment",
   rec_tagged: "rec_tagged",
   friend_request: "friend_request",
   friend_accepted: "friend_accepted",
@@ -61,6 +64,7 @@ function notifCopy(type: string, actorName: string, data: Record<string, unknown
   switch (type) {
     case "rec_like": return `${actorName} liked your Rex`;
     case "rec_comment": return `${actorName} commented on your Rex`;
+    case "rec_comment_thread": return `${actorName} also commented on a Rex you commented on`;
     case "rec_tagged": return `${actorName} tagged you on a Rex`;
     case "friend_request": return `${actorName} sent you a friend request`;
     case "friend_accepted": return `${actorName} accepted your friend request`;

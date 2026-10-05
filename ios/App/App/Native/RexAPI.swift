@@ -4190,7 +4190,7 @@ final class RexAPI {
         let token = try await validToken()
         var components = URLComponents(url: baseURL.appendingPathComponent("/rest/v1/recommendation_comments"), resolvingAgainstBaseURL: false)!
         components.queryItems = [
-            URLQueryItem(name: "select", value: "id,body,created_at,user_id,profiles!recommendation_comments_user_id_fkey(username,display_name,avatar_url)"),
+            URLQueryItem(name: "select", value: "id,body,created_at,user_id,parent_id,profiles!recommendation_comments_user_id_fkey(username,display_name,avatar_url)"),
             URLQueryItem(name: "recommendation_id", value: "eq.\(recommendationId)"),
             URLQueryItem(name: "order", value: "created_at.asc"),
         ]
@@ -4205,7 +4205,7 @@ final class RexAPI {
         return try JSONDecoder().decode([RexComment].self, from: data)
     }
 
-    func addComment(recommendationId: String, body text: String) async throws {
+    func addComment(recommendationId: String, body text: String, parentId: String? = nil) async throws {
         let token = try await validToken()
         guard let userId = currentUserId else { throw RexAPIError.notSignedIn }
         var request = URLRequest(url: baseURL.appendingPathComponent("/rest/v1/recommendation_comments"))
@@ -4213,9 +4213,13 @@ final class RexAPI {
         request.setValue(anonKey, forHTTPHeaderField: "apikey")
         request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
-        request.httpBody = try JSONSerialization.data(withJSONObject: [
+        var payload: [String: Any] = [
             "recommendation_id": recommendationId, "user_id": userId, "body": text,
-        ])
+        ]
+        // Only sent when it's a reply, so a database without the column still
+        // takes an ordinary comment.
+        if let parentId { payload["parent_id"] = parentId }
+        request.httpBody = try JSONSerialization.data(withJSONObject: payload)
         let (data, response) = try await URLSession.shared.data(for: request)
         guard let http = response as? HTTPURLResponse, http.statusCode < 400 else {
             throw RexAPIError.server(friendlyError(data, fallback: "Couldn't post your comment."))
