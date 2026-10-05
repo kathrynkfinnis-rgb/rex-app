@@ -107,7 +107,7 @@ struct ItemDetailView: View {
         .navigationBarTitleDisplayMode(.inline)
         // A drag can drop the keyboard too, so the comment field and its Post
         // button aren't only reachable via the keyboard's own Done button.
-        .scrollDismissesKeyboard(.interactively)
+        .rexDismissableKeyboard()
         .sheet(item: $activeSheet) { sheet in
             switch sheet {
             case .collection(let rec):

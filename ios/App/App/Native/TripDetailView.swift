@@ -263,6 +263,7 @@ struct TripDetailView: View {
         .background(RexColor.background.ignoresSafeArea())
         .navigationTitle("Trip")
         .navigationBarTitleDisplayMode(.inline)
+        .rexDismissableKeyboard()
         .toolbar {
             if isOwner {
                 ToolbarItem(placement: .topBarTrailing) {

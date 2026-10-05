@@ -220,6 +220,7 @@ struct ListDetailView: View {
         .background(RexColor.background.ignoresSafeArea())
         .navigationTitle("List")
         .navigationBarTitleDisplayMode(.inline)
+        .rexDismissableKeyboard()
         .toolbar {
             if isOwner {
                 // Sept 5 — "a dedicated 'add a Rex' button inside a list".

@@ -166,15 +166,17 @@ struct LikesCommentsView: View {
                         RoundedRectangle(cornerRadius: RexRadius.input, style: .continuous)
                             .stroke(RexColor.border, lineWidth: 1)
                     )
-                    // The keyboard could otherwise sit over the Post button
-                    // with no way to reach it — this toolbar gives an explicit
-                    // way to dismiss it, and Return now posts directly too.
-                    .toolbar {
-                        ToolbarItemGroup(placement: .keyboard) {
-                            Spacer()
-                            Button("Done") { draftFocused = false }
-                        }
-                    }
+                    // Oct 5 — "what is this? Two floating 'domes'." Two Done
+                    // buttons above the keyboard.
+                    //
+                    // This view carried its own keyboard toolbar so the
+                    // keyboard couldn't sit over the Post button. But the item
+                    // page draws one of these per friend's take, and SwiftUI
+                    // collects keyboard toolbars from every view in the
+                    // hierarchy — so two takes meant two Done buttons, three
+                    // meant three. The screens that host this apply
+                    // rexDismissableKeyboard() once instead, which is the same
+                    // button in the same place and only ever one of it.
 
                 Button {
                     Task { await post() }
@@ -449,6 +451,7 @@ struct CommentsSheet: View {
             .background(RexColor.background.ignoresSafeArea())
             .navigationTitle("Comments")
             .navigationBarTitleDisplayMode(.inline)
+            .rexDismissableKeyboard()
             .toolbar {
                 ToolbarItem(placement: .topBarTrailing) {
                     Button("Done") { dismiss() }

@@ -106,13 +106,28 @@ struct FeedView: View {
     /// web. Only offered for a single selected category — genre doesn't
     /// mean the same thing across, say, Books and Films at once, so this
     /// stays out of the way once more than one category is picked.
+    /// Oct 5 — "'mujeres en china' is the third subcategory when you filter by
+    /// books." It was: this built the row from every distinct genre string in
+    /// the feed, and `genre` holds two different things. When somebody picks a
+    /// sub-category in the Add form it holds one of ours — Fiction, Thriller —
+    /// but when an item comes from a catalogue it holds whatever that
+    /// catalogue called it, and OpenLibrary's subjects are closer to library
+    /// index terms than genres: "mujeres en china", "fiction in spanish",
+    /// "accessible book".
+    ///
+    /// A filter row is a set of choices, so it can only offer values that mean
+    /// something to choose between. It's now the curated list for that
+    /// category, narrowed to the ones actually present, in the curated order —
+    /// so it reads the same way every time rather than reshuffling
+    /// alphabetically as new things arrive. Catalogue strings still sit on the
+    /// item and still show on its card; they just aren't offered as filters.
     private var availableSubcategories: [String] {
         guard selectedCategories.count == 1, let filter = selectedCategories.first else { return [] }
-        var set = Set<String>()
+        var inUse = Set<String>()
         for rec in recommendations where RexCategory(rawType: rec.items?.type) == filter {
-            for genre in splitGenres(rec.items?.genre) { set.insert(genre) }
+            for genre in splitGenres(rec.items?.genre) { inUse.insert(genre.lowercased()) }
         }
-        return set.sorted()
+        return rexOrderedSubcategories(filter).filter { inUse.contains($0.lowercased()) }
     }
 
     /// Bursts the reader has chosen to see in full.
@@ -168,7 +183,12 @@ struct FeedView: View {
             if blastsOnly { return rec.isBlast }
             if rec.isBlast { return selectedCategories.isEmpty } // never in a category filter
             if !selectedCategories.isEmpty, !selectedCategories.contains(RexCategory(rawType: rec.items?.type)) { return false }
-            if let subFilter, !splitGenres(rec.items?.genre).contains(subFilter) { return false }
+            // Case-insensitively: a catalogue can hand back "fiction" where the
+            // chip says "Fiction", and the two are the same choice.
+            if let subFilter,
+               !splitGenres(rec.items?.genre).contains(where: { $0.caseInsensitiveCompare(subFilter) == .orderedSame }) {
+                return false
+            }
             if !query.trimmingCharacters(in: .whitespaces).isEmpty {
                 let q = query.lowercased()
                 let haystack = [
