@@ -842,6 +842,15 @@ struct AddRexView: View {
                     organiseNotesControls
                 }
                 .padding(.top, RexSpacing.sm)
+
+                // Oct 5 — "enable admins to post all types of content as Rex
+                // (incl lists and trips)." This toggle only ever existed in
+                // the branch below, which trips and lists never reach — so the
+                // two kinds of post the REX account most wants to make, a
+                // curated list and an itinerary, were the two it couldn't.
+                if isAdmin, officialAccountId != nil {
+                    postAsRexSection
+                }
             } else {
 
             modePicker(for: category)
@@ -1792,7 +1801,13 @@ struct AddRexView: View {
                     // item only — see the imageURL argument to createItem.
                     photoURLs: [],
                     returningId: true,
-                    asDraft: asDraft
+                    asDraft: asDraft,
+                    // Oct 5 — admins can post a trip as REX. The stops below
+                    // deliberately stay under the admin's own account: they
+                    // are children of the trip, never shown on their own, and
+                    // the database only allows the official account where
+                    // it's checked (migration 20260918100000).
+                    postAs: postAsRex ? officialAccountId : nil
                 )
                 // Posting is several sequential network calls; if one stop
                 // partway through fails, the trip used to just be left half
@@ -1865,7 +1880,11 @@ struct AddRexView: View {
                     itemId: itemId,
                     rating: rating,
                     note: note.isEmpty ? nil : note,
-                    returningId: true
+                    returningId: true,
+                    // Oct 5 — admins can post a list as REX. Its items stay
+                    // under the admin's own account for the same reason a
+                    // trip's stops do: they aren't posts of their own.
+                    postAs: postAsRex ? officialAccountId : nil
                 )
                 if !listNotes.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
                     try? await RexAPI.shared.updateLongNote(recommendationId: listRecId, text: listNotes)
