@@ -112,10 +112,12 @@ export const Route = createFileRoute("/c/$id")({
       { name: "twitter:title", content: title },
       { name: "twitter:description", content: desc },
     ];
-    if (image) {
-      meta.push({ property: "og:image", content: image });
-      meta.push({ name: "twitter:image", content: image });
-    }
+    // Oct 5 — a preview with no image falls back to a bare link icon in
+    // WhatsApp, which is where most of these are shared. The REX mark is a
+    // better answer than nothing, and it is the same mark the app uses.
+    const preview = image || `${SITE}/icon-512.png`;
+    meta.push({ property: "og:image", content: preview });
+    meta.push({ name: "twitter:image", content: preview });
     return { meta, links: [{ rel: "canonical", href: url }] };
   },
   component: SharedCollectionPage,

@@ -400,10 +400,68 @@ func rexNormalisedGenres(_ raw: String?, for category: RexCategory) -> String? {
         if let mapped = rexGenreSynonyms[term] ?? rexGenreByWord(term, in: curated),
            curated.contains(mapped) {
             if !out.contains(mapped) { out.append(mapped) }
+            continue
+        }
+        // Oct 5 — a catalogue heading is often a phrase with the genre inside
+        // it rather than the genre on its own: "Fiction, thrillers, suspense",
+        // "Biography & Autobiography / Personal Memoirs", "English detective
+        // and mystery stories". Matching an exact string finds none of those,
+        // which is why only Fiction survived. Look for the genre words inside
+        // the heading instead.
+        for (needle, option) in rexGenreNeedles where curated.contains(option) {
+            guard termContainsWord(term, needle) else { continue }
+            // "non-fiction" must not also register as "fiction".
+            if needle == "fiction", termContainsWord(term, "non fiction") || term.contains("nonfiction") { continue }
+            if !out.contains(option) { out.append(option) }
         }
     }
-    return out.isEmpty ? nil : out.joined(separator: ", ")
+    // The broad ones last, so a chip row reads "Thriller, Fiction" rather than
+    // burying the useful half under the obvious one.
+    let broad = ["Fiction", "Non-fiction"]
+    out.sort { a, b in
+        let aBroad = broad.contains(a), bBroad = broad.contains(b)
+        return aBroad == bBroad ? false : !aBroad
+    }
+    return out.isEmpty ? nil : out.prefix(4).joined(separator: ", ")
 }
+
+/// Whether a heading contains this genre as whole words, so "history" matches
+/// "world history" but not "prehistoric".
+private func termContainsWord(_ term: String, _ needle: String) -> Bool {
+    let padded = " " + term.replacingOccurrences(of: "[^a-z0-9]+", with: " ", options: .regularExpression) + " "
+    return padded.contains(" " + needle + " ")
+}
+
+/// Words that give a heading away, and what they mean in our vocabulary.
+/// Ordered specific-before-broad only for readability; the matching is a set.
+private let rexGenreNeedles: [(String, String)] = [
+    ("thriller", "Thriller"), ("thrillers", "Thriller"), ("suspense", "Thriller"),
+    ("mystery", "Mystery & crime"), ("mysteries", "Mystery & crime"),
+    ("crime", "Mystery & crime"), ("detective", "Mystery & crime"),
+    ("science fiction", "Sci-fi"), ("sci fi", "Sci-fi"),
+    ("fantasy", "Fantasy"),
+    ("romance", "Romance"), ("love stories", "Romance"),
+    ("historical fiction", "Historical fiction"),
+    ("biography", "Biography & memoir"), ("autobiography", "Biography & memoir"),
+    ("memoir", "Biography & memoir"), ("memoirs", "Biography & memoir"),
+    ("history", "History"),
+    ("business", "Business"), ("economics", "Business"),
+    ("science", "Science"), ("nature", "Science"),
+    ("self help", "Self-help"), ("personal growth", "Self-help"),
+    ("poetry", "Poetry"), ("poems", "Poetry"),
+    ("cooking", "Cookery"), ("cookery", "Cookery"), ("cookbooks", "Cookery"),
+    ("travel", "Travel"),
+    ("young adult", "Young adult"),
+    ("juvenile", "For kids"), ("children", "For kids"), ("picture books", "For kids"),
+    ("literary", "Literary fiction"),
+    ("fiction", "Fiction"),
+    ("nonfiction", "Non-fiction"),
+    // Film and TV headings travel the same way.
+    ("documentary", "Documentary"), ("comedy", "Comedy"), ("drama", "Drama"),
+    ("horror", "Horror"), ("animation", "Animation"), ("western", "Western"),
+    ("adventure", "Adventure"), ("action", "Action"), ("war", "War"),
+    ("music", "Music"),
+]
 
 /// A term that ends in one of ours — "european restaurant", "cocktail bar",
 /// "coffee shop" — belongs to it. Google's place types are built this way, so

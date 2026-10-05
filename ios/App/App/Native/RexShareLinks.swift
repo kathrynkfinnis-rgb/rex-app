@@ -25,25 +25,19 @@ enum RexShareLink {
     }
 
     /// Oct 5 — "when you share something on WhatsApp it should always have a
-    /// 'to see more, join Rex' with a short link", and "every time anything
-    /// gets shared on WhatsApp, it should have the link."
+    /// 'to see more, join Rex' with a short link."
     ///
-    /// Every share goes through here now, so one place decides what a shared
-    /// Rex looks like in a chat thread rather than three that had drifted
-    /// apart — one had a link and a message, one a link and no invitation, and
-    /// a collection had neither.
-    ///
-    /// The invitation sits on its own line after the link. WhatsApp previews
-    /// the first URL it finds, so the link leading is what produces the card;
-    /// the invitation points at the same site rather than introducing a second
-    /// URL that would make the preview ambiguous. Someone without the app
-    /// lands on a public page that offers the App Store from there.
-    static let joinLine = "To see more, join REX \u{2014} \(site)"
+    /// The message is words only. ShareLink appends the URL itself, so a
+    /// message that also contains it produces the link twice — and the first
+    /// attempt here put the site in the invitation as well, which made three
+    /// links for one share. Everything a reader needs is the one link
+    /// ShareLink adds: it opens a public page that offers the App Store from
+    /// there, so the invitation doesn't need an address of its own.
+    static let joinLine = "To see more, join REX."
 
-    /// The whole message: what it is, then the link, then the invitation.
-    static func message(_ lead: String, url: URL?) -> String {
-        [lead, url?.absoluteString, joinLine]
-            .compactMap { $0 }
-            .joined(separator: "\n\n")
+    /// What it is, then the invitation. No URLs: see above.
+    static func message(_ lead: String, url: URL? = nil) -> String {
+        _ = url
+        return "\(lead)\n\n\(joinLine)"
     }
 }

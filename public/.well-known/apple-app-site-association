@@ -1,0 +1,14 @@
+{
+  "applinks": {
+    "details": [
+      {
+        "appIDs": ["X54V2C674U.com.kathrynfinnis.rexapp"],
+        "components": [
+          { "/": "/r/*", "comment": "A shared Rex" },
+          { "/": "/t/*", "comment": "A shared trip" },
+          { "/": "/c/*", "comment": "A shared collection" }
+        ]
+      }
+    ]
+  }
+}

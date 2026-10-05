@@ -682,7 +682,19 @@ enum RexSearch {
                 title: d["title"] as? String ?? "Untitled",
                 subtitle: subtitle.isEmpty ? nil : subtitle,
                 imageURL: cover,
-                genre: subjects.first(where: { $0.count <= 22 }) ?? subjects.first
+                // Oct 5 — "on the books filter, now only Fiction appears —
+                // can we go one level below (thriller, biography etc)."
+                //
+                // This used to take the first subject under 22 characters,
+                // which is how "mujeres en china" became a book's genre:
+                // OpenLibrary's subjects are an unordered pile of library
+                // headings, and the first short one is arbitrary. Handing the
+                // whole pile over instead lets rexNormalisedGenres find the
+                // ones that are actually genres — a book filed under
+                // "Fiction, thrillers, suspense, English fiction" comes back
+                // as Fiction and Thriller rather than whichever heading
+                // happened to be shortest.
+                genre: subjects.prefix(30).joined(separator: ", ")
             )
         }
     }
