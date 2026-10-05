@@ -333,8 +333,14 @@ struct CollectionDetailView: View {
                         }
                     }
 
-                    ShareLink(item: shareText) {
-                        Label("Share", systemImage: "square.and.arrow.up")
+                    if let shareURL {
+                        ShareLink(item: shareURL, message: Text(shareText)) {
+                            Label("Share", systemImage: "square.and.arrow.up")
+                        }
+                    } else {
+                        ShareLink(item: shareText) {
+                            Label("Share", systemImage: "square.and.arrow.up")
+                        }
                     }
 
                     if route.isMine {
@@ -395,19 +401,21 @@ struct CollectionDetailView: View {
         .padding(.top, RexSpacing.sm)
     }
 
-    /// A text summary rather than a link — there's no public web page for a
-    /// collection to point at (see the toolbar comment). Good enough for
-    /// "hey, check out this list of restaurants" over WhatsApp/iMessage/etc,
-    /// which was the actual ask; a real shareable link is separate follow-up
-    /// work if it turns out people want to open it back up in-app.
+    /// Oct 5 — "I just tried to share a collection, and it's just the list of
+    /// places truncated."
+    ///
+    /// It was: there was no public page for a collection, so the share pasted
+    /// the first twelve titles and "...and 9 more" — nothing to open, nothing
+    /// to preview, and no way in for someone without the app. /c/<id> exists
+    /// now, so this is a link like every other share.
+    private var shareURL: URL? {
+        RexShareLink.collectionURL(listId: route.listId)
+    }
+
     private var shareText: String {
-        var lines = ["\(emoji) \(name) on REX"]
-        let titles = rows.compactMap { $0.recommendations?.items?.title }
-        lines.append(contentsOf: titles.prefix(12).map { "\u{2022} \($0)" })
-        if titles.count > 12 {
-            lines.append("...and \(titles.count - 12) more")
-        }
-        return lines.joined(separator: "\n")
+        let count = rows.count
+        let lead = "\(emoji) \(name) \u{2014} \(count) \(count == 1 ? "thing" : "things") on REX"
+        return RexShareLink.message(lead, url: shareURL)
     }
 
     private var visibilityLabel: String {

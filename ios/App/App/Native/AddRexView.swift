@@ -2402,7 +2402,10 @@ struct AddRexView: View {
             // WhatsApp etc?" — the system share sheet covers WhatsApp,
             // Messages, Instagram and the rest in one button.
             if isRealPost, let shareURL {
-                ShareLink(item: shareURL, message: Text("I just Rex'd \u{201C}\(title)\u{201D} \u{2014} have a look:")) {
+                ShareLink(
+                    item: shareURL,
+                    message: Text(RexShareLink.message("I just Rex'd \u{201C}\(title)\u{201D}", url: shareURL))
+                ) {
                     Label("Share with friends", systemImage: "square.and.arrow.up")
                         .font(RexFont.text(16, weight: .semibold))
                         .frame(maxWidth: .infinity)

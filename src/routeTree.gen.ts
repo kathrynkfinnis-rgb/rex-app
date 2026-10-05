@@ -27,6 +27,7 @@ import { Route as AuthenticatedNotificationsRouteImport } from './routes/_authen
 import { Route as AuthenticatedSharedCollectionsRouteImport } from './routes/_authenticated/shared-collections'
 import { Route as AuthenticatedTripsRouteImport } from './routes/_authenticated/trips'
 import { Route as AuthenticatedYouRouteImport } from './routes/_authenticated/you'
+import { Route as CIdRouteImport } from './routes/c.$id'
 import { Route as RIdRouteImport } from './routes/r.$id'
 import { Route as TIdRouteImport } from './routes/t.$id'
 import { Route as AuthenticatedAskIndexRouteImport } from './routes/_authenticated/ask.index'
@@ -130,6 +131,11 @@ const AuthenticatedYouRoute = AuthenticatedYouRouteImport.update({
   path: '/you',
   getParentRoute: () => AuthenticatedRouteRoute,
 } as any)
+const CIdRoute = CIdRouteImport.update({
+  id: '/c/$id',
+  path: '/c/$id',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const RIdRoute = RIdRouteImport.update({
   id: '/r/$id',
   path: '/r/$id',
@@ -195,6 +201,7 @@ export interface FileRoutesByFullPath {
   '/shared-collections': typeof AuthenticatedSharedCollectionsRoute
   '/trips': typeof AuthenticatedTripsRoute
   '/you': typeof AuthenticatedYouRoute
+  '/c/$id': typeof CIdRoute
   '/r/$id': typeof RIdRoute
   '/t/$id': typeof TIdRoute
   '/ask/$id': typeof AuthenticatedAskIdRoute
@@ -223,6 +230,7 @@ export interface FileRoutesByTo {
   '/shared-collections': typeof AuthenticatedSharedCollectionsRoute
   '/trips': typeof AuthenticatedTripsRoute
   '/you': typeof AuthenticatedYouRoute
+  '/c/$id': typeof CIdRoute
   '/r/$id': typeof RIdRoute
   '/t/$id': typeof TIdRoute
   '/ask/$id': typeof AuthenticatedAskIdRoute
@@ -253,6 +261,7 @@ export interface FileRoutesById {
   '/_authenticated/shared-collections': typeof AuthenticatedSharedCollectionsRoute
   '/_authenticated/trips': typeof AuthenticatedTripsRoute
   '/_authenticated/you': typeof AuthenticatedYouRoute
+  '/c/$id': typeof CIdRoute
   '/r/$id': typeof RIdRoute
   '/t/$id': typeof TIdRoute
   '/_authenticated/ask/$id': typeof AuthenticatedAskIdRoute
@@ -283,6 +292,7 @@ export interface FileRouteTypes {
     | '/shared-collections'
     | '/trips'
     | '/you'
+    | '/c/$id'
     | '/r/$id'
     | '/t/$id'
     | '/ask/$id'
@@ -311,6 +321,7 @@ export interface FileRouteTypes {
     | '/shared-collections'
     | '/trips'
     | '/you'
+    | '/c/$id'
     | '/r/$id'
     | '/t/$id'
     | '/ask/$id'
@@ -340,6 +351,7 @@ export interface FileRouteTypes {
     | '/_authenticated/shared-collections'
     | '/_authenticated/trips'
     | '/_authenticated/you'
+    | '/c/$id'
     | '/r/$id'
     | '/t/$id'
     | '/_authenticated/ask/$id'
@@ -355,6 +367,7 @@ export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   AuthenticatedRouteRoute: typeof AuthenticatedRouteRouteWithChildren
   AuthRoute: typeof AuthRoute
+  CIdRoute: typeof CIdRoute
   RIdRoute: typeof RIdRoute
   TIdRoute: typeof TIdRoute
 }
@@ -487,6 +500,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedYouRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
+    '/c/$id': {
+      id: '/c/$id'
+      path: '/c/$id'
+      fullPath: '/c/$id'
+      preLoaderRoute: typeof CIdRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/r/$id': {
       id: '/r/$id'
       path: '/r/$id'
@@ -611,6 +631,7 @@ const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   AuthenticatedRouteRoute: AuthenticatedRouteRouteWithChildren,
   AuthRoute: AuthRoute,
+  CIdRoute: CIdRoute,
   RIdRoute: RIdRoute,
   TIdRoute: TIdRoute,
 }

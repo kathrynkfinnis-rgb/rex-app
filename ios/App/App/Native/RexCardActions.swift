@@ -36,7 +36,9 @@ struct RexCardActions: View {
     private var shareText: String {
         let title = rec.items?.title ?? "this"
         let who = rec.profiles?.display_name ?? rec.profiles?.username ?? "A friend"
-        return "\(who) Rex'd \(title) on REX"
+        // Oct 5 — the link and the invitation come from RexShareLink.message
+        // so every share in the app reads the same in a chat thread.
+        return RexShareLink.message("\(who) Rex'd \(title) on REX", url: shareURL)
     }
 
     var body: some View {
