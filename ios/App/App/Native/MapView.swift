@@ -64,6 +64,10 @@ struct RexMapView: View {
     /// Oct 4 — what the camera is currently looking at, so the map can offer
     /// the trips that belong to wherever you have panned to.
     @State private var visibleRegion: MKCoordinateRegion?
+    /// Oct 5 — branches of chains your friends rate that nobody has been to.
+    /// Kept apart from `places` so nothing downstream can mistake one for a
+    /// recommendation.
+    @State private var unvisitedBranches: [MapPlace] = []
     /// Recommendation id of the trip we're following, if any.
     @State private var tripFilter: String?
     /// Set alongside tripFilter whenever we follow a trip, so the "Following
@@ -252,6 +256,7 @@ struct RexMapView: View {
                     onLongPress: { coordinate in Task { await resolveLongPress(coordinate) } },
                     highlightGenre: subFilter,
                     onRegionChange: { visibleRegion = $0 },
+                    unvisitedBranches: wantsOnly || tripFilter != nil ? [] : unvisitedBranches,
                     fitToPlacesNonce: tripFitNonce
                 )
                 .ignoresSafeArea(edges: .bottom)
@@ -658,6 +663,18 @@ struct RexMapView: View {
                 }
             }
             let allMerged = Array(merged.values)
+
+            // Oct 5 — the branches of these chains that nobody has been to.
+            // After the pins, deliberately: this is context, and the map
+            // should be usable before it arrives.
+            Task {
+                let keys = allMerged.compactMap(\.chain_key)
+                guard !keys.isEmpty else { return }
+                unvisitedBranches = await RexAPI.shared.unvisitedChainBranches(
+                    chainKeys: keys,
+                    excludingItemIds: Set(allMerged.map(\.id))
+                )
+            }
             // Show what's already geocoded immediately; anything still
             // missing lat/lng gets repaired in the background and folded in
             // as it resolves, rather than the map's first load waiting on
@@ -925,15 +942,30 @@ struct RexMapView: View {
                         .fixedSize(horizontal: false, vertical: true)
 
                     HStack(spacing: RexSpacing.sm) {
-                        if place.recommendations.count == 1 {
-                            RexRatingBadge(raw: place.recommendations[0].rating)
+                        // Oct 5 — a hollow pin is a branch of a chain somebody
+                        // rates that nobody has been to, so it has no rating
+                        // and no recommender. Saying so is the point of it;
+                        // an average of nothing, or "A friend", would be the
+                        // map claiming something nobody said.
+                        if place.recommendations.isEmpty {
+                            Image(systemName: "mappin.circle")
+                                .font(.system(size: 14))
+                                .foregroundStyle(RexColor.mutedForeground)
+                            Text("Nobody's been to this one yet")
+                                .font(RexFont.text(13))
+                                .foregroundStyle(RexColor.mutedForeground)
+                                .lineLimit(1)
                         } else {
-                            RexRatingAverageBadge(ratings: place.recommendations.map { $0.rating })
+                            if place.recommendations.count == 1 {
+                                RexRatingBadge(raw: place.recommendations[0].rating)
+                            } else {
+                                RexRatingAverageBadge(ratings: place.recommendations.map { $0.rating })
+                            }
+                            Text(placeStandfirst(place))
+                                .font(RexFont.text(13))
+                                .foregroundStyle(RexColor.mutedForeground)
+                                .lineLimit(1)
                         }
-                        Text(placeStandfirst(place))
-                            .font(RexFont.text(13))
-                            .foregroundStyle(RexColor.mutedForeground)
-                            .lineLimit(1)
                     }
 
                     if let hours = sheetDetails?.todayHours {

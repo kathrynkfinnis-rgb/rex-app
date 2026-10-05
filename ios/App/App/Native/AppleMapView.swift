@@ -50,6 +50,11 @@ struct AppleMapView: UIViewRepresentable {
     /// before. Called as the camera settles rather than continuously — see the
     /// delegate, which fires on every frame of a pinch.
     var onRegionChange: ((MKCoordinateRegion) -> Void)? = nil
+    /// Oct 5 — branches of a chain somebody rates that nobody has been to.
+    /// Kept separate from `places` rather than folded in, because they are a
+    /// different kind of claim and the moment they share a list something
+    /// downstream will treat one as the other.
+    var unvisitedBranches: [MapPlace] = []
     /// Bumped whenever the camera should frame every pin currently shown —
     /// following a trip, so all its stops are on screen at once rather than
     /// wherever the map happened to be sitting.
@@ -149,7 +154,8 @@ struct AppleMapView: UIViewRepresentable {
 
         // Only rebuild annotations when the set of places actually changes —
         // clearing on every SwiftUI update makes the map flicker.
-        let ids = places.map(\.id).joined(separator: ",") + "|" + (highlightGenre ?? "")
+        let ids = places.map(\.id).joined(separator: ",") + "|"
+            + unvisitedBranches.map(\.id).joined(separator: ",") + "|" + (highlightGenre ?? "")
         if context.coordinator.renderedIds != ids {
             mapView.removeAnnotations(mapView.annotations.filter { $0 is RexPlaceAnnotation })
             context.coordinator.markersById.removeAll()
@@ -165,6 +171,19 @@ struct AppleMapView: UIViewRepresentable {
                     symbol: rexSubcategorySymbol(genre: place.genre, type: place.type)
                 ))
                 context.coordinator.markersById[place.id] = place
+            }
+            for branch in unvisitedBranches {
+                guard let lat = branch.lat, let lng = branch.lng else { continue }
+                annotations.append(RexPlaceAnnotation(
+                    id: branch.id,
+                    title: branch.title,
+                    subtitle: "Nobody's been to this one",
+                    coordinate: CLLocationCoordinate2D(latitude: lat, longitude: lng),
+                    tint: markerColor(for: branch),
+                    symbol: rexSubcategorySymbol(genre: branch.genre, type: branch.type),
+                    isUnvisitedBranch: true
+                ))
+                context.coordinator.markersById[branch.id] = branch
             }
             mapView.addAnnotations(annotations)
             context.coordinator.renderedIds = ids
@@ -269,7 +288,22 @@ struct AppleMapView: UIViewRepresentable {
                 withIdentifier: Self.pinReuseId,
                 for: annotation
             ) as? MKMarkerAnnotationView
-            view?.markerTintColor = place.tint
+            // Oct 5 — a branch nobody has been to is drawn hollow: the
+            // chain's colour on a pale ground rather than filled with it. It
+            // has to be legible as "here, but unvouched" at a glance, because
+            // a pin that looks like a recommendation is one as far as anybody
+            // reading the map is concerned.
+            if place.isUnvisitedBranch {
+                view?.markerTintColor = UIColor(RexColor.card)
+                view?.glyphTintColor = place.tint
+                view?.alpha = 0.9
+                view?.displayPriority = .defaultLow
+            } else {
+                view?.markerTintColor = place.tint
+                view?.glyphTintColor = .white
+                view?.alpha = 1
+                view?.displayPriority = .defaultHigh
+            }
             view?.glyphText = nil
             view?.glyphImage = showGlyphs
                 ? UIImage(systemName: place.symbol)
@@ -369,14 +403,23 @@ final class RexPlaceAnnotation: NSObject, MKAnnotation {
     /// Oct 1 — shown only when the map is zoomed in far enough to read it;
     /// see Coordinator.showGlyphs.
     let symbol: String
+    /// Oct 5 — another branch of a chain your friends rate, which nobody has
+    /// actually been to. Drawn hollow, because it is information rather than
+    /// a recommendation and the map should never blur the two.
+    let isUnvisitedBranch: Bool
 
-    init(id: String, title: String?, subtitle: String?, coordinate: CLLocationCoordinate2D, tint: UIColor, symbol: String) {
+    init(
+        id: String, title: String?, subtitle: String?,
+        coordinate: CLLocationCoordinate2D, tint: UIColor, symbol: String,
+        isUnvisitedBranch: Bool = false
+    ) {
         self.id = id
         self.title = title
         self.subtitle = subtitle
         self.coordinate = coordinate
         self.tint = tint
         self.symbol = symbol
+        self.isUnvisitedBranch = isUnvisitedBranch
     }
 }
 

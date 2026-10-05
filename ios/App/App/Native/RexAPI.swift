@@ -1479,6 +1479,51 @@ final class RexAPI {
     /// explicitly instead (trip_id/list_id both null) and PATCHes it if
     /// found, so re-rating something you've already Rex'd on its own still
     /// updates in place rather than erroring or duplicating.
+    /// Oct 5 — branches of these chains that are in REX but that nobody has
+    /// Rex'd, for the map's hollow pins.
+    ///
+    /// One query against items, never Google: the map loads often and asking
+    /// Google per chain on every load would be both slow and billed. A branch
+    /// nobody has put into REX at all simply isn't shown here — the place page
+    /// is where those are offered, one chain at a time.
+    func unvisitedChainBranches(chainKeys: [String], excludingItemIds: Set<String>) async -> [MapPlace] {
+        let keys = Array(Set(chainKeys.filter { !$0.isEmpty })).prefix(40)
+        guard !keys.isEmpty, let token = try? await validToken() else { return [] }
+
+        var components = URLComponents(url: baseURL.appendingPathComponent("/rest/v1/items"), resolvingAgainstBaseURL: false)!
+        components.queryItems = [
+            URLQueryItem(name: "select", value: "id,title,subtitle,type,genre,address,lat,lng,image_url"),
+            URLQueryItem(name: "chain_key", value: "in.(\(keys.joined(separator: ",")))"),
+            URLQueryItem(name: "lat", value: "not.is.null"),
+            URLQueryItem(name: "limit", value: "200"),
+        ]
+        guard let url = components.url else { return [] }
+        var request = URLRequest(url: url)
+        request.setValue(anonKey, forHTTPHeaderField: "apikey")
+        request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+        guard let (data, response) = try? await URLSession.shared.data(for: request),
+              let http = response as? HTTPURLResponse, http.statusCode < 400
+        else { return [] }
+
+        struct Row: Codable {
+            let id: String; let title: String; let subtitle: String?
+            let type: String; let genre: String?; let address: String?
+            let lat: Double?; let lng: Double?; let image_url: String?
+        }
+        let rows = (try? JSONDecoder().decode([Row].self, from: data)) ?? []
+        return rows
+            .filter { !excludingItemIds.contains($0.id) }
+            .map {
+                // No recommendations by construction — that is what makes it
+                // a hollow pin rather than a real one.
+                MapPlace(
+                    id: $0.id, title: $0.title, subtitle: $0.subtitle, type: $0.type,
+                    genre: $0.genre, address: $0.address, lat: $0.lat, lng: $0.lng,
+                    image_url: $0.image_url, recommendations: []
+                )
+            }
+    }
+
     /// Oct 5 — the other branches of this place already in REX.
     ///
     /// Only reads what's here; it never asks Google. A branch nobody has put
@@ -5327,7 +5372,9 @@ final class RexAPI {
         // error hint suggested) resolves the ambiguity outright — same fix
         // applied to fetchMapPlaces(forTrip:) and fetchMapPlace(itemId:)
         // below, which embed the exact same way.
-        let select = "id,title,subtitle,type,genre,address,lat,lng,image_url," +
+        // Oct 5 — chain_key comes along so the map knows which chains are on
+        // screen and can draw the branches nobody has been to.
+        let select = "id,title,subtitle,type,genre,address,lat,lng,image_url,chain_key," +
             "recommendations!inner(id,rating,user_id,trip_id,profiles!recommendations_user_id_fkey(username,display_name,avatar_url))"
         var components = URLComponents(url: baseURL.appendingPathComponent("/rest/v1/items"), resolvingAgainstBaseURL: false)!
         components.queryItems = [

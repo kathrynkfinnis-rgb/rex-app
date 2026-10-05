@@ -305,6 +305,9 @@ struct MapPlace: Codable, Identifiable {
     let lat: Double?
     let lng: Double?
     let image_url: String?
+    /// Oct 5 — which chain this belongs to, so the map can find the branches
+    /// of it that nobody has been to.
+    var chain_key: String? = nil
     let recommendations: [MapRecStub]
 
     /// Trips this place is a stop on.
