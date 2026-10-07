@@ -470,6 +470,24 @@ enum RexSearch {
     private static var editionCounts: [String: Int] = [:]
     private static let editionCountLock = NSLock()
 
+    /// Oct 7 — "this book isn't coming up despite it being a NY Times best
+    /// seller."
+    ///
+    /// The search was the full title as printed on the cover: "The Cauldron:
+    /// the making of the modern Middle East". OpenLibrary files it as "The
+    /// Cauldron" and nothing else, so every pass below looked for a subtitle
+    /// that is not in the record and found nothing — while "the cauldron
+    /// montefiore" finds it first time. A title and its subtitle are divided
+    /// by a colon by convention, so the half in front of one is worth asking
+    /// for on its own.
+    private static func mainTitle(_ q: String) -> String? {
+        guard let colon = q.firstIndex(of: ":") else { return nil }
+        let head = String(q[..<colon]).trimmingCharacters(in: .whitespaces)
+        // Two characters isn't a title, it's a false start.
+        guard head.count >= 3, head != q else { return nil }
+        return head
+    }
+
     private static func books(_ q: String) async throws -> [RexSearchHit] {
         let words = q.split(separator: " ").count
         // OpenLibrary files plenty of books without their leading article —
@@ -493,9 +511,19 @@ enum RexSearch {
         // which printing to show.
         async let googleHits = googleBooks(q)
 
+        // The title without its subtitle — see mainTitle. Appended last so it
+        // only ever adds candidates; the ranking below still decides, and an
+        // exact match on what was actually typed keeps beating this.
+        let head = mainTitle(q) ?? ""
+        async let headHits: [RexSearchHit] = head.isEmpty
+            ? [] : openLibrary("title=\(esc(head))")
+        async let headGoogleHits: [RexSearchHit] = head.isEmpty
+            ? [] : googleBooks(head)
+
         let all = (try await titleHits) + (try await bareTitleHits)
             + (try await authorHits) + (try await generalHits)
             + (await googleHits)
+            + (try await headHits) + (await headGoogleHits)
 
         var best: [String: RexSearchHit] = [:]
         var order: [String] = []
@@ -520,13 +548,35 @@ enum RexSearch {
     }
 
     /// Google Books as a second book source, for the recent titles
-    /// OpenLibrary hasn't catalogued. Unkeyed, same as the details lookup
-    /// further down this file; a failure returns nothing rather than throwing,
-    /// because it's a supplement and book search must not start failing if
-    /// Google rate-limits us.
+    /// OpenLibrary hasn't catalogued. A failure returns nothing rather than
+    /// throwing, because it's a supplement and book search must not start
+    /// failing if Google rate-limits us.
+    ///
+    /// Oct 7 — it was rate-limiting us, and had been for a while: every
+    /// request was coming back 429, "Quota exceeded for Queries per day". The
+    /// call carried no key, so it was drawing on the anonymous per-IP pool
+    /// rather than the project's own quota — which meant this second source
+    /// had quietly stopped being a second source at all, and book search was
+    /// running on OpenLibrary alone. The same key the Places calls use; it is
+    /// iOS-bundle-restricted, hence the header.
     private static func googleBooks(_ q: String) async -> [RexSearchHit] {
-        guard let url = URL(string: "https://www.googleapis.com/books/v1/volumes?q=\(esc(q))&maxResults=10&printType=books"),
-              let (data, response) = try? await URLSession.shared.data(from: url),
+        var components = URLComponents(string: "https://www.googleapis.com/books/v1/volumes")
+        components?.queryItems = [
+            URLQueryItem(name: "q", value: q),
+            URLQueryItem(name: "maxResults", value: "10"),
+            URLQueryItem(name: "printType", value: "books"),
+        ]
+        if !googleKey.isEmpty {
+            components?.queryItems?.append(URLQueryItem(name: "key", value: googleKey))
+        }
+        guard let url = components?.url else { return [] }
+        var request = URLRequest(url: url)
+        request.setValue(
+            Bundle.main.bundleIdentifier ?? "",
+            forHTTPHeaderField: "X-Ios-Bundle-Identifier"
+        )
+
+        guard let (data, response) = try? await URLSession.shared.data(for: request),
               let http = response as? HTTPURLResponse, http.statusCode < 400,
               let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
               let items = json["items"] as? [[String: Any]]
