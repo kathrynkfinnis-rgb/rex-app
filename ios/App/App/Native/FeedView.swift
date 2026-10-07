@@ -1421,8 +1421,23 @@ struct EditableIfMine: ViewModifier {
 
     private var isMine: Bool { rec.user_id == RexAPI.shared.currentUserId }
 
+    /// Oct 7 — "you can't edit posts by Rex."
+    ///
+    /// Admins have been able to post as the REX account since 5 October, and
+    /// then couldn't touch what they'd posted: the "…" is gated on the Rex
+    /// being yours, and a Rex posted as REX belongs to the official account
+    /// rather than to you. So the one kind of post that is nobody's personal
+    /// opinion was the one kind nobody could correct.
+    ///
+    /// Deliberately narrow. An admin gets the menu on REX's own posts, and on
+    /// nothing else — being on the team is not a licence to edit what your
+    /// friends wrote about a restaurant.
+    @State private var canEditAsRex = false
+
+    private var editable: Bool { isMine || canEditAsRex }
+
     func body(content: Content) -> some View {
-        if isMine {
+        if editable {
             content
                 .overlay(alignment: .topTrailing) {
                     // Oct 4 — "want a 'hide from feed' toggle on all cards."
@@ -1475,6 +1490,15 @@ struct EditableIfMine: ViewModifier {
                 }
         } else {
             content
+                .task { await checkRexPost() }
         }
+    }
+
+    /// Both lookups are cached on RexAPI after their first call, so this costs
+    /// one round trip per session rather than one per card.
+    private func checkRexPost() async {
+        guard !isMine, !canEditAsRex else { return }
+        guard await RexAPI.shared.isAdmin() else { return }
+        canEditAsRex = rec.user_id == (await RexAPI.shared.officialAccountId())
     }
 }
