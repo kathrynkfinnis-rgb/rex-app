@@ -767,7 +767,27 @@ final class RexAPI {
                 queryItems.append(URLQueryItem(name: "trip_id", value: "is.null"))
             }
             for filter in extraFilters { queryItems.append(URLQueryItem(name: filter.0, value: filter.1)) }
-            if includeListFilter {
+            // Oct 7 — "when you search the feed, things within a trip or
+            // within a list should come up too."
+            //
+            // Trip stops already did, since 2 September. List items mostly
+            // didn't, and this is why: a Rex inside a list is routinely left
+            // off the feed so a fifteen-item list doesn't post fifteen cards,
+            // and that same flag was being applied to search. So the things
+            // most likely to be in a list were the things least likely to be
+            // findable.
+            //
+            // Hidden from the feed means "don't broadcast this", not "make
+            // this unfindable" — the same distinction already drawn for trip
+            // stops just above, and for sharing in the October migration:
+            // keeping something out of the feed is not keeping it from
+            // somebody who goes looking. Browsing still hides them; a search
+            // or a category filter is the one time you have asked for
+            // something specific, and it reaches them.
+            //
+            // RLS is untouched by any of this: you still only ever see your
+            // own and your friends'.
+            if includeListFilter, !isFiltered {
                 queryItems.append(URLQueryItem(name: "or", value: "(show_in_feed.is.null,show_in_feed.eq.true)"))
             }
             components.queryItems = queryItems
