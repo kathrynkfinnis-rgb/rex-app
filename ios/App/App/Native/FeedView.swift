@@ -139,6 +139,8 @@ struct FeedView: View {
     @State private var expandedBursts: Set<String> = []
     /// How many people have Rex'd each item, and what's already on your list.
     @State private var rexCounts: [String: Int] = [:]
+    /// Oct 7 — who wants to try each item, for the faces on a want card.
+    @State private var wanters: [String: [RexProfileDetail]] = [:]
     @State private var myWantItemIds: Set<String> = []
 
     /// A mass import — someone's whole Goodreads or IMDb history in one go —
@@ -404,22 +406,7 @@ struct FeedView: View {
                                 onDelete: { await deleteRex(rec) }
                               ) {
                                 Group {
-                                    RecommendationCardView(
-                                        rec: rec,
-                                        rexCount: rexCounts[rec.item_id] ?? 0,
-                                        isOnMyList: myWantItemIds.contains(rec.item_id),
-                                        onAuthorTap: { userId, name in
-                                            path.append(UserProfileRoute(userId: userId, name: name))
-                                        },
-                                        onBookAuthorTap: { author in
-                                            path.append(AuthorRoute(author: author))
-                                        },
-                                        // Blasts keep their own screen, which
-                                        // is where their responses live.
-                                        onCommentTap: { rec.isBlast ? open(rec) : (activeSheet = .comments(rec)) },
-                                        onViewOnMap: onViewOnMap,
-                                        onViewTripOnMap: onViewTripOnMap
-                                    )
+                                    card(for: rec)
                                 }
                                 .modifier(EditableIfMine(rec: rec, onEdit: { activeSheet = .edit($0) }, onChanged: { Task { await loadFeed() } }))
                                 // No .draggable() here: Collections isn't
@@ -1206,6 +1193,30 @@ struct FeedView: View {
         }
     }
 
+    /// One feed card. Lifted out of the list above because adding the wanters
+    /// argument tipped that expression past what the type-checker would solve
+    /// in reasonable time — the same thing that happened to the Add sheet's
+    /// modifier chain and the comment row. Nothing about the card changed.
+    @ViewBuilder
+    private func card(for rec: FeedRecommendation) -> some View {
+        RecommendationCardView(
+            rec: rec,
+            rexCount: rexCounts[rec.item_id] ?? 0,
+            isOnMyList: myWantItemIds.contains(rec.item_id),
+            wanters: wanters[rec.item_id] ?? [],
+            onAuthorTap: { userId, name in
+                path.append(UserProfileRoute(userId: userId, name: name))
+            },
+            onBookAuthorTap: { author in
+                path.append(AuthorRoute(author: author))
+            },
+            // Blasts keep their own screen, which is where their responses live.
+            onCommentTap: { rec.isBlast ? open(rec) : (activeSheet = .comments(rec)) },
+            onViewOnMap: onViewOnMap,
+            onViewTripOnMap: onViewTripOnMap
+        )
+    }
+
     private func loadFeed() async {
         // Sept 17 — who's blocked, in either direction; everything below
         // is filtered against it (RexAPI.filterHidden).
@@ -1232,6 +1243,7 @@ struct FeedView: View {
             async let counts = RexAPI.shared.fetchRexCounts(itemIds: itemIds)
             async let wants = RexAPI.shared.fetchWants()
             rexCounts = (try? await counts) ?? [:]
+            wanters = await RexAPI.shared.fetchWanters(itemIds: itemIds)
             myWantItemIds = Set(((try? await wants) ?? []).compactMap { $0.items?.id })
             unreadNotificationCount = await RexAPI.shared.fetchUnreadNotificationCount()
         } catch {

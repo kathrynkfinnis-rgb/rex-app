@@ -5472,6 +5472,50 @@ final class RexAPI {
         return (row.kind, row.target_id)
     }
 
+    /// Oct 7 — "make it more clear when multiple people want to try something
+    /// and give it the hot logo too… perhaps have the swipeable profile pics
+    /// on the card like we have on the Rexes."
+    ///
+    /// Who wants to try each of these items. Two queries rather than a
+    /// PostgREST embed because wants.user_id references auth.users rather than
+    /// profiles, so there is no relationship for it to trace — and going
+    /// through fetchProfiles means a wanter you aren't friends with still
+    /// arrives with a name, via the same profile_basics fallback.
+    ///
+    /// Best-effort: an empty result costs the card its faces, not its content.
+    func fetchWanters(itemIds: [String]) async -> [String: [RexProfileDetail]] {
+        guard !itemIds.isEmpty, let token = try? await validToken() else { return [:] }
+        var components = URLComponents(url: baseURL.appendingPathComponent("/rest/v1/wants"), resolvingAgainstBaseURL: false)!
+        components.queryItems = [
+            URLQueryItem(name: "select", value: "item_id,user_id,created_at"),
+            URLQueryItem(name: "item_id", value: "in.(\(itemIds.joined(separator: ",")))"),
+            // Oldest first, so whoever wanted it first reads first — the same
+            // order savedByRow uses to put the "1" on the earliest Rexer.
+            URLQueryItem(name: "order", value: "created_at.asc"),
+        ]
+        guard let url = components.url else { return [:] }
+        var request = URLRequest(url: url)
+        request.setValue(anonKey, forHTTPHeaderField: "apikey")
+        request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+        guard let (data, response) = try? await URLSession.shared.data(for: request),
+              let http = response as? HTTPURLResponse, http.statusCode < 400
+        else { return [:] }
+
+        struct Row: Codable { let item_id: String; let user_id: String }
+        let rows = (try? JSONDecoder().decode([Row].self, from: data)) ?? []
+        guard !rows.isEmpty else { return [:] }
+
+        let profiles = (try? await fetchProfiles(ids: Array(Set(rows.map(\.user_id))))) ?? []
+        let byId = Dictionary(uniqueKeysWithValues: profiles.map { ($0.id, $0) })
+
+        var out: [String: [RexProfileDetail]] = [:]
+        for row in rows {
+            guard let profile = byId[row.user_id] else { continue }
+            out[row.item_id, default: []].append(profile)
+        }
+        return out
+    }
+
     func fetchMapPlaces() async throws -> [MapPlace] {
         let token = try await validToken()
         // "the map doesn't even load" (Aug 26/27) — the embedded profiles(...)
@@ -6219,7 +6263,10 @@ final class RexAPI {
     ) async throws -> (tripId: String, added: Int, failed: [ImportFailure]) {
         guard !rows.isEmpty else { throw RexAPIError.server("Nothing to import.") }
         let tripItemId = try await createItem(type: "trip", title: tripName.trimmingCharacters(in: .whitespaces), subtitle: nil, address: nil)
-        let tripRecId = try await createRecommendation(itemId: tripItemId, rating: 8, note: note, returningId: true)
+        // Oct 7 — was 8, which put a 👌 on every imported trip that nobody
+        // had given it. 0 is this column's unrated sentinel, and every other
+        // path that makes a trip has always passed it.
+        let tripRecId = try await createRecommendation(itemId: tripItemId, rating: 0, note: note, returningId: true)
 
         var added = 0
         var failed: [ImportFailure] = []
@@ -6252,7 +6299,10 @@ final class RexAPI {
             type: "list", title: listName.trimmingCharacters(in: .whitespaces), subtitle: nil, address: nil,
             genre: kind.isEmpty ? nil : kind
         )
-        let listRecId = try await createRecommendation(itemId: listItemId, rating: 8, note: note, returningId: true)
+        // Oct 7 — the same, and more clearly wrong on a list: a list is a
+        // container for other people's Rex, and the ratings belong to the
+        // things inside it rather than to the collection.
+        let listRecId = try await createRecommendation(itemId: listItemId, rating: 0, note: note, returningId: true)
 
         var added = 0
         var failed: [ImportFailure] = []

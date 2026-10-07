@@ -307,7 +307,12 @@ struct EditRexView: View {
                         }
                     }
 
-                    if !wantToTry {
+                    // Oct 7 — not for a list. A list is a container for other
+                    // people's Rex, so the ratings belong to the things inside
+                    // it; offering one here is what let a list wear a 👌 in the
+                    // first place. The same reason trips and lists are created
+                    // unrated (see approveStagingAsList).
+                    if !wantToTry, category != .list {
                         VStack(alignment: .leading, spacing: RexSpacing.sm) {
                             Text("Your rating").font(RexFont.text(14, weight: .semibold))
                             RexRatingPicker(value: $rating, clearable: true)

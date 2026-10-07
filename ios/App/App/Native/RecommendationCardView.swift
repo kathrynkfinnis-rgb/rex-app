@@ -6,6 +6,9 @@ struct RecommendationCardView: View {
     var rexCount: Int = 0
     /// Already on your list — you want to go/read/watch it.
     var isOnMyList: Bool = false
+    /// Oct 7 — everyone who wants to try this, oldest first. Only drawn on a
+    /// want card, where "how many other people fancy this" is the whole point.
+    var wanters: [RexProfileDetail] = []
     /// Opening the author's profile. The card is one tap target now (so it can
     /// swipe), so the author row can't be its own NavigationLink — the parent
     /// swallowed it. The feed hands the push back in through here.
@@ -438,21 +441,38 @@ struct RecommendationCardView: View {
 
     /// Social proof and your own state with this item, both of which are the
     /// point of REX and were previously buried.
+    /// Oct 7 — "the 'want to try' and 'on your list' is still duplicative.
+    /// Only need one."
+    ///
+    /// It was worse than duplicative, it was triplicated: a want card carried
+    /// a bookmark chip saying "Wants to try", a near-identical bookmark chip
+    /// saying "On your list", and the action bar underneath already showed
+    /// "Saved" on the control you'd actually use to change it. "On your list"
+    /// is gone — the Saved button says it, in the place you can act on it.
+    ///
+    /// What replaces it is the thing that was missing: how many people want
+    /// this. A want card could only ever say "Wants to try" no matter whether
+    /// one friend or six had saved it, because the count beside it was
+    /// rexCount — people who had *been*, which on a want is usually nobody.
     @ViewBuilder
     private var rexdByRow: some View {
         let others = max(0, rexCount - 1)
-        if others > 0 || isOnMyList || rec.isWant || rec.isBlast {
+        if others > 0 || rec.isWant || rec.isBlast {
             HStack(spacing: RexSpacing.sm) {
-                if rec.isWant || rec.isBlast {
+                if rec.isWant {
+                    wantedByBadge
+                } else if rec.isBlast {
                     HStack(spacing: 4) {
-                        Image(systemName: rec.isWant ? "bookmark" : "sparkles")
-                            .font(.system(size: 10))
-                        Text(rec.isWant ? "Wants to try" : "Asking")
-                            .font(RexFont.text(11, weight: .medium))
+                        Image(systemName: "sparkles").font(.system(size: 10))
+                        Text("Asking").font(RexFont.text(11, weight: .medium))
                     }
-                    .foregroundStyle(rec.isWant ? RexColor.mutedForeground : RexColor.accent)
+                    .foregroundStyle(RexColor.accent)
                 }
 
+                // Kept on a want card too. "You want to try it, and two
+                // friends have actually been" is a different sentence from
+                // "six people want to try it" — it was the bookmark pair that
+                // said the same thing twice, not this.
                 if others > 0 {
                     HStack(spacing: 4) {
                         // Three or more people is worth calling hot.
@@ -470,15 +490,57 @@ struct RecommendationCardView: View {
                     .clipShape(Capsule())
                 }
 
-                if isOnMyList {
-                    HStack(spacing: 4) {
-                        Image(systemName: "bookmark.fill").font(.system(size: 9))
-                        Text("On your list").font(RexFont.text(11, weight: .medium))
-                    }
-                    .foregroundStyle(RexColor.mutedForeground)
-                }
+                Spacer(minLength: 0)
             }
             .padding(.top, RexSpacing.xs)
+        }
+    }
+
+    /// The want card's one label, carrying the count and — from three people
+    /// up — the same flame a Rex card gets, because a thing six friends all
+    /// mean to try is exactly as interesting as one six friends have done.
+    @ViewBuilder
+    private var wantedByBadge: some View {
+        let count = max(wanters.count, 1)
+        let hot = count >= 3
+
+        HStack(spacing: RexSpacing.xs) {
+            if !wanters.isEmpty {
+                wanterFaces
+            }
+
+            HStack(spacing: 4) {
+                Image(systemName: hot ? "flame.fill" : "bookmark")
+                    .font(.system(size: 10))
+                Text(count == 1
+                     ? "Wants to try"
+                     : "\(count) want to try this")
+                    .font(RexFont.text(hot ? 12 : 11, weight: hot ? .semibold : .medium))
+            }
+            .foregroundStyle(hot ? RexColor.accent : RexColor.mutedForeground)
+            .padding(.horizontal, hot ? RexSpacing.sm : 0)
+            .padding(.vertical, hot ? 4 : 0)
+            .background(hot ? RexColor.accent.opacity(0.1) : .clear, in: Capsule())
+        }
+    }
+
+    /// Overlapping faces rather than the item page's scrolling strip: a card
+    /// has one line to spare, and four faces and a number say "a few people"
+    /// faster than a row you have to swipe. Tapping the card still opens the
+    /// page, where the full strip lives.
+    @ViewBuilder
+    private var wanterFaces: some View {
+        let shown = Array(wanters.prefix(4))
+        HStack(spacing: -7) {
+            ForEach(Array(shown.enumerated()), id: \.element.id) { index, profile in
+                UserAvatarView(
+                    url: profile.avatar_url,
+                    name: profile.display_name ?? profile.username,
+                    size: 20
+                )
+                .overlay(Circle().stroke(RexColor.card, lineWidth: 1.5))
+                .zIndex(Double(shown.count - index))
+            }
         }
     }
 
