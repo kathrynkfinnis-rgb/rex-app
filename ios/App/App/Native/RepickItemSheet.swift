@@ -16,6 +16,11 @@ struct RepickItemSheet: View {
     /// What it currently points at, so the search starts somewhere useful and
     /// the sheet can say what is being replaced.
     let currentTitle: String
+    /// What picking one of these will do, in the user's terms. Defaults to the
+    /// edit-a-Rex case; the find-a-missing-pin screen passes its own.
+    var blurb: String? = nil
+    /// The title shown in the navigation bar.
+    var heading: String = "Change what this is"
     var onPick: (RexSearchHit) async -> Void
 
     @Environment(\.dismiss) private var dismiss
@@ -26,9 +31,17 @@ struct RepickItemSheet: View {
     @State private var searchTask: Task<Void, Never>?
     @FocusState private var focused: Bool
 
-    init(category: RexCategory, currentTitle: String, onPick: @escaping (RexSearchHit) async -> Void) {
+    init(
+        category: RexCategory,
+        currentTitle: String,
+        blurb: String? = nil,
+        heading: String = "Change what this is",
+        onPick: @escaping (RexSearchHit) async -> Void
+    ) {
         self.category = category
         self.currentTitle = currentTitle
+        self.blurb = blurb
+        self.heading = heading
         self.onPick = onPick
         _query = State(initialValue: currentTitle)
     }
@@ -37,7 +50,7 @@ struct RepickItemSheet: View {
         NavigationStack {
             ScrollView {
                 VStack(alignment: .leading, spacing: RexSpacing.md) {
-                    Text("Currently \u{201C}\(currentTitle)\u{201D}. Pick the right one and this Rex moves to it \u{2014} your rating, note and photos come with it.")
+                    Text(blurb ?? "Currently \u{201C}\(currentTitle)\u{201D}. Pick the right one and this Rex moves to it \u{2014} your rating, note and photos come with it.")
                         .font(RexFont.text(13))
                         .foregroundStyle(RexColor.mutedForeground)
                         .fixedSize(horizontal: false, vertical: true)
@@ -71,7 +84,7 @@ struct RepickItemSheet: View {
                 .padding(RexSpacing.page)
             }
             .background(RexColor.background.ignoresSafeArea())
-            .navigationTitle("Change what this is")
+            .navigationTitle(heading)
             .navigationBarTitleDisplayMode(.inline)
             .rexDismissableKeyboard()
             .toolbar {

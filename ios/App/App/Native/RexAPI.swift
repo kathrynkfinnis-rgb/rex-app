@@ -5565,6 +5565,39 @@ final class RexAPI {
         }
     }
 
+    /// Oct 7 — "two matches look right, nothing else identified. Can we do
+    /// this manually in the app?"
+    ///
+    /// Yes, and editing a place has always been able to set its location —
+    /// what was missing was any way to find the places that need it. 198 of
+    /// them, scattered through lists and trips, with nothing to tell you which.
+    /// This is that list.
+    ///
+    /// Deliberately everybody's, not just your own: a pin-less place is
+    /// missing from the map for all of you, and whoever is willing to fix one
+    /// should be able to. Items have always been readable and updatable by any
+    /// signed-in user for exactly this reason.
+    func fetchPlacesWithoutPin() async -> [RexItem] {
+        guard let token = try? await validToken() else { return [] }
+        var components = URLComponents(url: baseURL.appendingPathComponent("/rest/v1/items"), resolvingAgainstBaseURL: false)!
+        components.queryItems = [
+            URLQueryItem(name: "select", value: "*"),
+            URLQueryItem(name: "type", value: "in.(place,event)"),
+            URLQueryItem(name: "lat", value: "is.null"),
+            URLQueryItem(name: "order", value: "title.asc"),
+            // PostgREST caps at 1000 anyway; this is the whole backlog twice over.
+            URLQueryItem(name: "limit", value: "500"),
+        ]
+        guard let url = components.url else { return [] }
+        var request = URLRequest(url: url)
+        request.setValue(anonKey, forHTTPHeaderField: "apikey")
+        request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+        guard let (data, response) = try? await URLSession.shared.data(for: request),
+              let http = response as? HTTPURLResponse, http.statusCode < 400
+        else { return [] }
+        return (try? JSONDecoder().decode([RexItem].self, from: data)) ?? []
+    }
+
     func fetchMapPlaces() async throws -> [MapPlace] {
         let token = try await validToken()
         // "the map doesn't even load" (Aug 26/27) — the embedded profiles(...)

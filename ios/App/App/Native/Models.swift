@@ -52,7 +52,9 @@ struct RexPlaceDetails {
     }
 }
 
-struct RexItem: Codable {
+/// `id` is already there, so Identifiable costs nothing and lets an item drive
+/// a .sheet(item:) directly — see PlacesWithoutPinView.
+struct RexItem: Codable, Identifiable {
     let id: String
     let type: String
     let title: String

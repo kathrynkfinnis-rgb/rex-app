@@ -176,6 +176,10 @@ struct RexMapView: View {
             .sorted { $0.name.localizedCaseInsensitiveCompare($1.name) == .orderedAscending }
     }
 
+    /// How many places and events have no coordinates, so aren't on this map
+    /// at all. Counted rather than listed here — the list is its own screen.
+    @State private var pinlessCount = 0
+
     /// The cuisines present among the places currently loaded, in Kathryn's
     /// order rather than whatever order they were found in.
     private var cuisinesOnMap: [String] {
@@ -294,6 +298,7 @@ struct RexMapView: View {
             async let placesTask: () = load()
             async let locationTask: () = resolveLocation()
             _ = await (placesTask, locationTask)
+            pinlessCount = await RexAPI.shared.fetchPlacesWithoutPin().count
         }
         .onChange(of: refreshSignal) { _, _ in
             // Not isLoading = true here — that would blank the map behind
@@ -524,6 +529,27 @@ struct RexMapView: View {
                     // nobody has Rex'd would bury the shapes they follow.
                     ForEach(cuisinesOnMap, id: \.self) { name in
                         subcategoryChip(name)
+                    }
+
+                    // Oct 7 — "can we do this manually in the app?" The places
+                    // that aren't on this map, listed, so they can be. Last in
+                    // the row and only when there are any: it is a repair job,
+                    // not a filter, and it should be findable without being in
+                    // the way of the filters it sits beside.
+                    if pinlessCount > 0 {
+                        NavigationLink(value: PlacesWithoutPinRoute()) {
+                            HStack(spacing: 5) {
+                                Image(systemName: "mappin.slash").font(.system(size: 10))
+                                Text("\(pinlessCount) with no pin")
+                            }
+                            .font(RexFont.text(12.5, weight: .medium))
+                            .padding(.horizontal, 12).padding(.vertical, 6)
+                            .background(RexColor.card)
+                            .foregroundStyle(RexColor.mutedForeground)
+                            .clipShape(Capsule())
+                            .overlay(Capsule().stroke(RexColor.border, lineWidth: 1))
+                        }
+                        .buttonStyle(.plain)
                     }
                 }
             }

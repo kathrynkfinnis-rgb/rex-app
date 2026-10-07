@@ -108,6 +108,7 @@ struct MainTabView: View {
                     RexMapView(refreshSignal: mapRefreshSignal, focusRequest: mapFocusRequest)
                         .navigationDestination(for: String.self) { ItemDetailView(itemId: $0) }
                         .navigationDestination(for: UserProfileRoute.self) { UserProfileView(route: $0) }
+                        .navigationDestination(for: PlacesWithoutPinRoute.self) { _ in PlacesWithoutPinView() }
                 }
                 .tag(1)
 
