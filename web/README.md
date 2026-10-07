@@ -46,9 +46,24 @@ sets — it has no file extension, which is Apple's spec rather than a mistake.
 
 ## Deploying
 
+Run it from **inside** this directory:
+
 ```
-npx wrangler pages deploy web --project-name=rex-web
+cd web && npx wrangler pages deploy . --project-name=rex-web --branch main
 ```
+
+Not `wrangler pages deploy web` from the repo root. That form picked up the
+TanStack app's generated `.output/server/wrangler.json` as a "redirected
+configuration", silently skipped `functions/`, and published a build with no
+share pages at all — `/r/<id>` started serving the landing page instead. A
+deploy that worked prints two lines you should look for:
+
+```
+✨ Compiled Worker successfully
+✨ Uploading Functions bundle
+```
+
+If those are missing, the Functions didn't go up, whatever else it says.
 
 ## Checking it locally
 
