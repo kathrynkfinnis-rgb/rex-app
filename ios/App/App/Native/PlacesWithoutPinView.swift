@@ -19,6 +19,10 @@ struct PlacesWithoutPinRoute: Hashable {}
 struct PlacesWithoutPinView: View {
     @State private var items: [RexItem] = []
     @State private var isLoading = true
+    /// Oct 7 — "can we make the 198 with no pin only available to admins?"
+    /// Checked here as well as on the chip that leads here: a gate that only
+    /// exists on the door you came through isn't a gate.
+    @State private var isAdmin = false
     @State private var locating: RexItem?
     @State private var fixedIds: Set<String> = []
     @State private var errorMessage: String?
@@ -32,6 +36,8 @@ struct PlacesWithoutPinView: View {
             VStack(alignment: .leading, spacing: RexSpacing.md) {
                 if isLoading {
                     ProgressView().frame(maxWidth: .infinity).padding(.top, RexSpacing.xxl)
+                } else if !isAdmin {
+                    notForYou
                 } else if remaining.isEmpty {
                     emptyState
                 } else {
@@ -118,6 +124,24 @@ struct PlacesWithoutPinView: View {
         .buttonStyle(.plain)
     }
 
+    /// Deliberately plain rather than apologetic. Nobody arrives here by
+    /// accident, and anyone who does has lost nothing.
+    private var notForYou: some View {
+        VStack(spacing: RexSpacing.sm) {
+            Image(systemName: "lock")
+                .font(.system(size: 30))
+                .foregroundStyle(RexColor.mutedForeground)
+            Text("Not available")
+                .font(RexFont.display(20, weight: .semibold))
+                .foregroundStyle(RexColor.foreground)
+            Text("This one's for the REX team.")
+                .font(RexFont.text(14))
+                .foregroundStyle(RexColor.mutedForeground)
+        }
+        .frame(maxWidth: .infinity)
+        .padding(RexSpacing.xxl)
+    }
+
     private var emptyState: some View {
         VStack(spacing: RexSpacing.sm) {
             Image(systemName: "mappin.and.ellipse")
@@ -136,7 +160,8 @@ struct PlacesWithoutPinView: View {
 
     private func load() async {
         isLoading = true
-        items = await RexAPI.shared.fetchPlacesWithoutPin()
+        isAdmin = await RexAPI.shared.isAdmin()
+        items = isAdmin ? await RexAPI.shared.fetchPlacesWithoutPin() : []
         isLoading = false
     }
 

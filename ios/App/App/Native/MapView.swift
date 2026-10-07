@@ -178,7 +178,14 @@ struct RexMapView: View {
 
     /// How many places and events have no coordinates, so aren't on this map
     /// at all. Counted rather than listed here — the list is its own screen.
+    ///
+    /// Oct 7 — admins only. It is a repair job on everybody's data, not a
+    /// feature: the screen it leads to edits items other people posted, and
+    /// an ordinary user has no reason to be handed a list of two hundred
+    /// chores. Counted only when the check passes, so nobody else pays for
+    /// the query either.
     @State private var pinlessCount = 0
+    @State private var isAdmin = false
 
     /// The cuisines present among the places currently loaded, in Kathryn's
     /// order rather than whatever order they were found in.
@@ -298,7 +305,10 @@ struct RexMapView: View {
             async let placesTask: () = load()
             async let locationTask: () = resolveLocation()
             _ = await (placesTask, locationTask)
-            pinlessCount = await RexAPI.shared.fetchPlacesWithoutPin().count
+            isAdmin = await RexAPI.shared.isAdmin()
+            if isAdmin {
+                pinlessCount = await RexAPI.shared.fetchPlacesWithoutPin().count
+            }
         }
         .onChange(of: refreshSignal) { _, _ in
             // Not isLoading = true here — that would blank the map behind
@@ -536,7 +546,7 @@ struct RexMapView: View {
                     // the row and only when there are any: it is a repair job,
                     // not a filter, and it should be findable without being in
                     // the way of the filters it sits beside.
-                    if pinlessCount > 0 {
+                    if isAdmin, pinlessCount > 0 {
                         NavigationLink(value: PlacesWithoutPinRoute()) {
                             HStack(spacing: 5) {
                                 Image(systemName: "mappin.slash").font(.system(size: 10))
