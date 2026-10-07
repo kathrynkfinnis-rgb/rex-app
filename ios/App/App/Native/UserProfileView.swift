@@ -32,6 +32,8 @@ struct UserProfileView: View {
     /// to add her" (Danny). Your relationship with this person: nil while
     /// loading, then "none", "requested", "requested_you", "friend", "you".
     @State private var connection: String?
+    /// Oct 7 — joined date and counts, for a profile you aren't connected to.
+    @State private var stats: RexProfileStats?
     @State private var connectionFriendshipId: String?
     @State private var isChangingConnection = false
     /// Sept 17 — reporting or blocking this person.
@@ -303,6 +305,16 @@ struct UserProfileView: View {
                     RexRatingAverageBadge(ratings: recommendations.map { $0.rating })
                 }
                 .padding(.top, 2)
+                } else {
+                    // Oct 7 — "have her name at the top! And then maybe the
+                    // date joined, how many Rexes etc."
+                    //
+                    // For a stranger the page was a name and an Add friend
+                    // button with nothing to go on. These counts come from
+                    // profile_basics rather than from their Rex, which are
+                    // friends-only and so read as 0 from out here — the
+                    // reason the line above is hidden for a stranger at all.
+                    strangerStatsRow
                 }
                 connectionButton
                     .padding(.top, RexSpacing.xs)
@@ -310,6 +322,29 @@ struct UserProfileView: View {
             Spacer()
         }
         .padding(.top, RexSpacing.sm)
+    }
+
+    /// What we can honestly say about somebody we aren't connected to: how
+    /// long they've been here and how much they've done. Not what they Rex'd
+    /// — that's what being friends is for.
+    @ViewBuilder
+    private var strangerStatsRow: some View {
+        if let stats {
+            HStack(spacing: RexSpacing.md) {
+                if let count = stats.rex_count, count > 0 {
+                    Text("\(count) Rex")
+                }
+                if let friends = stats.friend_count, friends > 0 {
+                    Text("\(friends) \(friends == 1 ? "friend" : "friends")")
+                }
+                if let joined = stats.joinedDate {
+                    Text("Joined \(joined.formatted(.dateTime.month(.abbreviated).year()))")
+                }
+            }
+            .font(RexFont.text(12))
+            .foregroundStyle(RexColor.mutedForeground)
+            .padding(.top, 2)
+        }
     }
 
     @ViewBuilder
@@ -535,6 +570,7 @@ struct UserProfileView: View {
         // survives whatever the rest does, because deciding whether to send a
         // friend request means seeing who you'd be sending it to.
         profile = (try? await RexAPI.shared.fetchProfiles(ids: [route.userId]))?.first
+        stats = await RexAPI.shared.fetchProfileStats(userId: route.userId)
 
         do {
             async let recsTask = RexAPI.shared.fetchRecommendations(forUser: route.userId)

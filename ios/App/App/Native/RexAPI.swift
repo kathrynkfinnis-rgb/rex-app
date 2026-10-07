@@ -2295,6 +2295,26 @@ final class RexAPI {
         return direct + ((try? await profileBasics(ids: missing)) ?? [])
     }
 
+    /// Oct 7 — how long somebody has been here and how much they have posted,
+    /// for a profile you're deciding whether to send a friend request to.
+    /// Comes from the same function as the name, so it costs no extra round
+    /// trip when both are wanted; best-effort, and the page simply omits the
+    /// line if it isn't there.
+    func fetchProfileStats(userId: String) async -> RexProfileStats? {
+        guard let token = try? await validToken() else { return nil }
+        var request = URLRequest(url: baseURL.appendingPathComponent("/rest/v1/rpc/profile_basics"))
+        request.httpMethod = "POST"
+        request.setValue(anonKey, forHTTPHeaderField: "apikey")
+        request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        request.httpBody = try? JSONSerialization.data(withJSONObject: ["_ids": [userId]])
+
+        guard let (data, response) = try? await URLSession.shared.data(for: request),
+              let http = response as? HTTPURLResponse, http.statusCode < 400
+        else { return nil }
+        return (try? JSONDecoder().decode([RexProfileStats].self, from: data))?.first
+    }
+
     /// Name, username and avatar for people the profiles table won't return.
     /// Best-effort by design: before the 5 October migration the function
     /// doesn't exist, and the page falls back to the name it was opened with.

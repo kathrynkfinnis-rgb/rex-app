@@ -178,6 +178,31 @@ struct WantRow: Codable, Identifiable {
     let items: RexItem?
 }
 
+/// Oct 7 — "have her name at the top! And then maybe the date joined, how
+/// many Rexes etc." What profile_basics returns beyond the name: enough about
+/// somebody to answer a friend request without accepting one to find out who
+/// they are.
+struct RexProfileStats: Codable {
+    let id: String
+    let joined_at: String?
+    let rex_count: Int?
+    let friend_count: Int?
+
+    var joinedDate: Date? {
+        guard let joined_at else { return nil }
+        return ISO8601DateFormatter.rexFractional.date(from: joined_at)
+            ?? ISO8601DateFormatter().date(from: joined_at)
+    }
+}
+
+extension ISO8601DateFormatter {
+    static let rexFractional: ISO8601DateFormatter = {
+        let f = ISO8601DateFormatter()
+        f.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+        return f
+    }()
+}
+
 struct Friendship: Codable, Identifiable {
     let id: String
     let requester_id: String
