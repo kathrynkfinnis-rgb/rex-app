@@ -274,10 +274,27 @@ struct ListItemSheet: View {
     }
 
     private func scheduleSearch() {
-        picked = nil
+        // Oct 7 — "when adding a place to a list you still have to click twice
+        // on the place before it saves, à la what used to happen with trips."
+        //
+        // Precisely what used to happen with trips, and the same cause: this
+        // cleared `picked` unconditionally. Tapping a result sets picked AND
+        // the title; setting the title fires this; this wiped picked; and the
+        // results list — which shows whenever nothing is picked — sprang back
+        // under your finger. The second tap worked only because the title no
+        // longer changed, so this never ran. TripStopSheet was fixed on 29
+        // September and this sheet, which was written from it, was not.
+        //
+        // Clearing is still right when someone edits the name after picking,
+        // which is them saying they meant something else. It just isn't right
+        // when the only thing that changed is the title we set ourselves.
+        if title != picked?.title { picked = nil }
         searchTask?.cancel()
         let q = title.trimmingCharacters(in: .whitespaces)
         guard q.count >= 2 else { myHits = []; webHits = []; isSearching = false; return }
+        // Nothing to search for while something is picked — and a result
+        // arriving now would reopen the list.
+        guard picked == nil else { myHits = []; webHits = []; isSearching = false; return }
         isSearching = true
         searchTask = Task {
             try? await Task.sleep(nanoseconds: 500_000_000)
@@ -286,6 +303,8 @@ struct ListItemSheet: View {
             async let web = RexSearch.search(category: type, query: q)
             let (m, w) = await (mine, web)
             guard !Task.isCancelled else { return }
+            // Picked while this was in flight: the answer is stale.
+            guard picked == nil else { isSearching = false; return }
             myHits = m
             let mineTitles = Set(m.map { $0.hit.title.lowercased() })
             webHits = w.filter { !mineTitles.contains($0.title.lowercased()) }.prefix(6).map { $0 }
@@ -314,13 +333,23 @@ struct ListItemSheet: View {
         let trimmedTitle = title.trimmingCharacters(in: .whitespaces)
         guard !trimmedTitle.isEmpty else { return }
         let trimmedLink = linkURL.trimmingCharacters(in: .whitespaces)
+        // Oct 7 — "uploaded this last night but some of the stops not on the
+        // map, e.g. IRENE and The Joint."
+        //
+        // These three were hard-coded nil. This sheet was written for things
+        // you'd buy or read, where an address is meaningless — but a list
+        // holds anything, and "A Guide to Brixton Market" is fifteen
+        // restaurants. Google had already returned the coordinates when the
+        // place was picked; the sheet threw them away, so the pin could never
+        // exist and no amount of geocoding afterwards would be as accurate as
+        // what was discarded here.
         let stop = DraftStop(
             type: type,
             title: trimmedTitle,
             subtitle: picked?.subtitle,
-            address: nil,
-            lat: nil,
-            lng: nil,
+            address: picked?.address,
+            lat: picked?.lat,
+            lng: picked?.lng,
             genre: picked?.genre,
             imageURL: picked?.imageURL,
             externalId: picked?.externalSource == "rex" ? nil : picked?.externalId,
