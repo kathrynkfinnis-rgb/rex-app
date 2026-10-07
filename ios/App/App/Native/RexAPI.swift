@@ -5536,6 +5536,35 @@ final class RexAPI {
         return out
     }
 
+    /// Oct 7 — "when you go back to edit a book you can't amend the link, you
+    /// can only amend the title by hand. Should be able to amend the link."
+    ///
+    /// Points an existing Rex at a different catalogue entry. Deliberately
+    /// moves the recommendation rather than rewriting the item: an item is
+    /// shared by everyone who has Rex'd it, so editing one to be a different
+    /// book would silently change what everybody else said they read. Saying
+    /// "this Rex of mine is actually about that book" is the true statement,
+    /// and it leaves other people's alone.
+    ///
+    /// Your rating, note, photos, tags and the date all stay where they are —
+    /// only what it is about changes.
+    func repointRecommendation(id: String, toItemId itemId: String) async throws {
+        let token = try await validToken()
+        var components = URLComponents(url: baseURL.appendingPathComponent("/rest/v1/recommendations"), resolvingAgainstBaseURL: false)!
+        components.queryItems = [URLQueryItem(name: "id", value: "eq.\(id)")]
+        var request = URLRequest(url: components.url!)
+        request.httpMethod = "PATCH"
+        request.setValue(anonKey, forHTTPHeaderField: "apikey")
+        request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        request.httpBody = try JSONSerialization.data(withJSONObject: ["item_id": itemId])
+
+        let (data, response) = try await URLSession.shared.data(for: request)
+        guard let http = response as? HTTPURLResponse, http.statusCode < 400 else {
+            throw RexAPIError.server(friendlyError(data, fallback: "Couldn't change what this points at."))
+        }
+    }
+
     func fetchMapPlaces() async throws -> [MapPlace] {
         let token = try await validToken()
         // "the map doesn't even load" (Aug 26/27) — the embedded profiles(...)

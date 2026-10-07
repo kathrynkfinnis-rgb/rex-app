@@ -62,6 +62,9 @@ struct EditRexView: View {
     /// splitGenres() reads everywhere. Free-text here rather than
     /// rebuilding that chip picker — same format, editable after the fact.
     @State private var genre: String
+    /// Oct 7 — the "change which book this is" picker.
+    @State private var repicking = false
+    @State private var repickError: String?
 
     /// Bridges the chips (a set) to `genre` (the comma-joined string the
     /// database has always held), so the storage format is untouched.
@@ -305,6 +308,25 @@ struct EditRexView: View {
                         }
                     }
 
+                    // Oct 7 — "should be able to amend the link." Retyping the
+                    // title never fixed a wrong match: the cover, the author
+                    // and the genre all come from the catalogue entry, so a
+                    // Rex attached to the wrong book stayed attached to it
+                    // under a corrected name. Only for the categories that
+                    // have a catalogue behind them — a place you typed in has
+                    // nothing to re-pick from.
+                    if [.book, .movie, .tv, .podcast].contains(category) {
+                        Button {
+                            repicking = true
+                        } label: {
+                            Label("Change which \(category.label.lowercased()) this is",
+                                  systemImage: "arrow.triangle.2.circlepath")
+                                .font(RexFont.text(13, weight: .semibold))
+                                .foregroundStyle(RexColor.primary)
+                        }
+                        .buttonStyle(.plain)
+                    }
+
                     // Oct 7 — the cuisine, editable for the same reason the
                     // shape is: the backfill guessed a lot of these from what
                     // Google called the place, and a guess you can't correct is
@@ -477,8 +499,50 @@ struct EditRexView: View {
             } message: {
                 Text("This can't be undone.")
             }
+            .sheet(isPresented: $repicking) {
+                RepickItemSheet(
+                    category: category,
+                    currentTitle: rec.items?.title ?? title
+                ) { hit in
+                    await repoint(to: hit)
+                }
+            }
+            .alert("Couldn't change it", isPresented: Binding(
+                get: { repickError != nil },
+                set: { if !$0 { repickError = nil } }
+            )) {
+                Button("OK", role: .cancel) {}
+            } message: {
+                Text(repickError ?? "")
+            }
         }
         .tint(RexColor.primary)
+    }
+
+    /// Moves this Rex onto the catalogue entry that was picked, creating that
+    /// entry if nobody has Rex'd it yet — createItem dedupes on the external
+    /// id, so picking a book a friend already has reuses their row and the two
+    /// of you end up on the same page rather than on two copies of it.
+    ///
+    /// The item itself is never rewritten: it is shared by everyone who has
+    /// Rex'd it, and editing one to be a different book would silently change
+    /// what they said they read.
+    private func repoint(to hit: RexSearchHit) async {
+        do {
+            let itemId = try await RexAPI.shared.createItem(
+                type: category.rawValue,
+                title: hit.title,
+                subtitle: hit.subtitle,
+                address: hit.address,
+                hit: hit
+            )
+            guard itemId != rec.item_id else { return }
+            try await RexAPI.shared.repointRecommendation(id: rec.id, toItemId: itemId)
+            onSaved()
+            dismiss()
+        } catch {
+            repickError = error.localizedDescription
+        }
     }
 
     /// Same debounced search-as-you-type AddTripStopSheet's own address
