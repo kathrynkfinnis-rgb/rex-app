@@ -391,8 +391,21 @@ function typesFor(question: string): string[] {
   if (/\b(tv|series|show|box set)\b/.test(q)) types.push("tv");
   if (/\b(book|read|novel|author)\b/.test(q)) types.push("book");
   if (/\b(podcast|listen)\b/.test(q)) types.push("podcast");
-  if (/\b(recipe|cook|make for dinner)\b/.test(q)) types.push("recipe");
-  if (/\b(eat|restaurant|bar|pub|caf|coffee|lunch|dinner|drink|stay|hotel|place|visit|go)\b/.test(q)) {
+  // Oct 5 — "in Explore I asked for a recipe but it gave me a restaurant and
+  // a map pin. It should scrape the web for popular recipes to follow."
+  //
+  // "A recipe for dinner" matched both of the rules below: "recipe" asked for
+  // recipes, and "dinner" asked for restaurants. Somebody standing in their
+  // own kitchen was being sent out to eat.
+  //
+  // Cooking wins when both match. The words that overlap — dinner, lunch,
+  // eat — are the ambiguous ones, and the words that don't — recipe, cook,
+  // bake — are unambiguous: nobody asks how to cook something and means a
+  // restaurant. Naming the dish you want to make is the specific signal, so
+  // it decides.
+  const wantsToCook = /\b(recipe|recipes|cook|cooking|bake|baking|make at home|homemade|home-made)\b/.test(q);
+  if (wantsToCook) types.push("recipe");
+  if (!wantsToCook && /\b(eat|restaurant|bar|pub|caf|coffee|lunch|dinner|drink|stay|hotel|place|visit|go)\b/.test(q)) {
     types.push("place", "event");
   }
   if (/\b(trip|itinerary|days? in|weekend|holiday)\b/.test(q)) types.push("place", "event", "trip");
@@ -467,7 +480,12 @@ function buildPrompt(input: {
     "say something the note doesn't — why this one answers *their question*, given what you",
     "know about them. Never summarise or reword the note; if you have nothing to add beyond",
     "it, leave `why` out entirely.",
-    ' "web": [{"title": "...", "search_hint": "...", "type": "place|movie|tv|book|podcast", "why": "..."}],',
+    // Oct 5 — "recipe" was missing from this list, which is the other half of
+    // why a recipe question came back as a restaurant: even when the model had
+    // a recipe to suggest, the only types it was allowed to use were places
+    // and catalogue media, so a recipe had to be filed as one of those — and
+    // a place is what it became, map pin and all.
+    ' "web": [{"title": "...", "search_hint": "...", "type": "place|movie|tv|book|podcast|recipe", "why": "..."}],',
     ' "facts": ["a durable preference they stated, in their words"]}',
     "",
     "`facts` is for things worth remembering next time and only when they said it outright —",
