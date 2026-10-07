@@ -4,17 +4,17 @@ import SwiftUI
 struct FriendsRoute: Hashable {}
 
 struct NotificationsView: View {
-    private enum Filter: String, CaseIterable {
-        case all = "All"
-        case unread = "Unread"
-        case social = "Social"
-        case activity = "Activity"
-    }
 
     @State private var notifications: [RexNotification] = []
     @State private var isLoading = true
     @State private var errorMessage: String?
-    @State private var filter: Filter = .all
+    /// Oct 5 — "we should only have an unread filter here."
+    ///
+    /// There were four chips: All, Unread, Social, Activity. Three of them
+    /// answered a question nobody was asking — you don't come to this screen
+    /// wanting "social notifications", you come wanting the ones you haven't
+    /// seen. One toggle, off by default.
+    @State private var unreadOnly = false
     /// Item id for each recommendation a notification points at, resolved in
     /// one batch after load — entity_id on a notification is a recommendation
     /// id, not an item id, and PostgREST can't embed it directly since it's
@@ -31,19 +31,8 @@ struct NotificationsView: View {
     @State private var respondedOutcome: [String: Bool] = [:]
     @State private var respondErrorMessage: String?
 
-    /// Friend requests/accepts are "social"; likes, comments, saves, mentions
-    /// and blasts are "activity" — same split the web uses.
-    private func isSocial(_ n: RexNotification) -> Bool {
-        n.type.hasPrefix("friend")
-    }
-
     private var visible: [RexNotification] {
-        switch filter {
-        case .all: return notifications
-        case .unread: return notifications.filter { $0.read_at == nil }
-        case .social: return notifications.filter(isSocial)
-        case .activity: return notifications.filter { !isSocial($0) }
-        }
+        unreadOnly ? notifications.filter { $0.read_at == nil } : notifications
     }
 
     private var unreadCount: Int {
@@ -131,22 +120,23 @@ struct NotificationsView: View {
                 }
             }
 
-            HStack(spacing: RexSpacing.sm) {
-                ForEach(Filter.allCases, id: \.self) { f in
-                    Button {
-                        filter = f
-                    } label: {
-                        Text(f.rawValue)
-                            .font(RexFont.text(13, weight: filter == f ? .semibold : .regular))
-                            .foregroundStyle(filter == f ? RexColor.primaryForeground : RexColor.mutedForeground)
-                            .padding(.horizontal, RexSpacing.md)
-                            .padding(.vertical, 6)
-                            .background(filter == f ? RexColor.primary : RexColor.card)
-                            .clipShape(Capsule())
-                            .overlay(Capsule().stroke(filter == f ? RexColor.primary : RexColor.border, lineWidth: 1))
-                    }
-                    .buttonStyle(.plain)
+            // One chip, and only when there is something unread to filter to.
+            // A toggle that can only ever show you nothing is worse than no
+            // toggle at all.
+            if unreadCount > 0 || unreadOnly {
+                Button {
+                    unreadOnly.toggle()
+                } label: {
+                    Text("Unread")
+                        .font(RexFont.text(13, weight: unreadOnly ? .semibold : .regular))
+                        .foregroundStyle(unreadOnly ? RexColor.primaryForeground : RexColor.mutedForeground)
+                        .padding(.horizontal, RexSpacing.md)
+                        .padding(.vertical, 6)
+                        .background(unreadOnly ? RexColor.primary : RexColor.card)
+                        .clipShape(Capsule())
+                        .overlay(Capsule().stroke(unreadOnly ? RexColor.primary : RexColor.border, lineWidth: 1))
                 }
+                .buttonStyle(.plain)
             }
         }
         .padding(.top, RexSpacing.sm)
@@ -394,7 +384,7 @@ struct NotificationsView: View {
             Image(systemName: "bell")
                 .font(.system(size: 30))
                 .foregroundStyle(RexColor.mutedForeground)
-            Text(filter == .all ? "You're all caught up" : "Nothing here")
+            Text(unreadOnly ? "Nothing unread" : "You're all caught up")
                 .font(RexFont.display(20, weight: .semibold))
                 .foregroundStyle(RexColor.foreground)
             Text("When friends comment, like, or send you a blast you'll see it here.")

@@ -285,6 +285,9 @@ struct AddRexView: View {
     @State private var photoURLs: [String] = []
     @State private var taggedFriendIds: Set<String> = []
     @State private var subcategories: Set<String> = []
+    /// Oct 4 — keeping the note box above the keyboard as it grows.
+    @FocusState private var noteFocused: Bool
+    private static let noteFieldID = "rex-note-field"
     /// Oct 7 — the cuisine, for somewhere you eat. Stored in the same genre
     /// string as the shape; held apart here so the two chip rows don't fight.
     @State private var cuisines: Set<String> = []
@@ -297,6 +300,15 @@ struct AddRexView: View {
     /// The shape and the cuisine, as the one comma-separated string items.genre
     /// has always been. Sorted within each half, shape first — the map colours
     /// by shape and the card leads with it.
+    /// Bottom-anchored on purpose: the caret is at the end of what you are
+    /// writing, so the bottom of the box is the part that has to stay visible.
+    /// Animated so the field rises with the text rather than jumping.
+    private func scrollToNote(_ proxy: ScrollViewProxy) {
+        withAnimation(.easeOut(duration: 0.18)) {
+            proxy.scrollTo(Self.noteFieldID, anchor: .bottom)
+        }
+    }
+
     private var genreValue: String? {
         let shape = subcategories.sorted()
         let food = rexCuisines.filter { cuisines.contains($0) }
@@ -377,13 +389,33 @@ struct AddRexView: View {
         NavigationStack {
             ZStack {
                 RexColor.background.ignoresSafeArea()
+                // Oct 4 — "if I went over two lines of text I couldn't scroll
+                // down and see what I was writing."
+                //
+                // The note box grows as you type, but a growing field inside a
+                // ScrollView doesn't move the view with it: the box got taller
+                // downwards, under the keyboard, and the caret went with it.
+                // The reader below scrolls the field back into sight whenever
+                // it takes focus and whenever the text grows while it has it.
                 ScrollView {
-                    if didPost {
-                        successState
-                    } else if let category {
-                        form(for: category)
-                    } else {
-                        categoryPicker
+                    ScrollViewReader { proxy in
+                        Group {
+                            if didPost {
+                                successState
+                            } else if let category {
+                                form(for: category)
+                            } else {
+                                categoryPicker
+                            }
+                        }
+                        .onChange(of: noteFocused) { _, focused in
+                            guard focused else { return }
+                            scrollToNote(proxy)
+                        }
+                        .onChange(of: note) { _, _ in
+                            guard noteFocused else { return }
+                            scrollToNote(proxy)
+                        }
                     }
                 }
             }
@@ -925,6 +957,8 @@ struct AddRexView: View {
                 // lines started scrolling under the caret.
                 TextField("What did you love about it?", text: $note, axis: .vertical)
                     .lineLimit(3...14)
+                    .id(Self.noteFieldID)
+                    .focused($noteFocused)
                     .padding(12)
                     .background(RexColor.card)
                     .clipShape(RoundedRectangle(cornerRadius: 14))
