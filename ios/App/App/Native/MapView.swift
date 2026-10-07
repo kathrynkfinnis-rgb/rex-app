@@ -509,6 +509,33 @@ struct RexMapView: View {
                 .buttonStyle(.plain)
             }
 
+            // Oct 7 — "I'm in 74 and I can't see the chip to update the
+            // unpinned locations."
+            //
+            // Because it was the twenty-eighth chip in a scrolling row, behind
+            // every place type and every cuisine. It is a repair job rather
+            // than a filter, so it never belonged among them: it sits on its
+            // own line now, the same shape as "Looking for a trip?" above,
+            // where there is nothing to scroll past.
+            if isAdmin, pinlessCount > 0 {
+                NavigationLink(value: PlacesWithoutPinRoute()) {
+                    HStack(spacing: RexSpacing.sm) {
+                        Image(systemName: "mappin.slash").font(.system(size: 11))
+                        Text("\(pinlessCount) \(pinlessCount == 1 ? "place isn't" : "places aren't") on the map")
+                            .font(RexFont.text(13, weight: .medium))
+                        Spacer()
+                        Image(systemName: "chevron.right").font(.system(size: 10, weight: .semibold))
+                    }
+                    .foregroundStyle(RexColor.mutedForeground)
+                    .padding(.horizontal, RexSpacing.sm + 2)
+                    .padding(.vertical, 7)
+                    .background(RexColor.card)
+                    .clipShape(Capsule())
+                    .overlay(Capsule().stroke(RexColor.border, lineWidth: 1))
+                }
+                .buttonStyle(.plain)
+            }
+
             // Sept 5 — sub-category chips replace Places/Events. They filter,
             // and because each carries its pin's colour they double as the
             // key for the colour-coding — a coloured map with no legend is
@@ -541,26 +568,6 @@ struct RexMapView: View {
                         subcategoryChip(name)
                     }
 
-                    // Oct 7 — "can we do this manually in the app?" The places
-                    // that aren't on this map, listed, so they can be. Last in
-                    // the row and only when there are any: it is a repair job,
-                    // not a filter, and it should be findable without being in
-                    // the way of the filters it sits beside.
-                    if isAdmin, pinlessCount > 0 {
-                        NavigationLink(value: PlacesWithoutPinRoute()) {
-                            HStack(spacing: 5) {
-                                Image(systemName: "mappin.slash").font(.system(size: 10))
-                                Text("\(pinlessCount) with no pin")
-                            }
-                            .font(RexFont.text(12.5, weight: .medium))
-                            .padding(.horizontal, 12).padding(.vertical, 6)
-                            .background(RexColor.card)
-                            .foregroundStyle(RexColor.mutedForeground)
-                            .clipShape(Capsule())
-                            .overlay(Capsule().stroke(RexColor.border, lineWidth: 1))
-                        }
-                        .buttonStyle(.plain)
-                    }
                 }
             }
 

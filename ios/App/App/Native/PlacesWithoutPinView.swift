@@ -17,17 +17,17 @@ struct PlacesWithoutPinRoute: Hashable {}
 /// person looking at the name usually knows exactly where it is, so this makes
 /// that the easy path rather than the impossible one.
 struct PlacesWithoutPinView: View {
-    @State private var items: [RexItem] = []
+    @State private var items: [UnpinnedPlace] = []
     @State private var isLoading = true
     /// Oct 7 — "can we make the 198 with no pin only available to admins?"
     /// Checked here as well as on the chip that leads here: a gate that only
     /// exists on the door you came through isn't a gate.
     @State private var isAdmin = false
-    @State private var locating: RexItem?
+    @State private var locating: UnpinnedPlace?
     @State private var fixedIds: Set<String> = []
     @State private var errorMessage: String?
 
-    private var remaining: [RexItem] {
+    private var remaining: [UnpinnedPlace] {
         items.filter { !fixedIds.contains($0.id) }
     }
 
@@ -41,25 +41,51 @@ struct PlacesWithoutPinView: View {
                 } else if remaining.isEmpty {
                     emptyState
                 } else {
-                    Text("\(remaining.count) \(remaining.count == 1 ? "place has" : "places have") no pin, so they're missing from the map. Tap one and pick it from the search to put it on there.")
+                    Text("\(remaining.count) \(remaining.count == 1 ? "place has" : "places have") no pin, so they're missing from the map. Tap one to find it, or swipe left: \u{201C}Not a place\u{201D} for a brand or a product filed wrongly, \u{201C}Ignore\u{201D} for somewhere real that will never have one. Neither deletes anything.")
                         .font(RexFont.text(13))
                         .foregroundStyle(RexColor.mutedForeground)
                         .fixedSize(horizontal: false, vertical: true)
 
                     if !fixedIds.isEmpty {
-                        Label("\(fixedIds.count) located this session", systemImage: "checkmark.circle.fill")
+                        Label("\(fixedIds.count) dealt with this session", systemImage: "checkmark.circle.fill")
                             .font(RexFont.text(12, weight: .semibold))
                             .foregroundStyle(RexColor.primary)
                     }
 
-                    VStack(spacing: 0) {
+                    // Oct 7 — "can you make it so that left swipe gives the
+                    // delete option?" … "maybe instead of deleting, you can
+                    // just remove from this list?" … "some are items / brands
+                    // rather than places."
+                    //
+                    // So: two swipes, and neither deletes anything. Deleting
+                    // an item cascades to every Rex and want of it, for
+                    // everybody — not something a quick gesture on a
+                    // two-hundred-row list should be able to do.
+                    //
+                    // "Not a place" is the one most of these want: a brand
+                    // filed as a place is wrong on its card and in the Places
+                    // filter too, so moving it to Other fixes it everywhere
+                    // and drops it off this list as a consequence rather than
+                    // as the point. "Ignore" is for a real place that simply
+                    // won't ever have a pin.
+                    //
+                    // A List rather than the VStack this was, because
+                    // swipeActions only exists inside one.
+                    List {
                         ForEach(remaining, id: \.id) { item in
                             row(item)
-                            if item.id != remaining.last?.id {
-                                Divider().padding(.leading, RexSpacing.md)
-                            }
+                                .listRowInsets(EdgeInsets())
+                                .listRowSeparator(.hidden)
+                                .listRowBackground(RexColor.card)
+                                .swipeActions(edge: .trailing, allowsFullSwipe: false) {
+                                    swipeButtons(item)
+                                }
                         }
                     }
+                    .listStyle(.plain)
+                    .scrollDisabled(true)
+                    .scrollContentBackground(.hidden)
+                    .frame(height: CGFloat(remaining.count) * 62 + 6)
                     .background(RexColor.card)
                     .clipShape(RoundedRectangle(cornerRadius: RexRadius.card, style: .continuous))
                     .overlay(
@@ -92,7 +118,26 @@ struct PlacesWithoutPinView: View {
         .task { await load() }
     }
 
-    private func row(_ item: RexItem) -> some View {
+    /// Lifted out of the row: the two buttons plus the row itself was past
+    /// what the type checker would solve in one expression.
+    @ViewBuilder
+    private func swipeButtons(_ item: UnpinnedPlace) -> some View {
+        Button {
+            Task { await markAsThing(item) }
+        } label: {
+            Label("Not a place", systemImage: "shippingbox")
+        }
+        .tint(RexColor.moss)
+
+        Button {
+            Task { await ignore(item) }
+        } label: {
+            Label("Ignore", systemImage: "eye.slash")
+        }
+        .tint(RexColor.mutedForeground)
+    }
+
+    private func row(_ item: UnpinnedPlace) -> some View {
         Button {
             locating = item
         } label: {
@@ -114,6 +159,17 @@ struct PlacesWithoutPinView: View {
                     }
                 }
                 Spacer(minLength: 0)
+                // How much is attached. A row with nothing on it is almost
+                // certainly junk from an import; one with four Rex is a real
+                // place that simply has no coordinates, and the difference
+                // decides which swipe it wants.
+                if item.attachedCount > 0 {
+                    Text("\(item.attachedCount)")
+                        .font(RexFont.text(11, weight: .semibold))
+                        .foregroundStyle(RexColor.mutedForeground)
+                        .padding(.horizontal, 7).padding(.vertical, 3)
+                        .background(RexColor.badgeBackground, in: Capsule())
+                }
                 Image(systemName: "mappin.slash")
                     .font(.system(size: 13))
                     .foregroundStyle(RexColor.placeholder)
@@ -161,14 +217,34 @@ struct PlacesWithoutPinView: View {
     private func load() async {
         isLoading = true
         isAdmin = await RexAPI.shared.isAdmin()
-        items = isAdmin ? await RexAPI.shared.fetchPlacesWithoutPin() : []
+        items = await RexAPI.shared.fetchUnpinnedPlaces()
         isLoading = false
+    }
+
+    /// Nothing is deleted by either of these. The row leaves the list because
+    /// it has been dealt with, not because it has been destroyed.
+    private func ignore(_ item: UnpinnedPlace) async {
+        await act(item) { try await RexAPI.shared.ignoreUnpinnedPlace(itemId: item.id) }
+    }
+
+    private func markAsThing(_ item: UnpinnedPlace) async {
+        await act(item) { try await RexAPI.shared.markPlaceAsThing(itemId: item.id) }
+    }
+
+    private func act(_ item: UnpinnedPlace, _ work: () async throws -> Void) async {
+        do {
+            try await work()
+            fixedIds.insert(item.id)
+            errorMessage = nil
+        } catch {
+            errorMessage = error.localizedDescription
+        }
     }
 
     /// Takes the coordinates and the address from the chosen result, and
     /// nothing else — the title is what people wrote and what they'll
     /// recognise, so Google's spelling of it doesn't get to overrule theirs.
-    private func locate(_ item: RexItem, with hit: RexSearchHit) async {
+    private func locate(_ item: UnpinnedPlace, with hit: RexSearchHit) async {
         guard let lat = hit.lat, let lng = hit.lng else {
             errorMessage = "That result had no location on it. Try another."
             return

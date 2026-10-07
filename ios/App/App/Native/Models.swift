@@ -205,6 +205,23 @@ extension ISO8601DateFormatter {
     }()
 }
 
+/// Oct 7 — a place with no coordinates, for the admin screen that locates or
+/// removes them. Carries how much is attached, because deleting one cascades
+/// to every Rex and want of it and the screen has to be able to say so before
+/// it happens.
+struct UnpinnedPlace: Codable, Identifiable {
+    let id: String
+    let type: String
+    let title: String
+    let subtitle: String?
+    let address: String?
+    let image_url: String?
+    let rex_count: Int
+    let want_count: Int
+
+    var attachedCount: Int { rex_count + want_count }
+}
+
 struct Friendship: Codable, Identifiable {
     let id: String
     let requester_id: String

@@ -5577,6 +5577,54 @@ final class RexAPI {
     /// missing from the map for all of you, and whoever is willing to fix one
     /// should be able to. Items have always been readable and updatable by any
     /// signed-in user for exactly this reason.
+    /// Oct 7 — the admin list of places with no coordinates, through a
+    /// function that does the admin check in the database and counts what is
+    /// attached to each row. The table read below is kept for the map's
+    /// count, which needs no detail.
+    func fetchUnpinnedPlaces() async -> [UnpinnedPlace] {
+        await unpinnedRPC("places_without_pin", body: [:]) ?? []
+    }
+
+    /// Takes a place off the list without deleting anything. Reversible.
+    func ignoreUnpinnedPlace(itemId: String) async throws {
+        try await unpinnedAction("ignore_place_without_pin", itemId: itemId)
+    }
+
+    /// Oct 7 — "some are items / brands rather than places." Moves one into
+    /// Other, which both fixes its card everywhere and takes it off this list.
+    func markPlaceAsThing(itemId: String) async throws {
+        try await unpinnedAction("place_is_actually_a_thing", itemId: itemId)
+    }
+
+    private func unpinnedRPC<T: Decodable>(_ name: String, body: [String: Any]) async -> T? {
+        guard let token = try? await validToken() else { return nil }
+        var request = URLRequest(url: baseURL.appendingPathComponent("/rest/v1/rpc/\(name)"))
+        request.httpMethod = "POST"
+        request.setValue(anonKey, forHTTPHeaderField: "apikey")
+        request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        request.httpBody = try? JSONSerialization.data(withJSONObject: body)
+        guard let (data, response) = try? await URLSession.shared.data(for: request),
+              let http = response as? HTTPURLResponse, http.statusCode < 400
+        else { return nil }
+        return try? JSONDecoder().decode(T.self, from: data)
+    }
+
+    private func unpinnedAction(_ name: String, itemId: String) async throws {
+        let token = try await validToken()
+        var request = URLRequest(url: baseURL.appendingPathComponent("/rest/v1/rpc/\(name)"))
+        request.httpMethod = "POST"
+        request.setValue(anonKey, forHTTPHeaderField: "apikey")
+        request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        request.httpBody = try JSONSerialization.data(withJSONObject: ["_item": itemId])
+
+        let (data, response) = try await URLSession.shared.data(for: request)
+        guard let http = response as? HTTPURLResponse, http.statusCode < 400 else {
+            throw RexAPIError.server(friendlyError(data, fallback: "Couldn't update that place."))
+        }
+    }
+
     func fetchPlacesWithoutPin() async -> [RexItem] {
         guard let token = try? await validToken() else { return [] }
         var components = URLComponents(url: baseURL.appendingPathComponent("/rest/v1/items"), resolvingAgainstBaseURL: false)!
