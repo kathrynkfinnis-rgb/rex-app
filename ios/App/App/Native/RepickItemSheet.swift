@@ -154,11 +154,21 @@ struct RepickItemSheet: View {
                         .foregroundStyle(RexColor.foreground)
                         .multilineTextAlignment(.leading)
                         .lineLimit(2)
-                    if let sub = hit.subtitle, !sub.isEmpty {
-                        Text(sub)
+                    // Oct 7 — "hard to confirm a match from just the name."
+                    //
+                    // It was: this read only the subtitle, which a place
+                    // usually hasn't got — the street is in `address`, a
+                    // different field entirely. So eight results called The
+                    // Crown arrived as eight identical rows. Address first
+                    // where there is one, and two lines, because the half of
+                    // an address that tells them apart is usually the end of
+                    // it rather than the beginning.
+                    if let where_ = hit.address ?? hit.subtitle, !where_.isEmpty {
+                        Text(where_)
                             .font(RexFont.text(12))
                             .foregroundStyle(RexColor.mutedForeground)
-                            .lineLimit(1)
+                            .multilineTextAlignment(.leading)
+                            .lineLimit(2)
                     }
                 }
                 Spacer(minLength: 0)
