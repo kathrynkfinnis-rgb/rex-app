@@ -65,6 +65,27 @@ struct EditRexView: View {
 
     /// Bridges the chips (a set) to `genre` (the comma-joined string the
     /// database has always held), so the storage format is untouched.
+    /// The cuisines inside `genre`, as their own chip row. Writing back keeps
+    /// the shape in front and the cuisines in Kathryn's order, so the stored
+    /// string stays "Restaurant, Italian" rather than drifting into whatever
+    /// order a Set happened to iterate in.
+    private var cuisineSelection: Binding<Set<String>> {
+        Binding(
+            get: { Set(rexCuisinesIn(genre)) },
+            set: { picked in
+                let shape = rexGenreWithoutCuisines(genre)
+                let food = rexCuisines.filter { picked.contains($0) }
+                genre = (shape + food).joined(separator: ", ")
+            }
+        )
+    }
+
+    /// The place shapes where a type of food is worth asking about.
+    private var servesFood: Bool {
+        let shape = Set(rexGenreWithoutCuisines(genre))
+        return !shape.isDisjoint(with: ["Restaurant", "Pub", "Bar", "Café", "Bakery"])
+    }
+
     private var subcategorySelection: Binding<Set<String>> {
         Binding(
             get: { Set(splitGenres(genre)) },
@@ -281,6 +302,18 @@ struct EditRexView: View {
                             Text(category == .place ? "Type of place" : "Type")
                                 .font(RexFont.text(14, weight: .semibold))
                             FlowChips(options: chipOptions(options), selected: subcategorySelection)
+                        }
+                    }
+
+                    // Oct 7 — the cuisine, editable for the same reason the
+                    // shape is: the backfill guessed a lot of these from what
+                    // Google called the place, and a guess you can't correct is
+                    // worse than no guess.
+                    if category == .place, servesFood {
+                        VStack(alignment: .leading, spacing: RexSpacing.sm) {
+                            Text("Type of food")
+                                .font(RexFont.text(14, weight: .semibold))
+                            FlowChips(options: rexCuisines, selected: cuisineSelection)
                         }
                     }
 

@@ -16,6 +16,13 @@
 -- useful number but also tells you about other people's friend lists. A count
 -- of somebody's own activity is theirs to show; a count derived from who else
 -- they know is not clearly theirs to give away.
+-- Dropped rather than replaced: this adds three columns to the return type,
+-- and CREATE OR REPLACE cannot change one ("cannot change return type of
+-- existing function"). Nothing depends on it at the database level — the app
+-- calls it over PostgREST — so dropping and recreating costs nothing beyond
+-- the instant between the two statements.
+DROP FUNCTION IF EXISTS public.profile_basics(uuid[]);
+
 CREATE OR REPLACE FUNCTION public.profile_basics(_ids uuid[])
 RETURNS TABLE(
   id uuid,

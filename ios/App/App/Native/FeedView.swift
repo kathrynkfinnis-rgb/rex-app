@@ -132,7 +132,16 @@ struct FeedView: View {
         for rec in recommendations where RexCategory(rawType: rec.items?.type) == filter {
             for genre in splitGenres(rec.items?.genre) { inUse.insert(genre.lowercased()) }
         }
-        return rexOrderedSubcategories(filter).filter { inUse.contains($0.lowercased()) }
+        let shapes = rexOrderedSubcategories(filter).filter { inUse.contains($0.lowercased()) }
+
+        // Oct 7 — "need to be able to filter by sub-sub-category on both the
+        // map and the feed." A cuisine lives in the same genre string as the
+        // shape, so the matching below already handles it; it only needed
+        // offering. After the shapes, in Kathryn's order, and only the ones
+        // actually present — the same rule the shapes follow.
+        guard filter == .place else { return shapes }
+        let food = rexCuisines.filter { inUse.contains($0.lowercased()) }
+        return shapes + food
     }
 
     /// Bursts the reader has chosen to see in full.

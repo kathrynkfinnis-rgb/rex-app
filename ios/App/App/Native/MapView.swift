@@ -176,6 +176,16 @@ struct RexMapView: View {
             .sorted { $0.name.localizedCaseInsensitiveCompare($1.name) == .orderedAscending }
     }
 
+    /// The cuisines present among the places currently loaded, in Kathryn's
+    /// order rather than whatever order they were found in.
+    private var cuisinesOnMap: [String] {
+        var inUse = Set<String>()
+        for place in places {
+            for genre in splitGenres(place.genre) { inUse.insert(genre.lowercased()) }
+        }
+        return rexCuisines.filter { inUse.contains($0.lowercased()) }
+    }
+
     /// A sub-category chip, tinted with the colour its pins use.
     private func subcategoryChip(_ name: String) -> some View {
         let color = rexSubcategoryColor(
@@ -503,6 +513,16 @@ struct RexMapView: View {
                     // I meaning to try".
                     chip("Want to try", active: wantsOnly) { wantsOnly.toggle() }
                     ForEach(rexMapSubcategories, id: \.self) { name in
+                        subcategoryChip(name)
+                    }
+                    // Oct 7 — "need to be able to filter by sub-sub-category
+                    // on both the map and the feed." The matching above
+                    // already compares against every value in the genre
+                    // string, which is where a cuisine lives, so these only
+                    // needed offering. Only the ones actually on the map,
+                    // after the shapes — thirteen permanent chips for food
+                    // nobody has Rex'd would bury the shapes they follow.
+                    ForEach(cuisinesOnMap, id: \.self) { name in
                         subcategoryChip(name)
                     }
                 }

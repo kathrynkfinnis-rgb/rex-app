@@ -285,6 +285,24 @@ struct AddRexView: View {
     @State private var photoURLs: [String] = []
     @State private var taggedFriendIds: Set<String> = []
     @State private var subcategories: Set<String> = []
+    /// Oct 7 — the cuisine, for somewhere you eat. Stored in the same genre
+    /// string as the shape; held apart here so the two chip rows don't fight.
+    @State private var cuisines: Set<String> = []
+
+    /// The place shapes where a type of food is worth asking about.
+    private var servesFood: Bool {
+        !subcategories.isDisjoint(with: ["Restaurant", "Pub", "Bar", "Café", "Bakery"])
+    }
+
+    /// The shape and the cuisine, as the one comma-separated string items.genre
+    /// has always been. Sorted within each half, shape first — the map colours
+    /// by shape and the card leads with it.
+    private var genreValue: String? {
+        let shape = subcategories.sorted()
+        let food = rexCuisines.filter { cuisines.contains($0) }
+        let all = shape + food
+        return all.isEmpty ? nil : all.joined(separator: ", ")
+    }
     @State private var productLink = ""
     /// Sept 2 trips rebuild — a trip's itinerary is an ordered list of
     /// headings and stops now (see ItineraryEntry), not a flat [DraftStop]
@@ -794,6 +812,20 @@ struct AddRexView: View {
                     .font(.system(size: 14, weight: .semibold))
                     .foregroundStyle(RexColor.foreground)
                 FlowChips(options: options, selected: $subcategories)
+            }
+
+            // Oct 7 — "for restaurants, please can we have a sub-sub-category
+            // filter… they should be types of food."
+            //
+            // Only for somewhere you eat. A cuisine on a museum is a box
+            // nobody fills in, and the shapes below are the ones where asking
+            // is worth the row. Two is allowed — "things can belong to two
+            // sub-sub-categories" — which the chips give for free.
+            if category == .place, servesFood {
+                Text("Type of food")
+                    .font(.system(size: 14, weight: .semibold))
+                    .foregroundStyle(RexColor.foreground)
+                FlowChips(options: rexCuisines, selected: $cuisines)
             }
 
             // A link to the thing itself: the point of Other (products,
@@ -1467,7 +1499,7 @@ struct AddRexView: View {
             try await RexAPI.shared.updateItemSubtitle(itemId: tripItemId, subtitle: tripDateText)
             try await RexAPI.shared.updateItemGenre(
                 itemId: tripItemId,
-                genre: subcategories.isEmpty ? nil : subcategories.sorted().joined(separator: ", ")
+                genre: genreValue
             )
             // Cover photo lives on the item (the thumbnail), not on the
             // recommendation — same rule as posting, see post().
@@ -1773,7 +1805,7 @@ struct AddRexView: View {
                 // The "genre" column is where approveStagingAsList already
                 // stores a list's kind (Book/Place/Trip/...) — same column,
                 // same meaning, whichever route created the list.
-                genre: category == .list ? listKind : (subcategories.isEmpty ? nil : subcategories.sorted().joined(separator: ", ")),
+                genre: category == .list ? listKind : genreValue,
                 linkURL: productLink.trimmingCharacters(in: .whitespaces).isEmpty ? nil : productLink.trimmingCharacters(in: .whitespaces),
                 // #21/#154 "guaranteed image", generalized beyond recipes:
                 // whenever the catalogue hasn't already supplied a cover
@@ -2332,6 +2364,7 @@ struct AddRexView: View {
         productLink = ""
         photoURLs = []
         subcategories = []
+        cuisines = []
         taggedFriendIds = []
         anonymous = false
         rating = 8

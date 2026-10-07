@@ -394,6 +394,119 @@ let rexSubcategories: [RexCategory: [String]] = [
 /// Deliberately conservative: a string that doesn't map is dropped rather than
 /// guessed at. An unfiled item is a small loss; one filed under the wrong
 /// genre is a wrong answer that looks right.
+/// Oct 7 — "for restaurants, please can we have a sub-sub-category filter…
+/// they should be types of food."
+///
+/// Kathryn's list, in her order. A level below "Restaurant", which is where
+/// rexSubcategories stops: Google's primaryTypeDisplayName leads with the
+/// cuisine ("Thai Restaurant", "Cantonese restaurant") and that is collapsed
+/// away into the shape, because one chip per cuisine would be unfilterable.
+/// This puts the cuisine back as its own, smaller vocabulary.
+///
+/// Stored in the same items.genre string as the shape, comma-separated, so a
+/// place reads "Restaurant, Italian" — which is also how "things can belong to
+/// two sub-sub-categories" works without any new column: "Restaurant, Italian,
+/// Spanish" is already a legal value.
+let rexCuisines: [String] = [
+    "Italian", "Japanese", "Mexican", "Thai", "Vietnamese", "Chinese",
+    "Indian", "Mediterranean", "Middle Eastern", "French", "American",
+    "Spanish", "British",
+]
+
+/// What Google actually calls these, mapped onto the thirteen above.
+///
+/// Deliberately conservative, the same rule rexNormalisedGenres follows: a
+/// term that isn't clearly one of ours is dropped rather than guessed at. An
+/// untagged restaurant is a small loss; a Korean place filed under Chinese is
+/// a wrong answer that looks right, so Korean, Caribbean, Greek-as-its-own-
+/// thing and the rest simply don't map until the list grows to hold them.
+let rexCuisineSynonyms: [String: String] = [
+    // Italian
+    "pizza": "Italian", "pizzeria": "Italian", "trattoria": "Italian",
+    "osteria": "Italian", "pasta": "Italian", "sicilian": "Italian",
+    "neapolitan": "Italian", "tuscan": "Italian",
+    // Japanese
+    "sushi": "Japanese", "ramen": "Japanese", "izakaya": "Japanese",
+    "yakitori": "Japanese", "teppanyaki": "Japanese", "donburi": "Japanese",
+    // Mexican
+    "taco": "Mexican", "tacos": "Mexican", "taqueria": "Mexican",
+    "burrito": "Mexican", "tex mex": "Mexican", "tex-mex": "Mexican",
+    // Chinese — the regional cuisines of China, which Google names directly.
+    "cantonese": "Chinese", "szechuan": "Chinese", "sichuan": "Chinese",
+    "hunan": "Chinese", "dim sum": "Chinese", "dumpling": "Chinese",
+    "shanghainese": "Chinese", "taiwanese": "Chinese",
+    // Indian
+    "curry": "Indian", "punjabi": "Indian", "south indian": "Indian",
+    "north indian": "Indian", "tandoori": "Indian", "balti": "Indian",
+    // Vietnamese / Thai
+    "pho": "Vietnamese", "banh mi": "Vietnamese",
+    "thai": "Thai",
+    // Mediterranean — the countries nobody disputes belong to it.
+    "greek": "Mediterranean", "cypriot": "Mediterranean",
+    "sardinian": "Mediterranean",
+    // Middle Eastern
+    "lebanese": "Middle Eastern", "persian": "Middle Eastern",
+    "iranian": "Middle Eastern", "turkish": "Middle Eastern",
+    "israeli": "Middle Eastern", "falafel": "Middle Eastern",
+    "shawarma": "Middle Eastern", "mezze": "Middle Eastern",
+    // French
+    "bistro": "French", "brasserie": "French", "patisserie": "French",
+    "creperie": "French", "crêperie": "French",
+    // American
+    "burger": "American", "hamburger": "American", "steakhouse": "American",
+    "barbecue": "American", "bbq": "American", "diner": "American",
+    "soul food": "American", "new american": "American",
+    // Spanish
+    "tapas": "Spanish", "basque": "Spanish", "catalan": "Spanish",
+    "paella": "Spanish",
+    // British
+    "fish and chips": "British", "fish & chips": "British",
+    "sunday roast": "British", "modern british": "British",
+    "english": "British", "scottish": "British", "welsh": "British",
+]
+
+/// The cuisines inside a stored genre string, in the order Kathryn listed
+/// them rather than the order they happen to be stored in.
+func rexCuisinesIn(_ genre: String?) -> [String] {
+    let parts = Set(splitGenres(genre).map { $0.lowercased() })
+    return rexCuisines.filter { parts.contains($0.lowercased()) }
+}
+
+/// A genre string with its cuisines taken out — the place's shape on its own,
+/// for anywhere that wants "Restaurant" without "Restaurant, Italian".
+func rexGenreWithoutCuisines(_ genre: String?) -> [String] {
+    let cuisines = Set(rexCuisines.map { $0.lowercased() })
+    return splitGenres(genre).filter { !cuisines.contains($0.lowercased()) }
+}
+
+/// Reads a cuisine out of whatever Google called the place. Used both when
+/// something is added and by the backfill for everything already saved.
+func rexCuisineFrom(_ raw: String?) -> [String] {
+    var out: [String] = []
+    for piece in (raw ?? "").split(separator: ",") {
+        let term = piece.trimmingCharacters(in: .whitespaces).lowercased()
+        guard !term.isEmpty else { continue }
+        if let exact = rexCuisines.first(where: { $0.lowercased() == term }) {
+            if !out.contains(exact) { out.append(exact) }
+            continue
+        }
+        // Whole words only, so "american" matches "New American Restaurant"
+        // but "pan-asian" doesn't quietly become anything.
+        for (needle, cuisine) in rexCuisineSynonyms where termContainsWord(term, needle) {
+            if !out.contains(cuisine) { out.append(cuisine) }
+        }
+        for cuisine in rexCuisines where termContainsWord(term, cuisine.lowercased()) {
+            // "Latin American" is not American, and Google uses it. The one
+            // place a cuisine's own name means something else.
+            if cuisine == "American", term.contains("latin") { continue }
+            if !out.contains(cuisine) { out.append(cuisine) }
+        }
+    }
+    // Two is the most anywhere honestly is; past that the tags stop meaning
+    // anything and the card has nowhere to put them.
+    return Array(out.prefix(2))
+}
+
 func rexNormalisedGenres(_ raw: String?, for category: RexCategory) -> String? {
     let curated = rexSubcategories[category] ?? []
     guard !curated.isEmpty else { return raw }
@@ -433,6 +546,18 @@ func rexNormalisedGenres(_ raw: String?, for category: RexCategory) -> String? {
         let aBroad = broad.contains(a), bBroad = broad.contains(b)
         return aBroad == bBroad ? false : !aBroad
     }
+
+    // Oct 7 — the cuisine, kept rather than collapsed away. Google leads with
+    // it ("Thai Restaurant", "Cantonese restaurant") and the loop above throws
+    // it out, because "Thai" is not one of the place shapes. Appended after
+    // the shape, so a card reads "Restaurant, Thai" — the shape first, because
+    // that is what the map colours by and what the eye wants first.
+    if category == .place {
+        for cuisine in rexCuisineFrom(raw) where !out.contains(cuisine) {
+            out.append(cuisine)
+        }
+    }
+
     return out.isEmpty ? nil : out.prefix(4).joined(separator: ", ")
 }
 
