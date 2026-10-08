@@ -302,10 +302,25 @@ struct AddRexView: View {
     /// by shape and the card leads with it.
     /// Bottom-anchored on purpose: the caret is at the end of what you are
     /// writing, so the bottom of the box is the part that has to stay visible.
-    /// Animated so the field rises with the text rather than jumping.
-    private func scrollToNote(_ proxy: ScrollViewProxy) {
-        withAnimation(.easeOut(duration: 0.18)) {
-            proxy.scrollTo(Self.noteFieldID, anchor: .bottom)
+    ///
+    /// Oct 8 — "when you try and type, the box at the bottom gets shunted down
+    /// so you can't see what you're typing." The first attempt at this scrolled
+    /// the instant the field took focus, which is before the keyboard has
+    /// finished coming up — so it scrolled against the full-height scroll view
+    /// and the keyboard then covered the result. The screenshot showed it
+    /// exactly: the "Note" label sitting on the keyboard line with the box
+    /// underneath it.
+    ///
+    /// Waiting for the keyboard to settle first means the scroll view has
+    /// already been inset for it, so the same scrollTo lands where it should.
+    /// The delay is longer than the system animation on purpose; being a
+    /// moment late is invisible, being early is the bug.
+    private func scrollToNote(_ proxy: ScrollViewProxy, settle: Bool = true) {
+        Task { @MainActor in
+            if settle { try? await Task.sleep(nanoseconds: 350_000_000) }
+            withAnimation(.easeOut(duration: 0.18)) {
+                proxy.scrollTo(Self.noteFieldID, anchor: .bottom)
+            }
         }
     }
 
@@ -413,8 +428,11 @@ struct AddRexView: View {
                             scrollToNote(proxy)
                         }
                         .onChange(of: note) { _, _ in
+                            // Already typing, so the keyboard is up and there
+                            // is nothing to wait for — a delay here would make
+                            // every keystroke lag.
                             guard noteFocused else { return }
-                            scrollToNote(proxy)
+                            scrollToNote(proxy, settle: false)
                         }
                     }
                 }

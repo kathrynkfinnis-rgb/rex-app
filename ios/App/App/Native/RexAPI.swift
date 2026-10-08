@@ -1001,6 +1001,13 @@ final class RexAPI {
         if !details.photoURLs.isEmpty { body["google_photo_urls"] = details.photoURLs }
         if let rating = details.rating { body["google_rating"] = rating }
         if let count = details.ratingCount { body["google_rating_count"] = count }
+        // Oct 8 — the other half of "we can't click through to the website for
+        // restaurants". The fetch has asked Google for websiteUri all along
+        // and this threw it away, so even a place whose details were cached
+        // came back with nothing for the link to point at. Saving it here also
+        // backfills every place already in the database: the details fetch
+        // runs once per place, and now it brings the website with it.
+        if let website = details.websiteURL, !website.isEmpty { body["link_url"] = website }
 
         request.httpBody = try? JSONSerialization.data(withJSONObject: body)
         _ = try? await URLSession.shared.data(for: request)
@@ -1798,6 +1805,16 @@ final class RexAPI {
             // can't tell Bancone City from the Crown in Doncaster.
             if let key = RexSearch.chainKey(name: hit.title, websiteURL: hit.websiteURL) {
                 body["chain_key"] = key
+            }
+            // Oct 8 — "we currently can't click through to the website for
+            // restaurants." The item page has rendered link_url as a tappable
+            // link since #45, and Google has been returning the place's own
+            // website all along — it was just read for chain detection and
+            // then dropped on the floor, so the column stayed empty and the
+            // link never had anything to be. An explicit link below still
+            // wins; this only fills the gap.
+            if let website = hit.websiteURL, !website.isEmpty {
+                body["link_url"] = website
             }
             body["lat"] = hit.lat ?? NSNull()
             body["lng"] = hit.lng ?? NSNull()
