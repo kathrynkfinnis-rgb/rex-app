@@ -103,6 +103,16 @@ struct ItemDetailView: View {
             } else if let item {
                 VStack(alignment: .leading, spacing: 0) {
                     header(item: item)
+                    // Oct 8 — "I want most info to appear on one screen,
+                    // there's just a lot of blank space." Option two of the
+                    // three mock-ups: the details section's nine labelled rows
+                    // become a two-column strip of facts directly under the
+                    // header, and the synopsis sits under that at two lines.
+                    // Together they cost about the height one old heading did,
+                    // which is what puts the reviews above the fold.
+                    if RexCategory(rawType: item.type) == .book {
+                        bookFactsSection(item: item).padding(.horizontal, 16)
+                    }
                     googlePhotosSection
                     communityPhotosSection
                     recipeSection(item: item)
@@ -133,8 +143,12 @@ struct ItemDetailView: View {
                     // the page and they were sitting between you and the
                     // reviews; nobody opens a friend's Rex to read a synopsis
                     // first.
-                    detailsSection
-                        .padding(.horizontal, 16)
+                    // A book's details moved up under the header; everything
+                    // else still shows them here, below the people.
+                    if RexCategory(rawType: item.type) != .book {
+                        detailsSection
+                            .padding(.horizontal, 16)
+                    }
                     chainSection
                     castSection
                     moreByAuthorSection
@@ -1427,9 +1441,112 @@ struct ItemDetailView: View {
         .padding(16)
     }
 
+    /// Oct 8 — a book's facts as a two-column strip rather than a stack of
+    /// labelled sections, and the synopsis under it at two lines.
+    ///
+    /// The old details section opened with a horizontal row of rating cards,
+    /// one per source, and closed with "From Open Library" underneath the
+    /// synopsis. Both are gone: "lose the Open Library thing for books" — it
+    /// credits whichever catalogue the data came from, which for a book is a
+    /// name no reader recognises or wants. Goodreads stays, in the header,
+    /// because people do know it.
+    @ViewBuilder
+    private func bookFactsSection(item: RexItem) -> some View {
+        if isLoadingDetails, details == nil {
+            HStack(spacing: 6) {
+                ProgressView().controlSize(.small)
+                Text("Looking it up\u{2026}").font(RexFont.text(12)).foregroundStyle(RexColor.mutedForeground)
+            }
+            .padding(.top, RexSpacing.sm)
+        } else {
+            let facts = bookFacts(item: item)
+            VStack(alignment: .leading, spacing: RexSpacing.sm) {
+                if !facts.isEmpty {
+                    // Two columns, because every one of these is a short label
+                    // and a shorter value — a full-width row each would be the
+                    // same whitespace the stacked sections were.
+                    LazyVGrid(
+                        columns: [GridItem(.flexible(), spacing: RexSpacing.md),
+                                  GridItem(.flexible(), spacing: RexSpacing.md)],
+                        alignment: .leading,
+                        spacing: 0
+                    ) {
+                        ForEach(facts, id: \.label) { fact in
+                            HStack(alignment: .firstTextBaseline, spacing: 6) {
+                                Text(fact.label)
+                                    .font(RexFont.text(11))
+                                    .foregroundStyle(RexColor.mutedForeground)
+                                Spacer(minLength: 4)
+                                Text(fact.value)
+                                    .font(RexFont.text(11, weight: .semibold))
+                                    .foregroundStyle(RexColor.foreground)
+                                    .lineLimit(1)
+                            }
+                            .padding(.vertical, 5)
+                            .overlay(alignment: .bottom) {
+                                Rectangle().fill(RexColor.divider).frame(height: 1)
+                            }
+                        }
+                    }
+                }
+
+                if let synopsis = details?.synopsis {
+                    Text(synopsis)
+                        .font(RexFont.text(13.5))
+                        .foregroundStyle(RexColor.foreground.opacity(0.9))
+                        // Two, not four: the reviews are what the page is for,
+                        // and four lines of publisher copy is most of the
+                        // distance between the title and the first of them.
+                        .lineLimit(synopsisExpanded ? nil : 2)
+                        .fixedSize(horizontal: false, vertical: true)
+                    if !synopsisExpanded, synopsis.count > 120 {
+                        Button("Read more") { withAnimation(.snappy) { synopsisExpanded = true } }
+                            .font(RexFont.text(12, weight: .semibold))
+                            .foregroundStyle(RexColor.primary)
+                    }
+                }
+            }
+            .padding(.top, RexSpacing.sm)
+        }
+    }
+
+    /// What a book actually has to say for itself. Anything missing is left
+    /// out rather than shown empty — a strip of "Pages —" is worse than four
+    /// facts instead of five.
+    private func bookFacts(item: RexItem) -> [(label: String, value: String)] {
+        var out: [(String, String)] = []
+
+        // details.facts arrives as "384 pages"; the label carries the word.
+        if let raw = details?.facts {
+            let pages = raw.replacingOccurrences(of: " pages", with: "")
+                .trimmingCharacters(in: .whitespaces)
+            if !pages.isEmpty, pages.allSatisfy(\.isNumber) {
+                out.append(("Pages", pages))
+            } else if !raw.isEmpty {
+                out.append(("Length", raw))
+            }
+        }
+
+        // A book's subtitle is "Author · Year" (see RexSearch's import), so
+        // the year is the part after the separator when there is one.
+        if let subtitle = item.subtitle {
+            let parts = subtitle.components(separatedBy: " \u{00B7} ")
+            if let year = parts.last, parts.count > 1, year.count == 4, year.allSatisfy(\.isNumber) {
+                out.append(("Published", year))
+            }
+        }
+
+        if let genre = item.genre {
+            let kinds = splitGenres(genre)
+            if !kinds.isEmpty { out.append(("Genre", kinds.prefix(2).joined(separator: ", "))) }
+        }
+
+        return out.map { (label: $0.0, value: $0.1) }
+    }
+
     /// What the thing actually is, before what your friends made of it:
-    /// the ratings strip, then the synopsis. Only films, TV and books have
-    /// one; everything else skips it entirely.
+    /// the ratings strip, then the synopsis. Films and TV only now — a book's
+    /// facts moved up under its header on 8 October.
     @ViewBuilder
     private var detailsSection: some View {
         if isLoadingDetails, details == nil {
