@@ -20,8 +20,16 @@ import SwiftUI
 enum MentionDraft {
     static func inProgress(in text: String) -> String? {
         guard let at = text.lastIndex(of: "@") else { return nil }
-        let before = text.index(before: at)
-        if at != text.startIndex, !text[before].isWhitespace { return nil }
+        // Oct 8 — four TestFlight crashes in two days, all here. The index was
+        // computed on its own line, above the check that makes it safe, so an
+        // "@" typed as the very first character asked for the index before
+        // startIndex and Swift trapped. Which is to say: starting a comment
+        // with a mention crashed the app, every time — "crashed when I tried
+        // to write a comment", "crashed when trying to tag someone".
+        //
+        // Inside the condition, where the comma short-circuits and it is only
+        // reached once we know there is something before the "@".
+        if at != text.startIndex, !text[text.index(before: at)].isWhitespace { return nil }
         let word = text[text.index(after: at)...]
         // A space ends it: "@phoebe was right" is finished, not in progress.
         guard !word.contains(where: { $0.isWhitespace }) else { return nil }
