@@ -85,9 +85,21 @@ struct ExploreView: View {
         for rec in recentRex where !rec.isWant && !rec.isBlast && RexCategory(rawType: rec.items?.type) != .trip {
             byItem[rec.item_id, default: []].append(rec)
         }
+        // Oct 8 — "can we populate these with stuff even if not Rex'd that
+        // much." A shelf used to require two people to have Rex'd the same
+        // thing, which is a fair definition of "most Rex'd" and a poor one
+        // for an app this size: with a few dozen users almost everything has
+        // exactly one Rex, so the recipes shelf held one recipe and the
+        // events shelf one event. A shelf with a single card in it reads as
+        // though the app is empty, which is worse than a looser claim.
+        //
+        // Everything qualifies now, still ordered by how many people agree,
+        // so the genuinely-agreed ones keep the front of the shelf and the
+        // rest fill it out behind them. The badge below tells the truth about
+        // which of those two a given shelf actually is.
         var byCategory: [RexCategory: [(rec: FeedRecommendation, count: Int)]] = [:]
         for (_, recs) in byItem {
-            guard let first = recs.first, recs.count > 1 else { continue }
+            guard let first = recs.first else { continue }
             byCategory[RexCategory(rawType: first.items?.type), default: []].append((first, recs.count))
         }
         return rexAllCategories
@@ -256,7 +268,16 @@ struct ExploreView: View {
             emptyState
         } else {
             ForEach(mostRexdByCategory, id: \.category) { group in
-                shelf(title: "Most Rex'd \(group.category.pluralLabel.lowercased())", tag: "AGREED ON") {
+                // "Agreed on" only when somebody actually agreed — otherwise
+                // the shelf is simply what your friends have Rex'd, and
+                // saying so is better than a badge that isn't true.
+                let agreed = group.recs.first?.count ?? 0 > 1
+                shelf(
+                    title: agreed
+                        ? "Most Rex'd \(group.category.pluralLabel.lowercased())"
+                        : "\(group.category.pluralLabel) your friends rate",
+                    tag: agreed ? "AGREED ON" : "FRIENDS"
+                ) {
                     ForEach(group.recs, id: \.rec.id) { entry in
                         Button { openRex(entry.rec) } label: { recentRexCard(entry.rec) }
                             .buttonStyle(.plain)
