@@ -129,13 +129,13 @@ struct ItemDetailView: View {
                     // When nobody has, your own box leads — there is nothing
                     // to read, and an empty "What friends say" above a form is
                     // a worse opening than the form.
-                    if othersHaveSpoken {
-                        friendsSection
-                        yourTakeSection
-                    } else {
-                        yourTakeSection
-                        friendsSection
-                    }
+                    // Oct 8 — one order, whoever has spoken. Your review sits
+                    // in the same place on every page: under anybody else's,
+                    // where you'd look for it. The conditional swap meant a
+                    // page you had Rex'd was laid out differently from one you
+                    // hadn't, which is what made them feel like two screens.
+                    friendsSection
+                    yourTakeSection
                     // Context below the people. Cast, then other work by the
                     // same author, then where else it exists.
                     // Oct 5 — the synopsis and the outside world's scores moved
@@ -1388,20 +1388,37 @@ struct ItemDetailView: View {
         .rexCard()
     }
 
+    /// Everybody else's Rex of this. Yours is excluded because it has its own
+    /// box below, which can also edit it — see the note in friendsSection.
+    private var theirs: [FeedRecommendation] {
+        recs.filter { $0.user_id != RexAPI.shared.currentUserId }
+    }
+
     private var friendsSection: some View {
+        // Oct 8 — "don't need 'loved' repeated, I can already see Phoebe's
+        // review", and "make the pages where you have Rex'd the same as if
+        // someone else has".
+        //
+        // Both are this: the list was every Rex including your own, and your
+        // own was then shown again underneath in its own box. On a page you
+        // had Rex'd you read yourself twice, and the page looked different
+        // from one you hadn't — your review above the heading on one, below it
+        // on the other.
+        //
+        // Other people's here, yours below in the box that can edit it. The
+        // section disappears entirely when nobody else has said anything,
+        // rather than printing "No takes yet" over your own review.
         VStack(alignment: .leading, spacing: 10) {
+            if !theirs.isEmpty {
             Divider().overlay(RexColor.border)
 
             Text("What friends say")
                 .font(.system(size: 20, weight: .semibold, design: .rounded))
                 .foregroundStyle(RexColor.foreground)
                 .padding(.top, 6)
-
-            if recs.isEmpty {
-                Text("No takes yet.").font(.system(size: 14)).foregroundStyle(RexColor.mutedForeground)
             }
 
-            ForEach(recs) { rec in
+            ForEach(theirs) { rec in
                 VStack(alignment: .leading, spacing: 6) {
                     HStack {
                         // Whoever said it is as interesting as what they said.

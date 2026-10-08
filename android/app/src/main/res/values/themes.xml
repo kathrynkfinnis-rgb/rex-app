@@ -1,0 +1,9 @@
+<resources>
+    <!-- Only what the system needs before Compose takes over; every colour
+         the app actually uses lives in ui/theme/Theme.kt, ported from the
+         iOS Theme.swift so the two stay the same app. -->
+    <style name="Theme.Rex" parent="android:Theme.Material.Light.NoActionBar">
+        <item name="android:statusBarColor">#F8F8F5</item>
+        <item name="android:windowLightStatusBar">true</item>
+    </style>
+</resources>

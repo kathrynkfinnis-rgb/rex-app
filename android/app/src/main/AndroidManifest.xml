@@ -1,0 +1,46 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+
+    <uses-permission android:name="android.permission.INTERNET" />
+    <!-- The map centres on where you are, the same as iOS. Coarse is enough:
+         REX never needs to know which side of the street you are on. -->
+    <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+
+    <application
+        android:name=".RexApp"
+        android:allowBackup="true"
+        android:icon="@mipmap/ic_launcher"
+        android:label="@string/app_name"
+        android:supportsRtl="true"
+        android:theme="@style/Theme.Rex">
+
+        <activity
+            android:name=".MainActivity"
+            android:exported="true"
+            android:windowSoftInputMode="adjustResize"
+            android:theme="@style/Theme.Rex">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+
+            <!-- App Links, the Android half of Universal Links. Reads the same
+                 /.well-known/assetlinks.json find-rex.com will serve beside the
+                 apple-app-site-association file it already has. Paths match the
+                 iOS entitlement exactly: a shared link opens the app on either
+                 phone or the web page on neither. -->
+            <intent-filter android:autoVerify="true">
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data android:scheme="https" android:host="find-rex.com" />
+                <data android:pathPrefix="/r/" />
+                <data android:pathPrefix="/t/" />
+                <data android:pathPrefix="/c/" />
+                <data android:pathPrefix="/w/" />
+                <data android:pathPrefix="/s/" />
+            </intent-filter>
+        </activity>
+    </application>
+</manifest>

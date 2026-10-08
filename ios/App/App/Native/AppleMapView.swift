@@ -286,6 +286,13 @@ struct AppleMapView: UIViewRepresentable {
         /// A dashed ring in the chain's colour, on nothing. Small on purpose:
         /// it should read as a note on the map rather than compete with the
         /// pins for places somebody has actually been to.
+        /// How much room a pin claims when MapKit works out what overlaps.
+        /// Smaller means things separate at a lower zoom; too small and pins
+        /// genuinely on top of each other stop merging and print over one
+        /// another, which is the problem clustering exists to solve. 26 is a
+        /// deliberate step down from the balloon's own ~40 rather than a leap.
+        static let pinCollisionSize: CGFloat = 26
+
         static func ghostImage(tint: UIColor) -> UIImage {
             if let cached = ghostCache[tint] { return cached }
             let size = CGSize(width: 18, height: 18)
@@ -342,6 +349,21 @@ struct AppleMapView: UIViewRepresentable {
             view?.glyphImage = showGlyphs
                 ? UIImage(systemName: place.symbol)
                 : nil
+            // Oct 8 — "can we change distances for expansion? You have to zoom
+            // in too much to separate a 2."
+            //
+            // MapKit decides what collides, and so what clusters, from the
+            // annotation view's own frame. A marker balloon is about 40pt
+            // across, so two pins merge whenever they are within roughly that
+            // on screen — which at street level is most of a block, and is why
+            // Londis and Scotch Meats sat under one bubble while plainly being
+            // two different shops.
+            //
+            // Shrinking the collision box to 26 separates them about a third
+            // of a zoom step sooner. The balloon still draws at its own size;
+            // only what MapKit measures for collision changes, so the map
+            // looks the same and simply gives up hiding things earlier.
+            view?.frame.size = CGSize(width: Self.pinCollisionSize, height: Self.pinCollisionSize)
             // The callout is REX's own sheet, not MapKit's bubble — selecting
             // is what opens it, so the built-in callout would be a second,
             // worse version of the same thing.
@@ -468,8 +490,11 @@ final class RexClusterAnnotationView: MKAnnotationView {
         super.init(annotation: annotation, reuseIdentifier: reuseIdentifier)
         displayPriority = .required
         collisionMode = .circle
-        frame = CGRect(x: 0, y: 0, width: 36, height: 36)
-        centerOffset = CGPoint(x: 0, y: -18)
+        // Oct 8 — the bubble's own collision box, matched to the pins'. At 36
+        // a cluster held itself together after the pins inside it had stopped
+        // overlapping, so a "2" survived longer than the two things in it.
+        frame = CGRect(x: 0, y: 0, width: 28, height: 28)
+        centerOffset = CGPoint(x: 0, y: -14)
     }
 
     required init?(coder: NSCoder) { fatalError("init(coder:) has not been implemented") }
