@@ -6355,10 +6355,26 @@ final class RexAPI {
             // helps disambiguate a name like "The Ivy" that exists in
             // several cities. Best-effort — a row that doesn't geocode
             // just stays pinless the way it already did.
+            // Oct 8 — the golf courses in Harry's trip had no detail on them
+            // at all, where a restaurant added by hand has photos, opening
+            // hours, a rating and a website. The difference was this: an
+            // import looked the place up, kept the two coordinates and threw
+            // the rest of Google's answer away — including the place id, which
+            // is the thing loadPlaceDetails needs before it will fetch
+            // anything. So an imported place could never become a real place
+            // page, however many times you opened it.
+            //
+            // The whole result is kept now, and handed to createItem the same
+            // way a place picked from search is. A row that only geocodes
+            // still gets its pin and nothing else, as before.
             var geocodedLat: Double?
             var geocodedLng: Double?
+            var placeHit: RexSearchHit?
             if type == "place" || type == "event" {
-                if let located = await RexSearch.locate(
+                placeHit = await RexSearch.locateDetailed(
+                    name: row.raw_title, address: nil, context: [row.raw_creator, locationHint]
+                )
+                if placeHit == nil, let located = await RexSearch.locate(
                     name: row.raw_title, address: nil, context: [row.raw_creator, locationHint]
                 ) {
                     geocodedLat = located.lat
@@ -6369,14 +6385,15 @@ final class RexAPI {
                 type: type,
                 title: row.raw_title,
                 subtitle: row.resolved_subtitle ?? row.raw_creator,
-                address: nil,
+                address: placeHit?.address,
+                hit: placeHit,
                 genre: row.resolved_genre,
                 linkURL: row.raw_url,
                 externalId: row.resolved_external_id,
                 externalSource: row.resolved_external_source,
                 imageURL: row.resolved_image_url,
-                lat: geocodedLat,
-                lng: geocodedLng
+                lat: placeHit?.lat ?? geocodedLat,
+                lng: placeHit?.lng ?? geocodedLng
             )
         }
 

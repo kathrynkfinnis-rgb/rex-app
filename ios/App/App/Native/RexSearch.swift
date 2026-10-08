@@ -1074,6 +1074,35 @@ enum RexSearch {
     /// address geocoder; otherwise it's the name (plus whatever context —
     /// city, trip name — is going) through Places, and then the sanity check
     /// above before we believe the answer.
+    /// Oct 8 — "for the golf trip Harry uploaded there is no additional
+    /// detail on the golf courses. Why is that? Can we make the pages more
+    /// like the restaurant."
+    ///
+    /// Because an imported place arrived as a bare name with a pin. This
+    /// function asks Google for the place and gets back everything a place
+    /// page is built from — the place id, photos, the rating, the website,
+    /// the cuisine — and then returns two numbers out of it. Without the
+    /// place id, ItemDetailView.loadPlaceDetails refuses to fetch anything
+    /// at all, so the page has nothing to show.
+    ///
+    /// Same shape as `locate` below, including the same plausibility check,
+    /// but it hands back the whole result. A geocode-only fallback can't
+    /// produce one, so nil here means "use locate and keep the pin".
+    static func locateDetailed(name: String?, address: String?, context: [String?] = []) async -> RexSearchHit? {
+        let cleanContext = context.compactMap { $0?.trimmingCharacters(in: .whitespaces) }.filter { !$0.isEmpty }
+        let query = ([name].compactMap { $0?.trimmingCharacters(in: .whitespaces) }.filter { !$0.isEmpty }
+                     + cleanContext).joined(separator: ", ")
+        guard !query.isEmpty,
+              let hit = (try? await places(query))?.first,
+              let lat = hit.lat, let lng = hit.lng
+        else { return nil }
+
+        // The same refusal as locate: no detail beats detail about somewhere
+        // in the wrong country. See the note on plausibleRadiusMeters.
+        guard let expected = cleanContext.first, let centre = await centre(of: expected) else { return hit }
+        return metres((lat, lng), centre) <= plausibleRadiusMeters ? hit : nil
+    }
+
     static func locate(name: String?, address: String?, context: [String?] = []) async -> (lat: Double, lng: Double, address: String?)? {
         if let address = address?.trimmingCharacters(in: .whitespacesAndNewlines), address.count > 8,
            address.contains(where: \.isNumber) || address.contains(",") {
