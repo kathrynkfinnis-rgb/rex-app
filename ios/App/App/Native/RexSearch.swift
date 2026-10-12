@@ -494,7 +494,24 @@ enum RexSearch {
         // Paul Murray's novel is "Bee Sting", not "The Bee Sting" — so a
         // title search for exactly what someone typed misses it entirely.
         let unarticled = dropLeadingArticle(q)
+        // Oct 12 — "Trespasses by Louise Kennedy: had to type the whole name
+        // and the author to get there."
+        //
+        // Because wildcardLastWord turned it into "trespasses*", and
+        // OpenLibrary returns nothing at all for that — while plain
+        // "trespasses" returns 869. The wildcard is there so a half-typed word
+        // still matches, and it does for some words ("piranes*" finds
+        // Piranesi) but not others: appending it bypasses the index's
+        // stemming, so a complete word that stems to something else matches
+        // nothing. Which means the wildcard helped while you typed and then
+        // deleted every result the moment you finished.
+        //
+        // Both forms now, merged. The wildcard keeps its job mid-word and the
+        // plain query covers the word being finished, which is the state the
+        // search is in when somebody actually stops to read the results.
         async let titleHits = openLibrary("title=\(esc(wildcardLastWord(q)))")
+        async let plainTitleHits: [RexSearchHit] = wildcardLastWord(q) == q
+            ? [] : openLibrary("title=\(esc(q))")
         async let bareTitleHits: [RexSearchHit] = unarticled == q
             ? [] : openLibrary("title=\(esc(wildcardLastWord(unarticled)))")
         async let authorHits: [RexSearchHit] = words >= 2 ? openLibrary("author=\(esc(q))") : []
@@ -520,7 +537,7 @@ enum RexSearch {
         async let headGoogleHits: [RexSearchHit] = head.isEmpty
             ? [] : googleBooks(head)
 
-        let all = (try await titleHits) + (try await bareTitleHits)
+        let all = (try await titleHits) + (try await plainTitleHits) + (try await bareTitleHits)
             + (try await authorHits) + (try await generalHits)
             + (await googleHits)
             + (try await headHits) + (await headGoogleHits)
