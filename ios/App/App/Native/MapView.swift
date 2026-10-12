@@ -187,6 +187,19 @@ struct RexMapView: View {
     @State private var pinlessCount = 0
     @State private var isAdmin = false
 
+    /// The cuisines worth offering right now: only once a food-serving shape
+    /// is the active filter, and only those actually on the map. A cuisine row
+    /// under "Museum" would be thirteen chips that filter to nothing.
+    ///
+    /// A cuisine stays listed while it is itself the filter, or the row would
+    /// vanish underneath the chip you just tapped.
+    private var cuisinesBelow: [String] {
+        let foodShapes = ["Restaurant", "Pub", "Bar", "Caf\u{00E9}", "Bakery"]
+        guard let active = subFilter else { return [] }
+        guard foodShapes.contains(active) || rexCuisines.contains(active) else { return [] }
+        return cuisinesOnMap
+    }
+
     /// The cuisines present among the places currently loaded, in Kathryn's
     /// order rather than whatever order they were found in.
     private var cuisinesOnMap: [String] {
@@ -561,13 +574,27 @@ struct RexMapView: View {
                     // on both the map and the feed." The matching above
                     // already compares against every value in the genre
                     // string, which is where a cuisine lives, so these only
-                    // needed offering. Only the ones actually on the map,
-                    // after the shapes — thirteen permanent chips for food
-                    // nobody has Rex'd would bury the shapes they follow.
-                    ForEach(cuisinesOnMap, id: \.self) { name in
-                        subcategoryChip(name)
-                    }
+                }
+            }
 
+            // Oct 8 — "these filters should appear below restaurants, in the
+            // same level."
+            //
+            // They were in the same row as Restaurant, Pub and Bar, which made
+            // thirteen cuisines read as thirteen more kinds of place rather
+            // than a division of one of them. A cuisine is a level below a
+            // shape, so it sits on a row below and only once you have asked
+            // for somewhere that serves food — pick Restaurant and the food
+            // appears; pick Museum and it doesn't, because there is nothing
+            // there to divide.
+            if !cuisinesBelow.isEmpty {
+                ScrollView(.horizontal, showsIndicators: false) {
+                    HStack(spacing: RexSpacing.sm) {
+                        ForEach(cuisinesBelow, id: \.self) { name in
+                            subcategoryChip(name)
+                        }
+                    }
+                    .padding(.horizontal, RexSpacing.page)
                 }
             }
 

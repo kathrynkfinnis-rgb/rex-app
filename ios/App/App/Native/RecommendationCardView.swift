@@ -151,7 +151,15 @@ struct RecommendationCardView: View {
 
                         if let subtitle = item.subtitle, !subtitle.isEmpty {
                             if category == .book, let onBookAuthorTap {
+                                // Oct 8 — "the authors' names need to be
+                                // truncated", again. It was fixed on 3 October
+                                // on the branch below and not on this one, and
+                                // this is the branch books take — a book's
+                                // author is tappable, so it gets its own row.
+                                // Which meant the fix landed everywhere except
+                                // the only category that has authors.
                                 bookSubtitleRow(subtitle, onTap: onBookAuthorTap)
+                                    .padding(.trailing, titleTrailingReserve)
                             } else {
                                 Text(subtitle)
                                     .font(RexFont.text(13))

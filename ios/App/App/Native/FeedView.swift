@@ -137,11 +137,20 @@ struct FeedView: View {
         // Oct 7 — "need to be able to filter by sub-sub-category on both the
         // map and the feed." A cuisine lives in the same genre string as the
         // shape, so the matching below already handles it; it only needed
-        // offering. After the shapes, in Kathryn's order, and only the ones
-        // actually present — the same rule the shapes follow.
+        // offering.
+        //
+        // Oct 8 — "these filters should appear below restaurants, in the same
+        // level." They were simply appended, so thirteen cuisines read as
+        // thirteen more kinds of place. A cuisine divides a shape rather than
+        // standing beside one, so it is offered only once a shape that serves
+        // food is the filter — and stays while a cuisine itself is, or the row
+        // would disappear under the chip you just tapped.
         guard filter == .place else { return shapes }
-        let food = rexCuisines.filter { inUse.contains($0.lowercased()) }
-        return shapes + food
+        let foodShapes = ["Restaurant", "Pub", "Bar", "Caf\u{00E9}", "Bakery"]
+        guard let active = subFilter,
+              foodShapes.contains(active) || rexCuisines.contains(active)
+        else { return shapes }
+        return shapes + rexCuisines.filter { inUse.contains($0.lowercased()) }
     }
 
     /// Bursts the reader has chosen to see in full.
