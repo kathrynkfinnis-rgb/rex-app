@@ -176,6 +176,31 @@ struct ItemDetailView: View {
         .background(RexColor.background.ignoresSafeArea())
         .navigationTitle(showsTitle ? (item?.title ?? "") : "")
         .navigationBarTitleDisplayMode(.inline)
+        // Oct 12 — "move the save to collection button?"
+        //
+        // It sat in the middle of the header sharing a row with a rating
+        // badge, which is why it read as floating: a control among labels.
+        // In the navigation bar it is always in the same place, always
+        // reachable without scrolling, and competing with nothing — the same
+        // spot Safari and Instagram put the equivalent, so the gesture is
+        // already learned.
+        //
+        // An icon rather than words, because the bar has room for one of
+        // those and the sheet it opens says what it is.
+        .toolbar {
+            if let collectionTargetRec {
+                ToolbarItem(placement: .topBarTrailing) {
+                    Button {
+                        activeSheet = .collection(collectionTargetRec)
+                    } label: {
+                        Image(systemName: "folder.badge.plus")
+                            .font(.system(size: 15, weight: .medium))
+                            .foregroundStyle(RexColor.primary)
+                    }
+                    .accessibilityLabel("Save to collection")
+                }
+            }
+        }
         // A drag can drop the keyboard too, so the comment field and its Post
         // button aren't only reachable via the keyboard's own Done button.
         .rexDismissableKeyboard()
@@ -470,21 +495,6 @@ struct ItemDetailView: View {
                     }
                 }
 
-                if let collectionTargetRec {
-                    Button {
-                        activeSheet = .collection(collectionTargetRec)
-                    } label: {
-                        HStack(spacing: 4) {
-                            Image(systemName: "folder.badge.plus").font(.system(size: 12))
-                            Text("Save to collection").font(RexFont.text(12, weight: .semibold))
-                        }
-                        .foregroundStyle(RexColor.primary)
-                        .padding(.horizontal, RexSpacing.sm)
-                        .padding(.vertical, 6)
-                        .overlay(Capsule().stroke(RexColor.primary, lineWidth: 1))
-                    }
-                    .buttonStyle(.plain)
-                }
             }
             // Each pill keeps its natural width; the row scrolls if they
             // don't all fit.
