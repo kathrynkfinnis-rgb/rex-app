@@ -118,8 +118,21 @@ struct MentionedText: View {
     /// Same pattern as the database trigger, so what's highlighted here is
     /// exactly what will have notified someone.
     private var attributed: AttributedString {
-        var result = AttributedString(text)
-        result.foregroundColor = RexColor.foreground.opacity(0.9)
+        // Oct 12 — links first, mentions over the top. A comment can hold both
+        // and they never overlap: an @name is not an address, and an address
+        // has no @name in it that the trigger would match.
+        //
+        // Built from the linked version rather than having links applied
+        // afterwards, because indices belong to the string they came from —
+        // a range from one AttributedString means nothing in another.
+        var result = linkified(text)
+        // Body colour on everything that isn't a link, so the links keep
+        // theirs. Ranges collected first: mutating while iterating runs
+        // invalidates them underneath you.
+        let plainRuns = result.runs.filter { $0.link == nil }.map(\.range)
+        for range in plainRuns {
+            result[range].foregroundColor = RexColor.foreground.opacity(0.9)
+        }
         var searchStart = text.startIndex
         while let at = text[searchStart...].firstIndex(of: "@") {
             var end = text.index(after: at)

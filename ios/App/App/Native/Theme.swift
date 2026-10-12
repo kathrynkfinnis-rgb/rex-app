@@ -824,9 +824,25 @@ func linkified(_ text: String) -> AttributedString {
               let range = Range(match.range, in: text),
               let attrRange = Range(range, in: attributed) else { continue }
         attributed[attrRange].link = url
+        // Oct 12 — "embed the links as hyperlinks that you can then click on."
+        // They were already tappable; underlined body text doesn't read as a
+        // link, so nobody knew to try. Colour is what makes it look like one
+        // before you touch it.
+        attributed[attrRange].foregroundColor = RexColor.primary
         attributed[attrRange].underlineStyle = .single
     }
     return attributed
+}
+
+extension Text {
+    /// `Text` over something somebody typed, with any addresses in it live.
+    ///
+    /// Oct 12 — a plain `Text(someNote)` was the default in most places user
+    /// prose is shown, and card notes were the only ones running through
+    /// linkified. This is short enough to be the easier thing to reach for.
+    init(linked text: String) {
+        self.init(linkified(text))
+    }
 }
 
 /// The recognisable middle of an address — "Peckham", "Bristol" — rather than

@@ -2335,8 +2335,24 @@ struct AddRexView: View {
                     _ = posting
                 }
                 Button("Open the one I wrote") {
-                    editingExisting = existingRex
+                    // Oct 12 — "make sure the 'open the one I wrote' button
+                    // works when you add a Rex to a list." It didn't, and the
+                    // wiring was never the problem: this set the sheet's item
+                    // and the sheet was bound to it correctly.
+                    //
+                    // A sheet asked for from inside a confirmationDialog
+                    // button is asked for while that dialog is still
+                    // dismissing, and SwiftUI drops the second presentation
+                    // rather than queueing it. So the dialog closed and
+                    // nothing opened — which looks exactly like a dead button.
+                    //
+                    // Letting the dialog finish first is the whole fix.
+                    let rec = existingRex
                     existingRex = nil
+                    Task { @MainActor in
+                        try? await Task.sleep(nanoseconds: 350_000_000)
+                        editingExisting = rec
+                    }
                 }
                 Button("Cancel", role: .cancel) { existingRex = nil }
             } message: {

@@ -1202,7 +1202,7 @@ struct ItemDetailView: View {
             // nothing there yet.
             if let myRec, !(myRec.note ?? "").isEmpty, !isEditingNote {
                 HStack(alignment: .top, spacing: RexSpacing.sm) {
-                    Text("\u{201C}\(myRec.note ?? "")\u{201D}")
+                    Text(linked: "\u{201C}\(myRec.note ?? "")\u{201D}")
                         .font(RexFont.text(15))
                         .foregroundStyle(RexColor.foreground.opacity(0.9))
                         .fixedSize(horizontal: false, vertical: true)
@@ -1564,7 +1564,12 @@ struct ItemDetailView: View {
                         RexRatingBadge(raw: rec.rating)
                     }
                     if let note = rec.note, !note.isEmpty {
-                        Text("\u{201C}\(note)\u{201D}").font(.system(size: 13)).foregroundStyle(RexColor.foreground.opacity(0.9))
+                        // Oct 12 — a link somebody pasted into their review is
+                        // tappable here too, not only on the feed card.
+                        Text(linked: "\u{201C}\(note)\u{201D}")
+                            .font(.system(size: 13))
+                            .foregroundStyle(RexColor.foreground.opacity(0.9))
+                            .tint(RexColor.primary)
                     }
 
                     Rectangle().fill(RexColor.divider).frame(height: 1).padding(.vertical, 4)

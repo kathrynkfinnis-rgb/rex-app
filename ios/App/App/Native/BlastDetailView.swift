@@ -94,7 +94,7 @@ struct BlastDetailView: View {
                     Text(response.profiles?.display_name ?? response.profiles?.username ?? "Someone")
                         .font(RexFont.text(13, weight: .semibold))
                         .foregroundStyle(RexColor.foreground)
-                    Text(response.body)
+                    Text(linked: response.body)
                         .font(RexFont.text(14))
                         .foregroundStyle(RexColor.foreground.opacity(0.9))
 
@@ -176,7 +176,7 @@ struct BlastDetailView: View {
                         Text(reply.profiles?.display_name ?? reply.profiles?.username ?? "Someone")
                             .font(RexFont.text(12, weight: .semibold))
                             .foregroundStyle(RexColor.foreground)
-                        Text(reply.body)
+                        Text(linked: reply.body)
                             .font(RexFont.text(13))
                             .foregroundStyle(RexColor.foreground.opacity(0.9))
                     }
