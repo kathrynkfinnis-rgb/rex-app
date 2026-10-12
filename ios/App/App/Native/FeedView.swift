@@ -40,6 +40,10 @@ struct FeedView: View {
     /// not a picker that replaces itself on every tap.
     @State private var selectedCategories: Set<RexCategory> = []
     @State private var subFilter: String?
+    /// The cuisine row, separate from `subFilter` so that narrowing Restaurant
+    /// to Italian keeps Restaurant lit. One filter that both rows wrote to
+    /// would mean picking a cuisine silently let go of the shape above it.
+    @State private var cuisineFilter: String?
     @State private var blastsOnly = false
     private enum SortMode { case recent, mostLiked }
     @State private var sortMode: SortMode = .recent
@@ -134,23 +138,37 @@ struct FeedView: View {
         }
         let shapes = rexOrderedSubcategories(filter).filter { inUse.contains($0.lowercased()) }
 
-        // Oct 7 — "need to be able to filter by sub-sub-category on both the
-        // map and the feed." A cuisine lives in the same genre string as the
-        // shape, so the matching below already handles it; it only needed
-        // offering.
-        //
-        // Oct 8 — "these filters should appear below restaurants, in the same
-        // level." They were simply appended, so thirteen cuisines read as
-        // thirteen more kinds of place. A cuisine divides a shape rather than
-        // standing beside one, so it is offered only once a shape that serves
-        // food is the filter — and stays while a cuisine itself is, or the row
-        // would disappear under the chip you just tapped.
-        guard filter == .place else { return shapes }
-        let foodShapes = ["Restaurant", "Pub", "Bar", "Caf\u{00E9}", "Bakery"]
-        guard let active = subFilter,
-              foodShapes.contains(active) || rexCuisines.contains(active)
-        else { return shapes }
-        return shapes + rexCuisines.filter { inUse.contains($0.lowercased()) }
+        return shapes
+    }
+
+    /// Shapes that have a cuisine worth dividing them by.
+    private static let foodShapes = ["Restaurant", "Pub", "Bar", "Caf\u{00E9}", "Bakery"]
+
+    /// Oct 7 — "need to be able to filter by sub-sub-category on both the map
+    /// and the feed." A cuisine lives in the same genre string as the shape, so
+    /// the matching already handles it; it only needed offering.
+    ///
+    /// Oct 8 — "these filters should appear below restaurants, in the same
+    /// level", which was read as "in the same row" and implemented by appending
+    /// the cuisines to the shapes. That row is already ten chips wide and
+    /// scrolls horizontally, so the cuisines landed off the right-hand edge,
+    /// past Bakery and Activity — present, and invisible unless you went
+    /// looking.
+    ///
+    /// Oct 12 — "in the feed, can we add a third layer of filters under the
+    /// restaurant with the cuisine type?" Their own row, which is what a level
+    /// below actually looks like: a cuisine divides a shape rather than
+    /// standing beside one. Offered only once a shape that serves food is the
+    /// filter, and still offered while a cuisine itself is — otherwise the row
+    /// would vanish under the chip you just tapped.
+    private var availableCuisines: [String] {
+        guard selectedCategories.count == 1, selectedCategories.first == .place else { return [] }
+        guard let active = subFilter, Self.foodShapes.contains(active) else { return [] }
+        var inUse = Set<String>()
+        for rec in recommendations where RexCategory(rawType: rec.items?.type) == .place {
+            for genre in splitGenres(rec.items?.genre) { inUse.insert(genre.lowercased()) }
+        }
+        return rexCuisines.filter { inUse.contains($0.lowercased()) }
     }
 
     /// Bursts the reader has chosen to see in full.
@@ -179,7 +197,7 @@ struct FeedView: View {
     /// on top of that just hides the thing you searched for.
     private var visible: [FeedRow] {
         let rows = sorted
-        guard selectedCategories.isEmpty, subFilter == nil, !blastsOnly,
+        guard selectedCategories.isEmpty, subFilter == nil, cuisineFilter == nil, !blastsOnly,
               query.trimmingCharacters(in: .whitespaces).isEmpty
         else { return rows.map { FeedRow.rex($0) } }
         var out: [FeedRow] = []
@@ -265,6 +283,10 @@ struct FeedView: View {
             // chip says "Fiction", and the two are the same choice.
             if let subFilter,
                !splitGenres(rec.items?.genre).contains(where: { $0.caseInsensitiveCompare(subFilter) == .orderedSame }) {
+                return false
+            }
+            if let cuisineFilter,
+               !splitGenres(rec.items?.genre).contains(where: { $0.caseInsensitiveCompare(cuisineFilter) == .orderedSame }) {
                 return false
             }
             if !query.trimmingCharacters(in: .whitespaces).isEmpty {
@@ -358,7 +380,7 @@ struct FeedView: View {
         // deliberately narrowed things down, collapsing duplicates again on
         // top of that risks reading as "my search lost the result" even
         // though the match is technically still folded into the footer.
-        let noActiveFilter = selectedCategories.isEmpty && subFilter == nil && !blastsOnly
+        let noActiveFilter = selectedCategories.isEmpty && subFilter == nil && cuisineFilter == nil && !blastsOnly
             && query.trimmingCharacters(in: .whitespaces).isEmpty
         let deduped = noActiveFilter ? collapseDuplicateItems(base) : base
 
@@ -448,7 +470,7 @@ struct FeedView: View {
                         } else if visible.isEmpty {
                             noMatchesState
                         } else {
-                            if selectedCategories.isEmpty && subFilter == nil && query.isEmpty {
+                            if selectedCategories.isEmpty && subFilter == nil && cuisineFilter == nil && query.isEmpty {
                                 askForRexCard
                             }
                             ForEach(visible) { row in
@@ -892,12 +914,12 @@ struct FeedView: View {
                 ScrollView(.horizontal, showsIndicators: false) {
                     HStack(spacing: RexSpacing.sm) {
                         filterChip(title: "All", isActive: selectedCategories.isEmpty && !blastsOnly) {
-                            selectedCategories = []; subFilter = nil; blastsOnly = false
+                            selectedCategories = []; subFilter = nil; cuisineFilter = nil; blastsOnly = false
                         }
                         if recommendations.contains(where: \.isBlast) {
                             filterChip(title: "Blasts", isActive: blastsOnly) {
                                 blastsOnly.toggle()
-                                selectedCategories = []; subFilter = nil
+                                selectedCategories = []; subFilter = nil; cuisineFilter = nil
                             }
                         }
                         // Toggles membership rather than replacing the
@@ -910,7 +932,7 @@ struct FeedView: View {
                                 } else {
                                     selectedCategories.insert(category)
                                 }
-                                subFilter = nil; blastsOnly = false
+                                subFilter = nil; cuisineFilter = nil; blastsOnly = false
                             }
                         }
                     }
@@ -924,6 +946,24 @@ struct FeedView: View {
                         ForEach(availableSubcategories, id: \.self) { genre in
                             filterChip(title: genre, isActive: subFilter == genre, small: true) {
                                 subFilter = (subFilter == genre) ? nil : genre
+                                // Changing or dropping the shape drops the
+                                // cuisine under it — "Restaurant, Italian"
+                                // becoming "Café, Italian" is not what tapping
+                                // Café asked for.
+                                cuisineFilter = nil
+                            }
+                        }
+                    }
+                    .padding(.horizontal, 1)
+                }
+            }
+
+            if !availableCuisines.isEmpty {
+                ScrollView(.horizontal, showsIndicators: false) {
+                    HStack(spacing: RexSpacing.sm) {
+                        ForEach(availableCuisines, id: \.self) { cuisine in
+                            filterChip(title: cuisine, isActive: cuisineFilter == cuisine, small: true) {
+                                cuisineFilter = (cuisineFilter == cuisine) ? nil : cuisine
                             }
                         }
                     }

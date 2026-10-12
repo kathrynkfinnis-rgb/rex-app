@@ -885,8 +885,23 @@ struct ItemDetailView: View {
     /// Whoever Rex'd it first, then everyone since. `recs` comes back
     /// newest-first from fetchRecommendations(forItem:), and the person who
     /// found a place before anyone else is the one worth leading with.
+    /// Oct 12 — "How is Phoebe recommending this place twice and appearing in
+    /// the REX list twice?"
+    ///
+    /// Because on 4 October we deliberately allowed a second Rex of the same
+    /// place — going back two years later and feeling differently is worth
+    /// recording. This strip was never told. It drew one face per Rex, so the
+    /// second visit arrived as a second Phoebe, and the heading counted rows
+    /// and called them people.
+    ///
+    /// One face per person, keeping their earliest Rex: that is the row the
+    /// "1" badge is about, and it is the one that decides where they sit in a
+    /// strip ordered by who got there first. Both takes still appear in full
+    /// further down the page, which is where a second visit is actually
+    /// interesting.
     private var orderedRexers: [FeedRecommendation] {
-        recs.reversed()
+        var seen = Set<String>()
+        return recs.reversed().filter { seen.insert($0.user_id).inserted }
     }
 
 
@@ -1076,7 +1091,7 @@ struct ItemDetailView: View {
     private var savedByRow: some View {
         if !recs.isEmpty {
             VStack(alignment: .leading, spacing: 6) {
-                Text(recs.count == 1 ? "Rex\u{2019}d by" : "Rex\u{2019}d by \(recs.count) people")
+                Text(orderedRexers.count == 1 ? "Rex\u{2019}d by" : "Rex\u{2019}d by \(orderedRexers.count) people")
                     .font(.system(size: 11, weight: .semibold))
                     .tracking(0.3)
                     .foregroundStyle(RexColor.mutedForeground)
@@ -1092,7 +1107,7 @@ struct ItemDetailView: View {
                         // is the last row; drawn first here, with the badge.
                         ForEach(orderedRexers) { rec in
                             let name = rec.profiles?.display_name ?? rec.profiles?.username ?? "Someone"
-                            let isFirst = rec.id == recs.last?.id && recs.count > 1
+                            let isFirst = rec.id == orderedRexers.first?.id && orderedRexers.count > 1
                             NavigationLink(value: UserProfileRoute(userId: rec.user_id, name: name)) {
                                 VStack(spacing: 4) {
                                     UserAvatarView(url: rec.profiles?.avatar_url, name: name, size: 44)

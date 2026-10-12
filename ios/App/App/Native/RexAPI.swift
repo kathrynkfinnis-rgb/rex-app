@@ -1132,16 +1132,28 @@ final class RexAPI {
     /// near-duplicate of it.
     func searchMyRexItems(query: String) async throws -> [MyRexHit] {
         let trimmed = query.trimmingCharacters(in: .whitespaces)
-        guard trimmed.count >= 2, let userId = currentUserId else { return [] }
+        // Oct 12 — "This is inaccurate. It's just that I haven't searched
+        // anything yet." AttachRexSheet calls this with an empty query to fill
+        // the sheet with your most recent Rex before you type, and a blanket
+        // `count >= 2` guard returned nothing every time. The sheet then showed
+        // its own "Nothing Rex'd yet" — telling someone with a hundred Rex that
+        // they had none.
+        //
+        // An empty query now means "the most recent, unfiltered", which is what
+        // the caller was always asking for. One or two characters still return
+        // nothing: that is a half-typed word, not a request for everything.
+        guard trimmed.isEmpty || trimmed.count >= 2, let userId = currentUserId else { return [] }
         let token = try await validToken()
         var components = URLComponents(url: baseURL.appendingPathComponent("/rest/v1/recommendations"), resolvingAgainstBaseURL: false)!
         components.queryItems = [
             URLQueryItem(name: "select", value: "item_id,rating,note,items!inner(id,type,title,subtitle,image_url,genre,address,lat,lng,external_id,external_source)"),
             URLQueryItem(name: "user_id", value: "eq.\(userId)"),
-            URLQueryItem(name: "items.title", value: "ilike.*\(trimmed)*"),
             URLQueryItem(name: "order", value: "created_at.desc"),
             URLQueryItem(name: "limit", value: "8"),
         ]
+        if !trimmed.isEmpty {
+            components.queryItems?.append(URLQueryItem(name: "items.title", value: "ilike.*\(trimmed)*"))
+        }
         var request = URLRequest(url: components.url!)
         request.setValue(anonKey, forHTTPHeaderField: "apikey")
         request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
