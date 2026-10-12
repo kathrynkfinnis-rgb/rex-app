@@ -37,6 +37,13 @@ struct RexPlaceDetails {
     let rating: Double?
     let ratingCount: Int?
     let websiteURL: String?
+    /// Oct 12 — whether Google says this place takes reservations. The booking
+    /// URL itself sits behind Google's separate Place Actions product, which
+    /// this key has no access to, so knowing *that* it books is as far as we
+    /// can honestly get — see placeDetails for why guessing the rest is worse.
+    var takesBookings: Bool = false
+    /// Its Google listing, which is where the Reserve button actually lives.
+    var googleMapsURL: String? = nil
 
     var isEmpty: Bool {
         summary == nil && openingHours.isEmpty && photoURLs.isEmpty

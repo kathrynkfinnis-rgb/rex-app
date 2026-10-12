@@ -407,6 +407,34 @@ struct ItemDetailView: View {
 
                 Spacer(minLength: 0)
 
+                // Oct 12 — "include the website for restaurants and booking
+                // links as well, as per Google."
+                //
+                // Google tells us a place takes reservations but keeps the
+                // booking URL behind its own Place Actions product, which this
+                // key can't reach. So this says what is true — it books — and
+                // sends you to the listing where the Reserve button is.
+                // Building an OpenTable search URL out of the name would land
+                // people on the wrong restaurant often enough to be worse than
+                // not offering it at all.
+                //
+                // First in the row on purpose: on a restaurant you have
+                // decided on, booking is the thing you came to do.
+                if let details = effectivePlaceDetails, details.takesBookings,
+                   let link = details.googleMapsURL, let url = URL(string: link) {
+                    Link(destination: url) {
+                        HStack(spacing: 4) {
+                            Image(systemName: "calendar.badge.plus").font(.system(size: 12))
+                            Text("Book").font(RexFont.text(12, weight: .semibold))
+                        }
+                        .foregroundStyle(RexColor.primaryForeground)
+                        .padding(.horizontal, RexSpacing.md)
+                        .padding(.vertical, 6)
+                        .background(RexColor.primary)
+                        .clipShape(Capsule())
+                    }
+                }
+
                 if let viewOnMap, category == .place || category == .event {
                     Button {
                         viewOnMap(itemId)

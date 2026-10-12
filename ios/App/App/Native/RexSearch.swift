@@ -875,7 +875,13 @@ enum RexSearch {
         request.setValue(bundleId, forHTTPHeaderField: "X-Ios-Bundle-Identifier")
         request.setValue(
             "photos,primaryTypeDisplayName,editorialSummary," +
-            "regularOpeningHours.weekdayDescriptions,rating,userRatingCount,websiteUri",
+            "regularOpeningHours.weekdayDescriptions,rating,userRatingCount,websiteUri," +
+            // Oct 12 — "include the website for restaurants and booking links
+            // as well, as per Google." Google holds both: the place's own site
+            // and, separately, whatever reservation service it uses — OpenTable,
+            // SevenRooms, Resy. A restaurant page with a Book button is the
+            // difference between reading about somewhere and going.
+            "reservable,websiteUri,googleMapsLinks.placeUri",
             forHTTPHeaderField: "X-Goog-FieldMask"
         )
 
@@ -901,13 +907,25 @@ enum RexSearch {
 
         let hours = ((json["regularOpeningHours"] as? [String: Any])?["weekdayDescriptions"] as? [String]) ?? []
 
+        // Google's Places API exposes that a place takes reservations, but not
+        // the booking URL itself — that lives behind its own "Place Actions"
+        // product, which this key has no access to. So the honest version is
+        // to say it takes bookings and send you to the Google listing, where
+        // the Reserve button is. Inventing an OpenTable search URL from the
+        // name would land people on the wrong restaurant often enough to be
+        // worse than not offering it.
+        let reservable = (json["reservable"] as? Bool) ?? false
+        let mapsLink = (json["googleMapsLinks"] as? [String: Any])?["placeUri"] as? String
+
         return RexPlaceDetails(
             summary: summary,
             openingHours: hours,
             photoURLs: Array(photoURLs),
             rating: json["rating"] as? Double,
             ratingCount: json["userRatingCount"] as? Int,
-            websiteURL: json["websiteUri"] as? String
+            websiteURL: json["websiteUri"] as? String,
+            takesBookings: reservable,
+            googleMapsURL: mapsLink
         )
     }
 
