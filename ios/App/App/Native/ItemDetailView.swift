@@ -34,6 +34,10 @@ struct ItemDetailView: View {
     /// Oct 3 — press coverage, under "On Google".
     @State private var articles: [RexArticle] = []
     @State private var recs: [FeedRecommendation] = []
+    /// Oct 12 — "when you Rex a want-to-try it should also show who has Rex'd
+    /// it and who else has want-to-try it." Who has Rex'd it was already here;
+    /// who else is only meaning to was not, anywhere on the page.
+    @State private var wanters: [RexProfileDetail] = []
     @State private var isLoading = true
     @State private var errorMessage: String?
 
@@ -215,6 +219,7 @@ struct ItemDetailView: View {
             item = fetchedItem
             // Nothing from someone on either side of a block.
             recs = RexAPI.shared.filterHidden(fetchedRecs)
+            wanters = await RexAPI.shared.fetchWanters(itemIds: [itemId])[itemId] ?? []
             Task { await loadDetails(fetchedItem) }
             wanted = (try? await wantedTask) ?? false
             if let mine = fetchedRecs.first(where: { $0.user_id == RexAPI.shared.currentUserId }) {
@@ -338,6 +343,7 @@ struct ItemDetailView: View {
             }
 
             savedByRow
+            wantedByRow
 
 
             // Oct 4 — "the Google reviews line is corrupted on place cards."
@@ -963,6 +969,47 @@ struct ItemDetailView: View {
             excludingPlaceId: item.external_id
         )
         chainBranchesElsewhere = found.filter { !known.contains($0.title.lowercased()) }
+    }
+
+    /// Who means to go, as distinct from who has been. Deliberately its own
+    /// row under the Rexers rather than mixed in with them: "three friends
+    /// rate this" and "three friends fancy it" are different sentences, and
+    /// running them together would make the second borrow the first's weight.
+    ///
+    /// Yourself included, because your own want is a fact about the thing and
+    /// leaving it out would make the count disagree with the bookmark.
+    @ViewBuilder
+    private var wantedByRow: some View {
+        if !wanters.isEmpty {
+            VStack(alignment: .leading, spacing: 6) {
+                Text(wanters.count == 1 ? "Wants to try" : "\(wanters.count) want to try")
+                    .font(.system(size: 11, weight: .semibold))
+                    .tracking(0.3)
+                    .foregroundStyle(RexColor.mutedForeground)
+
+                ScrollView(.horizontal, showsIndicators: false) {
+                    HStack(spacing: RexSpacing.md) {
+                        ForEach(wanters) { person in
+                            let name = person.display_name ?? person.username
+                            NavigationLink(value: UserProfileRoute(userId: person.id, name: name)) {
+                                VStack(spacing: 4) {
+                                    UserAvatarView(url: person.avatar_url, name: name, size: 34)
+                                    Text(name.components(separatedBy: " ").first ?? name)
+                                        .font(.system(size: 10))
+                                        .foregroundStyle(RexColor.mutedForeground)
+                                        .lineLimit(1)
+                                }
+                                .frame(width: 50)
+                            }
+                            .buttonStyle(.plain)
+                        }
+                    }
+                    .padding(.horizontal, 1)
+                }
+            }
+            .padding(.horizontal, 16)
+            .padding(.top, RexSpacing.xs)
+        }
     }
 
     @ViewBuilder
