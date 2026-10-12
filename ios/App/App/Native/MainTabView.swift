@@ -124,6 +124,7 @@ struct MainTabView: View {
 
                 NavigationStack {
                     ExploreView()
+                        .navigationDestination(for: PlacesWithoutPinRoute.self) { _ in PlacesWithoutPinView() }
                 }
                 .tag(3)
 

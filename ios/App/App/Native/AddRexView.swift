@@ -437,7 +437,7 @@ struct AddRexView: View {
                     }
                 }
             }
-            .navigationTitle(category == nil ? "What are you Rexing?" : "Add a \(category!.label.lowercased())")
+            .navigationTitle(category == nil ? "What are you Rexing?" : "Add \(category!.withArticle)")
             .rexDismissableKeyboard()
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
@@ -1886,11 +1886,12 @@ struct AddRexView: View {
                     photoURLs: [],
                     returningId: true,
                     asDraft: asDraft,
-                    // Oct 5 — admins can post a trip as REX. The stops below
-                    // deliberately stay under the admin's own account: they
-                    // are children of the trip, never shown on their own, and
-                    // the database only allows the official account where
-                    // it's checked (migration 20260918100000).
+                    // Oct 5 — admins can post a trip as REX. Oct 12 — and so
+                    // do its stops now. The note here used to argue they could
+                    // stay under the admin because they are children of the
+                    // trip and never shown alone. They are shown alone: a stop
+                    // is a Rex of a place, it appears on that place's page and
+                    // against that place's pin, with whoever posted it.
                     postAs: postAsRex ? officialAccountId : nil
                 )
                 // Posting is several sequential network calls; if one stop
@@ -1925,7 +1926,12 @@ struct AddRexView: View {
                             tripId: tripRecId,
                             tripSection: stop.section,
                             returningId: true,
-                            asDraft: asDraft
+                            asDraft: asDraft,
+                            // Oct 12 — the same fault the list items had: a
+                            // trip posted as REX kept every stop under the
+                            // admin who posted it, so the trip said REX and
+                            // each place in it said Phoebe.
+                            postAs: postAsRex ? officialAccountId : nil
                         )
                         createdStopRecIds.append(stopRecId)
                     }
@@ -2013,7 +2019,20 @@ struct AddRexView: View {
                             // put every imported item on the feed as its own
                             // card.
                             showInFeed: false,
-                            returningId: true
+                            returningId: true,
+                            // Oct 12 — "ensure the individual Rex don't come
+                            // under our own accounts (see Phoebe's Halloween
+                            // list)." They did. The list itself was posted as
+                            // REX and every item inside it under whoever was
+                            // signed in, so the collection said REX and all
+                            // fifteen things in it said Phoebe.
+                            //
+                            // My note on 5 October said the items "aren't
+                            // posts of their own" and so could stay under the
+                            // admin. That was wrong about what they are: each
+                            // carries a user_id, and that user_id is whose
+                            // face appears against it everywhere it is shown.
+                            postAs: postAsRex ? officialAccountId : nil
                         )
                         createdItemRecIds.append(childRecId)
                     }

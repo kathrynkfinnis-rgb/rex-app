@@ -158,6 +158,13 @@ struct NotificationsView: View {
             .buttonStyle(.plain)
         } else if let recId = n.linkedRecommendationId, let itemId = recItemIds[recId] {
             NavigationLink(value: itemId) { rowContent(n) }.buttonStyle(.plain)
+        } else if let blastId = n.linkedBlastId {
+            // The blast itself, where the replies live — including the one
+            // this notification is about.
+            NavigationLink(value: BlastRoute(
+                requestId: blastId,
+                title: n.linkedTitle ?? "Blast"
+            )) { rowContent(n) }.buttonStyle(.plain)
         } else if let wantId = n.linkedWantId, let itemId = wantItemIds[wantId] {
             // Oct 5 — a want has no page of its own, so the thing it is about
             // is the honest destination: somebody liked your want-to-try, and

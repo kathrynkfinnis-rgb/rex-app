@@ -331,6 +331,19 @@ struct RexNotification: Codable, Identifiable {
         return id
     }
 
+    /// Oct 11 — "can't click on any of the replies."
+    ///
+    /// A reply to your blast carries entity_type 'request' and the blast's own
+    /// id. The notifications screen knew how to open a recommendation, a want,
+    /// a trip and a person, and had no branch for this — so the one kind of
+    /// notification that is literally somebody answering you was the one you
+    /// couldn't follow. Push has routed it correctly since 5 October; only the
+    /// list hadn't caught up.
+    var linkedBlastId: String? {
+        guard entity_type == "request", let id = entity_id else { return nil }
+        return id
+    }
+
     var linksToFriends: Bool {
         entity_type == "friendship" || type == "friend_request" || type == "friend_accepted"
     }

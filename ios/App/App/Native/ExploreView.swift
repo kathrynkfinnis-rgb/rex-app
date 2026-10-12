@@ -19,6 +19,11 @@ struct ExploreView: View {
     }
     @State private var source: ExploreSource = .friends
     @State private var filter: RexCategory?
+    /// Oct 9 — the places-with-no-pin entry, moved here off the map. Reuses
+    /// the admin answer this screen already asks for rather than a second
+    /// round trip for the same question.
+    @State private var isAdmin = false
+    @State private var pinlessCount = 0
     @State private var friendsCollections: [RexList] = []
     @State private var collectionOwners: [String: RexProfileDetail] = [:]
     @State private var friendCollectionThumbnails: [String: [String]] = [:]
@@ -187,7 +192,13 @@ struct ExploreView: View {
             .navigationDestination(for: CuratorShelvesRoute.self) { _ in CuratorShelvesView() }
             .refreshable { await load() }
             .task { await load() }
-            .task { isCurator = await RexAPI.shared.isAdmin() }
+            .task {
+                isCurator = await RexAPI.shared.isAdmin()
+                isAdmin = isCurator
+                if isAdmin {
+                    pinlessCount = await RexAPI.shared.fetchUnpinnedPlaces().count
+                }
+            }
         }
         .tint(RexColor.primary)
     }
@@ -224,6 +235,7 @@ struct ExploreView: View {
     /// what you land on; talking is what you reach for. It's a bar rather than
     /// the screen itself because an empty box is a worse first impression than
     /// a shelf of your friends' recommendations.
+    @ViewBuilder
     private var talkToRexBar: some View {
         Button {
             showingTalkToRex = true
@@ -258,6 +270,35 @@ struct ExploreView: View {
         .buttonStyle(.plain)
         .padding(.horizontal, RexSpacing.page)
         .padding(.bottom, RexSpacing.md)
+
+        // Oct 9 — the places-with-no-pin screen moved off the map, where it
+        // had become a permanent row on the screen you use most once the
+        // backlog was down to eighteen. It lives here instead: admin only,
+        // quiet, and findable when you want to chip away at the tail.
+        if isAdmin, pinlessCount > 0 {
+            NavigationLink(value: PlacesWithoutPinRoute()) {
+                HStack(spacing: RexSpacing.sm) {
+                    Image(systemName: "mappin.slash").font(.system(size: 13))
+                    Text("\(pinlessCount) \(pinlessCount == 1 ? "place isn't" : "places aren't") on the map")
+                        .font(RexFont.text(14))
+                    Spacer(minLength: 0)
+                    Image(systemName: "chevron.right")
+                        .font(.system(size: 11, weight: .semibold))
+                }
+                .foregroundStyle(RexColor.mutedForeground)
+                .padding(.horizontal, RexSpacing.md)
+                .frame(height: 46)
+                .background(RexColor.card)
+                .clipShape(RoundedRectangle(cornerRadius: RexRadius.input, style: .continuous))
+                .overlay(
+                    RoundedRectangle(cornerRadius: RexRadius.input, style: .continuous)
+                        .stroke(RexColor.border, lineWidth: 1)
+                )
+            }
+            .buttonStyle(.plain)
+            .padding(.horizontal, RexSpacing.page)
+            .padding(.bottom, RexSpacing.md)
+        }
     }
 
     /// where they've been, what they've collected, then the rest by category.

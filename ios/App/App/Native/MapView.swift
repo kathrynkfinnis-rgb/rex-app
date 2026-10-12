@@ -530,7 +530,15 @@ struct RexMapView: View {
             // than a filter, so it never belonged among them: it sits on its
             // own line now, the same shape as "Looking for a trip?" above,
             // where there is nothing to scroll past.
-            if isAdmin, pinlessCount > 0 {
+            // Oct 9 — "we can remove this bit now", circling this row. It has
+            // done its job: 198 places with no pin down to 18. What is left is
+            // the tail that needs looking up one at a time, which is not worth
+            // a permanent row on the screen you use most.
+            //
+            // Kept, but only once there is enough of a backlog to be worth an
+            // interruption. Under twenty it waits; the screen itself is still
+            // there and still reachable from Explore.
+            if isAdmin, pinlessCount >= 20 {
                 NavigationLink(value: PlacesWithoutPinRoute()) {
                     HStack(spacing: RexSpacing.sm) {
                         Image(systemName: "mappin.slash").font(.system(size: 11))

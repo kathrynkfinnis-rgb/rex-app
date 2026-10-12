@@ -402,7 +402,20 @@ struct RecommendationCardView: View {
                         .clipShape(Capsule())
                 }
             }
-            .padding(.trailing, RexSpacing.sm)
+            // Oct 9 — "need to move one of the tags to the row below to
+            // prevent this": PLACE · Restaurant · Mediterranean ran under the
+            // rating badge in the corner, so the heart sat on top of the word.
+            //
+            // The third time this corner has caught something. The title
+            // reserves room for it, the author line was given the same reserve
+            // on 3 October and again on 8 October for books — and this row,
+            // which sits at exactly the badge's height, never had it. Adding
+            // the cuisine chip made it long enough to reach.
+            //
+            // Reserved rather than wrapped: these scroll already, so the
+            // overflow has somewhere to go, and a second row of chips would
+            // make every card taller to fix a few.
+            .padding(.trailing, titleTrailingReserve)
         }
         // The chips are a label, not a control — a drag on them should still
         // swipe the card away.

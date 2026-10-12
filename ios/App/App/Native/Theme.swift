@@ -193,6 +193,23 @@ enum RexFont {
 enum RexCategory: String, Codable, CaseIterable {
     case place, trip, book, movie, tv, podcast, recipe, event, other, list
 
+    /// Oct 9 — "this should read add an other."
+    ///
+    /// The title was "Add a " plus the lowercased label, which gives "Add a
+    /// other" and "Add a event". Both read as a typo rather than a rule, and
+    /// one of them is on screen every time somebody adds something that isn't
+    /// a place.
+    ///
+    /// TV is the exception a vowel check can't get right on its own: the
+    /// letter is a consonant, the way it's said is not, and "a TV" is what
+    /// anybody would write.
+    var withArticle: String {
+        let name = self == .tv ? "TV show" : label.lowercased()
+        if self == .tv { return "a \(name)" }
+        let article = "aeiou".contains(name.lowercased().first ?? "x") ? "an" : "a"
+        return "\(article) \(name)"
+    }
+
     var label: String {
         switch self {
         case .place: return "Place"
