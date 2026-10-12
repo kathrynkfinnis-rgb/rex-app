@@ -159,6 +159,9 @@ struct FeedView: View {
     @State private var rexCounts: [String: Int] = [:]
     /// Oct 7 — who wants to try each item, for the faces on a want card.
     @State private var wanters: [String: [RexProfileDetail]] = [:]
+    /// Oct 12 — collections matching the search box, and who owns them.
+    @State private var matchingCollections: [RexList] = []
+    @State private var collectionOwnerNames: [String: String] = [:]
     @State private var myWantItemIds: Set<String> = []
 
     /// A mass import — someone's whole Goodreads or IMDb history in one go —
@@ -201,6 +204,56 @@ struct FeedView: View {
     /// Same person, same minute — close enough to call one import.
     private func burstKey(_ rec: FeedRecommendation) -> String {
         "\(rec.user_id)|\(rec.created_at.prefix(16))"
+    }
+
+    /// Collections whose name matches the search, shown above the results.
+    @ViewBuilder
+    private var matchingCollectionsRow: some View {
+        if !matchingCollections.isEmpty {
+            VStack(alignment: .leading, spacing: RexSpacing.xs) {
+                Text("COLLECTIONS")
+                    .font(.system(size: 10, weight: .semibold))
+                    .tracking(0.6)
+                    .foregroundStyle(RexColor.badgeForeground)
+
+                ForEach(matchingCollections) { list in
+                    NavigationLink(value: CollectionRoute(
+                        listId: list.id,
+                        name: list.name,
+                        isMine: list.user_id == RexAPI.shared.currentUserId
+                    )) {
+                        HStack(spacing: RexSpacing.sm) {
+                            Text(list.emoji ?? "\u{1F4D2}").font(.system(size: 18))
+                            VStack(alignment: .leading, spacing: 1) {
+                                Text(list.name)
+                                    .font(RexFont.text(14.5, weight: .medium))
+                                    .foregroundStyle(RexColor.foreground)
+                                    .lineLimit(1)
+                                if let owner = collectionOwnerNames[list.user_id ?? ""] {
+                                    Text(owner)
+                                        .font(RexFont.text(11.5))
+                                        .foregroundStyle(RexColor.mutedForeground)
+                                }
+                            }
+                            Spacer(minLength: 0)
+                            Image(systemName: "chevron.right")
+                                .font(.system(size: 11, weight: .semibold))
+                                .foregroundStyle(RexColor.placeholder)
+                        }
+                        .padding(RexSpacing.md)
+                        .background(RexColor.card)
+                        .clipShape(RoundedRectangle(cornerRadius: RexRadius.card, style: .continuous))
+                        .overlay(
+                            RoundedRectangle(cornerRadius: RexRadius.card, style: .continuous)
+                                .stroke(RexColor.border, lineWidth: 1)
+                        )
+                    }
+                    .buttonStyle(.plain)
+                }
+            }
+            .padding(.horizontal, RexSpacing.page)
+            .padding(.bottom, RexSpacing.sm)
+        }
     }
 
     private var matching: [FeedRecommendation] {
@@ -363,6 +416,12 @@ struct FeedView: View {
                     LazyVStack(spacing: RexSpacing.betweenCards, pinnedViews: [.sectionHeaders]) {
                         topBar
                             .id("top")
+
+                        // Oct 12 — collections that match what you typed,
+                        // above the Rex. A collection is a thing somebody
+                        // deliberately named, so a search for that name should
+                        // find it before it finds things that merely mention it.
+                        matchingCollectionsRow
 
                         Section {
                         if isLoading {
@@ -1075,6 +1134,7 @@ struct FeedView: View {
         let text = query.trimmingCharacters(in: .whitespaces)
         guard !selectedCategories.isEmpty || !text.isEmpty else {
             filteredRecommendations = nil
+            matchingCollections = []
             isLoadingFiltered = false
             return
         }
@@ -1084,6 +1144,20 @@ struct FeedView: View {
                 if Task.isCancelled { return }
             }
             isLoadingFiltered = true
+
+            // Oct 12 — collections matching the same words, on the same
+            // debounce. Cheap enough to ride along: one indexed name lookup.
+            let lists = await RexAPI.shared.searchCollections(text)
+            if !Task.isCancelled {
+                matchingCollections = lists
+                let owners = Array(Set(lists.compactMap(\.user_id)))
+                let profiles = (try? await RexAPI.shared.fetchProfiles(ids: owners)) ?? []
+                collectionOwnerNames = Dictionary(
+                    uniqueKeysWithValues: profiles.map {
+                        ($0.id, $0.display_name ?? $0.username)
+                    }
+                )
+            }
             // #184 — this used to be fetchFeed() alone, which only ever
             // queries recommendations: a want-to-try has no row there at
             // all, so the moment a category chip or search query went

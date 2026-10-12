@@ -5683,6 +5683,37 @@ final class RexAPI {
         return (try? JSONDecoder().decode([RexItem].self, from: data)) ?? []
     }
 
+    /// Oct 12 — "when you search, allow collections to come up. Phoebe
+    /// searched Borough Market and her Borough Market collection didn't."
+    ///
+    /// It couldn't: feed search queries recommendations and wants, and a
+    /// collection is neither — it lives in hitlist_lists, which nothing in
+    /// search had ever looked at. So the one thing somebody had deliberately
+    /// named "Borough Market" was the one thing a search for Borough Market
+    /// could not return.
+    ///
+    /// Whose collections come back is the table's own business: its policy
+    /// already decides, exactly as it does on the Collections tab.
+    func searchCollections(_ query: String) async -> [RexList] {
+        let q = query.trimmingCharacters(in: .whitespaces)
+        guard q.count >= 2, let token = try? await validToken() else { return [] }
+        var components = URLComponents(url: baseURL.appendingPathComponent("/rest/v1/hitlist_lists"), resolvingAgainstBaseURL: false)!
+        components.queryItems = [
+            URLQueryItem(name: "select", value: "id,name,emoji,item_type,visibility,created_at,user_id"),
+            URLQueryItem(name: "name", value: "ilike.*\(q)*"),
+            URLQueryItem(name: "order", value: "created_at.desc"),
+            URLQueryItem(name: "limit", value: "10"),
+        ]
+        guard let url = components.url else { return [] }
+        var request = URLRequest(url: url)
+        request.setValue(anonKey, forHTTPHeaderField: "apikey")
+        request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+        guard let (data, response) = try? await URLSession.shared.data(for: request),
+              let http = response as? HTTPURLResponse, http.statusCode < 400
+        else { return [] }
+        return (try? JSONDecoder().decode([RexList].self, from: data)) ?? []
+    }
+
     func fetchMapPlaces() async throws -> [MapPlace] {
         let token = try await validToken()
         // "the map doesn't even load" (Aug 26/27) — the embedded profiles(...)

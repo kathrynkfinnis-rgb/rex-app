@@ -113,6 +113,14 @@ struct ItemDetailView: View {
                     if RexCategory(rawType: item.type) == .book {
                         bookFactsSection(item: item).padding(.horizontal, 16)
                     }
+                    // Oct 12 — "include on a card for film and TV where you can
+                    // watch said show. Make it prominent at the top."
+                    //
+                    // Directly under the title, above the reviews, because it
+                    // is the one thing on the page you act on rather than read:
+                    // you have decided to watch it, and the only question left
+                    // is where.
+                    watchOnSection
                     googlePhotosSection
                     communityPhotosSection
                     recipeSection(item: item)
@@ -478,6 +486,72 @@ struct ItemDetailView: View {
     /// the place, swipeable. Friends' photos keep their own carousel further
     /// down: a picture someone you know took there is worth more than the
     /// listing's, so the two don't get mixed into one undifferentiated reel.
+    /// Where you can watch it tonight, on something you already pay for.
+    ///
+    /// Logos rather than names alone: these are brands people recognise at a
+    /// glance and read as words only slowly. The row scrolls rather than
+    /// wrapping, so a title on six services doesn't push the reviews down.
+    @ViewBuilder
+    private var watchOnSection: some View {
+        if let details, !details.watchOn.isEmpty {
+            VStack(alignment: .leading, spacing: 6) {
+                Text("Watch on")
+                    .font(.system(size: 11, weight: .semibold))
+                    .tracking(0.4)
+                    .foregroundStyle(RexColor.mutedForeground)
+
+                ScrollView(.horizontal, showsIndicators: false) {
+                    HStack(spacing: RexSpacing.sm) {
+                        ForEach(details.watchOn) { provider in
+                            HStack(spacing: 6) {
+                                if let logo = provider.logoURL, let url = URL(string: logo) {
+                                    AsyncImage(url: url) { phase in
+                                        if let image = phase.image {
+                                            image.resizable().scaledToFit()
+                                        } else {
+                                            RexColor.muted
+                                        }
+                                    }
+                                    .frame(width: 22, height: 22)
+                                    .clipShape(RoundedRectangle(cornerRadius: 5, style: .continuous))
+                                }
+                                Text(provider.name)
+                                    .font(RexFont.text(12, weight: .semibold))
+                                    .foregroundStyle(RexColor.foreground)
+                                    .lineLimit(1)
+                            }
+                            .padding(.horizontal, RexSpacing.sm)
+                            .padding(.vertical, 5)
+                            .background(RexColor.card)
+                            .clipShape(Capsule())
+                            .overlay(Capsule().stroke(RexColor.border, lineWidth: 1))
+                        }
+
+                        // TMDB's data comes from JustWatch, whose terms ask
+                        // that you link to their page rather than deep-link
+                        // each service. It is also the honest place to send
+                        // somebody whose service isn't listed.
+                        if let link = details.watchLink, let url = URL(string: link) {
+                            Link(destination: url) {
+                                HStack(spacing: 4) {
+                                    Text("All ways").font(RexFont.text(12, weight: .semibold))
+                                    Image(systemName: "arrow.up.right").font(.system(size: 9, weight: .semibold))
+                                }
+                                .foregroundStyle(RexColor.primary)
+                                .padding(.horizontal, RexSpacing.sm)
+                                .padding(.vertical, 5)
+                                .background(RexColor.badgeBackground)
+                                .clipShape(Capsule())
+                            }
+                        }
+                    }
+                    .padding(.horizontal, 16)
+                }
+            }
+            .padding(.top, RexSpacing.sm)
+        }
+    }
+
     @ViewBuilder
     private var googlePhotosSection: some View {
         let urls = effectivePlaceDetails?.photoURLs ?? []

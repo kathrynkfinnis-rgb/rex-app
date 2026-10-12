@@ -1177,9 +1177,22 @@ enum RexSearch {
         /// poster. A film page opens with a picture across the width, the way
         /// a place page does, and this is the only landscape image a film has.
         var backdropURL: String?
+        /// Oct 12 — subscription services the viewer's own country can watch
+        /// this on. Empty where TMDB has nothing for that region, which is
+        /// commoner than you would think outside the US and UK.
+        var watchOn: [WatchProvider] = []
+        /// TMDB's own page listing every way to watch, which is what its data
+        /// licence asks you to link to rather than deep-linking each service.
+        var watchLink: String?
         var isEmpty: Bool {
             synopsis == nil && ratings.isEmpty && facts == nil && cast.isEmpty
         }
+    }
+
+    struct WatchProvider: Identifiable, Hashable {
+        let name: String
+        let logoURL: String?
+        var id: String { name }
     }
 
     struct CastMember: Identifiable, Hashable {
@@ -1218,7 +1231,14 @@ enum RexSearch {
         // credits and the certificate ride along on the same request rather
         // than costing two more — TMDB charges nothing either way, but a
         // detail page that fires three calls feels like one that fires three.
-        let fields = kind == "movie" ? "credits,release_dates" : "credits,content_ratings"
+        // Oct 12 — "include on a card for film and TV where you can watch said
+        // show (e.g. Amazon Prime, Netflix). Make it prominent at the top."
+        //
+        // watch/providers rides along on the same request for the same reason
+        // credits does: TMDB charges nothing extra and a page that fires four
+        // calls feels like one that fires four.
+        let fields = (kind == "movie" ? "credits,release_dates" : "credits,content_ratings")
+            + ",watch/providers"
         guard !tmdbKey.isEmpty,
               let json = try? await getJSON("https://api.themoviedb.org/3/\(kind)/\(id)?api_key=\(tmdbKey)&append_to_response=\(fields)") else { return out }
 
@@ -1243,6 +1263,34 @@ enum RexSearch {
         let genres = (json["genres"] as? [[String: Any]])?.compactMap { $0["name"] as? String } ?? []
         if !genres.isEmpty { facts.append(genres.prefix(3).joined(separator: ", ")) }
         if !facts.isEmpty { out.facts = facts.joined(separator: " \u{00B7} ") }
+
+        // Where you can actually watch it, for the viewer's own country.
+        //
+        // TMDB returns this per region keyed by ISO code, and the regions
+        // disagree — a show on Netflix here can be on Hulu in the States, and
+        // saying the wrong one is worse than saying nothing. The phone's own
+        // region is the only honest guess available, and anything we have no
+        // entry for simply gets no row.
+        //
+        // "flatrate" only: that is included-with-subscription. TMDB also
+        // returns rent and buy, which answer a different question — "where can
+        // I watch this" means tonight, on something you already pay for, not
+        // "which shop sells it".
+        let region = Locale.current.region?.identifier ?? "GB"
+        if let providers = json["watch/providers"] as? [String: Any],
+           let results = providers["results"] as? [String: Any],
+           let here = results[region] as? [String: Any] {
+            let flatrate = (here["flatrate"] as? [[String: Any]]) ?? []
+            out.watchOn = flatrate.compactMap { entry in
+                guard let name = entry["provider_name"] as? String else { return nil }
+                let logo = (entry["logo_path"] as? String)
+                    .map { "https://image.tmdb.org/t/p/w92\($0)" }
+                return WatchProvider(name: name, logoURL: logo)
+            }
+            // TMDB's own page for this title, which is where its "JustWatch"
+            // attribution asks you to send people.
+            out.watchLink = here["link"] as? String
+        }
 
         // Billing order is TMDB's own, which is the order the credits run in —
         // so the first few are the people someone would recognise.
