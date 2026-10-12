@@ -13,9 +13,14 @@
 -- recompute every reminder from what they asked for instead of guessing their
 -- intent back out of a timestamp.
 --
--- Safe whether or not this morning's migration has been run: everything here
--- is guarded, and a database that already has the one-reminder table gets its
--- existing rows treated as the 30-minute reminder they were.
+-- Runs after 20261012120000, not instead of it. I told Kathryn this one was
+-- safe on its own and it is not — every statement here alters a table that the
+-- earlier migration creates, so on a fresh database it stops at
+-- `relation "public.ticket_reminders" does not exist`, which is exactly what
+-- it did. Idempotent is not the same as self-sufficient.
+--
+-- Within that order it is safe to re-run, and a database that already has the
+-- one-reminder table keeps its rows as the 30-minute reminder they were.
 alter table public.ticket_reminders
   add column if not exists lead_minutes integer not null default 30;
 
