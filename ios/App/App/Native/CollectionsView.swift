@@ -194,26 +194,82 @@ struct CollectionsView: View {
 
     // MARK: - Shelf 2: My Collections
 
+    /// Oct 12 — "being able to order and title your collections into topic."
+    ///
+    /// One shelf per topic, in the order you put them, with everything
+    /// ungrouped under "My Collections" at the end. A flat shelf was right at
+    /// four collections and stops working at twenty: no shape, and the only
+    /// way to find one is to remember where you left it.
+    ///
+    /// Ungrouped goes last rather than first. It is the pile you haven't
+    /// sorted yet, and putting it above the headings you deliberately made
+    /// would bury them under it.
+    private var myCollectionsByTopic: [(topic: String?, lists: [RexList])] {
+        let matched = filteredLists(lists)
+        var byTopic: [String: [RexList]] = [:]
+        var ungrouped: [RexList] = []
+        for list in matched {
+            if let topic = list.topic?.trimmingCharacters(in: .whitespaces), !topic.isEmpty {
+                byTopic[topic, default: []].append(list)
+            } else {
+                ungrouped.append(list)
+            }
+        }
+
+        // Null sort_order sorts last within a topic — see the migration — so a
+        // collection you haven't placed appears at the end rather than in the
+        // middle of an order you arranged.
+        func ordered(_ group: [RexList]) -> [RexList] {
+            group.sorted {
+                ($0.sort_order ?? Int.max, $0.name.lowercased())
+                    < ($1.sort_order ?? Int.max, $1.name.lowercased())
+            }
+        }
+
+        // Topics themselves ordered by the lowest position inside them, so
+        // moving a collection to the top of a topic moves the topic up too.
+        let topics = byTopic.keys.sorted { a, b in
+            let aFirst = byTopic[a]?.compactMap(\.sort_order).min() ?? Int.max
+            let bFirst = byTopic[b]?.compactMap(\.sort_order).min() ?? Int.max
+            return (aFirst, a.lowercased()) < (bFirst, b.lowercased())
+        }
+
+        var out: [(String?, [RexList])] = topics.map { ($0, ordered(byTopic[$0] ?? [])) }
+        if !ungrouped.isEmpty || !isSearching {
+            out.append((nil, ordered(ungrouped)))
+        }
+        return out.map { (topic: $0.0, lists: $0.1) }
+    }
+
     @ViewBuilder
     private var myCollectionsShelf: some View {
-        let matched = filteredLists(lists)
+        let groups = myCollectionsByTopic
         // Search should never hide the way to make a new one.
-        if !isSearching || !matched.isEmpty {
-            shelf(title: "My Collections", systemImage: "folder.fill") {
-                ForEach(matched.prefix(8)) { list in
-                    NavigationLink(value: CollectionRoute(listId: list.id, name: list.name, isMine: true)) {
-                        shelfTile(
-                            title: list.name,
-                            count: (contents[list.id] ?? []).count,
-                            emoji: list.emoji,
-                            locked: list.visibility == "draft",
-                            thumbnails: (contents[list.id] ?? []).compactMap { $0.recommendations?.items?.image_url }
-                        )
+        if !isSearching || groups.contains(where: { !$0.lists.isEmpty }) {
+            ForEach(groups, id: \.topic) { group in
+                if !group.lists.isEmpty || group.topic == nil {
+                    shelf(
+                        title: group.topic ?? "My Collections",
+                        systemImage: group.topic == nil ? "folder.fill" : "folder"
+                    ) {
+                        ForEach(group.lists.prefix(8)) { list in
+                            NavigationLink(value: CollectionRoute(listId: list.id, name: list.name, isMine: true)) {
+                                shelfTile(
+                                    title: list.name,
+                                    count: (contents[list.id] ?? []).count,
+                                    emoji: list.emoji,
+                                    locked: list.visibility == "draft",
+                                    thumbnails: (contents[list.id] ?? []).compactMap { $0.recommendations?.items?.image_url }
+                                )
+                            }
+                            .buttonStyle(.plain)
+                        }
+                        // Only on the ungrouped shelf: a new collection has no
+                        // topic yet, so that is where it would land.
+                        if !isSearching, group.topic == nil { newCollectionTile }
+                        if group.lists.count > 8 { seeAllTile(destination: .mine) }
                     }
-                    .buttonStyle(.plain)
                 }
-                if !isSearching { newCollectionTile }
-                if matched.count > 8 { seeAllTile(destination: .mine) }
             }
         }
     }

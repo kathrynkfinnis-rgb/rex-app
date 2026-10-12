@@ -18,6 +18,11 @@ struct CollectionDetailView: View {
 
     @State private var name: String
     @State private var emoji: String
+    /// Oct 12 — this collection's topic, and everybody's, for the menu.
+    @State private var topic: String?
+    @State private var allMyLists: [RexList] = []
+    @State private var namingTopic = false
+    @State private var newTopicDraft = ""
     @State private var visibility: String = "draft"
     @State private var rows: [SavedPost] = []
     /// Sept 21 — "build a list view and expanded view on collections (like
@@ -77,6 +82,30 @@ struct CollectionDetailView: View {
             byHeading[heading, default: []].append(row)
         }
         return order.map { ($0, byHeading[$0] ?? []) }
+    }
+
+    /// Every topic this person already uses, so moving a collection into one
+    /// is a choice rather than a spelling test — two collections under "London"
+    /// and "london" would be two topics, and nobody meant that.
+    private var existingTopics: [String] {
+        Array(Set(allMyLists.compactMap {
+            $0.topic?.trimmingCharacters(in: .whitespaces)
+        }.filter { !$0.isEmpty })).sorted { $0.lowercased() < $1.lowercased() }
+    }
+
+    private func setTopic(_ value: String?) async {
+        do {
+            try await RexAPI.shared.setCollectionTopic(id: route.listId, topic: value)
+            topic = value
+            await loadMyLists()
+        } catch {
+            errorMessage = error.localizedDescription
+        }
+    }
+
+    private func loadMyLists() async {
+        allMyLists = (try? await RexAPI.shared.fetchLists()) ?? []
+        topic = allMyLists.first { $0.id == route.listId }?.topic
     }
 
     init(route: CollectionRoute) {
@@ -331,6 +360,34 @@ struct CollectionDetailView: View {
                             visibilityButton("friends", "Friends", "person.2")
                             visibilityButton("public", "Anyone on REX", "globe")
                         }
+
+                        // Oct 12 — "being able to order and title your
+                        // collections into topic." The topics you already have
+                        // are offered first, because almost every move is into
+                        // one that exists; typing a new one is the rarer case
+                        // and sits at the bottom.
+                        Menu("Topic") {
+                            ForEach(existingTopics, id: \.self) { existing in
+                                Button {
+                                    Task { await setTopic(existing) }
+                                } label: {
+                                    Label(existing, systemImage: topic == existing ? "checkmark" : "folder")
+                                }
+                            }
+                            if topic != nil {
+                                Button {
+                                    Task { await setTopic(nil) }
+                                } label: {
+                                    Label("No topic", systemImage: "folder.badge.minus")
+                                }
+                            }
+                            Button {
+                                newTopicDraft = ""
+                                namingTopic = true
+                            } label: {
+                                Label("New topic\u{2026}", systemImage: "plus")
+                            }
+                        }
                     }
 
                     if let shareURL {
@@ -382,6 +439,18 @@ struct CollectionDetailView: View {
         }
         .refreshable { await load() }
         .task { await load() }
+        .task { await loadMyLists() }
+        .alert("New topic", isPresented: $namingTopic) {
+            TextField("Topic", text: $newTopicDraft)
+            Button("Cancel", role: .cancel) {}
+            Button("Save") {
+                let name = newTopicDraft.trimmingCharacters(in: .whitespaces)
+                guard !name.isEmpty else { return }
+                Task { await setTopic(name) }
+            }
+        } message: {
+            Text("A heading to group this collection under \u{2014} \u{201C}London\u{201D}, \u{201C}Baby\u{201D}, \u{201C}To read\u{201D}.")
+        }
     }
 
     private var headerBlock: some View {

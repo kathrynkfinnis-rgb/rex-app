@@ -491,6 +491,11 @@ struct RexList: Codable, Identifiable {
     let created_at: String?
     /// Owner — used to credit followed and shared collections.
     let user_id: String?
+    /// Oct 12 — the heading this sits under on the Collections tab, in the
+    /// owner's own words. Null means ungrouped.
+    var topic: String? = nil
+    /// Where it sits among its siblings. Null sorts last — see the migration.
+    var sort_order: Int? = nil
 }
 
 /// A recommendation the user saved from someone else's post.

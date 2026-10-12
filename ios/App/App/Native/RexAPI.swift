@@ -4448,9 +4448,13 @@ final class RexAPI {
         guard let userId = currentUserId else { throw RexAPIError.notSignedIn }
         var components = URLComponents(url: baseURL.appendingPathComponent("/rest/v1/hitlist_lists"), resolvingAgainstBaseURL: false)!
         components.queryItems = [
-            URLQueryItem(name: "select", value: "id,name,emoji,item_type,visibility,created_at"),
+            URLQueryItem(name: "select", value: "id,name,emoji,item_type,visibility,created_at,topic,sort_order"),
             URLQueryItem(name: "user_id", value: "eq.\(userId)"),
-            URLQueryItem(name: "order", value: "created_at.desc"),
+            // Oct 12 — the order you arranged them in, newest-first for
+            // anything you have not placed. nullslast matters: without it a
+            // collection with no sort_order would sort to the top and sit
+            // above everything you deliberately ordered.
+            URLQueryItem(name: "order", value: "sort_order.asc.nullslast,created_at.desc"),
         ]
         var request = URLRequest(url: components.url!)
         request.setValue(anonKey, forHTTPHeaderField: "apikey")
@@ -5712,6 +5716,46 @@ final class RexAPI {
               let http = response as? HTTPURLResponse, http.statusCode < 400
         else { return [] }
         return (try? JSONDecoder().decode([RexList].self, from: data)) ?? []
+    }
+
+    /// Oct 12 — "being able to order and title your collections into topic."
+    ///
+    /// The heading a collection sits under, in your own words. Passing nil
+    /// takes it out of whatever topic it was in rather than deleting the
+    /// topic — a topic exists only as the name its collections carry, so the
+    /// last one leaving is what makes it disappear.
+    func setCollectionTopic(id: String, topic: String?) async throws {
+        try await patchCollection(id: id, body: [
+            "topic": (topic?.trimmingCharacters(in: .whitespaces)).flatMap { $0.isEmpty ? nil : $0 } ?? NSNull(),
+        ])
+    }
+
+    /// Writes an explicit order across a set of collections, from their
+    /// position in the array. One request per row rather than a bulk upsert:
+    /// a reorder is a handful of rows and an upsert here would need every
+    /// column of each, which is a lot of ways to overwrite something by
+    /// accident for no gain.
+    func setCollectionOrder(_ ids: [String]) async {
+        for (index, id) in ids.enumerated() {
+            try? await patchCollection(id: id, body: ["sort_order": index])
+        }
+    }
+
+    private func patchCollection(id: String, body: [String: Any]) async throws {
+        let token = try await validToken()
+        var components = URLComponents(url: baseURL.appendingPathComponent("/rest/v1/hitlist_lists"), resolvingAgainstBaseURL: false)!
+        components.queryItems = [URLQueryItem(name: "id", value: "eq.\(id)")]
+        var request = URLRequest(url: components.url!)
+        request.httpMethod = "PATCH"
+        request.setValue(anonKey, forHTTPHeaderField: "apikey")
+        request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        request.httpBody = try JSONSerialization.data(withJSONObject: body)
+
+        let (data, response) = try await URLSession.shared.data(for: request)
+        guard let http = response as? HTTPURLResponse, http.statusCode < 400 else {
+            throw RexAPIError.server(friendlyError(data, fallback: "Couldn't update that collection."))
+        }
     }
 
     func fetchMapPlaces() async throws -> [MapPlace] {

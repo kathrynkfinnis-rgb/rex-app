@@ -16,6 +16,8 @@ struct CollectionsSectionListView: View {
     @State private var contents: [String: [SavedPost]] = [:]
     @State private var isLoading = true
     @State private var dropTarget: String?
+    /// Oct 12 — drag-to-reorder, on only while you are doing it.
+    @State private var isArranging = false
     @State private var pushedItemId: String?
 
     private var title: String {
@@ -33,6 +35,48 @@ struct CollectionsSectionListView: View {
                     }
                 } else if lists.isEmpty {
                     empty()
+                } else if isArranging {
+                    // Oct 12 — "being able to order and title your collections
+                    // into topic." The order half.
+                    //
+                    // A List, because onMove only exists inside one, and only
+                    // while arranging: a List looks and behaves differently
+                    // enough from the cards above that living in it all the
+                    // time would cost more than the reordering is worth.
+                    List {
+                        ForEach(lists) { list in
+                            HStack(spacing: RexSpacing.sm) {
+                                Text(list.emoji ?? "\u{1F4D2}").font(.system(size: 18))
+                                VStack(alignment: .leading, spacing: 1) {
+                                    Text(list.name)
+                                        .font(RexFont.text(14.5, weight: .medium))
+                                        .foregroundStyle(RexColor.foreground)
+                                        .lineLimit(1)
+                                    if let topic = list.topic, !topic.isEmpty {
+                                        Text(topic)
+                                            .font(RexFont.text(11.5))
+                                            .foregroundStyle(RexColor.mutedForeground)
+                                    }
+                                }
+                                Spacer(minLength: 0)
+                            }
+                            .listRowBackground(RexColor.card)
+                        }
+                        .onMove { from, to in
+                            lists.move(fromOffsets: from, toOffset: to)
+                            // Written straight away rather than on Done: the
+                            // screen can be left by the back arrow, and an
+                            // arrangement lost that way is worse than a few
+                            // extra writes.
+                            let ids = lists.map(\.id)
+                            Task { await RexAPI.shared.setCollectionOrder(ids) }
+                        }
+                    }
+                    .listStyle(.plain)
+                    .scrollDisabled(true)
+                    .scrollContentBackground(.hidden)
+                    .frame(height: CGFloat(lists.count) * 62 + 8)
+                    .environment(\.editMode, .constant(.active))
                 } else {
                     ForEach(lists) { list in
                         collectionCard(list)
@@ -45,6 +89,19 @@ struct CollectionsSectionListView: View {
         .background(RexColor.background.ignoresSafeArea())
         .navigationTitle(title)
         .navigationBarTitleDisplayMode(.inline)
+        .toolbar {
+            // Only your own: there is no sense arranging a shelf of other
+            // people's collections, and the order would be yours alone anyway.
+            if route.section == .mine, lists.count > 1 {
+                ToolbarItem(placement: .topBarTrailing) {
+                    Button(isArranging ? "Done" : "Arrange") {
+                        withAnimation(.snappy) { isArranging.toggle() }
+                    }
+                    .font(RexFont.text(14, weight: .semibold))
+                    .foregroundStyle(RexColor.primary)
+                }
+            }
+        }
         .navigationDestination(item: $pushedItemId) { ItemDetailView(itemId: $0) }
         .task { await load() }
     }
