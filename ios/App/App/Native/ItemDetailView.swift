@@ -114,8 +114,13 @@ struct ItemDetailView: View {
                     // header, and the synopsis sits under that at two lines.
                     // Together they cost about the height one old heading did,
                     // which is what puts the reviews above the fold.
-                    if RexCategory(rawType: item.type) == .book {
-                        bookFactsSection(item: item).padding(.horizontal, 16)
+                    // Oct 12 — "change cards so all mirror the places format."
+                    // The facts strip built for books on the 8th, now on every
+                    // category that has a catalogue behind it, so the four
+                    // pages read as one family rather than four screens that
+                    // happen to share a back button.
+                    if hasFactsStrip {
+                        catalogueFactsSection(item: item).padding(.horizontal, 16)
                     }
                     // Oct 12 — "include on a card for film and TV where you can
                     // watch said show. Make it prominent at the top."
@@ -155,9 +160,9 @@ struct ItemDetailView: View {
                     // the page and they were sitting between you and the
                     // reviews; nobody opens a friend's Rex to read a synopsis
                     // first.
-                    // A book's details moved up under the header; everything
-                    // else still shows them here, below the people.
-                    if RexCategory(rawType: item.type) != .book {
+                    // The catalogue categories moved their details up under
+                    // the header; anything else still shows them here.
+                    if !hasFactsStrip {
                         detailsSection
                             .padding(.horizontal, 16)
                     }
@@ -318,8 +323,18 @@ struct ItemDetailView: View {
                             .background(RexColor.muted)
                     }
                 }
-                .frame(width: 76, height: 76)
-                .clipShape(RoundedRectangle(cornerRadius: 16))
+                // Oct 12 — "make thumbnail images bigger when you click into a
+                // card." 76 was sized when this was a square beside two lines
+                // of text; the header carries four or five lines now, and a
+                // 76pt square next to them read as an icon rather than a
+                // picture of the thing.
+                //
+                // Portrait for a cover, square for everything else. A book or
+                // a film has one image and it is a poster — cropping that to a
+                // square takes the title off it, which is most of what a
+                // reader recognises a book by.
+                .frame(width: coverIsPortrait ? 84 : 104, height: coverIsPortrait ? 126 : 104)
+                .clipShape(RoundedRectangle(cornerRadius: coverIsPortrait ? 10 : 18))
 
                 VStack(alignment: .leading, spacing: 4) {
                     categoryBadge(category)
@@ -497,6 +512,13 @@ struct ItemDetailView: View {
     /// Logos rather than names alone: these are brands people recognise at a
     /// glance and read as words only slowly. The row scrolls rather than
     /// wrapping, so a title on six services doesn't push the reviews down.
+    /// Books, films and TV have a portrait cover; a place has a photograph.
+    /// Podcasts are square artwork, so they take the square.
+    private var coverIsPortrait: Bool {
+        let category = RexCategory(rawType: item?.type)
+        return category == .book || category == .movie || category == .tv
+    }
+
     @ViewBuilder
     private var watchOnSection: some View {
         if let details, !details.watchOn.isEmpty {
@@ -1594,7 +1616,7 @@ struct ItemDetailView: View {
     /// name no reader recognises or wants. Goodreads stays, in the header,
     /// because people do know it.
     @ViewBuilder
-    private func bookFactsSection(item: RexItem) -> some View {
+    private func catalogueFactsSection(item: RexItem) -> some View {
         if isLoadingDetails, details == nil {
             HStack(spacing: 6) {
                 ProgressView().controlSize(.small)
@@ -1602,7 +1624,7 @@ struct ItemDetailView: View {
             }
             .padding(.top, RexSpacing.sm)
         } else {
-            let facts = bookFacts(item: item)
+            let facts = catalogueFacts(item: item)
             VStack(alignment: .leading, spacing: RexSpacing.sm) {
                 if !facts.isEmpty {
                     // Two columns, because every one of these is a short label
@@ -1653,35 +1675,78 @@ struct ItemDetailView: View {
         }
     }
 
-    /// What a book actually has to say for itself. Anything missing is left
-    /// out rather than shown empty — a strip of "Pages —" is worse than four
-    /// facts instead of five.
-    private func bookFacts(item: RexItem) -> [(label: String, value: String)] {
-        var out: [(String, String)] = []
+    /// Which categories get the strip: the ones with a catalogue behind them
+    /// and therefore facts to state. A place has opening hours and a map
+    /// instead, which is a different and better answer for a place.
+    private var hasFactsStrip: Bool {
+        [.book, .movie, .tv, .podcast].contains(RexCategory(rawType: item?.type))
+    }
 
-        // details.facts arrives as "384 pages"; the label carries the word.
-        if let raw = details?.facts {
-            let pages = raw.replacingOccurrences(of: " pages", with: "")
-                .trimmingCharacters(in: .whitespaces)
-            if !pages.isEmpty, pages.allSatisfy(\.isNumber) {
-                out.append(("Pages", pages))
-            } else if !raw.isEmpty {
-                out.append(("Length", raw))
+    /// What the thing has to say for itself, as short label-and-value pairs.
+    ///
+    /// Anything missing is left out rather than shown empty: a strip reading
+    /// "Pages —" is worse than four facts instead of five.
+    ///
+    /// The awkward part is that RexSearch hands back one `facts` string —
+    /// "384 pages", "1h 58m · Drama, Romance", "3 seasons" — built for a
+    /// single line under a title. Rather than change that and every caller,
+    /// this takes it apart again: each piece is recognisable by shape, and a
+    /// piece that isn't is simply a genre, which is what it always was.
+    private func catalogueFacts(item: RexItem) -> [(label: String, value: String)] {
+        var out: [(String, String)] = []
+        var catalogueGenres: [String] = []
+
+        for piece in (details?.facts ?? "").components(separatedBy: " \u{00B7} ") {
+            let value = piece.trimmingCharacters(in: .whitespaces)
+            guard !value.isEmpty else { continue }
+
+            if value.hasSuffix("pages") {
+                out.append(("Pages", value.replacingOccurrences(of: " pages", with: "")))
+            } else if value.hasSuffix("season") || value.hasSuffix("seasons") {
+                out.append(("Seasons", value.replacingOccurrences(of: " seasons", with: "")
+                    .replacingOccurrences(of: " season", with: "")))
+            } else if value.first?.isNumber == true, value.contains("h") || value.hasSuffix("m") {
+                out.append(("Length", value))
+            } else {
+                catalogueGenres.append(value)
             }
         }
 
-        // A book's subtitle is "Author · Year" (see RexSearch's import), so
-        // the year is the part after the separator when there is one.
+        // The catalogue's own score, for everything but books.
+        //
+        // Books lose it on purpose: theirs comes from Open Library, whose name
+        // means nothing to a reader and was the thing Kathryn asked to drop on
+        // the 8th. TMDB is a score people recognise and read as a score, so a
+        // film keeps it — and it is the one fact here that is somebody else's
+        // opinion rather than a property of the thing, which is why it sits
+        // among the facts rather than up with the friends' ratings.
+        if RexCategory(rawType: item.type) != .book,
+           let rating = details?.ratings.first {
+            out.append((rating.source, rating.value))
+        }
+
+        // The certificate, where TMDB has one for this country.
+        if let certificate = details?.certificate, !certificate.isEmpty {
+            out.append(("Rated", certificate))
+        }
+
+        // A book's subtitle is "Author · Year" and a film's is the year on its
+        // own (see RexSearch's import), so a four-digit tail is the year
+        // either way.
         if let subtitle = item.subtitle {
             let parts = subtitle.components(separatedBy: " \u{00B7} ")
-            if let year = parts.last, parts.count > 1, year.count == 4, year.allSatisfy(\.isNumber) {
-                out.append(("Published", year))
+            if let year = parts.last?.trimmingCharacters(in: .whitespaces),
+               year.count == 4, year.allSatisfy(\.isNumber) {
+                out.append((RexCategory(rawType: item.type) == .book ? "Published" : "Released", year))
             }
         }
 
-        if let genre = item.genre {
-            let kinds = splitGenres(genre)
-            if !kinds.isEmpty { out.append(("Genre", kinds.prefix(2).joined(separator: ", "))) }
+        // Ours first — somebody chose those — then the catalogue's, which is
+        // usually finer-grained and worth having when nobody has chosen.
+        let chosen = splitGenres(item.genre)
+        let genres = chosen.isEmpty ? catalogueGenres : chosen
+        if !genres.isEmpty {
+            out.append(("Genre", genres.prefix(2).joined(separator: ", ")))
         }
 
         return out.map { (label: $0.0, value: $0.1) }
