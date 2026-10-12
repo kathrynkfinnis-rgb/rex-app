@@ -29,6 +29,7 @@
 		FEED011B0000000000000000 /* FriendsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = FEED011A0000000000000000 /* FriendsView.swift */; };
 		FEED012B0000000000000000 /* NotificationsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = FEED012A0000000000000000 /* NotificationsView.swift */; };
 		FEED013B0000000000000000 /* CollectionsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = FEED013A0000000000000000 /* CollectionsView.swift */; };
+		FEED13010000000000000000 /* LinkImportView.swift in Sources */ = {isa = PBXBuildFile; fileRef = FEED13000000000000000000 /* LinkImportView.swift */; };
 		FEED014B0000000000000000 /* MainTabView.swift in Sources */ = {isa = PBXBuildFile; fileRef = FEED014A0000000000000000 /* MainTabView.swift */; };
 		FEED015B0000000000000000 /* MapView.swift in Sources */ = {isa = PBXBuildFile; fileRef = FEED015A0000000000000000 /* MapView.swift */; };
 		FEED032B0000000000000000 /* AddToCollectionView.swift in Sources */ = {isa = PBXBuildFile; fileRef = FEED032A0000000000000000 /* AddToCollectionView.swift */; };
@@ -133,6 +134,7 @@
 		FEED011A0000000000000000 /* FriendsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FriendsView.swift; sourceTree = "<group>"; };
 		FEED012A0000000000000000 /* NotificationsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NotificationsView.swift; sourceTree = "<group>"; };
 		FEED013A0000000000000000 /* CollectionsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CollectionsView.swift; sourceTree = "<group>"; };
+		FEED13000000000000000000 /* LinkImportView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LinkImportView.swift; sourceTree = "<group>"; };
 		FEED014A0000000000000000 /* MainTabView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MainTabView.swift; sourceTree = "<group>"; };
 		FEED015A0000000000000000 /* MapView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MapView.swift; sourceTree = "<group>"; };
 		FEED032A0000000000000000 /* AddToCollectionView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AddToCollectionView.swift; sourceTree = "<group>"; };
@@ -275,6 +277,7 @@
 				FEED011A0000000000000000 /* FriendsView.swift */,
 				FEED012A0000000000000000 /* NotificationsView.swift */,
 				FEED013A0000000000000000 /* CollectionsView.swift */,
+				FEED13000000000000000000 /* LinkImportView.swift */,
 				FEED014A0000000000000000 /* MainTabView.swift */,
 				FEED015A0000000000000000 /* MapView.swift */,
 				FEED032A0000000000000000 /* AddToCollectionView.swift */,
@@ -454,6 +457,7 @@
 				FEED011B0000000000000000 /* FriendsView.swift in Sources */,
 				FEED012B0000000000000000 /* NotificationsView.swift in Sources */,
 				FEED013B0000000000000000 /* CollectionsView.swift in Sources */,
+				FEED13010000000000000000 /* LinkImportView.swift in Sources */,
 				FEED014B0000000000000000 /* MainTabView.swift in Sources */,
 				FEED015B0000000000000000 /* MapView.swift in Sources */,
 				FEED032B0000000000000000 /* AddToCollectionView.swift in Sources */,

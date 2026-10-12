@@ -588,6 +588,26 @@ struct EditorialCollectionItem: Codable, Identifiable {
 /// it's ever touched the database. Mirrors the web importer's ExtractedRec
 /// (src/lib/import.functions.ts) and the edge function's EXTRACTION_TOOL
 /// schema exactly — same shape either client asked for it.
+/// What a pasted Instagram or TikTok link turned out to be.
+///
+/// `truncated` is Instagram's doing: it publishes a caption's first 400
+/// characters to anything reading the page's metadata, so a long method stops
+/// mid-sentence. Saying so is the honest option — the alternative is three
+/// quarters of a recipe that looks complete.
+struct ExtractedLink: Codable {
+    let category: String
+    let title: String
+    let recipeText: String?
+    let note: String?
+    /// For a place: the name plus its city, ready to search for the real venue
+    /// rather than creating a nameless item from a caption.
+    let searchHint: String?
+    let thumbnail: String?
+    let author: String?
+    let sourceUrl: String
+    let truncated: Bool
+}
+
 struct ExtractedRec: Codable {
     let title: String
     let creator: String?

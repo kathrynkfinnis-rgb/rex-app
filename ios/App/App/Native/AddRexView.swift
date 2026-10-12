@@ -378,6 +378,7 @@ struct AddRexView: View {
         case editListItem(ItineraryEntry)
         case editTripStop(ItineraryEntry)
         case documentImport
+        case linkImport
         case buildTripFromRex
         case addTripStop
         case addListItem
@@ -387,6 +388,7 @@ struct AddRexView: View {
             case .editListItem(let e): return "listItem-\(e.id)"
             case .editTripStop(let e): return "tripStop-\(e.id)"
             case .documentImport: return "documentImport"
+            case .linkImport: return "linkImport"
             case .buildTripFromRex: return "buildTripFromRex"
             case .addTripStop: return "addTripStop"
             case .addListItem: return "addListItem"
@@ -565,6 +567,11 @@ struct AddRexView: View {
                     guard let index = tripEntries.firstIndex(where: { $0.id == entry.id }) else { return }
                     tripEntries[index].kind = .stop(updated)
                 }
+            case .linkImport:
+                LinkImportView { found in
+                    activeSheet = nil
+                    apply(found)
+                }
             case .documentImport:
                 ListsImportView(
                     onDone: { activeSheet = nil; onDone() },
@@ -657,35 +664,62 @@ struct AddRexView: View {
             // but this one runs the extraction itself rather than deep
             // -linking to the web importer: paste text in, review what came
             // out, save as a Trip or a Collection.
-            Button {
-                activeSheet = .documentImport
-            } label: {
-                HStack(spacing: RexSpacing.md) {
-                    ZStack {
-                        RoundedRectangle(cornerRadius: RexRadius.input, style: .continuous)
-                            .fill(RexColor.badgeBackground)
-                        Image(systemName: "doc.text")
-                            .font(.system(size: 20))
-                            .foregroundStyle(RexColor.primary)
-                    }
-                    .frame(width: 48, height: 48)
+            importCard(
+                icon: "doc.text",
+                title: "Import from doc",
+                detail: "Paste from Notes, a Word doc, or an itinerary."
+            ) { activeSheet = .documentImport }
 
-                    VStack(alignment: .leading, spacing: 2) {
-                        Text("Import from doc")
-                            .font(RexFont.display(17, weight: .semibold))
-                            .foregroundStyle(RexColor.foreground)
-                        Text("Paste from Notes, a Word doc, or an itinerary.")
-                            .font(RexFont.text(13))
-                            .foregroundStyle(RexColor.mutedForeground)
-                    }
-                    Spacer()
-                }
-                .padding(RexSpacing.md)
-                .rexCard()
-            }
-            .buttonStyle(.plain)
+            // Oct 12 — "can we paste in a link to an insta or tiktok video and
+            // pull out a Rex (e.g. recipes)." Beside the document import
+            // because it is the same move: something you already have,
+            // somewhere else, turned into the start of a Rex.
+            importCard(
+                icon: "link",
+                title: "Import from a link",
+                detail: "An Instagram or TikTok post \u{2014} recipes, places, anything."
+            ) { activeSheet = .linkImport }
         }
         .padding(16)
+    }
+
+    /// Both importers look the same because they are the same offer: something
+    /// you already have, somewhere else, turned into the start of a Rex.
+    ///
+    /// Extracted because two of these inline put categoryPicker past what the
+    /// type checker will solve — the second card was enough to tip it into
+    /// "unable to type-check this expression in reasonable time".
+    private func importCard(
+        icon: String,
+        title: String,
+        detail: String,
+        action: @escaping () -> Void
+    ) -> some View {
+        Button(action: action) {
+            HStack(spacing: RexSpacing.md) {
+                ZStack {
+                    RoundedRectangle(cornerRadius: RexRadius.input, style: .continuous)
+                        .fill(RexColor.badgeBackground)
+                    Image(systemName: icon)
+                        .font(.system(size: 20))
+                        .foregroundStyle(RexColor.primary)
+                }
+                .frame(width: 48, height: 48)
+
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(title)
+                        .font(RexFont.display(17, weight: .semibold))
+                        .foregroundStyle(RexColor.foreground)
+                    Text(detail)
+                        .font(RexFont.text(13))
+                        .foregroundStyle(RexColor.mutedForeground)
+                }
+                Spacer()
+            }
+            .padding(RexSpacing.md)
+            .rexCard()
+        }
+        .buttonStyle(.plain)
     }
 
     @ViewBuilder
@@ -1286,6 +1320,47 @@ struct AddRexView: View {
             productLink = productURL
         }
         hits = []
+    }
+
+    /// Oct 12 — fills this form in from a pasted Instagram or TikTok post.
+    ///
+    /// Fills in, rather than posts. Everything here came from a caption read
+    /// by a model, and the person is better placed than either of us to say
+    /// whether it got the dish right — so it lands in the same fields they
+    /// would have typed, with the post kept as the link so the Rex can always
+    /// be traced back to where it came from.
+    ///
+    /// A place is the exception and goes into the search box rather than the
+    /// title: a caption says "this spot in Lisbon", and what we want on the
+    /// map is the real venue with its address and coordinates, which only the
+    /// normal place search can give. So the name is typed in for them and the
+    /// search runs itself.
+    private func apply(_ found: ExtractedLink) {
+        let incoming = RexCategory(rawType: found.category)
+        if category == nil { category = incoming }
+
+        if incoming == .place, let hint = found.searchHint, !hint.isEmpty {
+            title = hint
+            scheduleSearch(for: .place)
+        } else {
+            title = found.title
+        }
+
+        if let recipe = found.recipeText, !recipe.isEmpty {
+            recipeText = recipe
+        }
+        if let incomingNote = found.note, !incomingNote.isEmpty, note.isEmpty {
+            note = incomingNote
+        }
+        if productLink.isEmpty { productLink = found.sourceUrl }
+
+        // Instagram publishes only the first 400 characters of a caption to
+        // anything reading the page, so a long method arrives cut off. Said
+        // here because the alternative is a recipe that looks whole and ends
+        // halfway through step four.
+        if found.truncated {
+            errorMessage = "Instagram only gives out the first part of a caption \u{2014} check the end of this one and paste anything missing."
+        }
     }
 
     /// Debounced so we're not firing a request per keystroke.

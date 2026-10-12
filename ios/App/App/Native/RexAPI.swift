@@ -6166,6 +6166,29 @@ final class RexAPI {
         return (decoded.title, decoded.text)
     }
 
+    /// Oct 12 — "can we paste in a link to an insta or tiktok video and pull
+    /// out a Rex (e.g. recipes)."
+    ///
+    /// The post's caption, read server-side and turned into the fields this
+    /// form needs. Captions only: see the edge function's header for why the
+    /// video itself is out of reach, and why a caption that says nothing comes
+    /// back as an error rather than a guess.
+    func extractFromLink(_ url: String) async throws -> ExtractedLink {
+        let token = try await validToken()
+        var request = URLRequest(url: baseURL.appendingPathComponent("/functions/v1/extract-from-link"))
+        request.httpMethod = "POST"
+        request.setValue(anonKey, forHTTPHeaderField: "apikey")
+        request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        request.httpBody = try JSONSerialization.data(withJSONObject: ["url": url])
+
+        let (data, response) = try await URLSession.shared.data(for: request)
+        guard let http = response as? HTTPURLResponse, http.statusCode < 400 else {
+            throw RexAPIError.server(friendlyError(data, fallback: "Couldn't read that link."))
+        }
+        return try JSONDecoder().decode(ExtractedLink.self, from: data)
+    }
+
     /// Stages extracted items for review — nothing becomes a real Rex until
     /// the user approves it (individually, or in bulk as a trip/collection).
     @discardableResult
