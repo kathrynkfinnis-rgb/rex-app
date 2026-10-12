@@ -139,7 +139,31 @@ enum RexSearch {
     ///
     /// The twenty cap is hers and it's the right instinct — Pret has hundreds
     /// of branches and nobody means to recommend all of them.
-    static func branches(of name: String, excludingPlaceId placeId: String?) async -> [RexSearchHit] {
+    /// Oct 12 — "the 'find other members of the chain' function is not working
+    /// for places that have a common business name. This is Catalyst."
+    ///
+    /// The name matching was doing its job: those businesses really are all
+    /// called Catalyst. An office suite in Wickwar, a trading estate in High
+    /// Wycombe and a climbing centre share a word and nothing else, and a
+    /// shared word was the only thing being asked for.
+    ///
+    /// So `like` is the kind of place the original is, and a candidate has to
+    /// be the same kind of thing before its name is even considered. It comes
+    /// from the same Google field on both sides, so the two are directly
+    /// comparable. A chain whose branches are typed slightly differently —
+    /// "Italian restaurant" beside "Restaurant" — still matches, because what
+    /// is compared is the noun at the end rather than the whole phrase.
+    ///
+    /// Kathryn also asked about reading the chain's own website for its branch
+    /// list. Not doing that: it means fetching and parsing a different page
+    /// shape per chain, and a store-finder is usually a script rather than a
+    /// list, so it would work for some brands and quietly fail for the rest.
+    /// A wrong branch list that looks authoritative is worse than this.
+    static func branches(
+        of name: String,
+        like originType: String?,
+        excludingPlaceId placeId: String?
+    ) async -> [RexSearchHit] {
         guard !googleKey.isEmpty else { return [] }
         let trimmed = name.trimmingCharacters(in: .whitespaces)
         guard trimmed.count >= 3 else { return [] }
@@ -170,8 +194,10 @@ enum RexSearch {
         let target = normalizeForChainMatch(trimmed)
         var seenAddresses = Set<String>()
         let branches = results.compactMap { place -> RexSearchHit? in
+            let candidateType = (place["primaryTypeDisplayName"] as? [String: Any])?["text"] as? String
             guard let id = place["id"] as? String, id != placeId,
                   let displayName = (place["displayName"] as? [String: Any])?["text"] as? String,
+                  isSameKindOfPlace(candidateType, as: originType),
                   isSameChain(normalizeForChainMatch(displayName), as: target),
                   let address = place["formattedAddress"] as? String,
                   seenAddresses.insert(address).inserted
@@ -329,6 +355,31 @@ enum RexSearch {
     /// tried first — demanding the names be equal — was airtight and found
     /// nothing at all, because a chain small enough to be worth offering is
     /// exactly the kind that writes the branch into the name.
+    /// Whether two Google place types describe the same kind of venue.
+    ///
+    /// Compared on the final noun rather than the whole phrase, because a
+    /// chain's branches are typed inconsistently — one Bancone is a
+    /// "Restaurant" and the next an "Italian restaurant", and those are the
+    /// same thing. "Office suite" and "Climbing gym" share no noun, which is
+    /// the Catalyst case.
+    ///
+    /// An origin with no type at all can't judge anything, so it allows
+    /// everything through and the name match decides alone, as it did before.
+    /// A candidate with no type is dropped once the origin has one: the whole
+    /// problem here is unidentifiable businesses sharing a word.
+    private static func isSameKindOfPlace(_ candidate: String?, as origin: String?) -> Bool {
+        func lastNoun(_ s: String) -> String? {
+            s.lowercased()
+                .replacingOccurrences(of: "[^a-z ]", with: "", options: .regularExpression)
+                .split(separator: " ")
+                .last
+                .map(String.init)
+        }
+        guard let origin, let originNoun = lastNoun(origin) else { return true }
+        guard let candidate, let candidateNoun = lastNoun(candidate) else { return false }
+        return originNoun == candidateNoun
+    }
+
     private static func isSameChain(_ candidate: String, as target: String) -> Bool {
         if candidate == target { return true }
         let (shorter, longer) = candidate.count < target.count

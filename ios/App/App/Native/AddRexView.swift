@@ -2131,6 +2131,7 @@ struct AddRexView: View {
             if category == .place {
                 chainBranches = await RexSearch.branches(
                     of: title.trimmingCharacters(in: .whitespaces),
+                    like: picked?.genre,
                     excludingPlaceId: picked?.externalId
                 )
             }
