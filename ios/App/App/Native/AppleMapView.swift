@@ -85,7 +85,7 @@ struct AppleMapView: UIViewRepresentable {
         mapView.showsCompass = true
         mapView.pointOfInterestFilter = .includingAll
         mapView.register(
-            MKMarkerAnnotationView.self,
+            RexPlaceAnnotationView.self,
             forAnnotationViewWithReuseIdentifier: Coordinator.pinReuseId
         )
         // Oct 2 — "I still can't see Yikou (and lots of others) even when I'm
@@ -289,9 +289,15 @@ struct AppleMapView: UIViewRepresentable {
         /// How much room a pin claims when MapKit works out what overlaps.
         /// Smaller means things separate at a lower zoom; too small and pins
         /// genuinely on top of each other stop merging and print over one
-        /// another, which is the problem clustering exists to solve. 26 is a
-        /// deliberate step down from the balloon's own ~40 rather than a leap.
-        static let pinCollisionSize: CGFloat = 26
+        /// another, which is the problem clustering exists to solve.
+        ///
+        /// The balloon's own width is about 40. 26 on 8 October, 18 now: what
+        /// stopped it going further then was that the frame is also the tap
+        /// target, and RexPlaceAnnotationView has since separated those, so a
+        /// finger still gets its 44 whatever this says. Two pins now split
+        /// roughly half a zoom step sooner than at 26, and about a step and a
+        /// half sooner than an untouched balloon.
+        static let pinCollisionSize: CGFloat = 18
 
         static func ghostImage(tint: UIColor) -> UIImage {
             if let cached = ghostCache[tint] { return cached }
@@ -342,7 +348,7 @@ struct AppleMapView: UIViewRepresentable {
             let view = mapView.dequeueReusableAnnotationView(
                 withIdentifier: Self.pinReuseId,
                 for: annotation
-            ) as? MKMarkerAnnotationView
+            ) as? RexPlaceAnnotationView
             view?.markerTintColor = place.tint
             view?.glyphTintColor = .white
             view?.glyphText = nil
@@ -359,10 +365,10 @@ struct AppleMapView: UIViewRepresentable {
             // Londis and Scotch Meats sat under one bubble while plainly being
             // two different shops.
             //
-            // Shrinking the collision box to 26 separates them about a third
-            // of a zoom step sooner. The balloon still draws at its own size;
-            // only what MapKit measures for collision changes, so the map
-            // looks the same and simply gives up hiding things earlier.
+            // Shrinking the collision box separates them sooner. The balloon
+            // still draws at its own size; only what MapKit measures for
+            // collision changes, so the map looks the same and simply gives up
+            // hiding things earlier. See pinCollisionSize for where it sits.
             view?.frame.size = CGSize(width: Self.pinCollisionSize, height: Self.pinCollisionSize)
             // The callout is REX's own sheet, not MapKit's bubble — selecting
             // is what opens it, so the built-in callout would be a second,
@@ -479,6 +485,27 @@ final class RexPlaceAnnotation: NSObject, MKAnnotation {
     }
 }
 
+/// A place pin whose collision box is small but whose tap target is not.
+///
+/// Oct 12 — "you don't have to zoom in so far to split out the grouped pins."
+/// MapKit measures collision from the view's frame, and UIKit measures taps
+/// from the same frame, so every step that separates pins sooner also makes
+/// them harder to hit. Below about 30pt that stops being a fair trade: a pin
+/// you can see and can't reliably tap is worse than one that clustered.
+///
+/// Overriding `point(inside:)` breaks the two apart. MapKit keeps measuring
+/// the small frame; a finger still gets 44pt, which is Apple's own minimum and
+/// roughly what the balloon looks like anyway.
+final class RexPlaceAnnotationView: MKMarkerAnnotationView {
+    override func point(inside point: CGPoint, with event: UIEvent?) -> Bool {
+        let target: CGFloat = 44
+        return bounds.insetBy(
+            dx: (bounds.width - target) / 2,
+            dy: (bounds.height - target) / 2
+        ).contains(point)
+    }
+}
+
 /// What a group of colliding pins looks like: REX green, the count, and the
 /// same shape language as a single pin so the map reads as one system.
 ///
@@ -486,25 +513,66 @@ final class RexPlaceAnnotation: NSObject, MKAnnotation {
 /// how pins "disappeared" from a map that had them all loaded. A cluster is
 /// the honest alternative to hiding: tap it and it opens out.
 final class RexClusterAnnotationView: MKAnnotationView {
+    /// How much room the bubble claims when MapKit works out what overlaps.
+    /// Kept just above the pins' own box so a cluster never outlives the pins
+    /// inside it.
+    static let collisionSize: CGFloat = 19
+    /// What the bubble actually looks like. Deliberately bigger than the
+    /// collision box — see `bubble`.
+    private static let artworkSize: CGFloat = 36
+
+    /// Oct 12 — "we would still like to change the map so you don't have to
+    /// zoom in so far to split out the grouped pins."
+    ///
+    /// On 8 October I set this view's frame to 28 in `init` and said the
+    /// cluster now matched the pins. It did not. Assigning `image` on an
+    /// MKAnnotationView resets `bounds` to the image's size, and the image is
+    /// assigned in `prepareForDisplay`, which runs after `init` — so every
+    /// bubble went back to colliding at 36 while the pins collided at 26. The
+    /// fix I described was overwritten by the next line of my own code, which
+    /// is why a "2" still held together after its two pins had separated.
+    ///
+    /// The artwork therefore lives in a subview instead of in `image`. The
+    /// view's own bounds stay at the collision size and nothing resets them;
+    /// the bubble draws at full size outside those bounds, because annotation
+    /// views do not clip. Collision and appearance are now two separate
+    /// numbers, which is what they always needed to be.
+    private let bubble = UIImageView()
+
     override init(annotation: MKAnnotation?, reuseIdentifier: String?) {
         super.init(annotation: annotation, reuseIdentifier: reuseIdentifier)
         displayPriority = .required
         collisionMode = .circle
-        // Oct 8 — the bubble's own collision box, matched to the pins'. At 36
-        // a cluster held itself together after the pins inside it had stopped
-        // overlapping, so a "2" survived longer than the two things in it.
-        frame = CGRect(x: 0, y: 0, width: 28, height: 28)
-        centerOffset = CGPoint(x: 0, y: -14)
+        frame = CGRect(x: 0, y: 0, width: Self.collisionSize, height: Self.collisionSize)
+        centerOffset = CGPoint(x: 0, y: -Self.collisionSize / 2)
+        bubble.frame = CGRect(x: 0, y: 0, width: Self.artworkSize, height: Self.artworkSize)
+        bubble.center = CGPoint(x: Self.collisionSize / 2, y: Self.collisionSize / 2)
+        bubble.autoresizingMask = [
+            .flexibleLeftMargin, .flexibleRightMargin, .flexibleTopMargin, .flexibleBottomMargin,
+        ]
+        addSubview(bubble)
     }
 
     required init?(coder: NSCoder) { fatalError("init(coder:) has not been implemented") }
+
+    /// The collision box is far smaller than a finger. Hit-testing normally
+    /// stops at `bounds`, so shrinking it to separate pins sooner would also
+    /// shrink the target you have to hit — the bubble would look tappable and
+    /// mostly not be. This restores a full-sized target over the artwork.
+    override func point(inside point: CGPoint, with event: UIEvent?) -> Bool {
+        let target = max(Self.artworkSize, 44)
+        return bounds.insetBy(
+            dx: (bounds.width - target) / 2,
+            dy: (bounds.height - target) / 2
+        ).contains(point)
+    }
 
     override func prepareForDisplay() {
         super.prepareForDisplay()
         guard let cluster = annotation as? MKClusterAnnotation else { return }
         let count = cluster.memberAnnotations.count
 
-        image = UIGraphicsImageRenderer(size: CGSize(width: 36, height: 36)).image { _ in
+        bubble.image = UIGraphicsImageRenderer(size: CGSize(width: 36, height: 36)).image { _ in
             UIColor(RexColor.primary).setFill()
             UIBezierPath(ovalIn: CGRect(x: 0, y: 0, width: 36, height: 36)).fill()
             UIColor.white.setStroke()
