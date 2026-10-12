@@ -61,6 +61,9 @@ struct ItemDetailView: View {
     /// question is live. Never raised on its own.
     @State private var offerTicketReminder = false
     @State private var editingOnSaleDate = false
+    /// Which timings you have on this event. Empty means no reminder.
+    @State private var myTicketLeads: Set<Int> = []
+    @State private var editingReminderTimings = false
     @State private var draftOnSaleDate = Date()
     @State private var isTogglingWant = false
     /// The card's own save button merged bookmark ("want to try") and this
@@ -246,12 +249,74 @@ struct ItemDetailView: View {
         // and it arrives unprompted, so it should be dismissable without
         // reading twice.
         .alert("Remind you about tickets?", isPresented: $offerTicketReminder) {
-            Button("Remind me") { Task { await toggleTicketReminder() } }
+            Button("Yes, remind me") { Task { await toggleTicketReminder() } }
+            Button("Pick the timings") {
+                guard let onSale = ticketsOnSale else { return }
+                Task {
+                    await applyTicketLeads(RexAPI.defaultTicketLeads, onSale: onSale)
+                    editingReminderTimings = true
+                }
+            }
             Button("No thanks", role: .cancel) {}
         } message: {
             if let onSale = ticketsOnSale {
-                Text("Tickets go on sale \(onSale.formatted(date: .abbreviated, time: .shortened)). We'll nudge you half an hour before.")
+                Text("Tickets go on sale \(onSale.formatted(date: .abbreviated, time: .shortened)). We'll nudge you the day before and again half an hour before.")
             }
+        }
+        // Oct 12 — "make these editable." A list of ticks rather than a count
+        // or a slider: the timings people want are a handful of named moments,
+        // and picking from them is one tap where a duration picker is four.
+        // Writes on each tap, so backing out with the arrow keeps the change —
+        // the same call made for arranging collections this morning.
+        .sheet(isPresented: $editingReminderTimings) {
+            NavigationStack {
+                List {
+                    Section {
+                        ForEach(RexAPI.ticketLeadChoices, id: \.minutes) { choice in
+                            Button {
+                                guard let onSale = ticketsOnSale else { return }
+                                var next = myTicketLeads
+                                if next.contains(choice.minutes) {
+                                    next.remove(choice.minutes)
+                                } else {
+                                    next.insert(choice.minutes)
+                                }
+                                myTicketLeads = next
+                                Task { await applyTicketLeads(next, onSale: onSale) }
+                            } label: {
+                                HStack {
+                                    Text(choice.label)
+                                        .font(RexFont.text(15))
+                                        .foregroundStyle(RexColor.foreground)
+                                    Spacer()
+                                    if myTicketLeads.contains(choice.minutes) {
+                                        Image(systemName: "checkmark")
+                                            .font(.system(size: 14, weight: .semibold))
+                                            .foregroundStyle(RexColor.primary)
+                                    }
+                                }
+                                .contentShape(Rectangle())
+                            }
+                            .buttonStyle(.plain)
+                        }
+                    } footer: {
+                        Text(myTicketLeads.isEmpty
+                             ? "Nothing ticked — you won't be reminded about this one."
+                             : "Each one is a separate push, and each goes out once.")
+                    }
+                }
+                .scrollContentBackground(.hidden)
+                .background(RexColor.background.ignoresSafeArea())
+                .navigationTitle("When to remind you")
+                .navigationBarTitleDisplayMode(.inline)
+                .toolbar {
+                    ToolbarItem(placement: .topBarTrailing) {
+                        Button("Done") { editingReminderTimings = false }
+                            .font(RexFont.text(15, weight: .semibold))
+                    }
+                }
+            }
+            .tint(RexColor.primary)
         }
         .sheet(isPresented: $editingOnSaleDate) {
             NavigationStack {
@@ -316,6 +381,7 @@ struct ItemDetailView: View {
             // Only events have these, so only events pay for the request.
             if RexCategory(rawType: fetchedItem.type) == .event {
                 ticketReminderPeople = await RexAPI.shared.ticketReminders(itemId: itemId)
+                myTicketLeads = await RexAPI.shared.myTicketLeads(itemId: itemId)
             }
             Task { await loadDetails(fetchedItem) }
             wanted = (try? await wantedTask) ?? false
@@ -367,23 +433,40 @@ struct ItemDetailView: View {
         RexCategory(rawType: item?.type) == .event
     }
 
-    private var reminderSet: Bool {
-        guard let me = RexAPI.shared.currentUserId else { return false }
-        return ticketReminderPeople.contains { $0.id == me }
+    private var reminderSet: Bool { !myTicketLeads.isEmpty }
+
+    /// What the button says once reminders are on. Names the timings when
+    /// there are one or two, because "the day before and 30 minutes before" is
+    /// the whole answer and reads better than a number; counts them beyond
+    /// that, where naming all of them would be longer than the card.
+    private var reminderSummary: String {
+        let names = RexAPI.ticketLeadChoices
+            .filter { myTicketLeads.contains($0.minutes) }
+            .map { $0.label.replacingOccurrences(of: " before", with: "") }
+        switch names.count {
+        case 0: return "Reminder set"
+        case 1: return "Reminding you \(names[0].lowercased())"
+        case 2: return "Reminding you \(names[0].lowercased()) and \(names[1].lowercased())"
+        default: return "\(names.count) reminders set"
+        }
     }
 
+    /// Turns reminders on with both defaults, or off entirely. The picker is
+    /// for changing the timings; this is the one-tap yes and no either side of
+    /// it, which is what the want-to-try offer and the main button need.
     private func toggleTicketReminder() async {
         guard let onSale = ticketsOnSale else { return }
-        let next = !reminderSet
+        await applyTicketLeads(reminderSet ? [] : RexAPI.defaultTicketLeads, onSale: onSale)
+    }
+
+    private func applyTicketLeads(_ leads: Set<Int>, onSale: Date) async {
         do {
-            if next {
-                try await RexAPI.shared.setTicketReminder(itemId: itemId, onSaleAt: onSale)
-            } else {
-                try await RexAPI.shared.cancelTicketReminder(itemId: itemId)
-            }
+            try await RexAPI.shared.setTicketReminders(itemId: itemId, onSaleAt: onSale, leads: leads)
+            myTicketLeads = leads
             ticketReminderPeople = await RexAPI.shared.ticketReminders(itemId: itemId)
         } catch {
             errorMessage = error.localizedDescription
+            myTicketLeads = await RexAPI.shared.myTicketLeads(itemId: itemId)
         }
     }
 
@@ -1186,11 +1269,15 @@ struct ItemDetailView: View {
                         .foregroundStyle(RexColor.foreground)
 
                     Button {
-                        Task { await toggleTicketReminder() }
+                        if reminderSet {
+                            editingReminderTimings = true
+                        } else {
+                            Task { await toggleTicketReminder() }
+                        }
                     } label: {
                         HStack(spacing: RexSpacing.sm) {
                             Image(systemName: reminderSet ? "bell.fill" : "bell")
-                            Text(reminderSet ? "You'll be told 30 minutes before" : "Remind me")
+                            Text(reminderSet ? reminderSummary : "Remind me")
                                 .font(RexFont.text(14, weight: .semibold))
                         }
                         .padding(.horizontal, RexSpacing.md)

@@ -989,7 +989,11 @@ struct FeedView: View {
                             try await RexAPI.shared.cancelTicketReminder(itemId: itemId)
                             myTicketReminderItemIds.remove(itemId)
                         } else {
-                            try await RexAPI.shared.setTicketReminder(itemId: itemId, onSaleAt: onSale)
+                            try await RexAPI.shared.setTicketReminders(
+                                itemId: itemId,
+                                onSaleAt: onSale,
+                                leads: RexAPI.defaultTicketLeads
+                            )
                             myTicketReminderItemIds.insert(itemId)
                         }
                     } catch {

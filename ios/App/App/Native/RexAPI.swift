@@ -6176,37 +6176,95 @@ final class RexAPI {
     /// Oct 12 — "if someone says 'want to try' on an event, give them an option
     /// to set a reminder for ticket sales."
     ///
-    /// How long before the on-sale moment the phone buzzes. Half an hour is
-    /// enough to get to a laptop and open the queue page, and not so early that
-    /// you have put it down again by the time it matters.
-    static let ticketReminderLead: TimeInterval = 30 * 60
-
-    /// Sets this user's reminder for an event's ticket release.
+    /// Oct 12 — "can we have a push the day before and 30 mins before, but make
+    /// these editable."
     ///
-    /// `remind_at` is computed here and stored, rather than derived at send
-    /// time from the item: if somebody later corrects the on-sale time, an
-    /// alarm already promised doesn't silently move under the person relying
-    /// on it. Resetting the reminder is how it moves.
-    func setTicketReminder(itemId: String, onSaleAt: Date) async throws {
+    /// Both, because they do different jobs: the day before is when you decide
+    /// who is going and who is paying, and the half hour is when you get to a
+    /// laptop. Either alone leaves one of those to luck.
+    static let defaultTicketLeads: Set<Int> = [1440, 30]
+
+    /// What the picker offers, in the order it offers them. A week is for
+    /// anything you would need to book a day off for; "as they go on sale" is
+    /// for people who would rather be told late than early.
+    static let ticketLeadChoices: [(minutes: Int, label: String)] = [
+        (10080, "A week before"),
+        (1440, "The day before"),
+        (120, "Two hours before"),
+        (30, "30 minutes before"),
+        (0, "As they go on sale"),
+    ]
+
+    /// Replaces this user's reminders for an event with exactly these timings.
+    ///
+    /// Written as a whole set rather than one at a time because that is what
+    /// the screen edits — a person ticks and unticks until it says what they
+    /// want, and one call then makes the database agree. Anything they
+    /// unticked is deleted, which also clears its notified_at, so re-ticking a
+    /// timing that already fired genuinely re-arms it.
+    ///
+    /// `remind_at` is computed here and stored rather than derived at send
+    /// time, so correcting an on-sale time later doesn't silently move an
+    /// alarm somebody is relying on; `lead_minutes` is stored beside it so the
+    /// app can recompute from what they actually asked for.
+    func setTicketReminders(itemId: String, onSaleAt: Date, leads: Set<Int>) async throws {
         let token = try await validToken()
         guard let userId = currentUserId else { throw RexAPIError.notSignedIn }
+        let formatter = ISO8601DateFormatter()
+
+        var deleteComponents = URLComponents(url: baseURL.appendingPathComponent("/rest/v1/ticket_reminders"), resolvingAgainstBaseURL: false)!
+        deleteComponents.queryItems = [
+            URLQueryItem(name: "user_id", value: "eq.\(userId)"),
+            URLQueryItem(name: "item_id", value: "eq.\(itemId)"),
+        ]
+        var deleteRequest = URLRequest(url: deleteComponents.url!)
+        deleteRequest.httpMethod = "DELETE"
+        deleteRequest.setValue(anonKey, forHTTPHeaderField: "apikey")
+        deleteRequest.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+        let (deleteData, deleteResponse) = try await URLSession.shared.data(for: deleteRequest)
+        guard let deleteHTTP = deleteResponse as? HTTPURLResponse, deleteHTTP.statusCode < 400 else {
+            throw RexAPIError.server(friendlyError(deleteData, fallback: "Couldn't change those reminders."))
+        }
+
+        guard !leads.isEmpty else { return }
+
+        let rows: [[String: Any]] = leads.sorted().map { lead in
+            [
+                "user_id": userId,
+                "item_id": itemId,
+                "lead_minutes": lead,
+                "remind_at": formatter.string(from: onSaleAt.addingTimeInterval(-Double(lead) * 60)),
+            ]
+        }
         var request = URLRequest(url: baseURL.appendingPathComponent("/rest/v1/ticket_reminders"))
         request.httpMethod = "POST"
         request.setValue(anonKey, forHTTPHeaderField: "apikey")
         request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
-        request.setValue("resolution=merge-duplicates", forHTTPHeaderField: "Prefer")
-        let formatter = ISO8601DateFormatter()
-        request.httpBody = try JSONSerialization.data(withJSONObject: [[
-            "user_id": userId,
-            "item_id": itemId,
-            "remind_at": formatter.string(from: onSaleAt.addingTimeInterval(-Self.ticketReminderLead)),
-        ]])
+        request.httpBody = try JSONSerialization.data(withJSONObject: rows)
 
         let (data, response) = try await URLSession.shared.data(for: request)
         guard let http = response as? HTTPURLResponse, http.statusCode < 400 else {
-            throw RexAPIError.server(friendlyError(data, fallback: "Couldn't set that reminder."))
+            throw RexAPIError.server(friendlyError(data, fallback: "Couldn't set those reminders."))
         }
+    }
+
+    /// Which timings this user has on an event, for the picker's ticks.
+    func myTicketLeads(itemId: String) async -> Set<Int> {
+        guard let token = try? await validToken(), let userId = currentUserId else { return [] }
+        var components = URLComponents(url: baseURL.appendingPathComponent("/rest/v1/ticket_reminders"), resolvingAgainstBaseURL: false)!
+        components.queryItems = [
+            URLQueryItem(name: "select", value: "lead_minutes"),
+            URLQueryItem(name: "user_id", value: "eq.\(userId)"),
+            URLQueryItem(name: "item_id", value: "eq.\(itemId)"),
+        ]
+        var request = URLRequest(url: components.url!)
+        request.setValue(anonKey, forHTTPHeaderField: "apikey")
+        request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+        guard let (data, response) = try? await URLSession.shared.data(for: request),
+              let http = response as? HTTPURLResponse, http.statusCode < 400 else { return [] }
+        struct Row: Codable { let lead_minutes: Int }
+        return Set(((try? JSONDecoder().decode([Row].self, from: data)) ?? []).map(\.lead_minutes))
     }
 
     func cancelTicketReminder(itemId: String) async throws {
@@ -6244,7 +6302,13 @@ final class RexAPI {
         guard let (data, response) = try? await URLSession.shared.data(for: request),
               let http = response as? HTTPURLResponse, http.statusCode < 400 else { return [] }
         struct Row: Codable { let profiles: RexProfileDetail? }
-        return ((try? JSONDecoder().decode([Row].self, from: data)) ?? []).compactMap(\.profiles)
+        // One row per timing since 12 Oct, so somebody who asked for both the
+        // day before and the half hour is two rows and one person. Counting
+        // rows here would be the Explore shelf mistake a third time.
+        var seen = Set<String>()
+        return ((try? JSONDecoder().decode([Row].self, from: data)) ?? [])
+            .compactMap(\.profiles)
+            .filter { seen.insert($0.id).inserted }
     }
 
     /// Friends' reminders for releases that haven't happened yet, for the feed.
