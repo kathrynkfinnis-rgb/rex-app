@@ -181,6 +181,10 @@ struct FeedView: View {
     @State private var matchingCollections: [RexList] = []
     @State private var collectionOwnerNames: [String: String] = [:]
     @State private var myWantItemIds: Set<String> = []
+    /// Oct 12 — friends waiting on a ticket release, and which of those you
+    /// are waiting on yourself.
+    @State private var ticketReminderRows: [TicketReminderRow] = []
+    @State private var myTicketReminderItemIds: Set<String> = []
 
     /// A mass import — someone's whole Goodreads or IMDb history in one go —
     /// otherwise buries everyone else. More than five in a row from the same
@@ -216,7 +220,30 @@ struct FeedView: View {
             }
             index = run
         }
-        return out
+        return withTicketReminders(out)
+    }
+
+    /// Oct 12 — ticket reminders, at the top of an unfiltered feed.
+    ///
+    /// At the top because they are the only thing here with a deadline: a Rex
+    /// from Tuesday is just as good read on Friday, and a ticket release you
+    /// scrolled past is gone. Soonest first for the same reason.
+    ///
+    /// One per event, not one per friend — three people waiting on the same
+    /// release is one fact, and three identical cards is the Explore shelf
+    /// mistake again. Yours are left out: you already know, and a card telling
+    /// you about your own alarm is clutter where it matters most.
+    private func withTicketReminders(_ rows: [FeedRow]) -> [FeedRow] {
+        guard !ticketReminderRows.isEmpty else { return rows }
+        var seenItems = Set<String>()
+        let cards: [FeedRow] = ticketReminderRows.compactMap { reminder in
+            guard let itemId = reminder.items?.id,
+                  reminder.profiles?.id != RexAPI.shared.currentUserId,
+                  seenItems.insert(itemId).inserted
+            else { return nil }
+            return .ticketReminder(reminder)
+        }
+        return cards + rows
     }
 
     /// Same person, same minute — close enough to call one import.
@@ -494,6 +521,9 @@ struct FeedView: View {
                                     .rexCard()
                                 }
                                 .buttonStyle(.plain)
+
+                              case .ticketReminder(let reminder):
+                                ticketReminderCard(reminder)
 
                               case .rex(let rec):
                               // Swiping only offers to delete your own Rex.
@@ -908,6 +938,83 @@ struct FeedView: View {
     /// you've scrolled to it, the same way a table's section headers do —
     /// solves the same "don't lose access to the filters" complaint with
     /// a much simpler, sturdier mechanism.
+    /// Oct 12 — "have a card on the feed that has a special button — 'Gemma has
+    /// set a reminder for tickets'."
+    ///
+    /// The button is the point. Everything else in the feed is something to
+    /// read; this is something to do, and the window to do it in closes. So it
+    /// says who, what, when, and offers the one action that matters — and once
+    /// you have taken it, it stops offering and starts confirming, because a
+    /// button you can press twice on something this time-sensitive is a way to
+    /// end up unsure whether you pressed it at all.
+    @ViewBuilder
+    private func ticketReminderCard(_ reminder: TicketReminderRow) -> some View {
+        let who = reminder.profiles?.display_name ?? reminder.profiles?.username ?? "A friend"
+        let onSale = reminder.items?.tickets_on_sale_at.flatMap { ISO8601DateFormatter.rexDate(from: $0) }
+        let mine = myTicketReminderItemIds.contains(reminder.items?.id ?? "")
+
+        VStack(alignment: .leading, spacing: RexSpacing.sm) {
+            HStack(spacing: RexSpacing.sm) {
+                UserAvatarView(
+                    url: reminder.profiles?.avatar_url,
+                    name: who,
+                    size: 28
+                )
+                Text("\(who) has set a reminder for tickets")
+                    .font(RexFont.text(13))
+                    .foregroundStyle(RexColor.mutedForeground)
+                Spacer(minLength: 0)
+            }
+
+            NavigationLink(value: reminder.items?.id ?? "") {
+                Text(reminder.items?.title ?? "")
+                    .font(RexFont.display(17, weight: .semibold))
+                    .foregroundStyle(RexColor.foreground)
+                    .multilineTextAlignment(.leading)
+                    .lineLimit(2)
+            }
+            .buttonStyle(.plain)
+
+            if let onSale {
+                Text("On sale \(onSale.formatted(date: .abbreviated, time: .shortened))")
+                    .font(RexFont.text(13))
+                    .foregroundStyle(RexColor.foreground)
+            }
+
+            Button {
+                guard let itemId = reminder.items?.id, let onSale else { return }
+                Task {
+                    do {
+                        if mine {
+                            try await RexAPI.shared.cancelTicketReminder(itemId: itemId)
+                            myTicketReminderItemIds.remove(itemId)
+                        } else {
+                            try await RexAPI.shared.setTicketReminder(itemId: itemId, onSaleAt: onSale)
+                            myTicketReminderItemIds.insert(itemId)
+                        }
+                    } catch {
+                        // A reminder that didn't save shouldn't look saved.
+                        myTicketReminderItemIds = await RexAPI.shared.myTicketReminderItemIds()
+                    }
+                }
+            } label: {
+                HStack(spacing: RexSpacing.sm) {
+                    Image(systemName: mine ? "bell.fill" : "bell")
+                    Text(mine ? "You'll be told too" : "Remind me too")
+                        .font(RexFont.text(14, weight: .semibold))
+                }
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, 10)
+                .background(mine ? RexColor.badgeBackground : RexColor.primary)
+                .foregroundStyle(mine ? RexColor.primary : RexColor.primaryForeground)
+                .clipShape(Capsule())
+            }
+            .buttonStyle(.plain)
+        }
+        .padding(RexSpacing.md)
+        .rexCard()
+    }
+
     private var filterChipsBar: some View {
         VStack(alignment: .leading, spacing: RexSpacing.md) {
             if !availableCategories.isEmpty {
@@ -1378,6 +1485,8 @@ struct FeedView: View {
             wanters = await RexAPI.shared.fetchWanters(itemIds: itemIds)
             myWantItemIds = Set(((try? await wants) ?? []).compactMap { $0.items?.id })
             unreadNotificationCount = await RexAPI.shared.fetchUnreadNotificationCount()
+            ticketReminderRows = await RexAPI.shared.upcomingTicketReminders()
+            myTicketReminderItemIds = await RexAPI.shared.myTicketReminderItemIds()
         } catch {
             errorMessage = error.localizedDescription
         }
@@ -1497,11 +1606,16 @@ func splitGenres(_ raw: String?) -> [String] {
 enum FeedRow: Identifiable {
     case rex(FeedRecommendation)
     case more(key: String, count: Int, by: String)
+    /// Oct 12 — a friend waiting on a ticket release. Its own case rather than
+    /// a dressed-up Rex, because it is not one: nobody is recommending
+    /// anything, and the useful response is to set your own alarm.
+    case ticketReminder(TicketReminderRow)
 
     var id: String {
         switch self {
         case .rex(let r): return r.id
         case .more(let key, _, _): return "more-\(key)"
+        case .ticketReminder(let r): return "ticket-\(r.id)"
         }
     }
 }

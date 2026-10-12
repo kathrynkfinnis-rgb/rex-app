@@ -965,10 +965,15 @@ final class RexAPI {
         // Oct 3 — Google Place Details, cached on the row. Tried first and
         // fallen back from, same as the ratings below it, so the app keeps
         // working against a database that hasn't had the migration yet.
-        if let item = try? await fetchItem(
-            id: id,
-            select: withRatings + ",summary,opening_hours,google_photo_urls,details_fetched_at,chain_key"
-        ) {
+        let withDetails = withRatings + ",summary,opening_hours,google_photo_urls,details_fetched_at,chain_key"
+        // Oct 12 — tickets_on_sale_at, tried on its own rung for the same
+        // reason as everything below it: an app running against a database
+        // that hasn't had this morning's migration should lose the reminder
+        // button, not the item page.
+        if let item = try? await fetchItem(id: id, select: withDetails + ",tickets_on_sale_at") {
+            return item
+        }
+        if let item = try? await fetchItem(id: id, select: withDetails) {
             return item
         }
         if let item = try? await fetchItem(id: id, select: withRatings) {
@@ -6164,6 +6169,149 @@ final class RexAPI {
         struct Response: Codable { let title: String?; let text: String }
         let decoded = try JSONDecoder().decode(Response.self, from: data)
         return (decoded.title, decoded.text)
+    }
+
+    // MARK: - Ticket reminders
+
+    /// Oct 12 — "if someone says 'want to try' on an event, give them an option
+    /// to set a reminder for ticket sales."
+    ///
+    /// How long before the on-sale moment the phone buzzes. Half an hour is
+    /// enough to get to a laptop and open the queue page, and not so early that
+    /// you have put it down again by the time it matters.
+    static let ticketReminderLead: TimeInterval = 30 * 60
+
+    /// Sets this user's reminder for an event's ticket release.
+    ///
+    /// `remind_at` is computed here and stored, rather than derived at send
+    /// time from the item: if somebody later corrects the on-sale time, an
+    /// alarm already promised doesn't silently move under the person relying
+    /// on it. Resetting the reminder is how it moves.
+    func setTicketReminder(itemId: String, onSaleAt: Date) async throws {
+        let token = try await validToken()
+        guard let userId = currentUserId else { throw RexAPIError.notSignedIn }
+        var request = URLRequest(url: baseURL.appendingPathComponent("/rest/v1/ticket_reminders"))
+        request.httpMethod = "POST"
+        request.setValue(anonKey, forHTTPHeaderField: "apikey")
+        request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        request.setValue("resolution=merge-duplicates", forHTTPHeaderField: "Prefer")
+        let formatter = ISO8601DateFormatter()
+        request.httpBody = try JSONSerialization.data(withJSONObject: [[
+            "user_id": userId,
+            "item_id": itemId,
+            "remind_at": formatter.string(from: onSaleAt.addingTimeInterval(-Self.ticketReminderLead)),
+        ]])
+
+        let (data, response) = try await URLSession.shared.data(for: request)
+        guard let http = response as? HTTPURLResponse, http.statusCode < 400 else {
+            throw RexAPIError.server(friendlyError(data, fallback: "Couldn't set that reminder."))
+        }
+    }
+
+    func cancelTicketReminder(itemId: String) async throws {
+        let token = try await validToken()
+        guard let userId = currentUserId else { throw RexAPIError.notSignedIn }
+        var components = URLComponents(url: baseURL.appendingPathComponent("/rest/v1/ticket_reminders"), resolvingAgainstBaseURL: false)!
+        components.queryItems = [
+            URLQueryItem(name: "user_id", value: "eq.\(userId)"),
+            URLQueryItem(name: "item_id", value: "eq.\(itemId)"),
+        ]
+        var request = URLRequest(url: components.url!)
+        request.httpMethod = "DELETE"
+        request.setValue(anonKey, forHTTPHeaderField: "apikey")
+        request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+
+        let (data, response) = try await URLSession.shared.data(for: request)
+        guard let http = response as? HTTPURLResponse, http.statusCode < 400 else {
+            throw RexAPIError.server(friendlyError(data, fallback: "Couldn't cancel that reminder."))
+        }
+    }
+
+    /// Everyone with a reminder on this event — you and whichever friends RLS
+    /// lets you see. Drives both the "you're set" state and the faces beside
+    /// it.
+    func ticketReminders(itemId: String) async -> [RexProfileDetail] {
+        guard let token = try? await validToken() else { return [] }
+        var components = URLComponents(url: baseURL.appendingPathComponent("/rest/v1/ticket_reminders"), resolvingAgainstBaseURL: false)!
+        components.queryItems = [
+            URLQueryItem(name: "select", value: "user_id,profiles!ticket_reminders_user_id_fkey(id,username,display_name,avatar_url)"),
+            URLQueryItem(name: "item_id", value: "eq.\(itemId)"),
+        ]
+        var request = URLRequest(url: components.url!)
+        request.setValue(anonKey, forHTTPHeaderField: "apikey")
+        request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+        guard let (data, response) = try? await URLSession.shared.data(for: request),
+              let http = response as? HTTPURLResponse, http.statusCode < 400 else { return [] }
+        struct Row: Codable { let profiles: RexProfileDetail? }
+        return ((try? JSONDecoder().decode([Row].self, from: data)) ?? []).compactMap(\.profiles)
+    }
+
+    /// Friends' reminders for releases that haven't happened yet, for the feed.
+    ///
+    /// Only ahead of now: once tickets are out, "Gemma is waiting for these"
+    /// is no longer news and the card would be telling you to set an alarm for
+    /// something that already went on sale. RLS does the friend filtering, so
+    /// this asks for everything and gets back only what it may see.
+    func upcomingTicketReminders() async -> [TicketReminderRow] {
+        guard let token = try? await validToken() else { return [] }
+        var components = URLComponents(url: baseURL.appendingPathComponent("/rest/v1/ticket_reminders"), resolvingAgainstBaseURL: false)!
+        components.queryItems = [
+            URLQueryItem(
+                name: "select",
+                value: "id,remind_at,items!inner(id,type,title,subtitle,image_url,genre,address,tickets_on_sale_at)," +
+                    "profiles!ticket_reminders_user_id_fkey(id,username,display_name,avatar_url)"
+            ),
+            URLQueryItem(name: "items.tickets_on_sale_at", value: "gt.\(ISO8601DateFormatter().string(from: Date()))"),
+            URLQueryItem(name: "order", value: "remind_at.asc"),
+            URLQueryItem(name: "limit", value: "20"),
+        ]
+        var request = URLRequest(url: components.url!)
+        request.setValue(anonKey, forHTTPHeaderField: "apikey")
+        request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+        guard let (data, response) = try? await URLSession.shared.data(for: request),
+              let http = response as? HTTPURLResponse, http.statusCode < 400 else { return [] }
+        return (try? JSONDecoder().decode([TicketReminderRow].self, from: data)) ?? []
+    }
+
+    /// Which events you have a reminder on, so a feed card can say "you'll be
+    /// told too" rather than offering again.
+    func myTicketReminderItemIds() async -> Set<String> {
+        guard let token = try? await validToken(), let userId = currentUserId else { return [] }
+        var components = URLComponents(url: baseURL.appendingPathComponent("/rest/v1/ticket_reminders"), resolvingAgainstBaseURL: false)!
+        components.queryItems = [
+            URLQueryItem(name: "select", value: "item_id"),
+            URLQueryItem(name: "user_id", value: "eq.\(userId)"),
+        ]
+        var request = URLRequest(url: components.url!)
+        request.setValue(anonKey, forHTTPHeaderField: "apikey")
+        request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+        guard let (data, response) = try? await URLSession.shared.data(for: request),
+              let http = response as? HTTPURLResponse, http.statusCode < 400 else { return [] }
+        struct Row: Codable { let item_id: String }
+        return Set(((try? JSONDecoder().decode([Row].self, from: data)) ?? []).map(\.item_id))
+    }
+
+    /// Writes an event's ticket-release time. Anyone can set it: it is a fact
+    /// about the event rather than about whoever happened to add it first, and
+    /// the person who knows when Glastonbury tickets drop is not necessarily
+    /// the person who created the entry.
+    func setTicketsOnSale(itemId: String, at date: Date?) async throws {
+        let token = try await validToken()
+        var components = URLComponents(url: baseURL.appendingPathComponent("/rest/v1/items"), resolvingAgainstBaseURL: false)!
+        components.queryItems = [URLQueryItem(name: "id", value: "eq.\(itemId)")]
+        var request = URLRequest(url: components.url!)
+        request.httpMethod = "PATCH"
+        request.setValue(anonKey, forHTTPHeaderField: "apikey")
+        request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        let value: Any = date.map { ISO8601DateFormatter().string(from: $0) } ?? NSNull()
+        request.httpBody = try JSONSerialization.data(withJSONObject: ["tickets_on_sale_at": value])
+
+        let (data, response) = try await URLSession.shared.data(for: request)
+        guard let http = response as? HTTPURLResponse, http.statusCode < 400 else {
+            throw RexAPIError.server(friendlyError(data, fallback: "Couldn't save that on-sale time."))
+        }
     }
 
     /// Oct 12 — "can we paste in a link to an insta or tiktok video and pull

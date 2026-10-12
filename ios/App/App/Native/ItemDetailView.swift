@@ -54,6 +54,14 @@ struct ItemDetailView: View {
     /// screen only ever offered the rating form, with no way to see or
     /// toggle the want flag at all once you'd followed a want card in here.
     @State private var wanted = false
+    /// Oct 12 — everyone who has asked to be told when this event's tickets
+    /// drop: you, and whichever friends RLS lets you see.
+    @State private var ticketReminderPeople: [RexProfileDetail] = []
+    /// Raised the moment you add an event to want-to-try, which is when the
+    /// question is live. Never raised on its own.
+    @State private var offerTicketReminder = false
+    @State private var editingOnSaleDate = false
+    @State private var draftOnSaleDate = Date()
     @State private var isTogglingWant = false
     /// The card's own save button merged bookmark ("want to try") and this
     /// into one icon a while back — two save actions there tested as
@@ -233,6 +241,61 @@ struct ItemDetailView: View {
             // you thought, because you are the one who went.
             AddRexView(onDone: { Task { await load() } }, initialPlaceHit: branch)
         }
+        // Oct 12 — the offer, raised by adding an event to want-to-try. An
+        // alert rather than a sheet: it is one question with a yes and a no,
+        // and it arrives unprompted, so it should be dismissable without
+        // reading twice.
+        .alert("Remind you about tickets?", isPresented: $offerTicketReminder) {
+            Button("Remind me") { Task { await toggleTicketReminder() } }
+            Button("No thanks", role: .cancel) {}
+        } message: {
+            if let onSale = ticketsOnSale {
+                Text("Tickets go on sale \(onSale.formatted(date: .abbreviated, time: .shortened)). We'll nudge you half an hour before.")
+            }
+        }
+        .sheet(isPresented: $editingOnSaleDate) {
+            NavigationStack {
+                VStack(alignment: .leading, spacing: RexSpacing.md) {
+                    DatePicker(
+                        "On sale",
+                        selection: $draftOnSaleDate,
+                        displayedComponents: [.date, .hourAndMinute]
+                    )
+                    .datePickerStyle(.graphical)
+                    .tint(RexColor.primary)
+
+                    Text("Anyone can set this — it's a fact about the event, not about who added it. Everyone who asks for a reminder gets told half an hour before.")
+                        .font(RexFont.text(12))
+                        .foregroundStyle(RexColor.mutedForeground)
+                    Spacer()
+                }
+                .padding(RexSpacing.page)
+                .background(RexColor.background.ignoresSafeArea())
+                .navigationTitle("When do tickets drop?")
+                .navigationBarTitleDisplayMode(.inline)
+                .toolbar {
+                    ToolbarItem(placement: .topBarLeading) {
+                        Button("Cancel") { editingOnSaleDate = false }
+                    }
+                    ToolbarItem(placement: .topBarTrailing) {
+                        Button("Save") {
+                            let chosen = draftOnSaleDate
+                            editingOnSaleDate = false
+                            Task {
+                                do {
+                                    try await RexAPI.shared.setTicketsOnSale(itemId: itemId, at: chosen)
+                                    await load()
+                                } catch {
+                                    errorMessage = error.localizedDescription
+                                }
+                            }
+                        }
+                        .font(RexFont.text(15, weight: .semibold))
+                    }
+                }
+            }
+            .tint(RexColor.primary)
+        }
     }
 
     private func load() async {
@@ -250,6 +313,10 @@ struct ItemDetailView: View {
             // Nothing from someone on either side of a block.
             recs = RexAPI.shared.filterHidden(fetchedRecs)
             wanters = await RexAPI.shared.fetchWanters(itemIds: [itemId])[itemId] ?? []
+            // Only events have these, so only events pay for the request.
+            if RexCategory(rawType: fetchedItem.type) == .event {
+                ticketReminderPeople = await RexAPI.shared.ticketReminders(itemId: itemId)
+            }
             Task { await loadDetails(fetchedItem) }
             wanted = (try? await wantedTask) ?? false
             if let mine = fetchedRecs.first(where: { $0.user_id == RexAPI.shared.currentUserId }) {
@@ -269,6 +336,19 @@ struct ItemDetailView: View {
         do {
             if next {
                 try await RexAPI.shared.createWant(itemId: itemId)
+                // Oct 12 — "if someone says 'want to try' on an event, then
+                // give them an option to set a reminder for ticket sales if
+                // appropriate."
+                //
+                // Offered here rather than always on show, because this is the
+                // moment it is wanted — you have just said you want to go, and
+                // the next thought is how you get in. "If appropriate" is the
+                // on-sale time existing: no time, no offer, which is correct
+                // for a free exhibition and for everything added before anyone
+                // thought to record one.
+                if isEvent, ticketsOnSale != nil, !reminderSet {
+                    offerTicketReminder = true
+                }
             } else {
                 try await RexAPI.shared.removeWant(itemId: itemId)
             }
@@ -276,6 +356,35 @@ struct ItemDetailView: View {
             wanted = !next
         }
         isTogglingWant = false
+    }
+
+    /// The event's ticket-release time, once the item has loaded one.
+    private var ticketsOnSale: Date? {
+        item?.tickets_on_sale_at.flatMap { ISO8601DateFormatter.rexDate(from: $0) }
+    }
+
+    private var isEvent: Bool {
+        RexCategory(rawType: item?.type) == .event
+    }
+
+    private var reminderSet: Bool {
+        guard let me = RexAPI.shared.currentUserId else { return false }
+        return ticketReminderPeople.contains { $0.id == me }
+    }
+
+    private func toggleTicketReminder() async {
+        guard let onSale = ticketsOnSale else { return }
+        let next = !reminderSet
+        do {
+            if next {
+                try await RexAPI.shared.setTicketReminder(itemId: itemId, onSaleAt: onSale)
+            } else {
+                try await RexAPI.shared.cancelTicketReminder(itemId: itemId)
+            }
+            ticketReminderPeople = await RexAPI.shared.ticketReminders(itemId: itemId)
+        } catch {
+            errorMessage = error.localizedDescription
+        }
     }
 
     private func save() {
@@ -384,6 +493,7 @@ struct ItemDetailView: View {
 
             savedByRow
             wantedByRow
+            ticketsSection
 
 
             // Oct 4 — "the Google reviews line is corrupted on place cards."
@@ -1053,6 +1163,81 @@ struct ItemDetailView: View {
     ///
     /// Yourself included, because your own want is a fact about the thing and
     /// leaving it out would make the count disagree with the bookmark.
+    /// Oct 12 — "offer notifications for upcoming ticket sales for events."
+    ///
+    /// Only on events, and it has two shapes. With an on-sale time it says
+    /// when, and offers to tell you half an hour before. Without one it asks
+    /// for the time, because nothing else can supply it — no catalogue
+    /// publishes ticket releases, so an empty state here is an invitation
+    /// rather than a dead end, and anyone can fill it in: when Glastonbury
+    /// tickets drop is a fact about the event, not about whoever added it.
+    @ViewBuilder
+    private var ticketsSection: some View {
+        if isEvent {
+            VStack(alignment: .leading, spacing: 8) {
+                if let onSale = ticketsOnSale {
+                    Text("Tickets on sale")
+                        .font(.system(size: 11, weight: .semibold))
+                        .tracking(0.3)
+                        .foregroundStyle(RexColor.mutedForeground)
+
+                    Text(onSale.formatted(date: .abbreviated, time: .shortened))
+                        .font(RexFont.display(17, weight: .semibold))
+                        .foregroundStyle(RexColor.foreground)
+
+                    Button {
+                        Task { await toggleTicketReminder() }
+                    } label: {
+                        HStack(spacing: RexSpacing.sm) {
+                            Image(systemName: reminderSet ? "bell.fill" : "bell")
+                            Text(reminderSet ? "You'll be told 30 minutes before" : "Remind me")
+                                .font(RexFont.text(14, weight: .semibold))
+                        }
+                        .padding(.horizontal, RexSpacing.md)
+                        .padding(.vertical, 10)
+                        .background(reminderSet ? RexColor.badgeBackground : RexColor.primary)
+                        .foregroundStyle(reminderSet ? RexColor.primary : RexColor.primaryForeground)
+                        .clipShape(Capsule())
+                    }
+                    .buttonStyle(.plain)
+
+                    let others = ticketReminderPeople.filter { $0.id != RexAPI.shared.currentUserId }
+                    if !others.isEmpty {
+                        Text(others.count == 1
+                             ? "\(others[0].display_name ?? others[0].username) is waiting for these too"
+                             : "\(others.count) friends are waiting for these too")
+                            .font(RexFont.text(12))
+                            .foregroundStyle(RexColor.mutedForeground)
+                    }
+
+                    Button("Change the on-sale time") {
+                        draftOnSaleDate = onSale
+                        editingOnSaleDate = true
+                    }
+                    .font(RexFont.text(12))
+                    .foregroundStyle(RexColor.mutedForeground)
+                } else {
+                    Button {
+                        draftOnSaleDate = Date()
+                        editingOnSaleDate = true
+                    } label: {
+                        HStack(spacing: RexSpacing.sm) {
+                            Image(systemName: "bell.badge")
+                            Text("Know when tickets go on sale? Add it")
+                                .font(RexFont.text(14, weight: .medium))
+                        }
+                        .foregroundStyle(RexColor.primary)
+                    }
+                    .buttonStyle(.plain)
+                }
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(RexSpacing.md)
+            .rexCard()
+            .padding(.horizontal, 16)
+        }
+    }
+
     @ViewBuilder
     private var wantedByRow: some View {
         if !wanters.isEmpty {

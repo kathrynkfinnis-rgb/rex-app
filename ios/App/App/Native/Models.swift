@@ -96,13 +96,18 @@ struct RexItem: Codable, Identifiable {
     /// Oct 5 — the brand domain shared by branches of one chain. Null for
     /// anywhere that isn't part of one.
     let chain_key: String?
+    /// Oct 12 — when tickets for an event go on sale. No catalogue publishes
+    /// this, so it is null until a person types it, and null is what stops the
+    /// app offering a reminder for the school play.
+    let tickets_on_sale_at: String?
 
-    init(id: String, type: String, title: String, subtitle: String?, image_url: String?, genre: String?, address: String? = nil, google_rating: Double? = nil, google_rating_count: Int? = nil, recipe_text: String? = nil, link_url: String? = nil, lat: Double? = nil, lng: Double? = nil, external_id: String? = nil, external_source: String? = nil, summary: String? = nil, opening_hours: [String]? = nil, google_photo_urls: [String]? = nil, details_fetched_at: String? = nil, chain_key: String? = nil) {
+    init(id: String, type: String, title: String, subtitle: String?, image_url: String?, genre: String?, address: String? = nil, google_rating: Double? = nil, google_rating_count: Int? = nil, recipe_text: String? = nil, link_url: String? = nil, lat: Double? = nil, lng: Double? = nil, external_id: String? = nil, external_source: String? = nil, summary: String? = nil, opening_hours: [String]? = nil, google_photo_urls: [String]? = nil, details_fetched_at: String? = nil, chain_key: String? = nil, tickets_on_sale_at: String? = nil) {
         self.summary = summary
         self.opening_hours = opening_hours
         self.google_photo_urls = google_photo_urls
         self.details_fetched_at = details_fetched_at
         self.chain_key = chain_key
+        self.tickets_on_sale_at = tickets_on_sale_at
         self.id = id
         self.type = type
         self.title = title
@@ -588,6 +593,20 @@ struct EditorialCollectionItem: Codable, Identifiable {
 /// it's ever touched the database. Mirrors the web importer's ExtractedRec
 /// (src/lib/import.functions.ts) and the edge function's EXTRACTION_TOOL
 /// schema exactly — same shape either client asked for it.
+/// Oct 12 — "have a card on the feed that has a special button — 'Gemma has
+/// set a reminder for tickets'."
+///
+/// A friend waiting on a ticket release. It is not a Rex and deliberately
+/// isn't modelled as one: nobody is recommending anything, they are telling you
+/// a date is coming, and the useful thing to do about it is set your own alarm
+/// rather than read their opinion.
+struct TicketReminderRow: Codable, Identifiable {
+    let id: String
+    let remind_at: String
+    let items: RexItem?
+    let profiles: RexProfileDetail?
+}
+
 /// What a pasted Instagram or TikTok link turned out to be.
 ///
 /// `truncated` is Instagram's doing: it publishes a caption's first 400
