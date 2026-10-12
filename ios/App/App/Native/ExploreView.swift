@@ -130,10 +130,27 @@ struct ExploreView: View {
             .map { $0 }
     }
 
-    private var recentByCategory: [(category: RexCategory, recs: [FeedRecommendation])] {
-        var byCategory: [RexCategory: [FeedRecommendation]] = [:]
+    /// Oct 12 — "this is duplicative in Explore — it should only come up once
+    /// and then say Rex'd by two people." MobLand appeared twice on the TV
+    /// shelf because Liv and Ollie had both Rex'd it, and this shelf was built
+    /// one tile per row. The shelf above it has grouped by item since it was
+    /// written; this one never did, so the same screen answered the same
+    /// question two different ways.
+    ///
+    /// One tile per thing, keeping the most recent Rex of it — the shelf is
+    /// ordered by recency, so the newest is the row that earned its place.
+    /// The count rides along for the caption.
+    private var recentByCategory: [(category: RexCategory, recs: [(rec: FeedRecommendation, count: Int)])] {
+        var byItem: [String: [FeedRecommendation]] = [:]
+        var order: [String] = []
         for rec in recentRex where !rec.isWant && !rec.isBlast {
-            byCategory[RexCategory(rawType: rec.items?.type), default: []].append(rec)
+            if byItem[rec.item_id] == nil { order.append(rec.item_id) }
+            byItem[rec.item_id, default: []].append(rec)
+        }
+        var byCategory: [RexCategory: [(rec: FeedRecommendation, count: Int)]] = [:]
+        for itemId in order {
+            guard let recs = byItem[itemId], let first = recs.first else { continue }
+            byCategory[RexCategory(rawType: first.items?.type), default: []].append((first, recs.count))
         }
         // This used to need two before a category earned a shelf, which on a
         // young app meant most of them were thrown away and the page read as
@@ -320,8 +337,10 @@ struct ExploreView: View {
                     tag: agreed ? "AGREED ON" : "FRIENDS"
                 ) {
                     ForEach(group.recs, id: \.rec.id) { entry in
-                        Button { openRex(entry.rec) } label: { recentRexCard(entry.rec) }
-                            .buttonStyle(.plain)
+                        Button { openRex(entry.rec) } label: {
+                            recentRexCard(entry.rec, rexdBy: entry.count)
+                        }
+                        .buttonStyle(.plain)
                     }
                 }
             }
@@ -342,9 +361,11 @@ struct ExploreView: View {
             }
             ForEach(recentByCategory, id: \.category) { group in
                 shelf(title: group.category.label, tag: "RECENT") {
-                    ForEach(group.recs) { rec in
-                        Button { openRex(rec) } label: { recentRexCard(rec) }
-                            .buttonStyle(.plain)
+                    ForEach(group.recs, id: \.rec.id) { entry in
+                        Button { openRex(entry.rec) } label: {
+                            recentRexCard(entry.rec, rexdBy: entry.count)
+                        }
+                        .buttonStyle(.plain)
                     }
                 }
             }
@@ -579,7 +600,10 @@ struct ExploreView: View {
         }
     }
 
-    private func recentRexCard(_ rec: FeedRecommendation) -> some View {
+    /// `rexdBy` is how many people Rex'd this thing, not how many rows the
+    /// shelf collapsed: a name is the better caption when there is one person
+    /// to name, and a count is the only honest one when there are more.
+    private func recentRexCard(_ rec: FeedRecommendation, rexdBy count: Int = 1) -> some View {
         VStack(alignment: .leading, spacing: RexSpacing.xs) {
             shelfThumbnail(url: rec.items?.image_url, symbol: RexCategory(rawType: rec.items?.type).symbol)
             Text(rec.items?.title ?? "")
@@ -587,8 +611,10 @@ struct ExploreView: View {
                 .foregroundStyle(RexColor.foreground)
                 .lineLimit(2)
                 .multilineTextAlignment(.leading)
-            if let who = rec.profiles?.display_name ?? rec.profiles?.username {
-                Text(who)
+            if let caption = count > 1
+                ? "Rex\u{2019}d by \(count) people"
+                : rec.profiles?.display_name ?? rec.profiles?.username {
+                Text(caption)
                     .font(RexFont.text(11))
                     .foregroundStyle(RexColor.mutedForeground)
                     .lineLimit(1)
