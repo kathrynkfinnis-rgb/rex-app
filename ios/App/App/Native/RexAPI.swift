@@ -215,16 +215,24 @@ final class RexAPI {
         return ok ? ",is_anonymous" : ""
     }
 
-    /// Whether the is_branch_copy migration has been run. Same reasoning as
-    /// anonymousColumn above: naming a column PostgREST doesn't know about
-    /// makes it reject the whole query, and the query this one guards is the
-    /// feed. Probe once, then remember.
-    private var branchCopyColumn: Bool?
+    /// Whether `is_branch_copy` can be named on a given resource.
+    ///
+    /// Oct 13 — this took the feed down, and the way it did is the lesson.
+    /// The probe was right in shape and wrong in aim: it asked
+    /// /rest/v1/recommendations, the table, while fetchFeed queries
+    /// recommendations_display, the view. The table had the column, the view
+    /// did not, so the probe answered "safe" and every feed request 400'd on
+    /// `column recommendations_display.is_branch_copy does not exist`.
+    ///
+    /// A probe is only worth anything if it asks the object the query will
+    /// ask. Keyed by resource path now, because the feed has two of them and
+    /// a migration reaches one at a time.
+    private var branchCopyColumn: [String: Bool] = [:]
 
-    private func hasBranchCopyColumn() async -> Bool {
-        if let branchCopyColumn { return branchCopyColumn }
+    private func hasBranchCopyColumn(on resourcePath: String) async -> Bool {
+        if let known = branchCopyColumn[resourcePath] { return known }
         guard let token = try? await validToken() else { return false }
-        var components = URLComponents(url: baseURL.appendingPathComponent("/rest/v1/recommendations"), resolvingAgainstBaseURL: false)!
+        var components = URLComponents(url: baseURL.appendingPathComponent(resourcePath), resolvingAgainstBaseURL: false)!
         components.queryItems = [
             URLQueryItem(name: "select", value: "is_branch_copy"),
             URLQueryItem(name: "limit", value: "1"),
@@ -235,7 +243,7 @@ final class RexAPI {
         let ok = (try? await URLSession.shared.data(for: request))
             .flatMap { ($0.1 as? HTTPURLResponse)?.statusCode }
             .map { $0 < 400 } ?? false
-        branchCopyColumn = ok
+        branchCopyColumn[resourcePath] = ok
         return ok
     }
 
@@ -712,8 +720,9 @@ final class RexAPI {
     func fetchFeed(category: String? = nil, searchText: String? = nil, offset: Int = 0) async throws -> [FeedRecommendation] {
         let token = try await validToken()
         let useView = await useRecommendationsDisplayView()
-        let branchCopyExists = await hasBranchCopyColumn()
         let resourcePath = useView ? "/rest/v1/recommendations_display" : "/rest/v1/recommendations"
+        // Asked of the resource this query will actually use — see the probe.
+        let branchCopyExists = await hasBranchCopyColumn(on: resourcePath)
         // The view returns profiles as a plain (already-masked) jsonb
         // column instead of an automatic FK embed — replacing the embed
         // with a CASE would have broken PostgREST's relationship
@@ -2135,7 +2144,9 @@ final class RexAPI {
         if let listSection, !listSection.isEmpty { body["list_section"] = listSection }
         if let showInFeed { body["show_in_feed"] = showInFeed }
         if anonymous { body["is_anonymous"] = true }
-        if branchCopy, await hasBranchCopyColumn() { body["is_branch_copy"] = true }
+        if branchCopy, await hasBranchCopyColumn(on: "/rest/v1/recommendations") {
+            body["is_branch_copy"] = true
+        }
         // NULL published_at is what makes a row a draft — see migration
         // 20260815162631. Everything else (feed, item pages, map,
         // leaderboard) already excludes these via RLS, not a client filter,
