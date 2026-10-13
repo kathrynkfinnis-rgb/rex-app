@@ -185,6 +185,12 @@ struct FeedView: View {
     /// are waiting on yourself.
     @State private var ticketReminderRows: [TicketReminderRow] = []
     @State private var myTicketReminderItemIds: Set<String> = []
+    /// Oct 13 — blasts you have already answered, and ones you have dismissed
+    /// by hand. Either takes a blast off the top; it stays in the feed in
+    /// ordinary date order, because answering a question is not a reason to
+    /// hide it.
+    @State private var answeredBlastIds: Set<String> = []
+    @State private var dismissedBlastIds: Set<String> = BlastPinStore.dismissed()
 
     /// A mass import — someone's whole Goodreads or IMDb history in one go —
     /// otherwise buries everyone else. More than five in a row from the same
@@ -421,7 +427,7 @@ struct FeedView: View {
         var tagged: [FeedRecommendation] = []
         var rest: [FeedRecommendation] = []
         for rec in deduped {
-            if rec.isBlast, isRecent(rec) {
+            if rec.isBlast, isPinnedBlast(rec) {
                 blasts.append(rec)
             } else if isRecentlyTaggedMe(rec) {
                 tagged.append(rec)
@@ -436,6 +442,39 @@ struct FeedView: View {
     private func isRecent(_ rec: FeedRecommendation) -> Bool {
         guard let created = rec.createdDate else { return false }
         return created > taggedBoostThreshold
+    }
+
+    /// Oct 13 — "once you've seen and replied to a blast, it should no longer
+    /// be pinned. Users should also be able to unpin a blast. And the blast
+    /// should only be pinned for 48 hours."
+    ///
+    /// Three ways to stop being asked, and they are three different kinds of
+    /// done. You answered it, so it is no longer a question for you. You said
+    /// not now, which is an answer about you rather than about the blast. Or
+    /// two days passed, by which time whoever asked has either been helped or
+    /// given up — a blast is a question somebody is waiting on, and nothing
+    /// anybody is still waiting on is two days old.
+    ///
+    /// None of these hide the blast. It drops into date order with everything
+    /// else, so it is still there to scroll to and still there to answer late.
+    private func isPinnedBlast(_ rec: FeedRecommendation) -> Bool {
+        guard let created = rec.createdDate, created > blastPinThreshold else { return false }
+        if answeredBlastIds.contains(rec.id) { return false }
+        if dismissedBlastIds.contains(rec.id) { return false }
+        // Your own blast stays up while it is live: it is the thing you are
+        // waiting on answers to.
+        return true
+    }
+
+    /// 48 hours, not the tagged-me boost's three days. A blast asks for
+    /// something now in a way a tag never does.
+    private var blastPinThreshold: Date {
+        Date().addingTimeInterval(-48 * 60 * 60)
+    }
+
+    private func dismissBlast(_ rec: FeedRecommendation) {
+        dismissedBlastIds.insert(rec.id)
+        BlastPinStore.dismiss(rec.id)
     }
 
     /// Like counts are fetched on demand, not on every feed load — most
@@ -548,6 +587,18 @@ struct FeedView: View {
                                 // One menu only — a second `.contextMenu` replaces
                                 // the first rather than adding to it.
                                 .contextMenu {
+                                    // Oct 13 — "users should also be able to
+                                    // unpin a blast." Offered only while it is
+                                    // actually pinned: an unpin on something
+                                    // sitting in date order would do nothing
+                                    // and look broken.
+                                    if rec.isBlast, isPinnedBlast(rec) {
+                                        Button {
+                                            withAnimation { dismissBlast(rec) }
+                                        } label: {
+                                            Label("Unpin this blast", systemImage: "pin.slash")
+                                        }
+                                    }
                                     // A want has no recommendation row, so
                                     // there's nothing for saved_posts to
                                     // reference — this silently 404'd before.
@@ -999,6 +1050,7 @@ struct FeedView: View {
                     } catch {
                         // A reminder that didn't save shouldn't look saved.
                         myTicketReminderItemIds = await RexAPI.shared.myTicketReminderItemIds()
+            answeredBlastIds = await RexAPI.shared.myAnsweredBlastIds()
                     }
                 }
             } label: {

@@ -25,6 +25,12 @@ struct CollectionDetailView: View {
     @State private var newTopicDraft = ""
     @State private var visibility: String = "draft"
     @State private var rows: [SavedPost] = []
+    /// Oct 13 — "ensure you can click on a collection to review it before you
+    /// save it yourself." You could already open somebody's collection and
+    /// read it; saving was only ever offered on the tile you came from, so
+    /// reviewing it first meant going back to decide. Nil until we know.
+    @State private var isSaved: Bool?
+    @State private var savingFollow = false
     /// Sept 21 — "build a list view and expanded view on collections (like
     /// we have for trips and lists)". Same @AppStorage key as those, so the
     /// choice carries across all three rather than being three settings.
@@ -331,6 +337,25 @@ struct CollectionDetailView: View {
             }
         }
         .toolbar {
+            // Someone else's collection: the decision you came here to make,
+            // next to the menu rather than buried in it. Your own has no such
+            // button, because following your own collection is meaningless.
+            if !route.isMine, let isSaved {
+                ToolbarItem(placement: .topBarTrailing) {
+                    Button {
+                        Task { await toggleFollow(currently: isSaved) }
+                    } label: {
+                        if savingFollow {
+                            ProgressView().controlSize(.small)
+                        } else {
+                            Label(isSaved ? "Saved" : "Save", systemImage: isSaved ? "bookmark.fill" : "bookmark")
+                                .font(RexFont.text(14, weight: .semibold))
+                                .labelStyle(.titleAndIcon)
+                        }
+                    }
+                    .disabled(savingFollow)
+                }
+            }
             // Shown for any collection, not just your own — there's no
             // public web page for a collection yet (task #108), so this is
             // a text summary rather than a link, but sharing a friend's
@@ -619,11 +644,34 @@ struct CollectionDetailView: View {
         }
     }
 
+    /// Saving is the whole point of the button, so it reads as done the
+    /// instant it is tapped and only goes back if the write fails — a
+    /// bookmark that waits on a round trip feels broken on a slow train.
+    private func toggleFollow(currently saved: Bool) async {
+        savingFollow = true
+        isSaved = !saved
+        do {
+            if saved {
+                try await RexAPI.shared.unfollowList(listId: route.listId)
+            } else {
+                try await RexAPI.shared.followList(listId: route.listId)
+            }
+        } catch {
+            isSaved = saved
+            errorMessage = error.localizedDescription
+        }
+        savingFollow = false
+    }
+
     private func load() async {
         isLoading = rows.isEmpty
         errorMessage = nil
         do {
             rows = try await RexAPI.shared.fetchCollectionItems(listId: route.listId)
+            if !route.isMine {
+                let followed = (try? await RexAPI.shared.fetchFollowedLists()) ?? []
+                isSaved = followed.contains { $0.id == route.listId }
+            }
             // The list's own name/emoji can have changed on another device.
             if let mine = try? await RexAPI.shared.fetchLists(),
                let match = mine.first(where: { $0.id == route.listId }) {

@@ -4249,6 +4249,28 @@ final class RexAPI {
     /// batch-fetches the profiles in one flat query alongside, merging
     /// client-side — the same shape those two fixes settled on, and immune
     /// to whatever the underlying constraint happens to be called.
+    /// Oct 13 — "once you've seen and replied to a blast, it should no longer
+    /// be pinned."
+    ///
+    /// Which blasts you've already answered. One request for the lot rather
+    /// than one per card: the feed needs this for every blast on screen at
+    /// once, and the answer is a handful of ids.
+    func myAnsweredBlastIds() async -> Set<String> {
+        guard let token = try? await validToken(), let userId = currentUserId else { return [] }
+        var components = URLComponents(url: baseURL.appendingPathComponent("/rest/v1/request_comments"), resolvingAgainstBaseURL: false)!
+        components.queryItems = [
+            URLQueryItem(name: "select", value: "request_id"),
+            URLQueryItem(name: "user_id", value: "eq.\(userId)"),
+        ]
+        var request = URLRequest(url: components.url!)
+        request.setValue(anonKey, forHTTPHeaderField: "apikey")
+        request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+        guard let (data, response) = try? await URLSession.shared.data(for: request),
+              let http = response as? HTTPURLResponse, http.statusCode < 400 else { return [] }
+        struct Row: Codable { let request_id: String }
+        return Set(((try? JSONDecoder().decode([Row].self, from: data)) ?? []).map(\.request_id))
+    }
+
     func fetchRequestComments(requestId: String) async throws -> [RequestComment] {
         let token = try await validToken()
         // Oct 3 — "when you reply to a blast, you should be able to tag REX to
