@@ -688,6 +688,9 @@ struct FeedView: View {
             .navigationDestination(for: String.self) { itemId in
                 ItemDetailView(itemId: itemId)
             }
+            .navigationDestination(for: RankedLibraryRoute.self) { route in
+                RankedLibraryView(route: route)
+            }
             .navigationDestination(for: TripRoute.self) { route in
                 TripDetailView(route: route)
             }

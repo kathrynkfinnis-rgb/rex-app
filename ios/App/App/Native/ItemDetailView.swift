@@ -78,14 +78,20 @@ struct ItemDetailView: View {
     private enum ActiveSheet: Identifiable {
         case collection(FeedRecommendation)
         case edit(FeedRecommendation)
+        /// Oct 13 — Joe's ordering: place this one against the rest.
+        case rank
         var id: String {
             switch self {
             case .collection(let rec): return "collection-\(rec.id)"
             case .edit(let rec): return "edit-\(rec.id)"
+            case .rank: return "rank"
             }
         }
     }
     @State private var activeSheet: ActiveSheet?
+    /// Oct 13 — where this sits in your own ordering, and how long that
+    /// ordering is. Nil until looked up; nil after, if it isn't placed.
+    @State private var myRank: (position: Int, total: Int)?
     /// "View on map function via a button" — the feed/profile cards
     /// already had one (#133), the full item page never did.
     @Environment(\.viewOnMap) private var viewOnMap
@@ -225,6 +231,15 @@ struct ItemDetailView: View {
                     onSaved: { Task { await load() } },
                     onDeleted: { Task { await load() } }
                 )
+            case .rank:
+                if let item {
+                    RankingCompareView(
+                        newItem: item,
+                        category: RexCategory(rawType: item.type)
+                    ) {
+                        Task { await loadMyRank() }
+                    }
+                }
             }
         }
         .task { await load() }
@@ -383,6 +398,7 @@ struct ItemDetailView: View {
                 ticketReminderPeople = await RexAPI.shared.ticketReminders(itemId: itemId)
                 myTicketLeads = await RexAPI.shared.myTicketLeads(itemId: itemId)
             }
+            await loadMyRank()
             Task { await loadDetails(fetchedItem) }
             wanted = (try? await wantedTask) ?? false
             if let mine = fetchedRecs.first(where: { $0.user_id == RexAPI.shared.currentUserId }) {
@@ -546,6 +562,7 @@ struct ItemDetailView: View {
 
             savedByRow
             wantedByRow
+            rankRow
             ticketsSection
 
 
@@ -1304,6 +1321,78 @@ struct ItemDetailView: View {
             .padding(RexSpacing.md)
             .rexCard()
             .padding(.horizontal, 16)
+        }
+    }
+
+    /// Oct 13 — Joe: "I would love to have my library of books in a ranking
+    /// order… you rank it against your other books."
+    ///
+    /// Only on the categories where "better than" is a real question — a book
+    /// against a book, a film against a film. A restaurant against a podcast
+    /// is not something anybody has an opinion about, so those pages say
+    /// nothing rather than offering a question with no answer.
+    @ViewBuilder
+    private var rankRow: some View {
+        if isRankable, recs.contains(where: { $0.user_id == RexAPI.shared.currentUserId }) {
+            HStack(spacing: RexSpacing.sm) {
+                if let myRank {
+                    NavigationLink(value: RankedLibraryRoute(
+                        category: item?.type ?? "", userId: nil, name: nil
+                    )) {
+                        HStack(spacing: 7) {
+                            Text("#\(myRank.position)")
+                                .font(RexFont.display(17))
+                                .foregroundStyle(RexColor.primary)
+                            Text("of your \(myRank.total)")
+                                .font(RexFont.text(13))
+                                .foregroundStyle(RexColor.mutedForeground)
+                        }
+                        .padding(.horizontal, RexSpacing.md)
+                        .padding(.vertical, 8)
+                        .background(RexColor.badgeBackground, in: Capsule())
+                    }
+                    .buttonStyle(.plain)
+
+                    Button("Move it") { activeSheet = .rank }
+                        .font(RexFont.text(13, weight: .semibold))
+                        .foregroundStyle(RexColor.primary)
+                } else {
+                    Button {
+                        activeSheet = .rank
+                    } label: {
+                        HStack(spacing: 7) {
+                            Image(systemName: "list.number")
+                                .font(.system(size: 12, weight: .semibold))
+                            Text("Rank it against your others")
+                                .font(RexFont.text(13, weight: .semibold))
+                        }
+                        .padding(.horizontal, RexSpacing.md)
+                        .padding(.vertical, 8)
+                        .background(RexColor.badgeBackground, in: Capsule())
+                        .foregroundStyle(RexColor.primary)
+                    }
+                    .buttonStyle(.plain)
+                }
+                Spacer(minLength: 0)
+            }
+            .padding(.horizontal, 16)
+            .padding(.top, RexSpacing.xs)
+        }
+    }
+
+    /// Ordering only makes sense within a kind, and only for kinds people
+    /// actually compare. Trips, lists and blasts are not things you rank.
+    private var isRankable: Bool {
+        [.book, .movie, .tv, .podcast, .recipe].contains(RexCategory(rawType: item?.type))
+    }
+
+    private func loadMyRank() async {
+        guard isRankable, let type = item?.type else { myRank = nil; return }
+        let ordering = await RexAPI.shared.fetchRanking(category: type)
+        if let index = ordering.firstIndex(where: { $0.item_id == itemId }) {
+            myRank = (index + 1, ordering.count)
+        } else {
+            myRank = nil
         }
     }
 

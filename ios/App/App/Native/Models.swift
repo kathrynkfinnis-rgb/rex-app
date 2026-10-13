@@ -607,6 +607,19 @@ struct TicketReminderRow: Codable, Identifiable {
     let profiles: RexProfileDetail?
 }
 
+/// Oct 13 — one thing in somebody's ordered library.
+///
+/// `position` is a place in a list, not a score. It is a float so inserting
+/// between two neighbours touches one row rather than renumbering everything
+/// below it; the app never shows it, only the order it produces.
+struct RankedItem: Codable, Identifiable {
+    let id: String
+    let item_id: String
+    let category: String
+    let position: Double
+    let items: RexItem?
+}
+
 /// What a pasted Instagram or TikTok link turned out to be.
 ///
 /// `truncated` is Instagram's doing: it publishes a caption's first 400

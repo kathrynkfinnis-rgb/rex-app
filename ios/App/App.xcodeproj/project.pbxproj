@@ -36,6 +36,8 @@
 		FEED011B0000000000000000 /* FriendsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = FEED011A0000000000000000 /* FriendsView.swift */; };
 		FEED012B0000000000000000 /* NotificationsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = FEED012A0000000000000000 /* NotificationsView.swift */; };
 		FEED013B0000000000000000 /* CollectionsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = FEED013A0000000000000000 /* CollectionsView.swift */; };
+		FEED17030000000000000000 /* RankedLibraryView.swift in Sources */ = {isa = PBXBuildFile; fileRef = FEED17020000000000000000 /* RankedLibraryView.swift */; };
+		FEED17010000000000000000 /* RankingView.swift in Sources */ = {isa = PBXBuildFile; fileRef = FEED17000000000000000000 /* RankingView.swift */; };
 		FEED16010000000000000000 /* RexCameraPicker.swift in Sources */ = {isa = PBXBuildFile; fileRef = FEED16000000000000000000 /* RexCameraPicker.swift */; };
 		FEED15010000000000000000 /* RexPageHeader.swift in Sources */ = {isa = PBXBuildFile; fileRef = FEED15000000000000000000 /* RexPageHeader.swift */; };
 		FEED13030000000000000000 /* BlastPinStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = FEED13020000000000000000 /* BlastPinStore.swift */; };
@@ -151,6 +153,8 @@
 		FEED011A0000000000000000 /* FriendsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FriendsView.swift; sourceTree = "<group>"; };
 		FEED012A0000000000000000 /* NotificationsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NotificationsView.swift; sourceTree = "<group>"; };
 		FEED013A0000000000000000 /* CollectionsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CollectionsView.swift; sourceTree = "<group>"; };
+		FEED17020000000000000000 /* RankedLibraryView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RankedLibraryView.swift; sourceTree = "<group>"; };
+		FEED17000000000000000000 /* RankingView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RankingView.swift; sourceTree = "<group>"; };
 		FEED16000000000000000000 /* RexCameraPicker.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RexCameraPicker.swift; sourceTree = "<group>"; };
 		FEED15000000000000000000 /* RexPageHeader.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RexPageHeader.swift; sourceTree = "<group>"; };
 		FEED13020000000000000000 /* BlastPinStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BlastPinStore.swift; sourceTree = "<group>"; };
@@ -297,6 +301,8 @@
 				FEED011A0000000000000000 /* FriendsView.swift */,
 				FEED012A0000000000000000 /* NotificationsView.swift */,
 				FEED013A0000000000000000 /* CollectionsView.swift */,
+				FEED17020000000000000000 /* RankedLibraryView.swift */,
+				FEED17000000000000000000 /* RankingView.swift */,
 				FEED16000000000000000000 /* RexCameraPicker.swift */,
 				FEED15000000000000000000 /* RexPageHeader.swift */,
 				FEED14000000000000000000 /* ArchivoBlack-Regular.ttf */,
@@ -494,6 +500,8 @@
 				FEED011B0000000000000000 /* FriendsView.swift in Sources */,
 				FEED012B0000000000000000 /* NotificationsView.swift in Sources */,
 				FEED013B0000000000000000 /* CollectionsView.swift in Sources */,
+				FEED17030000000000000000 /* RankedLibraryView.swift in Sources */,
+				FEED17010000000000000000 /* RankingView.swift in Sources */,
 				FEED16010000000000000000 /* RexCameraPicker.swift in Sources */,
 				FEED15010000000000000000 /* RexPageHeader.swift in Sources */,
 				FEED13030000000000000000 /* BlastPinStore.swift in Sources */,

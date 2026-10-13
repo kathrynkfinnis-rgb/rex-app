@@ -6236,6 +6236,102 @@ final class RexAPI {
         return (decoded.title, decoded.text)
     }
 
+    // MARK: - Rankings
+
+    /// Oct 13 — Joe's idea: a library in order, built by comparing a new thing
+    /// against the ones already placed rather than scoring it out of five.
+    ///
+    /// Somebody's ordering of one category, best first. Friends' orderings are
+    /// readable too — being worth showing other people is half the point.
+    func fetchRanking(userId: String? = nil, category: String) async -> [RankedItem] {
+        guard let token = try? await validToken(),
+              let whose = userId ?? currentUserId else { return [] }
+        var components = URLComponents(url: baseURL.appendingPathComponent("/rest/v1/rankings"), resolvingAgainstBaseURL: false)!
+        components.queryItems = [
+            URLQueryItem(name: "select", value: "id,item_id,category,position,items(id,type,title,subtitle,image_url,genre,address)"),
+            URLQueryItem(name: "user_id", value: "eq.\(whose)"),
+            URLQueryItem(name: "category", value: "eq.\(category)"),
+            URLQueryItem(name: "order", value: "position.asc"),
+        ]
+        var request = URLRequest(url: components.url!)
+        request.setValue(anonKey, forHTTPHeaderField: "apikey")
+        request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+        guard let (data, response) = try? await URLSession.shared.data(for: request),
+              let http = response as? HTTPURLResponse, http.statusCode < 400 else { return [] }
+        return (try? JSONDecoder().decode([RankedItem].self, from: data)) ?? []
+    }
+
+    /// Lays out everything you have Rex'd in this category in rating order, as
+    /// a starting point. Nobody ranks two hundred books from nothing.
+    @discardableResult
+    func seedRanking(category: String) async throws -> Int {
+        try await callRankingFunction("seed_rankings", category: category)
+    }
+
+    /// Renumbers an ordering to 1, 2, 3… Called when the gap between two
+    /// neighbours gets too small to split again.
+    @discardableResult
+    func renumberRanking(category: String) async throws -> Int {
+        try await callRankingFunction("renumber_rankings", category: category)
+    }
+
+    private func callRankingFunction(_ name: String, category: String) async throws -> Int {
+        let token = try await validToken()
+        var request = URLRequest(url: baseURL.appendingPathComponent("/rest/v1/rpc/\(name)"))
+        request.httpMethod = "POST"
+        request.setValue(anonKey, forHTTPHeaderField: "apikey")
+        request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        request.httpBody = try JSONSerialization.data(withJSONObject: ["_category": category])
+        let (data, response) = try await URLSession.shared.data(for: request)
+        guard let http = response as? HTTPURLResponse, http.statusCode < 400 else {
+            throw RexAPIError.server(friendlyError(data, fallback: "Couldn't set that ordering up."))
+        }
+        return Int(String(data: data, encoding: .utf8)?.trimmingCharacters(in: .whitespacesAndNewlines) ?? "") ?? 0
+    }
+
+    /// Puts an item at a position, or moves it there. The position is worked
+    /// out by the comparison flow — see RankingSession.
+    func placeInRanking(itemId: String, category: String, position: Double) async throws {
+        let token = try await validToken()
+        guard let userId = currentUserId else { throw RexAPIError.notSignedIn }
+        var request = URLRequest(url: baseURL.appendingPathComponent("/rest/v1/rankings"))
+        request.httpMethod = "POST"
+        request.setValue(anonKey, forHTTPHeaderField: "apikey")
+        request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        request.setValue("resolution=merge-duplicates", forHTTPHeaderField: "Prefer")
+        request.httpBody = try JSONSerialization.data(withJSONObject: [[
+            "user_id": userId,
+            "item_id": itemId,
+            "category": category,
+            "position": position,
+            "updated_at": ISO8601DateFormatter().string(from: Date()),
+        ]])
+        let (data, response) = try await URLSession.shared.data(for: request)
+        guard let http = response as? HTTPURLResponse, http.statusCode < 400 else {
+            throw RexAPIError.server(friendlyError(data, fallback: "Couldn't save that placing."))
+        }
+    }
+
+    func removeFromRanking(itemId: String) async throws {
+        let token = try await validToken()
+        guard let userId = currentUserId else { throw RexAPIError.notSignedIn }
+        var components = URLComponents(url: baseURL.appendingPathComponent("/rest/v1/rankings"), resolvingAgainstBaseURL: false)!
+        components.queryItems = [
+            URLQueryItem(name: "user_id", value: "eq.\(userId)"),
+            URLQueryItem(name: "item_id", value: "eq.\(itemId)"),
+        ]
+        var request = URLRequest(url: components.url!)
+        request.httpMethod = "DELETE"
+        request.setValue(anonKey, forHTTPHeaderField: "apikey")
+        request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+        let (data, response) = try await URLSession.shared.data(for: request)
+        guard let http = response as? HTTPURLResponse, http.statusCode < 400 else {
+            throw RexAPIError.server(friendlyError(data, fallback: "Couldn't take that out of the order."))
+        }
+    }
+
     // MARK: - Ticket reminders
 
     /// Oct 12 — "if someone says 'want to try' on an event, give them an option
