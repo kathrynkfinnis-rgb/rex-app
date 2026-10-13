@@ -485,94 +485,64 @@ struct ItemDetailView: View {
         }
     }
 
+    /// Oct 13 — the rebrand's header.
+    ///
+    /// One shape for every category: the painted band, the wavy edge, the
+    /// thing's own artwork resting on it, then the pill, the title and whoever
+    /// is involved. Replaces the two layouts that were here — a hero photo for
+    /// places, a thumbnail beside the title for everything else — which is why
+    /// a place and a book never quite read as the same app.
+    ///
+    /// The artwork is on the band rather than beside the title so the title
+    /// gets the full width: see RexPageHeader for why no type size fixes that
+    /// on its own.
     @ViewBuilder
     private func header(item: RexItem) -> some View {
         let category = RexCategory(rawType: item.type)
-        VStack(alignment: .leading, spacing: 12) {
-            // Oct 3 — "rebuild the place page". A place is a photograph
-            // first: you decide whether you want to go by looking at it. A
-            // book or a film keeps the small cover beside the title, because
-            // a portrait cover blown across the width is worse, not better.
-            if usesHeroImage(category: category) {
-                heroImage(item: item, category: category)
+        VStack(alignment: .leading, spacing: 0) {
+            ZStack(alignment: .topTrailing) {
+                RexBannerBand(category: category)
+                RexHeaderThumbnail(url: item.image_url, category: category)
+                    .padding(.trailing, RexHeaderMetrics.thumbTrailing)
+                    .padding(.top, RexHeaderMetrics.thumbTop)
+            }
+            // The thumbnail hangs past the band's bottom edge; without this
+            // the stack clips it at the fold.
+            .frame(height: RexHeaderMetrics.bandHeight, alignment: .top)
 
-                VStack(alignment: .leading, spacing: 4) {
-                    categoryBadge(category)
+            VStack(alignment: .leading, spacing: 0) {
+                RexCategoryPill(category: category)
 
-                    Text(item.title)
-                        .font(.system(size: 24, weight: .semibold, design: .rounded))
-                        .foregroundStyle(RexColor.foreground)
+                Text(item.title)
+                    .font(RexFont.display(min(44, titleSize(for: item.title))))
+                    .lineSpacing(-4)
+                    .foregroundStyle(RexColor.foreground)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .padding(.top, 12)
+
+                // The byline is the one place a voice belongs: an author, a
+                // cuisine and a neighbourhood, a year and a run of seasons.
+                if let summary = standfirst(item: item, category: category) {
+                    Text(summary)
+                        .font(RexFont.editorial(24))
+                        .foregroundStyle(RexColor.primary)
                         .fixedSize(horizontal: false, vertical: true)
+                        .padding(.top, 8)
+                }
 
-                    if let summary = standfirst(item: item, category: category) {
-                        Text(summary)
-                            .font(.system(size: 13))
-                            .foregroundStyle(RexColor.mutedForeground)
+                if let address = item.address, !address.isEmpty {
+                    HStack(alignment: .firstTextBaseline, spacing: 6) {
+                        Image(systemName: "mappin").font(.system(size: 12))
+                        Text(address)
+                            .font(RexFont.text(14))
                             .fixedSize(horizontal: false, vertical: true)
                     }
-                    if let address = item.address, !address.isEmpty {
-                        HStack(alignment: .firstTextBaseline, spacing: 3) {
-                            Image(systemName: "mappin").font(.system(size: 10))
-                            Text(address).font(.system(size: 11))
-                                .fixedSize(horizontal: false, vertical: true)
-                        }
-                        .foregroundStyle(RexColor.mutedForeground)
-                    }
-
-                    heroFacts(item: item, category: category)
-                        .padding(.top, 2)
-                }
-            } else {
-            HStack(alignment: .top, spacing: 14) {
-                Group {
-                    if let urlString = item.image_url, let url = URL(string: urlString) {
-                        // GoogleSafeAsyncImage, so a Places photo loads and a
-                        // chosen Rex drawing ("rex://icon/…") draws.
-                        GoogleSafeAsyncImage(url: url) { image in
-                            image.resizable().aspectRatio(contentMode: .fill)
-                        } placeholder: {
-                            RexColor.muted
-                        }
-                    } else {
-                        Image(category.placeholderImageName)
-                            .resizable()
-                            .aspectRatio(contentMode: .fill)
-                            .background(RexColor.muted)
-                    }
-                }
-                // Oct 12 — "make thumbnail images bigger when you click into a
-                // card." 76 was sized when this was a square beside two lines
-                // of text; the header carries four or five lines now, and a
-                // 76pt square next to them read as an icon rather than a
-                // picture of the thing.
-                //
-                // Portrait for a cover, square for everything else. A book or
-                // a film has one image and it is a poster — cropping that to a
-                // square takes the title off it, which is most of what a
-                // reader recognises a book by.
-                .frame(width: coverIsPortrait ? 84 : 104, height: coverIsPortrait ? 126 : 104)
-                .clipShape(RoundedRectangle(cornerRadius: coverIsPortrait ? 10 : 18))
-
-                VStack(alignment: .leading, spacing: 4) {
-                    categoryBadge(category)
-
-                    Text(item.title)
-                        .font(.system(size: 22, weight: .semibold, design: .rounded))
-                        .foregroundStyle(RexColor.foreground)
-
-                    // Author, year, running time, certificate — one line,
-                    // where the hero layout gave them two.
-                    heroFacts(item: item, category: category)
-                    if let address = item.address, !address.isEmpty {
-                        HStack(spacing: 3) {
-                            Image(systemName: "mappin").font(.system(size: 10))
-                            Text(address).font(.system(size: 11))
-                        }
-                        .foregroundStyle(RexColor.mutedForeground)
-                    }
+                    .foregroundStyle(RexColor.mutedForeground)
+                    .padding(.top, 9)
                 }
             }
-            }
+            .padding(.horizontal, 16)
+            .padding(.top, 10)
 
             savedByRow
             wantedByRow
@@ -745,6 +715,18 @@ struct ItemDetailView: View {
     /// wrapping, so a title on six services doesn't push the reviews down.
     /// Books, films and TV have a portrait cover; a place has a photograph.
     /// Podcasts are square artwork, so they take the square.
+    /// Archivo Black is wide, and a 44pt title that runs to five lines stops
+    /// being a title. Long names step down rather than wrap forever; short
+    /// ones keep the full size, which is the whole reason for the face.
+    private func titleSize(for title: String) -> CGFloat {
+        switch title.count {
+        case ..<18: return 44
+        case ..<30: return 38
+        case ..<48: return 32
+        default: return 28
+        }
+    }
+
     private var coverIsPortrait: Bool {
         let category = RexCategory(rawType: item?.type)
         return category == .book || category == .movie || category == .tv

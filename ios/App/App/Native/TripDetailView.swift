@@ -342,21 +342,50 @@ struct TripDetailView: View {
         .padding(.top, 2)
     }
 
+    /// The first few stops, which is what a trip is. Falls back to the trip
+    /// symbol on a tinted ground rather than an empty card.
+    @ViewBuilder
+    private var tripArtwork: some View {
+        let urls = stops.compactMap { $0.items?.image_url }.prefix(4)
+        if urls.isEmpty {
+            ZStack {
+                RexColor.badgeBackground
+                Image(systemName: RexCategory.trip.symbol)
+                    .font(.system(size: 34))
+                    .foregroundStyle(RexColor.primary)
+            }
+        } else {
+            ThumbnailGridView(urls: Array(urls))
+        }
+    }
+
+    /// Oct 13 — the rebrand's header, matching the item and collection pages.
+    ///
+    /// A trip has no cover of its own either, so the card on the band shows
+    /// the stops: the first few places you'd actually be going. Same band,
+    /// same wave, same thumbnail position as everywhere else.
     private var header: some View {
         VStack(alignment: .leading, spacing: 6) {
-            HStack(spacing: 4) {
-                Image(systemName: "bag").font(.system(size: 10))
-                Text("TRIP").font(.system(size: 10, weight: .semibold))
+            ZStack(alignment: .topTrailing) {
+                RexBannerBand(category: .trip)
+                tripArtwork
+                    .frame(width: RexHeaderMetrics.thumbWidth, height: RexHeaderMetrics.thumbHeight)
+                    .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
+                    .shadow(color: Color.black.opacity(0.28), radius: 13, x: 0, y: 8)
+                    .padding(.trailing, RexHeaderMetrics.thumbTrailing)
+                    .padding(.top, RexHeaderMetrics.thumbTop)
             }
-            .foregroundStyle(RexColor.primary)
-            .padding(.horizontal, 7).padding(.vertical, 3)
-            .background(RexColor.primary.opacity(0.1))
-            .clipShape(Capsule())
+            .frame(height: RexHeaderMetrics.bandHeight, alignment: .top)
+            .padding(.horizontal, -12)
+            .padding(.bottom, 4)
+
+            RexCategoryPill(category: .trip)
 
             HStack(spacing: RexSpacing.sm) {
                 Text(displayTitle)
-                    .font(.system(size: 26, weight: .semibold, design: .rounded))
+                    .font(RexFont.display(displayTitle.count < 18 ? 38 : displayTitle.count < 30 ? 32 : 28))
                     .foregroundStyle(RexColor.foreground)
+                    .fixedSize(horizontal: false, vertical: true)
                 // #183 — was static (route.title, whatever the card you
                 // came from happened to show) with no way to fix a typo
                 // short of deleting and rebuilding the whole trip.
@@ -374,8 +403,8 @@ struct TripDetailView: View {
 
             if !isLoading {
                 Text("\(stops.count) \(stops.count == 1 ? "stop" : "stops")")
-                    .font(.footnote)
-                    .foregroundStyle(RexColor.mutedForeground)
+                    .font(RexFont.editorial(21))
+                    .foregroundStyle(RexColor.primary)
             }
 
             if let tripNote, !tripNote.isEmpty {

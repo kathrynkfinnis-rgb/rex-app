@@ -1192,8 +1192,15 @@ enum RexSearch {
     static func locate(name: String?, address: String?, context: [String?] = []) async -> (lat: Double, lng: Double, address: String?)? {
         if let address = address?.trimmingCharacters(in: .whitespacesAndNewlines), address.count > 8,
            address.contains(where: \.isNumber) || address.contains(",") {
-            // A real street address is specific enough to trust on its own.
-            if let located = await geocodeDetailed(address) { return located }
+            // A real street address is specific enough to trust on its own —
+            // but only once it has been checked against the country it names.
+            // Oct 13: this early return skipped the plausibility test below,
+            // so a geocode that landed in the wrong continent was saved
+            // without anything ever asking whether it made sense.
+            if let located = await geocodeDetailed(address),
+               await isPlausible(located.lat, located.lng, for: address) {
+                return located
+            }
         }
         let cleanContext = context.compactMap { $0?.trimmingCharacters(in: .whitespaces) }.filter { !$0.isEmpty }
         let query = ([name].compactMap { $0?.trimmingCharacters(in: .whitespaces) }.filter { !$0.isEmpty } + cleanContext)
@@ -1210,6 +1217,58 @@ enum RexSearch {
             return nil
         }
         return found
+    }
+
+    /// Whether a point sits anywhere near the place an address names.
+    ///
+    /// Checked against the last comma-separated part, which in an address
+    /// written out in full is the country. No part to check, or nowhere we can
+    /// place it, means no opinion — this refuses wrong answers, it does not
+    /// demand proof of right ones.
+    private static func isPlausible(_ lat: Double, _ lng: Double, for address: String) async -> Bool {
+        let tail = address.split(separator: ",").map { $0.trimmingCharacters(in: .whitespaces) }
+        guard let country = tail.last, country.count > 2,
+              let centre = await centre(of: country) else { return true }
+        // A country is a big thing: this is a continent-scale sanity check,
+        // not a precision one. Colombia's centre to anywhere in Europe is
+        // thousands of kilometres; Cartagena to Bogotá is 650.
+        return metres((lat, lng), centre) <= 2_500_000
+    }
+
+    /// Oct 13 — "fix location button isn't working", and "these pins are also
+    /// wrong still — Sofitel and Blue Apple".
+    ///
+    /// Re-check used to geocode the address text and nothing else. Two things
+    /// were wrong with that. It went through the Geocoding API, which carried
+    /// the Europe rectangle, so pressing the button asked the same question
+    /// that produced the wrong pin and got the same answer — working exactly
+    /// as built, and indistinguishable from broken. And the Geocoding API is
+    /// built for street addresses: "Sofitel Legend Santa Clara" and "Blue
+    /// Apple Beach House, Isla Tierra Bomba" are venues, and it answers those
+    /// by matching fragments of the words to whatever nearby thing it can,
+    /// which is how you end up beside the airport instead of on the island.
+    ///
+    /// Places Text Search is built for named venues, so it asks first, with
+    /// the name and the address together. Geocoding stays as the fallback for
+    /// a genuine street address Places has never heard of.
+    static func pinpoint(name: String?, address: String) async -> (lat: Double, lng: Double, address: String?)? {
+        let cleanName = name?.trimmingCharacters(in: .whitespaces) ?? ""
+        let cleanAddress = address.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !cleanAddress.isEmpty else { return nil }
+
+        let query = cleanName.isEmpty || cleanAddress.localizedCaseInsensitiveContains(cleanName)
+            ? cleanAddress
+            : "\(cleanName), \(cleanAddress)"
+
+        if let hit = (try? await places(query))?.first, let lat = hit.lat, let lng = hit.lng,
+           await isPlausible(lat, lng, for: cleanAddress) {
+            return (lat, lng, hit.address ?? cleanAddress)
+        }
+        if let located = await geocodeDetailed(cleanAddress),
+           await isPlausible(located.lat, located.lng, for: cleanAddress) {
+            return located
+        }
+        return nil
     }
 
     static func geocode(_ query: String) async -> (lat: Double, lng: Double)? {

@@ -172,14 +172,56 @@ struct RexGhostButtonStyle: ButtonStyle {
 
 /// Editorial serif for headlines, system sans for everything else. Falls back
 /// gracefully when the licensed display face isn't bundled.
+/// Oct 13 — the rebrand's three typefaces, each with one job.
+///
+///   Archivo Black           titles and section heads
+///   DM Sans                 everything you operate — labels, buttons, facts,
+///                           navigation, longer reading
+///   Cormorant Garamond It.  where a human voice is speaking: a byline, a
+///                           quote, the line under a trip's name
+///
+/// All three are SIL Open Font License 1.1 (checked against google/fonts, and
+/// Fonts/OFL.txt ships with them), so bundling them costs nothing and needs no
+/// credit on screen.
+///
+/// `.custom(_:size:)` falls back to the system face if a file is ever missing
+/// from the bundle, so a bad build loses the brand rather than the text. Sizes
+/// stay literal rather than `relativeTo:` a text style: the layouts below are
+/// built around specific sizes, and Dynamic Type scaling them independently
+/// breaks the title/byline relationships these pages are made of.
 enum RexFont {
-    /// Expressive serif — brand-led moments and short headlines only.
-    static func display(_ size: CGFloat, weight: Font.Weight = .regular) -> Font {
-        .system(size: size, weight: weight, design: .serif)
+    private enum Face {
+        static let display = "ArchivoBlack-Regular"
+        static let text = "DMSans-Regular"
+        static let textMedium = "DMSans-Medium"
+        static let textBold = "DMSans-Bold"
+        static let editorial = "CormorantGaramond-Italic"
+        static let editorialBold = "CormorantGaramond-SemiBoldItalic"
     }
-    /// Neutral sans — navigation, buttons, forms, metadata, longer reading.
+
+    /// Titles and section heads. Archivo Black has one weight, so `weight` is
+    /// accepted and ignored — every caller that asked for .semibold or .bold
+    /// wanted "heavier than body", which this already is.
+    static func display(_ size: CGFloat, weight: Font.Weight = .regular) -> Font {
+        .custom(Face.display, fixedSize: size)
+    }
+
+    /// Navigation, buttons, forms, metadata, longer reading.
     static func text(_ size: CGFloat, weight: Font.Weight = .regular) -> Font {
-        .system(size: size, weight: weight)
+        let face: String
+        switch weight {
+        case .bold, .heavy, .black, .semibold: face = Face.textBold
+        case .medium: face = Face.textMedium
+        default: face = Face.text
+        }
+        return .custom(face, fixedSize: size)
+    }
+
+    /// A human voice — a byline, a quote, a count under a name. Deliberately
+    /// narrow in use: spent everywhere it stops reading as a voice and starts
+    /// reading as decoration.
+    static func editorial(_ size: CGFloat, weight: Font.Weight = .regular) -> Font {
+        .custom(weight == .regular ? Face.editorial : Face.editorialBold, fixedSize: size)
     }
 
     // The guidelines' product scale, so screens stop picking sizes ad hoc.
@@ -188,6 +230,16 @@ enum RexFont {
     static let section      = text(19, weight: .bold)          // 18-20
     static let body         = text(16)                         // 15-17
     static let metadata     = text(12)                         // 12-13
+}
+
+/// Oct 13 — the painted band at the top of every item and summary page.
+///
+/// One per category, in the asset catalogue rather than fetched: it is the
+/// first thing on screen and waiting on a network round trip to draw the
+/// header is exactly the wrong trade. They are ~350KB each, which is the price
+/// of the whole brand reading as hand-painted rather than as a stock gradient.
+extension RexCategory {
+    var bannerImageName: String { "RexBanner-\(rawValue)" }
 }
 
 enum RexCategory: String, Codable, CaseIterable {

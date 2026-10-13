@@ -108,6 +108,8 @@ struct RecipeEditorView: View {
     @State private var loaded = false
 
     @State private var photoSelection: PhotosPickerItem?
+    /// Oct 13 — "go direct to camera rather than having to take photo first."
+    @State private var showCamera = false
     @State private var isImportingPhoto = false
     @State private var importError: String?
 
@@ -123,14 +125,45 @@ struct RecipeEditorView: View {
                 // text is. PhotosPickerItem rather than a plain Button so
                 // this is one tap straight into the library, no
                 // intermediate sheet.
+                // Oct 13 — "when adding a recipe and import from photo, can
+                // you go direct to camera rather than having to take photo
+                // first." One tap into the camera, not a menu asking which
+                // kind of photo you meant: a cookbook open in front of you is
+                // the case this button exists for.
+                //
+                // The library keeps its own button rather than being folded
+                // into a menu, because a screenshot of a recipe site is just
+                // as common as a page you are holding, and neither should
+                // cost an extra tap. On a device with no camera — the
+                // Simulator, or one restricted by Screen Time — only the
+                // library button appears.
+                if RexCameraPicker.isAvailable {
+                    Button {
+                        showCamera = true
+                    } label: {
+                        HStack(spacing: 4) {
+                            if isImportingPhoto {
+                                ProgressView().controlSize(.mini)
+                            } else {
+                                Image(systemName: "camera.fill").font(.system(size: 11))
+                            }
+                            Text("Scan a recipe").font(RexFont.text(12, weight: .medium))
+                        }
+                        .foregroundStyle(RexColor.primaryForeground)
+                        .padding(.horizontal, RexSpacing.md)
+                        .padding(.vertical, 6)
+                        .background(RexColor.primary)
+                        .clipShape(Capsule())
+                    }
+                    .buttonStyle(.plain)
+                    .disabled(isImportingPhoto)
+                }
+
                 PhotosPicker(selection: $photoSelection, matching: .images) {
                     HStack(spacing: 4) {
-                        if isImportingPhoto {
-                            ProgressView().controlSize(.mini)
-                        } else {
-                            Image(systemName: "camera").font(.system(size: 11))
-                        }
-                        Text("Import from photo").font(RexFont.text(12, weight: .medium))
+                        Image(systemName: "photo.on.rectangle").font(.system(size: 11))
+                        Text(RexCameraPicker.isAvailable ? "Library" : "Import from photo")
+                            .font(RexFont.text(12, weight: .medium))
                     }
                     .foregroundStyle(RexColor.primary)
                     .padding(.horizontal, RexSpacing.md)
@@ -215,6 +248,12 @@ struct RecipeEditorView: View {
         .onChange(of: photoSelection) { _, item in
             guard let item else { return }
             Task { await importFromPhoto(item) }
+        }
+        .fullScreenCover(isPresented: $showCamera) {
+            RexCameraPicker { image in
+                Task { await importFromCapture(image) }
+            }
+            .ignoresSafeArea()
         }
     }
 
@@ -328,13 +367,27 @@ struct RecipeEditorView: View {
         recipeText = RexRecipe.serialize(ingredients: ingredients, method: method)
     }
 
+    /// A photo straight from the camera. Joins the library path as soon as
+    /// there are bytes — everything after that is the same work.
+    private func importFromCapture(_ image: UIImage) async {
+        guard let data = image.jpegData(compressionQuality: 0.9) else {
+            importError = "Couldn't read that photo. Try again, or paste the recipe as text."
+            return
+        }
+        await transcribe(downscaledJPEG(data))
+    }
+
     private func importFromPhoto(_ item: PhotosPickerItem) async {
+        defer { photoSelection = nil }
+        guard let data = try? await item.loadTransferable(type: Data.self) else { return }
+        await transcribe(downscaledJPEG(data))
+    }
+
+    private func transcribe(_ jpeg: Data) async {
         isImportingPhoto = true
         importError = nil
-        defer { photoSelection = nil; isImportingPhoto = false }
+        defer { isImportingPhoto = false }
         do {
-            guard let data = try await item.loadTransferable(type: Data.self) else { return }
-            let jpeg = downscaledJPEG(data)
             let (extractedTitle, text) = try await RexAPI.shared.extractRecipeFromPhoto(jpeg)
             guard !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
                 importError = "Couldn't find a recipe in that photo — try a clearer shot, or paste it as text instead."

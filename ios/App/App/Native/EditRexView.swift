@@ -584,11 +584,19 @@ struct EditRexView: View {
         guard !trimmed.isEmpty else { return }
         isGeocoding = true
         geocodeError = nil
-        if let located = await RexSearch.geocode(trimmed) {
+        // Oct 13 — through pinpoint rather than geocode: this asks Places for
+        // the venue by name first, and refuses an answer in the wrong country.
+        // The old call went straight to the Geocoding API, which is built for
+        // street addresses and carried a Europe bias, so the button faithfully
+        // re-fetched the same wrong pin.
+        if let located = await RexSearch.pinpoint(name: title, address: trimmed) {
             lat = located.lat
             lng = located.lng
+            // Google's own wording for the place, which is usually tidier than
+            // what was typed and is what the pin actually refers to.
+            if let resolved = located.address, !resolved.isEmpty { address = resolved }
         } else {
-            geocodeError = "Couldn't find that address. You can still save the text as typed."
+            geocodeError = "Couldn't place that one. Check the address names the town and country, then try again."
         }
         isGeocoding = false
     }

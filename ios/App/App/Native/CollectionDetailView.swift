@@ -521,26 +521,72 @@ struct CollectionDetailView: View {
         }
     }
 
+    /// Oct 13 — the rebrand's header, the same shape the item pages use.
+    ///
+    /// A collection has no cover art of its own, so the card resting on the
+    /// band carries what it does have: the first few things inside it. That is
+    /// also the most useful thing it could show — what a collection is for is
+    /// what is in it.
+    ///
+    /// The band bleeds past the page's own padding, which is what the negative
+    /// horizontal padding is doing. Everything under it keeps the margin.
     private var headerBlock: some View {
-        HStack(spacing: RexSpacing.md) {
-            ZStack {
-                RoundedRectangle(cornerRadius: RexRadius.card, style: .continuous)
-                    .fill(RexColor.badgeBackground)
-                Text(emoji).font(.system(size: 26))
+        VStack(alignment: .leading, spacing: 0) {
+            ZStack(alignment: .topTrailing) {
+                RexBannerBand(category: .list)
+                collectionArtwork
+                    .frame(width: RexHeaderMetrics.thumbWidth, height: RexHeaderMetrics.thumbHeight)
+                    .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
+                    .shadow(color: Color.black.opacity(0.28), radius: 13, x: 0, y: 8)
+                    .padding(.trailing, RexHeaderMetrics.thumbTrailing)
+                    .padding(.top, RexHeaderMetrics.thumbTop)
             }
-            .frame(width: 60, height: 60)
+            .frame(height: RexHeaderMetrics.bandHeight, alignment: .top)
+            .padding(.horizontal, -RexSpacing.page)
 
-            VStack(alignment: .leading, spacing: 2) {
+            VStack(alignment: .leading, spacing: 0) {
+                RexCategoryPill(category: .list)
+
+                // The topic sits above the name: it is the shelf this is
+                // filed on, and reading "Books to read / Winter list" top to
+                // bottom is how somebody would say it out loud.
+                if let topic, !topic.isEmpty {
+                    Text(topic.uppercased())
+                        .font(RexFont.text(11, weight: .bold))
+                        .tracking(0.9)
+                        .foregroundStyle(RexColor.mutedForeground)
+                        .padding(.top, 14)
+                }
+
                 Text(name)
-                    .font(RexFont.display(24, weight: .semibold))
+                    .font(RexFont.display(name.count < 18 ? 38 : name.count < 30 ? 32 : 28))
                     .foregroundStyle(RexColor.foreground)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .padding(.top, topic?.isEmpty == false ? 5 : 12)
+
                 Text("\(rows.count) \(rows.count == 1 ? "Rex" : "Rex") \u{00B7} \(visibilityLabel)")
-                    .font(RexFont.text(13))
-                    .foregroundStyle(RexColor.mutedForeground)
+                    .font(RexFont.editorial(21))
+                    .foregroundStyle(RexColor.primary)
+                    .padding(.top, 7)
             }
-            Spacer()
+            .padding(.top, 10)
         }
-        .padding(.top, RexSpacing.sm)
+    }
+
+    /// The first few things inside, or the emoji when there is nothing to show
+    /// yet. ThumbnailGridView is the same 2x2 the Collections tab and Explore
+    /// already use, so a collection looks like itself wherever you meet it.
+    @ViewBuilder
+    private var collectionArtwork: some View {
+        let urls = rows.compactMap { $0.recommendations?.items?.image_url }.prefix(4)
+        if urls.isEmpty {
+            ZStack {
+                RexColor.badgeBackground
+                Text(emoji).font(.system(size: 40))
+            }
+        } else {
+            ThumbnailGridView(urls: Array(urls))
+        }
     }
 
     /// Oct 5 — "I just tried to share a collection, and it's just the list of
