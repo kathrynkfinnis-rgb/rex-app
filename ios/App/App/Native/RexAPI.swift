@@ -215,6 +215,30 @@ final class RexAPI {
         return ok ? ",is_anonymous" : ""
     }
 
+    /// Whether the is_branch_copy migration has been run. Same reasoning as
+    /// anonymousColumn above: naming a column PostgREST doesn't know about
+    /// makes it reject the whole query, and the query this one guards is the
+    /// feed. Probe once, then remember.
+    private var branchCopyColumn: Bool?
+
+    private func hasBranchCopyColumn() async -> Bool {
+        if let branchCopyColumn { return branchCopyColumn }
+        guard let token = try? await validToken() else { return false }
+        var components = URLComponents(url: baseURL.appendingPathComponent("/rest/v1/recommendations"), resolvingAgainstBaseURL: false)!
+        components.queryItems = [
+            URLQueryItem(name: "select", value: "is_branch_copy"),
+            URLQueryItem(name: "limit", value: "1"),
+        ]
+        var request = URLRequest(url: components.url!)
+        request.setValue(anonKey, forHTTPHeaderField: "apikey")
+        request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+        let ok = (try? await URLSession.shared.data(for: request))
+            .flatMap { ($0.1 as? HTTPURLResponse)?.statusCode }
+            .map { $0 < 400 } ?? false
+        branchCopyColumn = ok
+        return ok
+    }
+
     func signUp(email: String, password: String) async throws {
         var request = URLRequest(url: baseURL.appendingPathComponent("/auth/v1/signup"))
         request.httpMethod = "POST"
@@ -688,6 +712,7 @@ final class RexAPI {
     func fetchFeed(category: String? = nil, searchText: String? = nil, offset: Int = 0) async throws -> [FeedRecommendation] {
         let token = try await validToken()
         let useView = await useRecommendationsDisplayView()
+        let branchCopyExists = await hasBranchCopyColumn()
         let resourcePath = useView ? "/rest/v1/recommendations_display" : "/rest/v1/recommendations"
         // The view returns profiles as a plain (already-masked) jsonb
         // column instead of an automatic FK embed — replacing the embed
@@ -765,6 +790,17 @@ final class RexAPI {
             // the only time you've actually asked for something specific.
             if !isFiltered {
                 queryItems.append(URLQueryItem(name: "trip_id", value: "is.null"))
+            }
+            // Oct 13 — "the 'others in the chain' shouldn't appear on the feed
+            // when you Rex them." Hidden while browsing, reachable by search
+            // and by the category chips, on the same reasoning as trip stops
+            // just above: you didn't post four Salad Kitchens, but if you go
+            // looking for one it should be findable.
+            //
+            // Behind the probe because naming a column PostgREST doesn't know
+            // about rejects the whole query, and this one is the feed.
+            if !isFiltered, branchCopyExists {
+                queryItems.append(URLQueryItem(name: "is_branch_copy", value: "is.false"))
             }
             for filter in extraFilters { queryItems.append(URLQueryItem(name: filter.0, value: filter.1)) }
             // Oct 7 — "when you search the feed, things within a trip or
@@ -2072,7 +2108,13 @@ final class RexAPI {
         postAs: String? = nil,
         /// When a queued REX post should go out. A row with this set and no
         /// published_at is picked up by publish_due_official_posts().
-        scheduledAt: Date? = nil
+        scheduledAt: Date? = nil,
+        /// Oct 13 — "the 'others in the chain' shouldn't appear on the feed
+        /// when you Rex them." Written by "Rex the other branches too", which
+        /// is one act however many addresses the brand has. The row still
+        /// carries your rating onto that branch's page and pin; it just isn't
+        /// a post.
+        branchCopy: Bool = false
     ) async throws -> String {
         let token = try await validToken()
         guard let userId = postAs ?? currentUserId else { throw RexAPIError.notSignedIn }
@@ -2093,6 +2135,7 @@ final class RexAPI {
         if let listSection, !listSection.isEmpty { body["list_section"] = listSection }
         if let showInFeed { body["show_in_feed"] = showInFeed }
         if anonymous { body["is_anonymous"] = true }
+        if branchCopy, await hasBranchCopyColumn() { body["is_branch_copy"] = true }
         // NULL published_at is what makes a row a draft — see migration
         // 20260815162631. Everything else (feed, item pages, map,
         // leaderboard) already excludes these via RLS, not a client filter,

@@ -153,7 +153,8 @@ struct SmallChainsView: View {
                 try await RexAPI.shared.createRecommendation(
                     itemId: itemId,
                     rating: rating,
-                    note: "Same place as the \(originalBranchLabel) one, which is the branch I went to."
+                    note: "Same place as the \(originalBranchLabel) one, which is the branch I went to.",
+                    branchCopy: true
                 )
             } catch {
                 failed.append(branch.address ?? branch.title)
