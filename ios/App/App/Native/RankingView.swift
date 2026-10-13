@@ -48,11 +48,21 @@ struct RankingSession {
 
     var isFinished: Bool { low >= high }
 
-    /// The position to store once the search has finished: halfway between the
-    /// neighbours it landed between. Ends of the list get a whole step clear of
-    /// the last one, so "best book I've read" isn't crammed against the second.
+    /// Where in the ordering the answers put it: 0 is above everything.
+    ///
+    /// The index, not the position, is what the questions actually determined.
+    /// Renumbering changes every position and no index, which is what lets a
+    /// renumber happen mid-placement without losing the answers.
+    var resolvedIndex: Int { low }
+
+    /// The position to store: halfway between the neighbours it landed
+    /// between. Ends of the list get a whole step clear, so "best book I've
+    /// read" isn't crammed against the second.
     var resolvedPosition: Double {
-        let index = low
+        RankingSession.position(at: low, in: placed)
+    }
+
+    static func position(at index: Int, in placed: [RankedItem]) -> Double {
         let above = index > 0 ? placed[index - 1].position : nil
         let below = index < placed.count ? placed[index].position : nil
         switch (above, below) {
@@ -234,28 +244,23 @@ struct RankingCompareView: View {
         isSaving = true
         defer { isSaving = false }
         do {
-            // Halving a gap fifty times exhausts a double. Renumber, reload,
-            // and resolve against the tidied positions rather than storing
-            // something that would collide.
+            // Halving the same gap enough times exhausts a double. Renumber
+            // first, then work the position out again from the tidied list.
+            //
+            // The answers survive this because what the questions determined
+            // is an *index* — "it goes seventh" — and renumbering changes
+            // every position while preserving the order. So the same index
+            // still means the same place, and nothing has to be asked twice.
+            var position = current.resolvedPosition
             if current.needsRenumbering {
                 try await RexAPI.shared.renumberRanking(category: category.rawValue)
                 var placed = await RexAPI.shared.fetchRanking(category: category.rawValue)
                 placed.removeAll { $0.item_id == newItem.id }
-                var rebuilt = RankingSession(placed: placed)
-                // The answers are already known; replay is not possible, so
-                // place it at the end and let the next comparison move it.
-                // Rare enough to be worth the simplicity.
-                rebuilt.answer(better: false)
-                try await RexAPI.shared.placeInRanking(
-                    itemId: newItem.id, category: category.rawValue,
-                    position: (placed.last?.position ?? 0) + 1
-                )
-            } else {
-                try await RexAPI.shared.placeInRanking(
-                    itemId: newItem.id, category: category.rawValue,
-                    position: current.resolvedPosition
-                )
+                position = RankingSession.position(at: current.resolvedIndex, in: placed)
             }
+            try await RexAPI.shared.placeInRanking(
+                itemId: newItem.id, category: category.rawValue, position: position
+            )
             onFinished()
             dismiss()
         } catch {
