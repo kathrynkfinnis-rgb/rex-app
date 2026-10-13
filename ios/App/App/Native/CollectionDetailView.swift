@@ -127,8 +127,51 @@ struct CollectionDetailView: View {
 
                 // Not while arranging: the compact rows have no move handles,
                 // so switching mid-rearrange would take the controls away.
-                if !rows.isEmpty, !isArranging {
-                    ItineraryViewToggle(compact: $compact)
+                // Oct 13 — "make collections like lists so you can
+                // subcategorise and reorder." They always could, since 8
+                // September: it is the arranging mode below. It sat seven
+                // items down a ••• menu under the word "headings", which is
+                // not the word anybody reaches for, so it may as well not
+                // have existed. The feature is fine; this is where it should
+                // have been all along, next to the other control that changes
+                // how the list is laid out.
+                if !rows.isEmpty {
+                    HStack(spacing: RexSpacing.sm) {
+                        if !isArranging {
+                            ItineraryViewToggle(compact: $compact)
+                        }
+                        Spacer(minLength: 0)
+                        if route.isMine {
+                            Button {
+                                withAnimation(.snappy) { isArranging.toggle() }
+                            } label: {
+                                HStack(spacing: 6) {
+                                    Image(systemName: isArranging ? "checkmark" : "arrow.up.arrow.down")
+                                        .font(.system(size: 12, weight: .semibold))
+                                    Text(isArranging ? "Done" : "Arrange")
+                                        .font(RexFont.text(13, weight: .semibold))
+                                }
+                                .padding(.horizontal, RexSpacing.md)
+                                .padding(.vertical, 8)
+                                .background(isArranging ? RexColor.primary : RexColor.card)
+                                .foregroundStyle(isArranging ? RexColor.primaryForeground : RexColor.primary)
+                                .clipShape(Capsule())
+                                .overlay(
+                                    Capsule().stroke(isArranging ? Color.clear : RexColor.border, lineWidth: 1)
+                                )
+                            }
+                            .buttonStyle(.plain)
+                        }
+                    }
+                }
+
+                // Said once, while arranging, because "tap a heading to name
+                // it" is not guessable from a pencil.
+                if isArranging {
+                    Text("Arrows move things. Tap a heading to name it \u{2014} naming the \u{201C}No heading\u{201D} group is how you make the first one.")
+                        .font(RexFont.text(12))
+                        .foregroundStyle(RexColor.mutedForeground)
+                        .frame(maxWidth: .infinity, alignment: .leading)
                 }
 
                 // A failed refresh shouldn't wipe out what's already on screen —
@@ -376,7 +419,7 @@ struct CollectionDetailView: View {
                         Button {
                             withAnimation(.snappy) { isArranging.toggle() }
                         } label: {
-                            Label(isArranging ? "Done arranging" : "Add headings & reorder",
+                            Label(isArranging ? "Done arranging" : "Sections & order",
                                   systemImage: isArranging ? "checkmark" : "arrow.up.arrow.down")
                         }
 
