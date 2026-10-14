@@ -23,11 +23,33 @@ enum ItineraryViewMode {
 /// the toolbar.
 struct ItineraryViewToggle: View {
     @Binding var compact: Bool
+    /// Oct 14 — "for a list of places, can we have a map view?" Offered only
+    /// when there is something to put on a map, so a list of books doesn't
+    /// carry a third button that can only disappoint.
+    ///
+    /// Unlike compact, this is deliberately not remembered: which of the two
+    /// readings you prefer is a habit, but whether you want the map is a
+    /// question about the list you are looking at now.
+    var showsMap: Bool = false
+    @Binding var mapped: Bool
+
+    init(compact: Binding<Bool>, showsMap: Bool = false, mapped: Binding<Bool> = .constant(false)) {
+        self._compact = compact
+        self.showsMap = showsMap
+        self._mapped = mapped
+    }
 
     var body: some View {
         HStack(spacing: 0) {
-            segment("Expanded", systemImage: "rectangle.grid.1x2", selected: !compact) { compact = false }
-            segment("Compact", systemImage: "list.bullet", selected: compact) { compact = true }
+            segment("Expanded", systemImage: "rectangle.grid.1x2", selected: !compact && !mapped) {
+                compact = false; mapped = false
+            }
+            segment("Compact", systemImage: "list.bullet", selected: compact && !mapped) {
+                compact = true; mapped = false
+            }
+            if showsMap {
+                segment("Map", systemImage: "map", selected: mapped) { mapped = true }
+            }
         }
         .padding(3)
         .background(RexColor.muted)

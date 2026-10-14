@@ -60,6 +60,9 @@ struct ListDetailView: View {
     /// Sept 10 — expanded (full cards) or compact (the edit view's rows).
     /// Shared with TripDetailView; see ItineraryCompactViews.
     @AppStorage(ItineraryViewMode.storageKey) private var compact = false
+    /// Oct 14 — "for a list of places, can we have a map view?" State rather
+    /// than AppStorage: see the note on ItineraryViewToggle.
+    @State private var mapped = false
     @State private var isMutating = false
     @State private var mutationError: String?
     @State private var renamingHeading: String?
@@ -75,6 +78,12 @@ struct ListDetailView: View {
     @State private var subtitle = ""
     @State private var editingSubtitle = false
     @State private var subtitleDraft = ""
+
+    /// Whether a map is worth offering: at least one place or event on the
+    /// list. A list of books has nowhere to put a pin.
+    private var hasMappableItems: Bool {
+        items.contains { ["place", "event"].contains($0.items?.type ?? "") }
+    }
 
     /// Items grouped by heading, preserving the order both groups and items
     /// first appear in — same rule TripDetailView's groups already follow.
@@ -97,10 +106,15 @@ struct ListDetailView: View {
                 header
 
                 if !items.isEmpty {
-                    ItineraryViewToggle(compact: $compact)
+                    ItineraryViewToggle(compact: $compact, showsMap: hasMappableItems, mapped: $mapped)
                 }
 
-                if isLoading {
+                if mapped, !items.isEmpty, !isEditing {
+                    ListMapSection(
+                        listRecommendationId: route.recommendationId,
+                        listName: route.title
+                    )
+                } else if isLoading {
                     ForEach(0..<3, id: \.self) { _ in
                         RoundedRectangle(cornerRadius: 16).fill(RexColor.muted).frame(height: 90)
                     }

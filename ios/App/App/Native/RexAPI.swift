@@ -6241,6 +6241,28 @@ final class RexAPI {
     /// same sample — TripSearchView breaks that assumption by letting you
     /// pick any trip, so following it needs its own fetch.
     func fetchMapPlaces(forTrip tripRecommendationId: String, tripName: String? = nil) async throws -> [MapPlace] {
+        try await fetchMapPlaces(
+            filteredBy: "recommendations.trip_id", equals: tripRecommendationId,
+            context: tripName, failure: "Couldn't load this trip's stops."
+        )
+    }
+
+    /// Oct 14 — "for a list of places, can we have a map view?" A list holds
+    /// its items exactly as a trip holds its stops (list_id mirrors trip_id),
+    /// so this is the same fetch against the other column — including the
+    /// geocode self-heal, which matters more here: a list is often imported
+    /// in bulk from a document, and those rows arrive with a name and no
+    /// coordinates at all.
+    func fetchMapPlaces(forList listRecommendationId: String, listName: String? = nil) async throws -> [MapPlace] {
+        try await fetchMapPlaces(
+            filteredBy: "recommendations.list_id", equals: listRecommendationId,
+            context: listName, failure: "Couldn't load this list's places."
+        )
+    }
+
+    private func fetchMapPlaces(
+        filteredBy column: String, equals value: String, context: String?, failure: String
+    ) async throws -> [MapPlace] {
         let token = try await validToken()
         let select = "id,title,subtitle,type,genre,address,lat,lng,image_url," +
             "recommendations!inner(id,rating,user_id,trip_id,profiles!recommendations_user_id_fkey(username,display_name,avatar_url))"
@@ -6248,16 +6270,17 @@ final class RexAPI {
         components.queryItems = [
             URLQueryItem(name: "select", value: select),
             URLQueryItem(name: "type", value: "in.(place,event)"),
-            URLQueryItem(name: "recommendations.trip_id", value: "eq.\(tripRecommendationId)"),
+            URLQueryItem(name: column, value: "eq.\(value)"),
             URLQueryItem(name: "limit", value: "200"),
         ]
+        let tripName = context
         var request = URLRequest(url: components.url!)
         request.setValue(anonKey, forHTTPHeaderField: "apikey")
         request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
 
         let (data, response) = try await URLSession.shared.data(for: request)
         guard let http = response as? HTTPURLResponse, http.statusCode < 400 else {
-            throw RexAPIError.server(friendlyError(data, fallback: "Couldn't load this trip's stops."))
+            throw RexAPIError.server(friendlyError(data, fallback: failure))
         }
         let places = try JSONDecoder().decode([MapPlace].self, from: data)
         // Same self-heal as fetchMapPlaces() — a trip stop with an address
