@@ -1441,7 +1441,6 @@ struct ItemDetailView: View {
             .frame(maxWidth: .infinity, alignment: .leading)
             .padding(RexSpacing.md)
             .rexCard()
-            .padding(.horizontal, 16)
         }
     }
 
@@ -1484,7 +1483,10 @@ struct ItemDetailView: View {
                         HStack(spacing: 7) {
                             Image(systemName: "list.number")
                                 .font(.system(size: 12, weight: .semibold))
-                            Text("Rank it against your others")
+                            // Oct 14 — "can we rename this 'rank it'." The
+                            // long version explained the mechanic; the short
+                            // one is what the button does.
+                            Text("Rank it")
                                 .font(RexFont.text(13, weight: .semibold))
                         }
                         .padding(.horizontal, RexSpacing.md)
@@ -1533,14 +1535,24 @@ struct ItemDetailView: View {
                         ForEach(wanters) { person in
                             let name = person.display_name ?? person.username
                             NavigationLink(value: UserProfileRoute(userId: person.id, name: name)) {
-                                VStack(spacing: 4) {
+                                // Oct 14 — "can we fix the alignment on these?
+                                // They should all start from the same point on
+                                // the left." A centred column insets its avatar
+                                // by half the difference between the frame and
+                                // the picture, so the first face sat eight
+                                // points right of the label above it — and the
+                                // Rex'd by row, with a bigger avatar in a wider
+                                // frame, sat seven points off in its own way.
+                                // Leading, same width in both rows, so every
+                                // left edge on the page is one line.
+                                VStack(alignment: .leading, spacing: 4) {
                                     UserAvatarView(url: person.avatar_url, name: name, size: 34)
                                     Text(name.components(separatedBy: " ").first ?? name)
                                         .font(.system(size: 10))
                                         .foregroundStyle(RexColor.mutedForeground)
                                         .lineLimit(1)
                                 }
-                                .frame(width: 50)
+                                .frame(width: 58, alignment: .leading)
                             }
                             .buttonStyle(.plain)
                         }
@@ -1548,7 +1560,9 @@ struct ItemDetailView: View {
                     .padding(.horizontal, 1)
                 }
             }
-            .padding(.horizontal, 16)
+            // No gutter of its own: header(item:) already puts 16 around the
+            // whole stack, and adding a second here is what set this row 16
+            // points in from the rating, the rank pill and the title above it.
             .padding(.top, RexSpacing.xs)
         }
     }
@@ -1575,7 +1589,7 @@ struct ItemDetailView: View {
                             let name = rec.profiles?.display_name ?? rec.profiles?.username ?? "Someone"
                             let isFirst = rec.id == orderedRexers.first?.id && orderedRexers.count > 1
                             NavigationLink(value: UserProfileRoute(userId: rec.user_id, name: name)) {
-                                VStack(spacing: 4) {
+                                VStack(alignment: .leading, spacing: 4) {
                                     UserAvatarView(url: rec.profiles?.avatar_url, name: name, size: 44)
                                         .overlay(alignment: .topLeading) {
                                             if isFirst {
@@ -1593,7 +1607,7 @@ struct ItemDetailView: View {
                                         .foregroundStyle(RexColor.mutedForeground)
                                         .lineLimit(1)
                                 }
-                                .frame(width: 58)
+                                .frame(width: 58, alignment: .leading)
                             }
                             .buttonStyle(.plain)
                         }
