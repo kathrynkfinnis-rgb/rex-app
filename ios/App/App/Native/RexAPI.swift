@@ -4934,7 +4934,7 @@ final class RexAPI {
     /// hitlist_lists is what decides whether you can see it.
     func fetchCollectionItems(listId: String) async throws -> [SavedPost] {
         let token = try await validToken()
-        let select = "id,created_at,list_id,recommendation_id,section,sort_order"
+        let select = "id,created_at,list_id,recommendation_id,section,sort_order,note"
         var components = URLComponents(url: baseURL.appendingPathComponent("/rest/v1/saved_posts"), resolvingAgainstBaseURL: false)!
         components.queryItems = [
             URLQueryItem(name: "select", value: select),
@@ -5006,7 +5006,7 @@ final class RexAPI {
         let token = try await validToken()
         var components = URLComponents(url: baseURL.appendingPathComponent("/rest/v1/wants"), resolvingAgainstBaseURL: false)!
         components.queryItems = [
-            URLQueryItem(name: "select", value: "id,created_at,item_id,list_id,list_section,list_sort_order," +
+            URLQueryItem(name: "select", value: "id,created_at,item_id,list_id,list_section,list_sort_order,list_note," +
                 "items(id,type,title,subtitle,image_url,genre,address,lat,lng)"),
             URLQueryItem(name: "list_id", value: "eq.\(listId)"),
         ]
@@ -5024,6 +5024,7 @@ final class RexAPI {
             let list_id: String?
             let list_section: String?
             let list_sort_order: Int?
+            let list_note: String?
             let items: RexItem?
         }
         let rows = (try? JSONDecoder().decode([Row].self, from: data)) ?? []
@@ -5066,7 +5067,8 @@ final class RexAPI {
                 recommendation_id: "want-\(row.id)",
                 recommendations: rec,
                 section: row.list_section,
-                sort_order: row.list_sort_order
+                sort_order: row.list_sort_order,
+                note: row.list_note
             )
         }
     }
@@ -7045,6 +7047,35 @@ final class RexAPI {
     /// row. Same approach TripDetailView's reorder takes: the client owns
     /// the arrangement and writes the result, rather than trying to
     /// express a move as a relative operation the server has to resolve.
+    /// Oct 14 — the short note beside one row of a collection.
+    ///
+    /// Same split as everything else about a collection entry: a saved post
+    /// keeps it in `note`, a want wearing a saved post's clothes keeps it in
+    /// `list_note` on its own table. The "want-" prefix is the only thing that
+    /// has to know which it is.
+    func setCollectionItemNote(savedPostId: String, note: String?) async throws {
+        let token = try await validToken()
+        let isWant = savedPostId.hasPrefix("want-")
+        let table = isWant ? "/rest/v1/wants" : "/rest/v1/saved_posts"
+        let rowId = isWant ? String(savedPostId.dropFirst("want-".count)) : savedPostId
+
+        var components = URLComponents(url: baseURL.appendingPathComponent(table), resolvingAgainstBaseURL: false)!
+        components.queryItems = [URLQueryItem(name: "id", value: "eq.\(rowId)")]
+        var request = URLRequest(url: components.url!)
+        request.httpMethod = "PATCH"
+        request.setValue(anonKey, forHTTPHeaderField: "apikey")
+        request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        let trimmed = note?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+        let value: Any = trimmed.isEmpty ? (NSNull() as Any) : trimmed
+        request.httpBody = try JSONSerialization.data(withJSONObject: [isWant ? "list_note" : "note": value])
+
+        let (data, response) = try await URLSession.shared.data(for: request)
+        guard let http = response as? HTTPURLResponse, http.statusCode < 400 else {
+            throw RexAPIError.server(friendlyError(data, fallback: "Couldn't save that note."))
+        }
+    }
+
     func setCollectionOrder(_ entries: [(savedPostId: String, section: String?, sortOrder: Int)]) async throws {
         let token = try await validToken()
         for entry in entries {

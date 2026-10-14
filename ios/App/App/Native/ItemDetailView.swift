@@ -1637,7 +1637,22 @@ struct ItemDetailView: View {
             .buttonStyle(.plain)
             .disabled(isTogglingWant)
 
-            RexRatingPicker(value: $rating)
+            // Oct 13 — "please can the REX details appear the same as if
+            // someone else wrote it but that I can edit it if I need to."
+            //
+            // A page you had Rex'd showed five rating buttons, an open text
+            // box and an Update button — a form, permanently mid-edit, where a
+            // friend's take on the same page is a tidy card you read. So your
+            // own words looked like unfinished input and everyone else's
+            // looked like an opinion.
+            //
+            // Yours is the same card now, with your face and your badge on it.
+            // The controls come back when you ask to change something, and
+            // when there is nothing written yet — which is the one time a form
+            // is the right answer, because there is nothing to read.
+            if !isEditingNote {
+                RexRatingPicker(value: $rating)
+            }
 
             // Oct 4 — "don't need to see my review in the text box here (on
             // all pages, not just films) — would rather see my comment and
@@ -1650,6 +1665,21 @@ struct ItemDetailView: View {
             // text; the box comes back when you ask for it, or when there is
             // nothing there yet.
             if let myRec, !(myRec.note ?? "").isEmpty, !isEditingNote {
+                VStack(alignment: .leading, spacing: 6) {
+                HStack {
+                    HStack(spacing: 6) {
+                        UserAvatarView(
+                            url: myRec.profiles?.avatar_url,
+                            name: myRec.profiles?.display_name ?? myRec.profiles?.username ?? "You",
+                            size: 24
+                        )
+                        Text(myRec.profiles?.display_name ?? myRec.profiles?.username ?? "You")
+                            .font(.system(size: 14, weight: .semibold))
+                            .foregroundStyle(RexColor.foreground)
+                    }
+                    Spacer()
+                    RexRatingBadge(raw: myRec.rating)
+                }
                 HStack(alignment: .top, spacing: RexSpacing.sm) {
                     Text(linked: "\u{201C}\(myRec.note ?? "")\u{201D}")
                         .font(RexFont.text(15))
@@ -1676,6 +1706,7 @@ struct ItemDetailView: View {
                             .contentShape(Rectangle())
                     }
                 }
+                }
                 .padding(12)
                 .background(RexColor.card)
                 .clipShape(RoundedRectangle(cornerRadius: 14))
@@ -1689,6 +1720,7 @@ struct ItemDetailView: View {
                     .overlay(RoundedRectangle(cornerRadius: 14).stroke(RexColor.border, lineWidth: 1))
             }
 
+            if myRec == nil || isEditingNote || (myRec?.note ?? "").isEmpty {
             Button(action: save) {
                 if isSaving {
                     ProgressView().tint(RexColor.primaryForeground).frame(maxWidth: .infinity)
@@ -1701,6 +1733,7 @@ struct ItemDetailView: View {
             .foregroundStyle(RexColor.primaryForeground)
             .clipShape(Capsule())
             .disabled(isSaving)
+            }
         }
         .padding(16)
     }

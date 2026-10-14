@@ -516,6 +516,10 @@ struct SavedPost: Codable, Identifiable {
     /// from the feed's own bookmark button, which has no heading in mind.
     var section: String? = nil
     var sort_order: Int? = nil
+    /// Oct 14 — "I would also like to be able to add a short note alongside
+    /// each item on a list." What to do about the thing, as opposed to the
+    /// Rex's own note, which is what somebody thought of it.
+    var note: String? = nil
 }
 
 struct RexComment: Codable, Identifiable {

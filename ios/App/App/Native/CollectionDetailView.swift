@@ -75,6 +75,10 @@ struct CollectionDetailView: View {
     @State private var mutationError: String?
     @State private var renamingSection: String?
     @State private var sectionDraft = ""
+    /// Oct 14 — "I would also like to be able to add a short note alongside
+    /// each item on a list." The row being annotated, and what is being typed.
+    @State private var notingRow: SavedPost?
+    @State private var noteDraft = ""
 
     /// Rows in stored order, grouped under their headings. Sections come
     /// out in the order they're first encountered rather than
@@ -270,6 +274,27 @@ struct CollectionDetailView: View {
                                 .padding(.horizontal, RexSpacing.sm)
                                 .padding(.top, index == 0 ? 0 : RexSpacing.sm)
                             }
+                            // Oct 14 — the note sits under the thing it is
+                            // about, in the editorial face, because it is
+                            // somebody speaking rather than a label. Shown to
+                            // everyone who can see the collection: a note
+                            // saying "get the crab sandwich" is most of why
+                            // you would share the list at all.
+                            if let itemNote = row.note, !itemNote.isEmpty {
+                                HStack(alignment: .top, spacing: 7) {
+                                    Image(systemName: "text.bubble")
+                                        .font(.system(size: 11))
+                                        .foregroundStyle(RexColor.primary)
+                                        .padding(.top, 3)
+                                    Text(itemNote)
+                                        .font(RexFont.editorial(18))
+                                        .foregroundStyle(RexColor.foreground.opacity(0.85))
+                                        .fixedSize(horizontal: false, vertical: true)
+                                }
+                                .frame(maxWidth: .infinity, alignment: .leading)
+                                .padding(.horizontal, RexSpacing.sm)
+                                .padding(.top, 2)
+                            }
                             SwipeToRemove(
                                 label: "Remove",
                                 systemImage: "minus.circle",
@@ -306,6 +331,15 @@ struct CollectionDetailView: View {
                                             }
                                         }
                                         if route.isMine {
+                                            Button {
+                                                notingRow = row
+                                                noteDraft = row.note ?? ""
+                                            } label: {
+                                                Label(
+                                                    (row.note ?? "").isEmpty ? "Add a note" : "Edit the note",
+                                                    systemImage: "text.bubble"
+                                                )
+                                            }
                                             Button(role: .destructive) {
                                                 Task { await remove(rec.id) }
                                             } label: {
@@ -482,6 +516,16 @@ struct CollectionDetailView: View {
                     Image(systemName: "ellipsis.circle")
                 }
             }
+        }
+        .alert("Note", isPresented: Binding(
+            get: { notingRow != nil },
+            set: { if !$0 { notingRow = nil } }
+        )) {
+            TextField("Get the crab sandwich\u{2026}", text: $noteDraft)
+            Button("Cancel", role: .cancel) { notingRow = nil }
+            Button("Save") { Task { await saveItemNote() } }
+        } message: {
+            Text("A short note beside this one on the list \u{2014} what to do about it, not what you thought of it.")
         }
         .alert("Heading", isPresented: Binding(
             get: { renamingSection != nil },
@@ -697,6 +741,26 @@ struct CollectionDetailView: View {
         } catch {
             // Put it back rather than showing an order that isn't saved.
             rows = previous
+            mutationError = error.localizedDescription
+        }
+        isMutating = false
+    }
+
+    /// Oct 14 — writes the note, and puts it on screen without a reload: the
+    /// row is already in hand and refetching the whole collection to show six
+    /// words is a lot of work for a small change.
+    private func saveItemNote() async {
+        guard let target = notingRow else { return }
+        let text = noteDraft.trimmingCharacters(in: .whitespacesAndNewlines)
+        notingRow = nil
+        isMutating = true
+        mutationError = nil
+        do {
+            try await RexAPI.shared.setCollectionItemNote(savedPostId: target.id, note: text)
+            if let index = rows.firstIndex(where: { $0.id == target.id }) {
+                rows[index].note = text.isEmpty ? nil : text
+            }
+        } catch {
             mutationError = error.localizedDescription
         }
         isMutating = false
