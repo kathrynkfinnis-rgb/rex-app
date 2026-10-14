@@ -305,6 +305,13 @@ struct RexNotification: Codable, Identifiable {
             return data?["has_suggestion"]?.boolValue == true
                 ? "\(who) suggested something on your blast \"\(title)\""
                 : "\(who) replied to your blast: \"\(preview)\""
+        // Oct 14 — "if I reply on a blast, and then someone else replies, I
+        // should also get a notification." Same shape as rec_comment_thread:
+        // "also", because you are in this one already.
+        case "blast_comment_thread":
+            return title.isEmpty
+                ? "\(who) also replied: \"\(preview)\""
+                : "\(who) also replied on \"\(title)\": \"\(preview)\""
         case "mention": return "\(who) tagged you: \"\(preview)\""
         case "friend_new_rec": return "\(who) Rexed \(title.isEmpty ? "something new" : title)"
         default: return "New activity"

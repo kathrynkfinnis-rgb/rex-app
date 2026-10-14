@@ -1792,26 +1792,39 @@ struct ItemDetailView: View {
 
             RexRatingPicker(value: $rating)
 
-            TextField("What did you love about it?", text: $note, axis: .vertical)
-                .lineLimit(3...14)
-                .padding(12)
-                .background(RexColor.card)
-                .clipShape(RoundedRectangle(cornerRadius: 14))
-                .overlay(RoundedRectangle(cornerRadius: 14).stroke(RexColor.border, lineWidth: 1))
+            // Oct 14 — "bring back the emojis but only have the text box once
+            // someone has clicked on an emoji."
+            //
+            // The emoji were never the problem; the form under them was. Five
+            // faces above an empty box reads as a page demanding to be filled
+            // in, and the question it is really asking — what did you make of
+            // it — gets lost behind the work. Pick a face and the box arrives,
+            // by which point writing something is a choice rather than a
+            // prerequisite.
+            if rating > 0 {
+                TextField("What did you love about it?", text: $note, axis: .vertical)
+                    .lineLimit(3...14)
+                    .padding(12)
+                    .background(RexColor.card)
+                    .clipShape(RoundedRectangle(cornerRadius: 14))
+                    .overlay(RoundedRectangle(cornerRadius: 14).stroke(RexColor.border, lineWidth: 1))
+                    .transition(.opacity.combined(with: .move(edge: .top)))
 
-            Button(action: save) {
-                if isSaving {
-                    ProgressView().tint(RexColor.primaryForeground).frame(maxWidth: .infinity)
-                } else {
-                    Text(myRec != nil ? "Update" : "Post").fontWeight(.semibold).frame(maxWidth: .infinity)
+                Button(action: save) {
+                    if isSaving {
+                        ProgressView().tint(RexColor.primaryForeground).frame(maxWidth: .infinity)
+                    } else {
+                        Text(myRec != nil ? "Update" : "Post").fontWeight(.semibold).frame(maxWidth: .infinity)
+                    }
                 }
+                .frame(height: 46)
+                .background(RexColor.primary)
+                .foregroundStyle(RexColor.primaryForeground)
+                .clipShape(Capsule())
+                .disabled(isSaving)
             }
-            .frame(height: 46)
-            .background(RexColor.primary)
-            .foregroundStyle(RexColor.primaryForeground)
-            .clipShape(Capsule())
-            .disabled(isSaving)
         }
+        .animation(.snappy, value: rating > 0)
     }
 
     /// More by the same author, Goodreads-style — covers you can run your eye
@@ -2189,14 +2202,10 @@ struct ItemDetailView: View {
                 .padding(12)
                 .background(RexColor.card)
                 .clipShape(RoundedRectangle(cornerRadius: 14))
-                // Dashed for a want: the same card, not yet filled in.
-                .overlay(
-                    RoundedRectangle(cornerRadius: 14)
-                        .strokeBorder(
-                            rec.isWant ? RexColor.mutedForeground.opacity(0.45) : RexColor.border,
-                            style: StrokeStyle(lineWidth: 1, dash: rec.isWant ? [4, 3] : [])
-                        )
-                )
+                // Oct 14 — "do not like the dotted surround. I think it's fine
+                // to just have the wants to try sticker." The chip already
+                // says what the card is; the border was saying it twice.
+                .overlay(RoundedRectangle(cornerRadius: 14).stroke(RexColor.border, lineWidth: 1))
             }
         }
         .padding(16)

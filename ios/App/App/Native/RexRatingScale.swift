@@ -88,12 +88,18 @@ struct RexRatingPicker: View {
                     value = (clearable && isSelected) ? 0 : tier.representativeRawValue
                 } label: {
                     VStack(spacing: 4) {
-                        // Oct 14 — "remove the emojis for update your take."
-                        // Five emoji in a row read as a reaction bar, which is
-                        // a different gesture from grading something you have
-                        // been to. The words say it on their own, and the
-                        // emoji still carries the rating everywhere it is
-                        // shown back — on a card, in a badge, on the page.
+                        // Oct 14 — "remove the emojis for update your take",
+                        // then, the same day, "bring back the emojis but only
+                        // have the text box once someone has clicked on an
+                        // emoji."
+                        //
+                        // So the emoji was never the problem — the form under
+                        // it was. Five emoji above an empty note box reads as
+                        // a page demanding to be filled in; five emoji on
+                        // their own read as a question with five answers. The
+                        // box arrives once one is picked. See takeEditor.
+                        Text(tier.emoji)
+                            .font(.system(size: 18))
                         Text(tier.label)
                             .font(RexFont.text(10, weight: isSelected ? .semibold : .regular))
                             .foregroundStyle(isSelected ? RexColor.primaryForeground : RexColor.mutedForeground)
