@@ -88,7 +88,12 @@ struct RexRatingPicker: View {
                     value = (clearable && isSelected) ? 0 : tier.representativeRawValue
                 } label: {
                     VStack(spacing: 4) {
-                        Text(tier.emoji).font(.system(size: 22))
+                        // Oct 14 — "remove the emojis for update your take."
+                        // Five emoji in a row read as a reaction bar, which is
+                        // a different gesture from grading something you have
+                        // been to. The words say it on their own, and the
+                        // emoji still carries the rating everywhere it is
+                        // shown back — on a card, in a badge, on the page.
                         Text(tier.label)
                             .font(RexFont.text(10, weight: isSelected ? .semibold : .regular))
                             .foregroundStyle(isSelected ? RexColor.primaryForeground : RexColor.mutedForeground)

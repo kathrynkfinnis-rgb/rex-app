@@ -1751,9 +1751,6 @@ struct ItemDetailView: View {
     /// Writing one, or changing one. The whole form, only when it is wanted.
     private var takeEditor: some View {
         VStack(alignment: .leading, spacing: 10) {
-            Text(myRec != nil ? "Update your take" : "Your take")
-                .font(RexFont.display(20))
-                .foregroundStyle(RexColor.foreground)
 
             Button {
                 Task { await toggleWant() }
@@ -2066,13 +2063,24 @@ struct ItemDetailView: View {
         // section disappears entirely when nobody else has said anything,
         // rather than printing "No takes yet" over your own review.
         VStack(alignment: .leading, spacing: 10) {
-            if !theirs.isEmpty {
-            Divider().overlay(RexColor.border)
+            // Oct 14 — "can we just have them all in one list, so not 'What
+            // friends say' and 'Your take', just 'Reviews'."
+            //
+            // They were two sections because yours is editable and theirs is
+            // not, which is a fact about the code and not about the page. A
+            // reader sees one thing: what people said about this. So one
+            // heading, with everybody's underneath it and yours last — the
+            // place it has been since 8 October.
+            //
+            // Shown whenever there is anything to head, which now includes a
+            // page where you are the only person who has said something.
+            if !theirs.isEmpty || myRec != nil {
+                Divider().overlay(RexColor.border)
 
-            Text("What friends say")
-                .font(.system(size: 20, weight: .semibold, design: .rounded))
-                .foregroundStyle(RexColor.foreground)
-                .padding(.top, 6)
+                Text("Reviews")
+                    .font(RexFont.display(20))
+                    .foregroundStyle(RexColor.foreground)
+                    .padding(.top, 6)
             }
 
             ForEach(theirs) { rec in

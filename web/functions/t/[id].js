@@ -87,6 +87,11 @@ function page({ title, description, image, url, body, status = 200 }) {
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<!-- Oct 14 — "the image is the wrong logo." With no photo on the thing
+     being shared there was no og:image at all, so WhatsApp fell back to
+     whatever it could find — the 64px favicon. The dino from the top left
+     of the feed, on the app's own ground at 1200 square, is the answer to
+     "the same logo as the top left of the feed screen". -->
 <title>${esc(title)}</title>
 <meta name="description" content="${esc(description)}">
 <meta property="og:site_name" content="REX">
@@ -94,11 +99,11 @@ function page({ title, description, image, url, body, status = 200 }) {
 <meta property="og:title" content="${esc(title)}">
 <meta property="og:description" content="${esc(description)}">
 <meta property="og:url" content="${esc(url)}">
-${image ? `<meta property="og:image" content="${esc(image)}">` : ""}
+${`<meta property="og:image" content="${esc(image || "https://find-rex.com/og-default.png")}">`}
 <meta name="twitter:card" content="${image ? "summary_large_image" : "summary"}">
 <meta name="twitter:title" content="${esc(title)}">
 <meta name="twitter:description" content="${esc(description)}">
-${image ? `<meta name="twitter:image" content="${esc(image)}">` : ""}
+${`<meta name="twitter:image" content="${esc(image || "https://find-rex.com/og-default.png")}">`}
 <link rel="canonical" href="${esc(url)}">
 <link rel="stylesheet" href="https://api.fontshare.com/v2/css?f[]=switzer@400,500,600,700&f[]=sentient@400,500,700&display=swap">
 <link rel="stylesheet" href="/styles.css">

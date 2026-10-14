@@ -1427,8 +1427,30 @@ struct FeedView: View {
     /// NotificationsView resolves it too. Same resolution here.
     private func handlePushDestination() async {
         guard let destination = pushRouter.pending else { return }
+        // Oct 14 — "if you click the link when someone has shared to WhatsApp,
+        // it just takes you to notifications."
+        //
+        // This used to clear `pending` here, before doing any of the work
+        // below. The work runs inside `.task(id: pushRouter.pending)`, so
+        // clearing it changed the id, and changing the id cancels the task
+        // that is running — this one. Anything after the first `await` was
+        // then executing in a cancelled task, every network call came back
+        // nil through its `try?`, and every branch fell to its "couldn't
+        // resolve" fallback, which is Notifications.
+        //
+        // Verified with her own link: find-rex.com/s/nxwee5q resolves to kind
+        // "rec" and a real id, and the web redirect works. Nothing was ever
+        // wrong with the link or with what it pointed at. The handler was
+        // cancelling itself and then reporting the failure it had caused.
+        //
+        // So `pending` is cleared at the end, and the share-code case hands
+        // straight on to this same routing rather than going back through the
+        // binding to ask for another pass.
+        await route(destination)
         pushRouter.pending = nil
+    }
 
+    private func route(_ destination: RexPushRouter.Destination) async {
         switch destination {
         case .item(let itemId):
             path.append(itemId)
@@ -1461,9 +1483,9 @@ struct FeedView: View {
                 return
             }
             switch kind {
-            case "want": pushRouter.pending = .want(id)
-            case "list": pushRouter.pending = .collection(id)
-            default: pushRouter.pending = .recommendation(id)
+            case "want": await route(.want(id))
+            case "list": await route(.collection(id))
+            default: await route(.recommendation(id))
             }
         case .friendship(let friendshipId):
             // The other person in that friendship — the one the notification
