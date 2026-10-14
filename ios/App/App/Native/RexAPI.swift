@@ -1767,6 +1767,22 @@ final class RexAPI {
         guard let http = response as? HTTPURLResponse, http.statusCode < 400 else {
             throw RexAPIError.server(friendlyError(data, fallback: "Couldn't save your take."))
         }
+        await clearWantOnReview(itemId: itemId)
+    }
+
+    /// Oct 14 — "once you've reviewed something, it should automatically be
+    /// removed from your want-to-try list."
+    ///
+    /// A want is a note to yourself that you have not been yet. Writing a
+    /// review settles that question, and leaving it on the list afterwards
+    /// means the list quietly fills with things you have already done — which
+    /// is how a to-do list stops being read.
+    ///
+    /// Best-effort on purpose: the review is the thing that mattered and it is
+    /// already saved. Failing to tidy the want afterwards should not turn a
+    /// successful post into an error on screen.
+    private func clearWantOnReview(itemId: String) async {
+        try? await removeWant(itemId: itemId)
     }
 
     /// TestFlight feedback (Aug 24) found a case upsertRecommendation's own
@@ -2197,6 +2213,12 @@ final class RexAPI {
         let (data, response) = try await URLSession.shared.data(for: request)
         guard let http = response as? HTTPURLResponse, http.statusCode < 400 else {
             throw RexAPIError.server(friendlyError(data, fallback: "Couldn't post your Rex."))
+        }
+        // Oct 14 — a posted Rex settles the question a want was asking. Not
+        // for a draft or a queued post, which have not been said yet, and not
+        // for a branch copy, which is somewhere you have not been.
+        if !asDraft, scheduledAt == nil, !branchCopy {
+            await clearWantOnReview(itemId: itemId)
         }
         guard returningId else { return "" }
         struct Created: Codable { let id: String }
@@ -3091,18 +3113,52 @@ final class RexAPI {
     /// geocodes to a same-named place anywhere in the world) — and the
     /// resolved address gets written back alongside the point, so the row
     /// stops being a special case from then on.
+    /// Oct 14 — "still getting spurious map hits — Calma's address is in
+    /// Lisbon, but it is appearing in China."
+    ///
+    /// The third report of this, and the reason it keeps coming back is that
+    /// this function only ever knew one fault. It repaired coordinates that
+    /// were *missing*; it had no notion of coordinates that were *wrong*, so
+    /// an item that confidently held a point in Hefei and an address in
+    /// Lisboa was, as far as the self-heal was concerned, fine.
+    ///
+    /// `existing` is what the row currently claims. When it is there and the
+    /// address names a country it is nowhere near, it is treated exactly like
+    /// no coordinates at all. The check is continent-scale on purpose —
+    /// 2,500km — because this is about catching the wrong country, not about
+    /// grading accuracy, and a false repair would be worse than the fault.
+    ///
+    /// Checked against the live APIs before writing this: "Calma, Lisboa"
+    /// resolves correctly and "Calma" alone resolves to Serbia, so nothing we
+    /// ask today produces China. These are rows written by something that no
+    /// longer runs, which is exactly the case a self-heal exists for and the
+    /// reason fixing it in the app beats a one-off script.
     func repairPlaceCoordsIfNeeded(
-        itemId: String, address: String, fallbackQuery: String? = nil
+        itemId: String, address: String, fallbackQuery: String? = nil,
+        existing: (lat: Double, lng: Double)? = nil,
+        name: String? = nil
     ) async -> (lat: Double, lng: Double)? {
         let query = address.isEmpty ? (fallbackQuery ?? "") : address
         guard !query.trimmingCharacters(in: .whitespaces).isEmpty else { return nil }
+
+        // Something already there and plausible is left alone. Only an address
+        // can say "plausible", so a row with coordinates and no address is
+        // also left alone — there is nothing to judge it against.
+        if let existing {
+            guard !address.isEmpty,
+                  await !RexSearch.isPlausible(existing.lat, existing.lng, for: address)
+            else { return nil }
+        }
+
         guard Self.repairLock.withLock({ Self.geocodeRepairedItemIds.insert(itemId).inserted }) else { return nil }
 
         let located: (lat: Double, lng: Double, address: String?)?
         if address.isEmpty {
             located = await RexSearch.locatePlace(query)
         } else {
-            located = await RexSearch.geocodeDetailed(query)
+            // Places by name first, which is what finds the venue rather than
+            // a street that shares some of its words.
+            located = await RexSearch.pinpoint(name: name, address: address)
         }
         guard let located else { return nil }
         guard let token = try? await validToken() else { return nil }
@@ -5645,6 +5701,35 @@ final class RexAPI {
     }
 
     /// What a /s/<code> link points at: a kind and an id, nothing more.
+    /// Oct 14 — "if you click the link when someone has shared to WhatsApp,
+    /// it just takes you to notifications, not the thing that was shared."
+    ///
+    /// Because a shared Rex is fetched like any other, and RLS shows you your
+    /// own and your friends'. Somebody sends a link to a friend-of-a-friend,
+    /// or to a person not on REX yet who then signs up — the row is invisible,
+    /// the deep link gives up, and Notifications is where it lands.
+    ///
+    /// get_shared_recommendation has existed since July for exactly this: a
+    /// SECURITY DEFINER read of one recommendation by id, which is how the web
+    /// share page renders for strangers. The app never used it. A share is an
+    /// invitation to look at the thing, so the thing is what should open.
+    func fetchSharedItemId(recommendationId: String) async -> (itemId: String, type: String?)? {
+        guard let token = try? await validToken() else { return nil }
+        var request = URLRequest(url: baseURL.appendingPathComponent("/rest/v1/rpc/get_shared_recommendation"))
+        request.httpMethod = "POST"
+        request.setValue(anonKey, forHTTPHeaderField: "apikey")
+        request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        request.httpBody = try? JSONSerialization.data(withJSONObject: ["rec_id": recommendationId])
+
+        guard let (data, response) = try? await URLSession.shared.data(for: request),
+              let http = response as? HTTPURLResponse, http.statusCode < 400
+        else { return nil }
+        struct Row: Codable { let item_id: String; let item_type: String? }
+        guard let row = (try? JSONDecoder().decode([Row].self, from: data))?.first else { return nil }
+        return (row.item_id, row.item_type)
+    }
+
     func resolveShareCode(_ code: String) async -> (kind: String, id: String)? {
         guard let token = try? await validToken() else { return nil }
         var request = URLRequest(url: baseURL.appendingPathComponent("/rest/v1/rpc/resolve_share_code"))
@@ -5989,10 +6074,16 @@ final class RexAPI {
     /// item row, so the backlog only ever gets smaller across app launches.
     func repairMissingMapCoords(_ places: [MapPlace], onRepaired: @escaping (MapPlace) -> Void) {
         for place in places {
-            guard place.lat == nil || place.lng == nil,
-                  let address = place.address, !address.isEmpty else { continue }
+            guard let address = place.address, !address.isEmpty else { continue }
+            let existing: (lat: Double, lng: Double)? = {
+                guard let lat = place.lat, let lng = place.lng else { return nil }
+                return (lat, lng)
+            }()
             Task {
-                guard let located = await self.repairPlaceCoordsIfNeeded(itemId: place.id, address: address) else { return }
+                guard let located = await self.repairPlaceCoordsIfNeeded(
+                    itemId: place.id, address: address,
+                    existing: existing, name: place.title
+                ) else { return }
                 let repaired = MapPlace(
                     id: place.id, title: place.title, subtitle: place.subtitle, type: place.type,
                     genre: place.genre, address: place.address, lat: located.lat, lng: located.lng,
@@ -6290,9 +6381,20 @@ final class RexAPI {
     ///
     /// Somebody's ordering of one category, best first. Friends' orderings are
     /// readable too — being worth showing other people is half the point.
-    func fetchRanking(userId: String? = nil, category: String) async -> [RankedItem] {
+    /// Oct 14 — "the 'rank it against your others' just crashes."
+    ///
+    /// It didn't crash, it vanished, which from the outside is the same thing
+    /// and arguably worse. The rankings migration had not been run, so every
+    /// read came back 404 and this returned an empty array — indistinguishable
+    /// from "you have not ranked anything yet". The screen read that as "first
+    /// in its category, nothing to compare against", wrote a row that also
+    /// failed, and dismissed itself. Tap, flash, nothing.
+    ///
+    /// Returning nil for "could not ask" and [] for "nothing there" is the
+    /// whole fix: the caller can then say so instead of guessing.
+    func fetchRanking(userId: String? = nil, category: String) async -> [RankedItem]? {
         guard let token = try? await validToken(),
-              let whose = userId ?? currentUserId else { return [] }
+              let whose = userId ?? currentUserId else { return nil }
         var components = URLComponents(url: baseURL.appendingPathComponent("/rest/v1/rankings"), resolvingAgainstBaseURL: false)!
         components.queryItems = [
             URLQueryItem(name: "select", value: "id,item_id,category,position,items(id,type,title,subtitle,image_url,genre,address)"),
@@ -6304,7 +6406,7 @@ final class RexAPI {
         request.setValue(anonKey, forHTTPHeaderField: "apikey")
         request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
         guard let (data, response) = try? await URLSession.shared.data(for: request),
-              let http = response as? HTTPURLResponse, http.statusCode < 400 else { return [] }
+              let http = response as? HTTPURLResponse, http.statusCode < 400 else { return nil }
         return (try? JSONDecoder().decode([RankedItem].self, from: data)) ?? []
     }
 

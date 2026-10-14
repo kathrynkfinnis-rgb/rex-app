@@ -1352,7 +1352,7 @@ enum RexSearch {
     /// written out in full is the country. No part to check, or nowhere we can
     /// place it, means no opinion — this refuses wrong answers, it does not
     /// demand proof of right ones.
-    private static func isPlausible(_ lat: Double, _ lng: Double, for address: String) async -> Bool {
+    static func isPlausible(_ lat: Double, _ lng: Double, for address: String) async -> Bool {
         let tail = address.split(separator: ",").map { $0.trimmingCharacters(in: .whitespaces) }
         guard let country = tail.last, country.count > 2,
               let centre = await centre(of: country) else { return true }

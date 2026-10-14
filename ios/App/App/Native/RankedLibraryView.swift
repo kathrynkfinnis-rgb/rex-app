@@ -174,7 +174,7 @@ struct RankedLibraryView: View {
 
     private func load() async {
         isLoading = true
-        rows = await RexAPI.shared.fetchRanking(userId: route.userId, category: route.category)
+        rows = await RexAPI.shared.fetchRanking(userId: route.userId, category: route.category) ?? []
         isLoading = false
     }
 

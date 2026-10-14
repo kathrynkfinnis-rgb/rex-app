@@ -163,6 +163,14 @@ struct ItemDetailView: View {
                     // you have decided to watch it, and the only question left
                     // is where.
                     watchOnSection
+                    // Oct 14 — "move cast up in the movie page." This reverses
+                    // the call of 5 October, which put the cast below the
+                    // reviews because it was the longest thing on the page and
+                    // was sitting between you and what your friends thought.
+                    // It sits above them now, under Watch on: by then you know
+                    // what it is and where to see it, and who is in it is the
+                    // next thing anybody asks about a film.
+                    castSection
                     googlePhotosSection
                     communityPhotosSection
                     recipeSection(item: item)
@@ -200,7 +208,6 @@ struct ItemDetailView: View {
                             .padding(.horizontal, 16)
                     }
                     chainSection
-                    castSection
                     moreByAuthorSection
                     elsewhereSection
                 }
@@ -1489,7 +1496,7 @@ struct ItemDetailView: View {
 
     private func loadMyRank() async {
         guard isRankable, let type = item?.type else { myRank = nil; return }
-        let ordering = await RexAPI.shared.fetchRanking(category: type)
+        let ordering = await RexAPI.shared.fetchRanking(category: type) ?? []
         if let index = ordering.firstIndex(where: { $0.item_id == itemId }) {
             myRank = (index + 1, ordering.count)
         } else {

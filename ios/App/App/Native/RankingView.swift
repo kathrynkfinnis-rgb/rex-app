@@ -103,6 +103,18 @@ struct RankingCompareView: View {
                     ProgressView().frame(maxWidth: .infinity, maxHeight: .infinity)
                 } else if let session, let opponent = session.opponent, let other = opponent.items {
                     question(against: other, remaining: session.remainingQuestions)
+                } else if let errorMessage {
+                    VStack(spacing: RexSpacing.md) {
+                        Image(systemName: "exclamationmark.triangle")
+                            .font(.title)
+                            .foregroundStyle(RexColor.destructive)
+                        Text(errorMessage)
+                            .font(RexFont.text(14))
+                            .foregroundStyle(RexColor.mutedForeground)
+                            .multilineTextAlignment(.center)
+                    }
+                    .padding(RexSpacing.xxl)
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
                 } else {
                     // Nothing placed yet: the first thing in a category needs
                     // no comparison, it just goes in.
@@ -215,16 +227,29 @@ struct RankingCompareView: View {
 
     private func start() async {
         isLoading = true
-        var placed = await RexAPI.shared.fetchRanking(category: category.rawValue)
+        // Oct 14 — nil means the ordering could not be read at all, which is
+        // a different thing from having ranked nothing. Treating the two the
+        // same is what made this screen open and shut itself.
+        guard var placed = await RexAPI.shared.fetchRanking(category: category.rawValue) else {
+            isLoading = false
+            errorMessage = "Couldn't open your ordering just now. Try again in a moment."
+            return
+        }
         // Comparing something against itself is not a question. Happens when
         // you re-rank a book that is already placed.
         placed.removeAll { $0.item_id == newItem.id }
 
         if placed.isEmpty {
             // First in its category: straight in, nothing to weigh it against.
-            try? await RexAPI.shared.placeInRanking(
-                itemId: newItem.id, category: category.rawValue, position: 1
-            )
+            do {
+                try await RexAPI.shared.placeInRanking(
+                    itemId: newItem.id, category: category.rawValue, position: 1
+                )
+            } catch {
+                isLoading = false
+                errorMessage = error.localizedDescription
+                return
+            }
             isLoading = false
             onFinished()
             dismiss()
@@ -254,7 +279,7 @@ struct RankingCompareView: View {
             var position = current.resolvedPosition
             if current.needsRenumbering {
                 try await RexAPI.shared.renumberRanking(category: category.rawValue)
-                var placed = await RexAPI.shared.fetchRanking(category: category.rawValue)
+                var placed = await RexAPI.shared.fetchRanking(category: category.rawValue) ?? []
                 placed.removeAll { $0.item_id == newItem.id }
                 position = RankingSession.position(at: current.resolvedIndex, in: placed)
             }

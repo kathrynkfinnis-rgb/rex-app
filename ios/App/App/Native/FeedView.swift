@@ -1490,9 +1490,21 @@ struct FeedView: View {
                 } else {
                     path.append(rec.item_id)
                 }
+            } else if let shared = await RexAPI.shared.fetchSharedItemId(recommendationId: recId) {
+                // Oct 14 — a link shared to WhatsApp and opened by somebody who
+                // isn't your friend: RLS hides the row, the fetch above finds
+                // nothing, and this used to give up and show Notifications —
+                // the one screen that has nothing to do with what was shared.
+                // get_shared_recommendation reads it regardless, which is how
+                // the web page has rendered for strangers since July.
+                if RexCategory(rawType: shared.type) == .trip {
+                    path.append(TripRoute(recommendationId: recId, title: "Trip"))
+                } else {
+                    path.append(shared.itemId)
+                }
             } else {
-                // Deleted, or not visible to us any more. The notifications
-                // list is the honest fallback — it still says what happened.
+                // Genuinely gone: deleted, or a link that was never valid.
+                // Notifications still says what happened.
                 path.append(NotificationsRoute())
             }
         }
