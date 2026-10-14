@@ -17,15 +17,32 @@ import SwiftUI
 /// Every number below is shared on purpose. The thumbnail crosses the wave on
 /// every page and stops short of the title's first line on every page, so the
 /// four screens line up when you flick between them.
+/// Oct 14 — two bands, chosen by what the thing actually has.
+///
+/// "The picture should be no more than 20% of the screen. Currently looks to be
+/// about 40%." It was 330pt, which on a phone is two fifths of everything
+/// before you reach a word. A texture needs no more than a fifth.
+///
+/// "If there are uploaded photos for trips / places, please can you use those
+/// in a concertina type effect… might need more space if we are doing that
+/// though, perhaps 30%?" Photos earn the room; a flat pattern does not.
 enum RexHeaderMetrics {
-    static let bandHeight: CGFloat = 330
-    static let waveHeight: CGFloat = 56
-    /// Where the sheet's content begins — just past the wave's deepest point.
-    static let sheetTop: CGFloat = 325
-    static let thumbTop: CGFloat = 178
-    static let thumbWidth: CGFloat = 116
-    static let thumbHeight: CGFloat = 174
-    static let thumbTrailing: CGFloat = 22
+    /// A texture: one tinted pattern per category, behind the thing's own cover.
+    static let bandHeight: CGFloat = 170
+    static let waveHeight: CGFloat = 40
+    static let sheetTop: CGFloat = 165
+    /// Photographs, folded. Taller because there is something to look at.
+    static let photoBandHeight: CGFloat = 250
+    static let photoWaveHeight: CGFloat = 52
+    static let photoSheetTop: CGFloat = 245
+    /// Four panels at 390pt wide is about 95pt each. Five is too narrow to
+    /// read as a photograph; the rest belong in the carousel further down.
+    static let concertinaPanels = 4
+
+    static let thumbTop: CGFloat = 52
+    static let thumbWidth: CGFloat = 84
+    static let thumbHeight: CGFloat = 126
+    static let thumbTrailing: CGFloat = 20
 }
 
 /// The curve that separates the painting from the page.
@@ -51,6 +68,58 @@ struct RexWaveEdge: Shape {
         path.addLine(to: CGPoint(x: 0, y: h))
         path.closeSubpath()
         return path
+    }
+}
+
+/// Oct 14 — "if there are uploaded photos for trips / places, please can you
+/// use those in a concertina type effect."
+///
+/// A folded screen. Each panel turns about the edge it shares with the one
+/// before it, alternating, so what sits between two panels is a hinge rather
+/// than a gap — and the faces turned away from the light carry a little
+/// shadow, which is the thing that makes it read as folded rather than as four
+/// photographs with spaces between them.
+///
+/// A rotation does not change what a view claims in layout, so each panel
+/// draws narrower than its slot and the dark behind shows through at the
+/// seams. That is the fold, and it is why the ground is dark rather than the
+/// page's own cream.
+struct RexConcertinaBand: View {
+    let urls: [String]
+
+    var body: some View {
+        ZStack(alignment: .bottom) {
+            Color(red: 0.055, green: 0.118, blue: 0.086)
+
+            HStack(spacing: 0) {
+                ForEach(Array(urls.prefix(RexHeaderMetrics.concertinaPanels).enumerated()), id: \.offset) { index, url in
+                    let turnedAway = index.isMultiple(of: 2)
+                    GoogleSafeAsyncImage(url: URL(string: url)!) { image in
+                        image.resizable().aspectRatio(contentMode: .fill)
+                    } placeholder: {
+                        RexColor.muted
+                    }
+                    .frame(maxWidth: .infinity)
+                    .frame(height: RexHeaderMetrics.photoBandHeight)
+                    .clipped()
+                    .overlay(Color.black.opacity(turnedAway ? 0.22 : 0))
+                    .rotation3DEffect(
+                        .degrees(turnedAway ? -26 : 26),
+                        axis: (x: 0, y: 1, z: 0),
+                        anchor: turnedAway ? .trailing : .leading,
+                        perspective: 0.42
+                    )
+                }
+            }
+
+            RexWaveEdge()
+                .fill(RexColor.background)
+                .frame(height: RexHeaderMetrics.photoWaveHeight)
+        }
+        .frame(height: RexHeaderMetrics.photoBandHeight)
+        .frame(maxWidth: .infinity)
+        .clipped()
+        .accessibilityLabel("Photographs of this place")
     }
 }
 

@@ -516,15 +516,25 @@ struct ItemDetailView: View {
     private func header(item: RexItem) -> some View {
         let category = RexCategory(rawType: item.type)
         VStack(alignment: .leading, spacing: 0) {
-            ZStack(alignment: .topTrailing) {
-                RexBannerBand(category: category)
-                RexHeaderThumbnail(url: item.image_url, category: category)
-                    .padding(.trailing, RexHeaderMetrics.thumbTrailing)
-                    .padding(.top, RexHeaderMetrics.thumbTop)
+            // Oct 14 — photographs if there are any, the category's texture if
+            // not. A folded screen of real photos is worth 30% of the screen;
+            // a flat pattern is worth 20%, and no more.
+            Group {
+            if bandPhotos.count > 1 {
+                RexConcertinaBand(urls: bandPhotos)
+                    .frame(height: RexHeaderMetrics.photoBandHeight, alignment: .top)
+            } else {
+                ZStack(alignment: .topTrailing) {
+                    RexBannerBand(category: category)
+                    RexHeaderThumbnail(url: item.image_url, category: category)
+                        .padding(.trailing, RexHeaderMetrics.thumbTrailing)
+                        .padding(.top, RexHeaderMetrics.thumbTop)
+                }
+                // The cover hangs past the band's bottom edge; without this the
+                // stack clips it at the fold.
+                .frame(height: RexHeaderMetrics.bandHeight, alignment: .top)
             }
-            // The thumbnail hangs past the band's bottom edge; without this
-            // the stack clips it at the fold.
-            .frame(height: RexHeaderMetrics.bandHeight, alignment: .top)
+            }
             // Oct 13 — "alignment too close to the left-hand side, need to
             // maintain the margins." The header this replaced ended with one
             // .padding(16) around the whole stack, which is what gave Rex'd by,
@@ -739,6 +749,21 @@ struct ItemDetailView: View {
     /// wrapping, so a title on six services doesn't push the reviews down.
     /// Books, films and TV have a portrait cover; a place has a photograph.
     /// Podcasts are square artwork, so they take the square.
+    /// Oct 14 — what goes across the top when there are photographs.
+    ///
+    /// Everyone's own photos first, then Google's: a picture somebody who went
+    /// there actually took beats a listing photo, and this is the one place on
+    /// the page where only a handful get shown.
+    ///
+    /// One photo is not a concertina — a single panel folded against nothing
+    /// is just a crooked picture — so it takes more than one to earn the
+    /// treatment, and a lone photo stays the cover on the texture.
+    private var bandPhotos: [String] {
+        var seen = Set<String>()
+        return (communityPhotoURLs + (item?.google_photo_urls ?? []))
+            .filter { seen.insert($0).inserted }
+    }
+
     /// Archivo Black is wide, and a 44pt title that runs to five lines stops
     /// being a title. Long names step down rather than wrap forever; short
     /// ones keep the full size, which is the whole reason for the face.

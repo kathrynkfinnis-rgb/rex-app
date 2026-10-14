@@ -33,6 +33,10 @@ struct AppleMapView: UIViewRepresentable {
     /// Jump straight to one place, overriding wherever the map currently sits.
     var focusRequest: MapFocusRequest?
     var onSelect: (MapPlace) -> Void
+    /// Oct 14 — "these pins are not separating", "still have to zoom in way
+    /// too much." Called instead of zooming when a cluster's members sit on
+    /// top of each other, where zooming can never help.
+    var onSelectMany: ([MapPlace]) -> Void = { _ in }
     /// #167 — "add a Rex by finding a place on the map first". A tap alone
     /// is already claimed (panning/pin selection); long-press is the same
     /// gesture Apple/Google Maps themselves use for "drop a pin here".
@@ -388,11 +392,52 @@ struct AppleMapView: UIViewRepresentable {
             return view
         }
 
+        /// Below this, two pins are the same pin for any practical purpose.
+        /// MapKit's maximum useful zoom shows roughly 50 metres across a
+        /// phone, so anything inside 25 would still be touching at the bottom
+        /// of the zoom and the bubble would never open.
+        static let inseparableMetres: CLLocationDistance = 25
+
+        /// How far apart the furthest two members of a cluster are.
+        private func spread(of members: [MKAnnotation]) -> CLLocationDistance {
+            guard let first = members.first else { return 0 }
+            var worst: CLLocationDistance = 0
+            let origin = CLLocation(latitude: first.coordinate.latitude, longitude: first.coordinate.longitude)
+            for member in members.dropFirst() {
+                let point = CLLocation(latitude: member.coordinate.latitude, longitude: member.coordinate.longitude)
+                worst = max(worst, origin.distance(from: point))
+            }
+            return worst
+        }
+
         func mapView(_ mapView: MKMapView, didSelect view: MKAnnotationView) {
             // Tapping a cluster zooms into it rather than picking one of its
             // pins arbitrarily — the whole point is that nothing is hidden.
             if let cluster = view.annotation as? MKClusterAnnotation {
                 mapView.deselectAnnotation(cluster, animated: false)
+
+                // Oct 14 — "these pins are not separating. Still have to zoom
+                // in way too much."
+                //
+                // Two different places at the same address — a restaurant and
+                // the bar upstairs, or the same venue entered twice — are at
+                // the same point on a map, and no zoom level separates points
+                // that are the same point. Every previous attempt at this
+                // tuned the collision distance, which is the wrong dial: at
+                // nought metres apart they collide at any setting.
+                //
+                // So a cluster that cannot come apart stops pretending it can.
+                // Zooming into a zero-width rect takes the map to its limit and
+                // leaves the bubble exactly where it was, which is what she has
+                // been doing over and over. This opens the list instead.
+                let members = cluster.memberAnnotations.compactMap { member -> MapPlace? in
+                    (member as? RexPlaceAnnotation).flatMap { markersById[$0.id] }
+                }
+                if spread(of: cluster.memberAnnotations) < Self.inseparableMetres, members.count > 1 {
+                    parent.onSelectMany(members)
+                    return
+                }
+
                 var rect = MKMapRect.null
                 for member in cluster.memberAnnotations {
                     let point = MKMapPoint(member.coordinate)

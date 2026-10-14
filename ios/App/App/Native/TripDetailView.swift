@@ -344,6 +344,12 @@ struct TripDetailView: View {
 
     /// The first few stops, which is what a trip is. Falls back to the trip
     /// symbol on a tinted ground rather than an empty card.
+    /// The stops' photographs, for the folded band.
+    private var bandPhotos: [String] {
+        var seen = Set<String>()
+        return stops.compactMap { $0.items?.image_url }.filter { seen.insert($0).inserted }
+    }
+
     @ViewBuilder
     private var tripArtwork: some View {
         let urls = stops.compactMap { $0.items?.image_url }.prefix(4)
@@ -366,16 +372,25 @@ struct TripDetailView: View {
     /// same wave, same thumbnail position as everywhere else.
     private var header: some View {
         VStack(alignment: .leading, spacing: 6) {
-            ZStack(alignment: .topTrailing) {
-                RexBannerBand(category: .trip)
-                tripArtwork
-                    .frame(width: RexHeaderMetrics.thumbWidth, height: RexHeaderMetrics.thumbHeight)
-                    .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
-                    .shadow(color: Color.black.opacity(0.28), radius: 13, x: 0, y: 8)
-                    .padding(.trailing, RexHeaderMetrics.thumbTrailing)
-                    .padding(.top, RexHeaderMetrics.thumbTop)
+            // Oct 14 — the stops' own photographs, folded, when there are
+            // any. A trip is places, and the places have pictures.
+            Group {
+                if bandPhotos.count > 1 {
+                    RexConcertinaBand(urls: bandPhotos)
+                        .frame(height: RexHeaderMetrics.photoBandHeight, alignment: .top)
+                } else {
+                    ZStack(alignment: .topTrailing) {
+                        RexBannerBand(category: .trip)
+                        tripArtwork
+                            .frame(width: RexHeaderMetrics.thumbWidth, height: RexHeaderMetrics.thumbHeight)
+                            .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
+                            .shadow(color: Color.black.opacity(0.28), radius: 13, x: 0, y: 8)
+                            .padding(.trailing, RexHeaderMetrics.thumbTrailing)
+                            .padding(.top, RexHeaderMetrics.thumbTop)
+                    }
+                    .frame(height: RexHeaderMetrics.bandHeight, alignment: .top)
+                }
             }
-            .frame(height: RexHeaderMetrics.bandHeight, alignment: .top)
             .padding(.horizontal, -12)
             .padding(.bottom, 4)
 

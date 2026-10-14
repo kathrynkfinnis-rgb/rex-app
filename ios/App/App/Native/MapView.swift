@@ -28,9 +28,12 @@ struct RexMapView: View {
         case place(MapPlace)
         case tripSearch
         case newRex(RexSearchHit)
+        /// Oct 14 — several places at one point, which no zoom can separate.
+        case pickOne([MapPlace])
 
-        init?(place: MapPlace?, tripSearch: Bool, hit: RexSearchHit?) {
+        init?(place: MapPlace?, tripSearch: Bool, hit: RexSearchHit?, stacked: [MapPlace]) {
             if let place { self = .place(place) }
+            else if !stacked.isEmpty { self = .pickOne(stacked) }
             else if tripSearch { self = .tripSearch }
             else if let hit { self = .newRex(hit) }
             else { return nil }
@@ -41,11 +44,15 @@ struct RexMapView: View {
             case .place(let place): return "place-\(place.id)"
             case .tripSearch: return "tripSearch"
             case .newRex(let hit): return "newRex-\(hit.id)"
+            case .pickOne(let places): return "pickOne-" + places.map(\.id).joined(separator: "-")
             }
         }
     }
 
     @State private var selectedPlace: MapPlace?
+    /// Places sharing one point, offered as a list because zooming cannot
+    /// pull them apart.
+    @State private var stackedPlaces: [MapPlace] = []
     /// See AppleMapView.fitToPlacesNonce.
     @State private var tripFitNonce = 0
     @State private var userCoordinate: CLLocationCoordinate2D?
@@ -287,6 +294,7 @@ struct RexMapView: View {
                     radiusMeters: radiusMeters,
                     focusRequest: focusRequest,
                     onSelect: { selectedPlace = $0 },
+                    onSelectMany: { stackedPlaces = $0 },
                     onLongPress: { coordinate in Task { await resolveLongPress(coordinate) } },
                     highlightGenre: subFilter,
                     onRegionChange: { visibleRegion = $0 },
@@ -339,10 +347,11 @@ struct RexMapView: View {
         // "Follow a trip" and long-press-to-add-a-place were both losing to
         // the place sheet above them.
         .sheet(item: Binding(
-            get: { MapSheet(place: selectedPlace, tripSearch: showingTripSearch, hit: pendingPlaceHit) },
+            get: { MapSheet(place: selectedPlace, tripSearch: showingTripSearch, hit: pendingPlaceHit, stacked: stackedPlaces) },
             set: { next in
                 if next == nil {
                     selectedPlace = nil
+                    stackedPlaces = []
                     placeSheetDetent = .fraction(0.5)
                     showingTripSearch = false
                     pendingPlaceHit = nil
@@ -350,6 +359,42 @@ struct RexMapView: View {
             }
         )) { sheet in
             switch sheet {
+            case .pickOne(let places):
+                // Oct 14 — "these pins are not separating." They are at the
+                // same address, so they never will. Naming them is the answer
+                // the map could never give by zooming.
+                NavigationStack {
+                    List(places) { place in
+                        Button {
+                            stackedPlaces = []
+                            selectedPlace = place
+                        } label: {
+                            VStack(alignment: .leading, spacing: 3) {
+                                Text(place.title)
+                                    .font(RexFont.text(16, weight: .bold))
+                                    .foregroundStyle(RexColor.foreground)
+                                if let genre = place.genre, !genre.isEmpty {
+                                    Text(genre)
+                                        .font(RexFont.text(13))
+                                        .foregroundStyle(RexColor.mutedForeground)
+                                }
+                                if let address = place.address, !address.isEmpty {
+                                    Text(address)
+                                        .font(RexFont.text(12))
+                                        .foregroundStyle(RexColor.mutedForeground)
+                                        .lineLimit(1)
+                                }
+                            }
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                            .contentShape(Rectangle())
+                        }
+                        .buttonStyle(.plain)
+                    }
+                    .listStyle(.plain)
+                    .navigationTitle("\(places.count) here")
+                    .navigationBarTitleDisplayMode(.inline)
+                }
+                .presentationDetents([.medium])
             case .place(let place):
                 // Oct 2 — "remove the details button and just go straight to
                 // what we see when we click the button, then you swipe up on
