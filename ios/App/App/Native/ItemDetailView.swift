@@ -1751,6 +1751,16 @@ struct ItemDetailView: View {
                         .contentShape(Rectangle())
                 }
             }
+
+            // Oct 14 — "I now can't see comments under my reviews."
+            //
+            // When your take was rebuilt into the shape a friend's take
+            // takes, it got the avatar, the quote and the badge but not the
+            // strip underneath — so the likes and comments on your own Rex
+            // were on the page for everybody else's and missing from yours,
+            // and a comment somebody left you had nowhere to appear.
+            Rectangle().fill(RexColor.divider).frame(height: 1).padding(.vertical, 4)
+            LikesCommentsView(recommendationId: myRec.id)
         }
         .padding(12)
         .background(RexColor.card)
