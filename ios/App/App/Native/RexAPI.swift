@@ -4512,7 +4512,14 @@ final class RexAPI {
         guard let (data, response) = try? await URLSession.shared.data(for: request),
               let http = response as? HTTPURLResponse, http.statusCode < 400 else { return [] }
         struct Row: Codable { let request_id: String }
-        return Set(((try? JSONDecoder().decode([Row].self, from: data)) ?? []).map(\.request_id))
+        // Prefixed, because the feed knows a blast by the synthetic id it was
+        // given when it was turned into a FeedRecommendation — "blast-<uuid>",
+        // not the bare request id this table stores. Returning the bare ids
+        // made the answered-blast check a set membership test that could
+        // never be true, which is the second half of why replying to a blast
+        // didn't unpin it.
+        return Set(((try? JSONDecoder().decode([Row].self, from: data)) ?? [])
+            .map { "blast-\($0.request_id)" })
     }
 
     func fetchRequestComments(requestId: String) async throws -> [RequestComment] {

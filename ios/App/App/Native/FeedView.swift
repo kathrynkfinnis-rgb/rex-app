@@ -574,7 +574,36 @@ struct FeedView: View {
                                 onDelete: { await deleteRex(rec) }
                               ) {
                                 Group {
-                                    card(for: rec)
+                                    // Oct 14 — "should disappear if I reply,
+                                    // if I 'x' it, or after 48 hours."
+                                    //
+                                    // The unpin existed, but only as a
+                                    // long-press menu item, which is not an
+                                    // "x" and is not findable. A pinned blast
+                                    // is the one card on the feed that claims
+                                    // a place it wasn't given, so it carries
+                                    // the control to give it back.
+                                    if rec.isBlast, isPinnedBlast(rec) {
+                                        ZStack(alignment: .topTrailing) {
+                                            card(for: rec)
+                                            Button {
+                                                withAnimation { dismissBlast(rec) }
+                                            } label: {
+                                                Image(systemName: "xmark")
+                                                    .font(.system(size: 11, weight: .bold))
+                                                    .foregroundStyle(RexColor.mutedForeground)
+                                                    .frame(width: 26, height: 26)
+                                                    .background(RexColor.card, in: Circle())
+                                                    .overlay(Circle().stroke(RexColor.border, lineWidth: 1))
+                                                    .contentShape(Circle())
+                                            }
+                                            .buttonStyle(.plain)
+                                            .padding(10)
+                                            .accessibilityLabel("Unpin this blast")
+                                        }
+                                    } else {
+                                        card(for: rec)
+                                    }
                                 }
                                 .modifier(EditableIfMine(rec: rec, onEdit: { activeSheet = .edit($0) }, onChanged: { Task { await loadFeed() } }))
                                 // No .draggable() here: Collections isn't
@@ -1060,7 +1089,6 @@ struct FeedView: View {
                     } catch {
                         // A reminder that didn't save shouldn't look saved.
                         myTicketReminderItemIds = await RexAPI.shared.myTicketReminderItemIds()
-            answeredBlastIds = await RexAPI.shared.myAnsweredBlastIds()
                     }
                 }
             } label: {
@@ -1587,6 +1615,11 @@ struct FeedView: View {
             unreadNotificationCount = await RexAPI.shared.fetchUnreadNotificationCount()
             ticketReminderRows = await RexAPI.shared.upcomingTicketReminders()
             myTicketReminderItemIds = await RexAPI.shared.myTicketReminderItemIds()
+            // Oct 14 — "the rules for blasts don't appear to be in effect."
+            // This line was the reply rule, and it had been spliced into the
+            // ticket-reminder button's catch block, where it ran only if
+            // saving a reminder failed. The feed never once loaded it.
+            answeredBlastIds = await RexAPI.shared.myAnsweredBlastIds()
         } catch {
             errorMessage = error.localizedDescription
         }
