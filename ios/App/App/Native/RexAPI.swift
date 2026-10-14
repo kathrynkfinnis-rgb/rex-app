@@ -5844,6 +5844,84 @@ final class RexAPI {
     /// through fetchProfiles means a wanter you aren't friends with still
     /// arrives with a name, via the same profile_basics fallback.
     ///
+    /// Oct 14 — "I also can't see Phoebe's comments on her want to try when I
+    /// click in."
+    ///
+    /// Nothing was missing from the want itself: it has a note, photos, likes
+    /// and comments, exactly as a Rex does. The item page just never drew one.
+    /// It showed the wanters as a row of faces, which is a fact about who,
+    /// with nothing of what they said and no way to reach the thread under it.
+    ///
+    /// So: every want on this item, in the shape the page already draws. The
+    /// "want-" prefix on the id is the one the feed uses, which is what makes
+    /// LikesCommentsView read want_likes/want_comments rather than the
+    /// recommendation tables.
+    ///
+    /// Same two-query shape as fetchWanters and for the same reason —
+    /// wants.user_id references auth.users, so there is no profiles embed to
+    /// trace. Best-effort throughout: a want that arrives without its author
+    /// is still worth showing.
+    func fetchWants(forItem itemId: String) async -> [FeedRecommendation] {
+        guard let token = try? await validToken() else { return [] }
+        let noteField = await wantNoteField()
+        let photosField = await wantPhotosField()
+        var components = URLComponents(url: baseURL.appendingPathComponent("/rest/v1/wants"), resolvingAgainstBaseURL: false)!
+        components.queryItems = [
+            URLQueryItem(name: "select", value: "id,created_at,item_id,user_id\(noteField)\(photosField)"),
+            URLQueryItem(name: "item_id", value: "eq.\(itemId)"),
+            URLQueryItem(name: "order", value: "created_at.desc"),
+        ]
+        guard let url = components.url else { return [] }
+        var request = URLRequest(url: url)
+        request.setValue(anonKey, forHTTPHeaderField: "apikey")
+        request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+        guard let (data, response) = try? await URLSession.shared.data(for: request),
+              let http = response as? HTTPURLResponse, http.statusCode < 400
+        else { return [] }
+
+        struct Row: Codable {
+            let id: String
+            let created_at: String?
+            let item_id: String
+            let user_id: String
+            let note: String?
+            let photo_urls: [String]?
+        }
+        let rows = (try? JSONDecoder().decode([Row].self, from: data)) ?? []
+        guard !rows.isEmpty else { return [] }
+
+        let profiles = (try? await fetchProfiles(ids: Array(Set(rows.map(\.user_id))))) ?? []
+        let byId = Dictionary(uniqueKeysWithValues: profiles.map {
+            ($0.id, RexProfile(username: $0.username, display_name: $0.display_name, avatar_url: $0.avatar_url))
+        })
+
+        return rows
+            .filter { !hiddenUsers.contains($0.user_id) }
+            .map { row in
+                FeedRecommendation(
+                    id: "want-\(row.id)",
+                    // A want has no rating, and zero is how the rest of the app
+                    // already says so.
+                    rating: 0,
+                    note: row.note,
+                    created_at: row.created_at ?? "",
+                    photo_url: nil,
+                    photo_urls: row.photo_urls,
+                    tags: nil,
+                    user_id: row.user_id,
+                    item_id: row.item_id,
+                    items: nil,
+                    profiles: byId[row.user_id],
+                    creators: nil,
+                    trip_section: nil,
+                    is_anonymous: false,
+                    list_section: nil,
+                    show_in_feed: nil,
+                    recommendation_tags: nil
+                )
+            }
+    }
+
     /// Best-effort: an empty result costs the card its faces, not its content.
     func fetchWanters(itemIds: [String]) async -> [String: [RexProfileDetail]] {
         guard !itemIds.isEmpty, let token = try? await validToken() else { return [:] }

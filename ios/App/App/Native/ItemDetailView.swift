@@ -38,6 +38,10 @@ struct ItemDetailView: View {
     /// it and who else has want-to-try it." Who has Rex'd it was already here;
     /// who else is only meaning to was not, anywhere on the page.
     @State private var wanters: [RexProfileDetail] = []
+    /// Oct 14 — the wants themselves, not just who made them: a want carries a
+    /// note, photos and its own comment thread, and none of that was on the
+    /// page while the only trace of a want was a face in a row.
+    @State private var wantPosts: [FeedRecommendation] = []
     @State private var isLoading = true
     @State private var errorMessage: String?
 
@@ -424,6 +428,7 @@ struct ItemDetailView: View {
             // Nothing from someone on either side of a block.
             recs = RexAPI.shared.filterHidden(fetchedRecs)
             wanters = await RexAPI.shared.fetchWanters(itemIds: [itemId])[itemId] ?? []
+            wantPosts = await RexAPI.shared.fetchWants(forItem: itemId)
             // Only events have these, so only events pay for the request.
             if RexCategory(rawType: fetchedItem.type) == .event {
                 ticketReminderPeople = await RexAPI.shared.ticketReminders(itemId: itemId)
@@ -2062,10 +2067,33 @@ struct ItemDetailView: View {
         .rexCard()
     }
 
-    /// Everybody else's Rex of this. Yours is excluded because it has its own
-    /// box below, which can also edit it — see the note in friendsSection.
+    /// Everybody else's Rex of this, and everybody's wants, in one list.
+    ///
+    /// Oct 14 — "show both want to try and Rexes in the same list in
+    /// chronological order (when posted), but visually differentiate between
+    /// want to try and actual Rex."
+    ///
+    /// The wants were only ever a row of faces before, so a want with a note
+    /// on it showed neither the note nor the thread of comments underneath —
+    /// which is how Phoebe's comments on her want became unreachable.
+    ///
+    /// Your own Rex is still excluded: it has its own editable box below, and
+    /// showing it twice is what the 8 October change removed. Your own *want*
+    /// does appear, because nothing else on the page carries what you wrote on
+    /// it or the replies to it.
     private var theirs: [FeedRecommendation] {
-        recs.filter { $0.user_id != RexAPI.shared.currentUserId }
+        let mine = RexAPI.shared.currentUserId
+        let merged = recs.filter { $0.user_id != mine } + wantPosts
+        return merged.sorted { a, b in
+            switch (a.createdDate, b.createdDate) {
+            case let (x?, y?): return x > y
+            // A row with an unparseable date sorts last rather than jumping
+            // the queue, which is what comparing against a nil would do.
+            case (nil, _?): return false
+            case (_?, nil): return true
+            case (nil, nil): return false
+            }
+        }
     }
 
     private var friendsSection: some View {
@@ -2097,7 +2125,10 @@ struct ItemDetailView: View {
             if !theirs.isEmpty || myRec != nil {
                 Divider().overlay(RexColor.border)
 
-                Text("Reviews")
+                // Oct 14 — "rather than 'Reviews' we do have 'Rexes' or
+                // something." A want isn't a review and it isn't a Rex
+                // either, so the heading says which of the two are under it.
+                Text(theirs.contains(where: { $0.isWant }) ? "Rexes and wants" : "Rexes")
                     .font(RexFont.display(20))
                     .foregroundStyle(RexColor.foreground)
                     .padding(.top, 6)
@@ -2125,7 +2156,23 @@ struct ItemDetailView: View {
                         }
                         .buttonStyle(.plain)
                         Spacer()
-                        RexRatingBadge(raw: rec.rating)
+                        // A want has no rating to show, so the chip goes where
+                        // the badge would be and says what this is instead.
+                        if rec.isWant {
+                            HStack(spacing: 4) {
+                                Image(systemName: "bookmark")
+                                    .font(.system(size: 9, weight: .bold))
+                                Text("WANTS TO TRY")
+                                    .font(.system(size: 9, weight: .bold))
+                                    .tracking(0.4)
+                            }
+                            .foregroundStyle(RexColor.mutedForeground)
+                            .padding(.horizontal, 8)
+                            .padding(.vertical, 4)
+                            .background(RexColor.badgeBackground, in: Capsule())
+                        } else {
+                            RexRatingBadge(raw: rec.rating)
+                        }
                     }
                     if let note = rec.note, !note.isEmpty {
                         // Oct 12 — a link somebody pasted into their review is
@@ -2142,7 +2189,14 @@ struct ItemDetailView: View {
                 .padding(12)
                 .background(RexColor.card)
                 .clipShape(RoundedRectangle(cornerRadius: 14))
-                .overlay(RoundedRectangle(cornerRadius: 14).stroke(RexColor.border, lineWidth: 1))
+                // Dashed for a want: the same card, not yet filled in.
+                .overlay(
+                    RoundedRectangle(cornerRadius: 14)
+                        .strokeBorder(
+                            rec.isWant ? RexColor.mutedForeground.opacity(0.45) : RexColor.border,
+                            style: StrokeStyle(lineWidth: 1, dash: rec.isWant ? [4, 3] : [])
+                        )
+                )
             }
         }
         .padding(16)
