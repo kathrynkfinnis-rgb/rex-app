@@ -1782,7 +1782,94 @@ final class RexAPI {
     /// already saved. Failing to tidy the want afterwards should not turn a
     /// successful post into an error on screen.
     private func clearWantOnReview(itemId: String) async {
+        guard let token = try? await validToken(), let userId = currentUserId else { return }
+
+        // Oct 14 — "the Rex should convert to a proper Rex, so it shouldn't
+        // come up with two ratings for the thing."
+        //
+        // Deleting the want is right on its own, but a want filed in a
+        // collection is a row in that collection — so deleting it would have
+        // quietly taken the thing off the list it was on, and adding the Rex
+        // separately would have left two entries for one place. The want's
+        // placement moves to the Rex: same collection, same heading, same
+        // position, same note. One row, one rating, where it always was.
+        var components = URLComponents(url: baseURL.appendingPathComponent("/rest/v1/wants"), resolvingAgainstBaseURL: false)!
+        components.queryItems = [
+            URLQueryItem(name: "select", value: "id,list_id,list_section,list_sort_order,list_note"),
+            URLQueryItem(name: "user_id", value: "eq.\(userId)"),
+            URLQueryItem(name: "item_id", value: "eq.\(itemId)"),
+        ]
+        var request = URLRequest(url: components.url!)
+        request.setValue(anonKey, forHTTPHeaderField: "apikey")
+        request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+        struct WantRowPlacement: Codable {
+            let id: String
+            let list_id: String?
+            let list_section: String?
+            let list_sort_order: Int?
+            let list_note: String?
+        }
+        let placement = (try? await URLSession.shared.data(for: request))
+            .flatMap { try? JSONDecoder().decode([WantRowPlacement].self, from: $0.0) }?
+            .first
+
+        // Nothing wanted here: a review of something that was never on the
+        // list has nothing to tidy.
+        guard let placement else { return }
+
+        if let listId = placement.list_id, let recId = await myRecommendationId(forItem: itemId) {
+            try? await addToCollection(
+                recommendationId: recId, listId: listId,
+                section: placement.list_section, sortOrder: placement.list_sort_order
+            )
+            if let note = placement.list_note, !note.isEmpty,
+               let savedPostId = await savedPostId(recommendationId: recId, listId: listId) {
+                try? await setCollectionItemNote(savedPostId: savedPostId, note: note)
+            }
+        }
+
         try? await removeWant(itemId: itemId)
+    }
+
+    /// Your own recommendation for an item, by id. Used when something has to
+    /// point at the Rex you have just written.
+    private func myRecommendationId(forItem itemId: String) async -> String? {
+        guard let token = try? await validToken(), let userId = currentUserId else { return nil }
+        var components = URLComponents(url: baseURL.appendingPathComponent("/rest/v1/recommendations"), resolvingAgainstBaseURL: false)!
+        components.queryItems = [
+            URLQueryItem(name: "select", value: "id"),
+            URLQueryItem(name: "user_id", value: "eq.\(userId)"),
+            URLQueryItem(name: "item_id", value: "eq.\(itemId)"),
+            URLQueryItem(name: "order", value: "created_at.desc"),
+            URLQueryItem(name: "limit", value: "1"),
+        ]
+        var request = URLRequest(url: components.url!)
+        request.setValue(anonKey, forHTTPHeaderField: "apikey")
+        request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+        struct Row: Codable { let id: String }
+        return (try? await URLSession.shared.data(for: request))
+            .flatMap { try? JSONDecoder().decode([Row].self, from: $0.0) }?
+            .first?.id
+    }
+
+    /// The saved_posts row that was just created for a recommendation in a
+    /// collection, so its note can be carried across.
+    private func savedPostId(recommendationId: String, listId: String) async -> String? {
+        guard let token = try? await validToken() else { return nil }
+        var components = URLComponents(url: baseURL.appendingPathComponent("/rest/v1/saved_posts"), resolvingAgainstBaseURL: false)!
+        components.queryItems = [
+            URLQueryItem(name: "select", value: "id"),
+            URLQueryItem(name: "recommendation_id", value: "eq.\(recommendationId)"),
+            URLQueryItem(name: "list_id", value: "eq.\(listId)"),
+            URLQueryItem(name: "limit", value: "1"),
+        ]
+        var request = URLRequest(url: components.url!)
+        request.setValue(anonKey, forHTTPHeaderField: "apikey")
+        request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+        struct Row: Codable { let id: String }
+        return (try? await URLSession.shared.data(for: request))
+            .flatMap { try? JSONDecoder().decode([Row].self, from: $0.0) }?
+            .first?.id
     }
 
     /// TestFlight feedback (Aug 24) found a case upsertRecommendation's own
