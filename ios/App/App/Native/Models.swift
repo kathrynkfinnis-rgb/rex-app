@@ -332,6 +332,7 @@ struct RexNotification: Codable, Identifiable {
         entity_type == "recommendation" && data?["category"]?.stringValue == "trip"
     }
 
+
     var linkedTitle: String? { data?["title"]?.stringValue }
     /// Oct 5 — "can't click through 'want to try' on the notification
     /// screen." A want's notifications carry entity_type 'want' (the like
@@ -589,6 +590,11 @@ struct EditorialCollectionItem: Codable, Identifiable {
     }
 
     var isTrip: Bool { items?.type == "trip" }
+    /// Oct 14 — "when I click on a list it should take me to the list with the
+    /// component Rexes." Same fault the trip above had on 3 October, and only
+    /// the trip was fixed: a list is also a page whose point is what is inside
+    /// it, and its contents hang off its recommendation rather than its item.
+    var isList: Bool { items?.type == "list" }
 }
 
 // MARK: - Import (#109 "Lists" category, #15/#38 native trip import)

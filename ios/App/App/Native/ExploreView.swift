@@ -633,8 +633,17 @@ struct ExploreView: View {
                     // the stops. TripDetailView is addressed by the trip's
                     // recommendation, so that's looked up on tap rather than
                     // fetched for every card on the shelf.
+                    // Oct 14 — "when I click on a list it should take me to
+                    // the list with the component Rexes." A list is the same
+                    // shape of thing as a trip: a page whose point is what is
+                    // inside it. On 3 October the trip got its own route here
+                    // and the list did not, so a curated list opened its bare
+                    // item page — the title, the REX account, a review, and
+                    // none of the podcasts it was recommending.
                     if item.isTrip {
                         Task { await openTrip(itemId: itemId, title: item.title) }
+                    } else if item.isList {
+                        Task { await openList(itemId: itemId, title: item.title) }
                     } else {
                         pushedItemId = itemId
                     }
@@ -655,6 +664,17 @@ struct ExploreView: View {
         if let recs = try? await RexAPI.shared.fetchRecommendations(forItem: itemId),
            let trip = recs.first {
             pushedTrip = TripRoute(recommendationId: trip.id, title: title)
+        } else {
+            pushedItemId = itemId
+        }
+    }
+
+    /// Same lookup openTrip does: the page is addressed by the recommendation
+    /// rather than the item, and a shelf holds item ids.
+    private func openList(itemId: String, title: String) async {
+        if let recs = try? await RexAPI.shared.fetchRecommendations(forItem: itemId),
+           let list = recs.first {
+            pushedList = ListRoute(recommendationId: list.id, title: title)
         } else {
             pushedItemId = itemId
         }

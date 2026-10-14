@@ -612,6 +612,11 @@ struct ItemDetailView: View {
             wantedByRow
             rankRow
             ticketsSection
+                // Oct 14 — "need more space between Gemma's profile picture
+                // and the line below." The name under the last face and the
+                // row of buttons were touching, so a person and a control read
+                // as one stack.
+                .padding(.bottom, 4)
 
 
             // Oct 4 — "the Google reviews line is corrupted on place cards."
@@ -1652,38 +1657,97 @@ struct ItemDetailView: View {
         }
     }
 
+    /// Oct 14 — "don't need any of this section, you should only be able to
+    /// update your take from the edit three dots."
+    ///
+    /// My last pass got this half right and half backwards. It built the card
+    /// she asked for and then left the rating picker showing whenever you
+    /// weren't editing — which is always — so the form she wanted gone sat
+    /// directly above the card that replaced it.
+    ///
+    /// Once you have written a take, this is a take: the card, and a menu on
+    /// it. The heading, the want chip, the five buttons and the Update button
+    /// are all the machinery of writing one, and there is nothing to write.
+    /// They come back whole when you ask to edit, and when there is nothing
+    /// there yet — which is the only time a form is the right thing on screen.
     private var yourTakeSection: some View {
         VStack(alignment: .leading, spacing: 10) {
+            if let myRec, !(myRec.note ?? "").isEmpty, !isEditingNote {
+                myTakeCard(myRec)
+            } else {
+                takeEditor
+            }
+        }
+        .padding(16)
+    }
+
+    /// What you wrote, in the shape a friend's take takes.
+    private func myTakeCard(_ myRec: FeedRecommendation) -> some View {
+        VStack(alignment: .leading, spacing: 6) {
             HStack {
-                Text(myRec != nil ? "Update your take" : "Your take")
-                    .font(.system(size: 20, weight: .semibold, design: .rounded))
-                    .foregroundStyle(RexColor.foreground)
+                HStack(spacing: 6) {
+                    UserAvatarView(
+                        url: myRec.profiles?.avatar_url,
+                        name: myRec.profiles?.display_name ?? myRec.profiles?.username ?? "You",
+                        size: 24
+                    )
+                    Text(myRec.profiles?.display_name ?? myRec.profiles?.username ?? "You")
+                        .font(.system(size: 14, weight: .semibold))
+                        .foregroundStyle(RexColor.foreground)
+                }
                 Spacer()
-                // "Still not able to update location within a card when
-                // looking from a collection" — this screen only ever had
-                // the inline rating/note above, never the full edit sheet
-                // (title/address/subcategories/etc.) every other card
-                // context (Feed, Profile, Trip, List) already opens via its
-                // own "Edit" — a card reached through Collections lands
-                // here with no way to get to it at all.
-                if let myRec {
+                RexRatingBadge(raw: myRec.rating)
+            }
+            HStack(alignment: .top, spacing: RexSpacing.sm) {
+                Text(linked: "\u{201C}\(myRec.note ?? "")\u{201D}")
+                    .font(RexFont.text(15))
+                    .foregroundStyle(RexColor.foreground.opacity(0.9))
+                    .fixedSize(horizontal: false, vertical: true)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                // Everything you can do to your own take lives here now.
+                Menu {
+                    Button {
+                        note = myRec.note ?? ""
+                        rating = myRec.rating
+                        isEditingNote = true
+                    } label: {
+                        Label("Edit what I wrote", systemImage: "pencil")
+                    }
                     Button {
                         activeSheet = .edit(myRec)
                     } label: {
-                        HStack(spacing: 4) {
-                            Image(systemName: "pencil").font(.system(size: 11))
-                            Text("Edit details").font(RexFont.text(12, weight: .semibold))
-                        }
-                        .foregroundStyle(RexColor.primary)
+                        Label("Edit the details", systemImage: "slider.horizontal.3")
                     }
-                    .buttonStyle(.plain)
+                    Button {
+                        Task { await toggleWant() }
+                    } label: {
+                        Label(
+                            wanted ? "Off the want-to-try list" : "Add to want-to-try",
+                            systemImage: wanted ? "bookmark.slash" : "bookmark"
+                        )
+                    }
+                } label: {
+                    Image(systemName: "ellipsis")
+                        .font(.system(size: 15, weight: .semibold))
+                        .foregroundStyle(RexColor.mutedForeground)
+                        .frame(width: 32, height: 28)
+                        .contentShape(Rectangle())
                 }
             }
+        }
+        .padding(12)
+        .background(RexColor.card)
+        .clipShape(RoundedRectangle(cornerRadius: 14))
+        .overlay(RoundedRectangle(cornerRadius: 14).stroke(RexColor.border, lineWidth: 1))
+    }
 
-            // Independent of the rating below — a want is its own row, not
-            // a step toward posting one. Lets you flag/unflag "want to try"
-            // right here instead of only ever being reachable from the
-            // feed card's own bookmark icon.
+    /// Writing one, or changing one. The whole form, only when it is wanted.
+    private var takeEditor: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            Text(myRec != nil ? "Update your take" : "Your take")
+                .font(RexFont.display(20))
+                .foregroundStyle(RexColor.foreground)
+
             Button {
                 Task { await toggleWant() }
             } label: {
@@ -1693,99 +1757,19 @@ struct ItemDetailView: View {
                 }
                 .font(RexFont.text(13, weight: .semibold))
                 .foregroundStyle(wanted ? RexColor.primary : RexColor.mutedForeground)
-                .padding(.horizontal, RexSpacing.md)
-                .padding(.vertical, 8)
-                .background(wanted ? RexColor.badgeBackground : RexColor.card)
-                .clipShape(Capsule())
-                .overlay(Capsule().stroke(RexColor.border, lineWidth: wanted ? 0 : 1))
             }
             .buttonStyle(.plain)
             .disabled(isTogglingWant)
 
-            // Oct 13 — "please can the REX details appear the same as if
-            // someone else wrote it but that I can edit it if I need to."
-            //
-            // A page you had Rex'd showed five rating buttons, an open text
-            // box and an Update button — a form, permanently mid-edit, where a
-            // friend's take on the same page is a tidy card you read. So your
-            // own words looked like unfinished input and everyone else's
-            // looked like an opinion.
-            //
-            // Yours is the same card now, with your face and your badge on it.
-            // The controls come back when you ask to change something, and
-            // when there is nothing written yet — which is the one time a form
-            // is the right answer, because there is nothing to read.
-            if !isEditingNote {
-                RexRatingPicker(value: $rating)
-            }
+            RexRatingPicker(value: $rating)
 
-            // Oct 4 — "don't need to see my review in the text box here (on
-            // all pages, not just films) — would rather see my comment and
-            // then be able to press a three dot edit button to edit it."
-            //
-            // A take you have already written is something to read, not a form
-            // field waiting for input. An editable box makes the page look
-            // unfinished every time you open it, and puts a keyboard one
-            // mistaken tap away from your own words. Written takes read as
-            // text; the box comes back when you ask for it, or when there is
-            // nothing there yet.
-            if let myRec, !(myRec.note ?? "").isEmpty, !isEditingNote {
-                VStack(alignment: .leading, spacing: 6) {
-                HStack {
-                    HStack(spacing: 6) {
-                        UserAvatarView(
-                            url: myRec.profiles?.avatar_url,
-                            name: myRec.profiles?.display_name ?? myRec.profiles?.username ?? "You",
-                            size: 24
-                        )
-                        Text(myRec.profiles?.display_name ?? myRec.profiles?.username ?? "You")
-                            .font(.system(size: 14, weight: .semibold))
-                            .foregroundStyle(RexColor.foreground)
-                    }
-                    Spacer()
-                    RexRatingBadge(raw: myRec.rating)
-                }
-                HStack(alignment: .top, spacing: RexSpacing.sm) {
-                    Text(linked: "\u{201C}\(myRec.note ?? "")\u{201D}")
-                        .font(RexFont.text(15))
-                        .foregroundStyle(RexColor.foreground.opacity(0.9))
-                        .fixedSize(horizontal: false, vertical: true)
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                    Menu {
-                        Button {
-                            note = myRec.note ?? ""
-                            isEditingNote = true
-                        } label: {
-                            Label("Edit what I wrote", systemImage: "pencil")
-                        }
-                        Button {
-                            activeSheet = .edit(myRec)
-                        } label: {
-                            Label("Edit the details", systemImage: "slider.horizontal.3")
-                        }
-                    } label: {
-                        Image(systemName: "ellipsis")
-                            .font(.system(size: 15, weight: .semibold))
-                            .foregroundStyle(RexColor.mutedForeground)
-                            .frame(width: 32, height: 28)
-                            .contentShape(Rectangle())
-                    }
-                }
-                }
+            TextField("What did you love about it?", text: $note, axis: .vertical)
+                .lineLimit(3...14)
                 .padding(12)
                 .background(RexColor.card)
                 .clipShape(RoundedRectangle(cornerRadius: 14))
                 .overlay(RoundedRectangle(cornerRadius: 14).stroke(RexColor.border, lineWidth: 1))
-            } else {
-                TextField("What did you love about it?", text: $note, axis: .vertical)
-                    .lineLimit(3...14)
-                    .padding(12)
-                    .background(RexColor.card)
-                    .clipShape(RoundedRectangle(cornerRadius: 14))
-                    .overlay(RoundedRectangle(cornerRadius: 14).stroke(RexColor.border, lineWidth: 1))
-            }
 
-            if myRec == nil || isEditingNote || (myRec?.note ?? "").isEmpty {
             Button(action: save) {
                 if isSaving {
                     ProgressView().tint(RexColor.primaryForeground).frame(maxWidth: .infinity)
@@ -1798,9 +1782,7 @@ struct ItemDetailView: View {
             .foregroundStyle(RexColor.primaryForeground)
             .clipShape(Capsule())
             .disabled(isSaving)
-            }
         }
-        .padding(16)
     }
 
     /// More by the same author, Goodreads-style — covers you can run your eye
