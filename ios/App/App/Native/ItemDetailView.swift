@@ -816,10 +816,18 @@ struct ItemDetailView: View {
     private var watchOnSection: some View {
         if let details, !details.watchOn.isEmpty {
             VStack(alignment: .leading, spacing: 6) {
+                // Oct 14 — "it's the Watch on that is the problem." The
+                // heading had no horizontal padding while the chips inside the
+                // scroller did, so the label sat against the screen edge and
+                // the thing it labels began 16pt to its right. The padding is
+                // on the scroller's contents rather than the scroller so chips
+                // can still run off the edge as you swipe; the heading needs
+                // its own.
                 Text("Watch on")
                     .font(.system(size: 11, weight: .semibold))
                     .tracking(0.4)
                     .foregroundStyle(RexColor.mutedForeground)
+                    .padding(.horizontal, 16)
 
                 ScrollView(.horizontal, showsIndicators: false) {
                     HStack(spacing: RexSpacing.sm) {
@@ -869,7 +877,7 @@ struct ItemDetailView: View {
                     .padding(.horizontal, 16)
                 }
             }
-            .padding(.top, RexSpacing.sm)
+            .padding(.top, RexSpacing.lg)
         }
     }
 
