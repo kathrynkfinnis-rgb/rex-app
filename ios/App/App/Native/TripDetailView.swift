@@ -375,9 +375,17 @@ struct TripDetailView: View {
             // Oct 14 — the stops' own photographs, folded, when there are
             // any. A trip is places, and the places have pictures.
             Group {
-                if bandPhotos.count > 1 {
-                    RexConcertinaBand(urls: bandPhotos)
-                        .frame(height: RexHeaderMetrics.photoBandHeight, alignment: .top)
+                if let hero = bandPhotos.first {
+                    ZStack(alignment: .topTrailing) {
+                        RexPhotoBand(url: hero)
+                        tripArtwork
+                            .frame(width: RexHeaderMetrics.thumbWidth, height: RexHeaderMetrics.thumbHeight)
+                            .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
+                            .shadow(color: Color.black.opacity(0.28), radius: 13, x: 0, y: 8)
+                            .padding(.trailing, RexHeaderMetrics.thumbTrailing)
+                            .padding(.top, RexHeaderMetrics.photoThumbTop)
+                    }
+                    .frame(height: RexHeaderMetrics.photoBandHeight, alignment: .top)
                 } else {
                     ZStack(alignment: .topTrailing) {
                         RexBannerBand(category: .trip)

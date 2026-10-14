@@ -35,11 +35,11 @@ enum RexHeaderMetrics {
     static let photoBandHeight: CGFloat = 250
     static let photoWaveHeight: CGFloat = 52
     static let photoSheetTop: CGFloat = 245
-    /// Four panels at 390pt wide is about 95pt each. Five is too narrow to
-    /// read as a photograph; the rest belong in the carousel further down.
-    static let concertinaPanels = 4
 
     static let thumbTop: CGFloat = 52
+    /// On the taller photo band the card sits lower, so it still crosses the
+    /// wave and still stops short of the title's first line.
+    static let photoThumbTop: CGFloat = 132
     static let thumbWidth: CGFloat = 84
     static let thumbHeight: CGFloat = 126
     static let thumbTrailing: CGFloat = 20
@@ -71,46 +71,31 @@ struct RexWaveEdge: Shape {
     }
 }
 
-/// Oct 14 — "if there are uploaded photos for trips / places, please can you
-/// use those in a concertina type effect."
+/// Oct 14 — "the concertina photo is not working — can we please go back to
+/// having the user uploaded photo at the top, with the thumbnail being the
+/// Google pic."
 ///
-/// A folded screen. Each panel turns about the edge it shares with the one
-/// before it, alternating, so what sits between two panels is a hinge rather
-/// than a gap — and the faces turned away from the light carry a little
-/// shadow, which is the thing that makes it read as folded rather than as four
-/// photographs with spaces between them.
+/// So: one photograph across the band, not four folded. The fold was a nice
+/// drawing and a bad photograph — at a quarter of 390pt each panel was about
+/// 95pt wide and turned 26° away, which is not enough of a picture to be worth
+/// looking at, and the shading that sold the fold darkened the photos as well.
 ///
-/// A rotation does not change what a view claims in layout, so each panel
-/// draws narrower than its slot and the dark behind shows through at the
-/// seams. That is the fold, and it is why the ground is dark rather than the
-/// page's own cream.
-struct RexConcertinaBand: View {
-    let urls: [String]
+/// The hierarchy that replaces it is the right one anyway: the picture someone
+/// who went there actually took goes across the top, and Google's goes in the
+/// card resting on it. A listing photo supports a personal one; it should not
+/// outrank it.
+struct RexPhotoBand: View {
+    let url: String
 
     var body: some View {
         ZStack(alignment: .bottom) {
-            Color(red: 0.055, green: 0.118, blue: 0.086)
-
-            HStack(spacing: 0) {
-                ForEach(Array(urls.prefix(RexHeaderMetrics.concertinaPanels).enumerated()), id: \.offset) { index, url in
-                    let turnedAway = index.isMultiple(of: 2)
-                    GoogleSafeAsyncImage(url: URL(string: url)!) { image in
-                        image.resizable().aspectRatio(contentMode: .fill)
-                    } placeholder: {
-                        RexColor.muted
-                    }
-                    .frame(maxWidth: .infinity)
-                    .frame(height: RexHeaderMetrics.photoBandHeight)
-                    .clipped()
-                    .overlay(Color.black.opacity(turnedAway ? 0.22 : 0))
-                    .rotation3DEffect(
-                        .degrees(turnedAway ? -26 : 26),
-                        axis: (x: 0, y: 1, z: 0),
-                        anchor: turnedAway ? .trailing : .leading,
-                        perspective: 0.42
-                    )
-                }
+            GoogleSafeAsyncImage(url: URL(string: url)!) { image in
+                image.resizable().aspectRatio(contentMode: .fill)
+            } placeholder: {
+                RexColor.muted
             }
+            .frame(width: UIScreen.main.bounds.width, height: RexHeaderMetrics.photoBandHeight)
+            .clipped()
 
             RexWaveEdge()
                 .fill(RexColor.background)
@@ -119,7 +104,7 @@ struct RexConcertinaBand: View {
         .frame(height: RexHeaderMetrics.photoBandHeight)
         .frame(maxWidth: .infinity)
         .clipped()
-        .accessibilityLabel("Photographs of this place")
+        .accessibilityLabel("A photograph of this place")
     }
 }
 

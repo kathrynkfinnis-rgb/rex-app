@@ -520,9 +520,20 @@ struct ItemDetailView: View {
             // not. A folded screen of real photos is worth 30% of the screen;
             // a flat pattern is worth 20%, and no more.
             Group {
-            if bandPhotos.count > 1 {
-                RexConcertinaBand(urls: bandPhotos)
-                    .frame(height: RexHeaderMetrics.photoBandHeight, alignment: .top)
+            // Oct 14 — "the user uploaded photo at the top, with the thumbnail
+            // being the Google pic." A picture somebody who went there took
+            // goes across the band; Google's sits in the card on it. A listing
+            // photo supports a personal one and should not outrank it.
+            if let hero = heroPhoto {
+                ZStack(alignment: .topTrailing) {
+                    RexPhotoBand(url: hero)
+                    if let card = cardPhoto {
+                        RexHeaderThumbnail(url: card, category: category)
+                            .padding(.trailing, RexHeaderMetrics.thumbTrailing)
+                            .padding(.top, RexHeaderMetrics.photoThumbTop)
+                    }
+                }
+                .frame(height: RexHeaderMetrics.photoBandHeight, alignment: .top)
             } else {
                 ZStack(alignment: .topTrailing) {
                     RexBannerBand(category: category)
@@ -548,7 +559,7 @@ struct ItemDetailView: View {
                 RexCategoryPill(category: category)
 
                 Text(item.title)
-                    .font(RexFont.display(min(44, titleSize(for: item.title))))
+                    .font(RexFont.display(min(34, titleSize(for: item.title))))
                     .lineSpacing(-4)
                     .foregroundStyle(RexColor.foreground)
                     .fixedSize(horizontal: false, vertical: true)
@@ -558,7 +569,7 @@ struct ItemDetailView: View {
                 // cuisine and a neighbourhood, a year and a run of seasons.
                 if let summary = standfirst(item: item, category: category) {
                     Text(summary)
-                        .font(RexFont.editorial(24))
+                        .font(RexFont.editorial(19))
                         .foregroundStyle(RexColor.primary)
                         .fixedSize(horizontal: false, vertical: true)
                         .padding(.top, 8)
@@ -576,6 +587,10 @@ struct ItemDetailView: View {
                 }
             }
             .padding(.top, 10)
+            // Oct 14 — "need a bigger gap here." The title block ran straight
+            // into Rex'd by with nothing between them, so a sentence about the
+            // programme and a list of people reading as one paragraph.
+            .padding(.bottom, 18)
 
             savedByRow
             wantedByRow
@@ -760,30 +775,35 @@ struct ItemDetailView: View {
     /// wrapping, so a title on six services doesn't push the reviews down.
     /// Books, films and TV have a portrait cover; a place has a photograph.
     /// Podcasts are square artwork, so they take the square.
-    /// Oct 14 — what goes across the top when there are photographs.
-    ///
-    /// Everyone's own photos first, then Google's: a picture somebody who went
-    /// there actually took beats a listing photo, and this is the one place on
-    /// the page where only a handful get shown.
-    ///
-    /// One photo is not a concertina — a single panel folded against nothing
-    /// is just a crooked picture — so it takes more than one to earn the
-    /// treatment, and a lone photo stays the cover on the texture.
-    private var bandPhotos: [String] {
-        var seen = Set<String>()
-        return (communityPhotoURLs + (item?.google_photo_urls ?? []))
-            .filter { seen.insert($0).inserted }
+    /// Oct 14 — the photograph across the band: one somebody who went there
+    /// uploaded. Nil when nobody has, which is when the category's texture
+    /// takes the band instead.
+    private var heroPhoto: String? {
+        communityPhotoURLs.first
+    }
+
+    /// The card resting on it: Google's picture of the place, falling back to
+    /// whatever the item itself carries. Never the same image as the band —
+    /// the same photograph twice is worse than one.
+    private var cardPhoto: String? {
+        let google = (item?.google_photo_urls ?? []).first
+        let candidate = google ?? item?.image_url
+        return candidate == heroPhoto ? nil : candidate
     }
 
     /// Archivo Black is wide, and a 44pt title that runs to five lines stops
     /// being a title. Long names step down rather than wrap forever; short
     /// ones keep the full size, which is the whole reason for the face.
+    /// Oct 14 — "font size can come down quite a bit on both the title and
+    /// the description underneath." It was set against the mockup, where a
+    /// title sits alone on a wide artboard; on a phone, under a band, above a
+    /// row of faces, 44pt of Archivo Black is shouting.
     private func titleSize(for title: String) -> CGFloat {
         switch title.count {
-        case ..<18: return 44
-        case ..<30: return 38
-        case ..<48: return 32
-        default: return 28
+        case ..<18: return 34
+        case ..<30: return 30
+        case ..<48: return 26
+        default: return 23
         }
     }
 
@@ -954,15 +974,25 @@ struct ItemDetailView: View {
         if category == .place || category == .event {
             return placeSummary(item: item, category: category)
         }
-        guard let synopsis = details?.synopsis?.trimmingCharacters(in: .whitespacesAndNewlines),
-              !synopsis.isEmpty else { return nil }
-        // First sentence, unless that is already most of it.
-        if synopsis.count <= 180 { return synopsis }
-        if let stop = synopsis.firstIndex(where: { $0 == "." || $0 == "!" || $0 == "?" }) {
-            let sentence = String(synopsis[...stop])
-            if sentence.count >= 40 { return sentence }
+        // Oct 14 — this used to be the first sentence of the synopsis, and the
+        // synopsis itself sits a few inches below under the facts strip. So
+        // "Alice is devastated when her best friend Steve starts dating her
+        // 26-year-old daughter Izzy" was on the page twice, once in Cormorant
+        // and once in DM Sans, which reads as a mistake because it is one.
+        //
+        // The byline says what kind of thing this is and when — the line you
+        // would say after the title out loud. The plot has its own place.
+        // `facts` is already the line this wants — "3 seasons", "1h 58m ·
+        // Drama, Romance", "384 pages" — assembled wherever the catalogue was
+        // read. An author or a creator goes in front of it where we have one.
+        var parts: [String] = []
+        if let who = item.subtitle?.trimmingCharacters(in: .whitespaces), !who.isEmpty {
+            parts.append(who)
         }
-        return String(synopsis.prefix(180)) + "\u{2026}"
+        if let facts = details?.facts?.trimmingCharacters(in: .whitespaces), !facts.isEmpty {
+            parts.append(facts)
+        }
+        return parts.isEmpty ? nil : parts.joined(separator: " \u{00B7} ")
     }
 
     /// The hard facts under the standfirst: hours for a place, certificate and
