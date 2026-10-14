@@ -32,6 +32,11 @@ struct RecommendationCardView: View {
     /// should take you to a filtered view of the map with just the pins for
     /// that trip". Trip recommendation id and title.
     var onViewTripOnMap: ((String, String) -> Void)? = nil
+    /// Oct 14 — "users should be able to show Lists as full titles if it's
+    /// more of a 'to do' list format rather than a list of Rexes." Set by the
+    /// list page when its author has said so; off everywhere else, where the
+    /// three-line cut is what keeps a column of cards readable.
+    var showsFullTitle: Bool = false
 
     @State private var noteExpanded = false
     /// How tall the note wants to be, and how tall it is allowed to be — the
@@ -145,7 +150,12 @@ struct RecommendationCardView: View {
                             .foregroundStyle(RexColor.foreground)
                             // Sept 5 — "the titles on the feed should be full
                             // unless it goes over 3 lines".
-                            .lineLimit(3)
+                            //
+                            // Oct 14 — except on a list whose author has said
+                            // it's a to-do list, where the title is the whole
+                            // instruction and cutting it loses the job.
+                            .lineLimit(showsFullTitle ? nil : 3)
+                            .fixedSize(horizontal: false, vertical: showsFullTitle)
                             .truncationMode(.tail)
                             .padding(.trailing, titleTrailingReserve)
 

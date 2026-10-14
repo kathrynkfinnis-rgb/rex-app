@@ -230,11 +230,19 @@ final class RexAPI {
     private var branchCopyColumn: [String: Bool] = [:]
 
     private func hasBranchCopyColumn(on resourcePath: String) async -> Bool {
-        if let known = branchCopyColumn[resourcePath] { return known }
+        await hasColumn("is_branch_copy", on: resourcePath)
+    }
+
+    /// The general form of the above, keyed by the pair that actually decides
+    /// the answer: which object, which column. A migration reaches one object
+    /// at a time, so "the table has it" never implies "the view has it".
+    private func hasColumn(_ column: String, on resourcePath: String) async -> Bool {
+        let key = "\(resourcePath):\(column)"
+        if let known = branchCopyColumn[key] { return known }
         guard let token = try? await validToken() else { return false }
         var components = URLComponents(url: baseURL.appendingPathComponent(resourcePath), resolvingAgainstBaseURL: false)!
         components.queryItems = [
-            URLQueryItem(name: "select", value: "is_branch_copy"),
+            URLQueryItem(name: "select", value: column),
             URLQueryItem(name: "limit", value: "1"),
         ]
         var request = URLRequest(url: components.url!)
@@ -243,8 +251,56 @@ final class RexAPI {
         let ok = (try? await URLSession.shared.data(for: request))
             .flatMap { ($0.1 as? HTTPURLResponse)?.statusCode }
             .map { $0 < 400 } ?? false
-        branchCopyColumn[resourcePath] = ok
+        branchCopyColumn[key] = ok
         return ok
+    }
+
+    /// Oct 14 — "users should be able to show Lists as full titles if it's
+    /// more of a 'to do' list format rather than a list of Rexes."
+    ///
+    /// "Plant spring-flowering bulbs (daffodils, crocuses, alliums,
+    /// hyacinths) for co…" is a garden job, not a title, and a card that cuts
+    /// it off at three lines loses the instruction. On a list of Rexes the
+    /// cut is right — the titles are names, and uniform cards read faster.
+    /// Which of the two a list is is something only its author knows, so
+    /// they say, and it's stored on the list rather than on the device: the
+    /// people they share it with are reading the same list.
+    func listShowsFullTitles(recommendationId: String) async -> Bool {
+        guard await hasColumn("list_full_titles", on: "/rest/v1/recommendations"),
+              let token = try? await validToken() else { return false }
+        var components = URLComponents(url: baseURL.appendingPathComponent("/rest/v1/recommendations"), resolvingAgainstBaseURL: false)!
+        components.queryItems = [
+            URLQueryItem(name: "select", value: "list_full_titles"),
+            URLQueryItem(name: "id", value: "eq.\(recommendationId)"),
+            URLQueryItem(name: "limit", value: "1"),
+        ]
+        var request = URLRequest(url: components.url!)
+        request.setValue(anonKey, forHTTPHeaderField: "apikey")
+        request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+        guard let (data, response) = try? await URLSession.shared.data(for: request),
+              let http = response as? HTTPURLResponse, http.statusCode < 400 else { return false }
+        struct Row: Codable { let list_full_titles: Bool? }
+        return ((try? JSONDecoder().decode([Row].self, from: data)) ?? []).first?.list_full_titles ?? false
+    }
+
+    func setListShowsFullTitles(recommendationId: String, _ on: Bool) async throws {
+        guard await hasColumn("list_full_titles", on: "/rest/v1/recommendations") else {
+            throw RexAPIError.server("This needs the latest version of Rex.")
+        }
+        let token = try await validToken()
+        var components = URLComponents(url: baseURL.appendingPathComponent("/rest/v1/recommendations"), resolvingAgainstBaseURL: false)!
+        components.queryItems = [URLQueryItem(name: "id", value: "eq.\(recommendationId)")]
+        var request = URLRequest(url: components.url!)
+        request.httpMethod = "PATCH"
+        request.setValue(anonKey, forHTTPHeaderField: "apikey")
+        request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        request.httpBody = try JSONSerialization.data(withJSONObject: ["list_full_titles": on])
+
+        let (data, response) = try await URLSession.shared.data(for: request)
+        guard let http = response as? HTTPURLResponse, http.statusCode < 400 else {
+            throw RexAPIError.server(friendlyError(data, fallback: "Couldn't change how this list reads."))
+        }
     }
 
     func signUp(email: String, password: String) async throws {

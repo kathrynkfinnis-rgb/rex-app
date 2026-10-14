@@ -101,6 +101,9 @@ struct CompactHeadingRow: View {
 /// thumbnail, name, what it is or where it is, rating.
 struct CompactItemRow: View {
     let rec: FeedRecommendation
+    /// Oct 14 — a to-do list's rows are instructions, not names, so they
+    /// wrap instead of being cut at one line. See RecommendationCardView.
+    var showsFullTitle: Bool = false
 
     private var category: RexCategory { RexCategory(rawType: rec.items?.type) }
 
@@ -112,7 +115,9 @@ struct CompactItemRow: View {
                 Text(rec.items?.title ?? "Untitled")
                     .font(RexFont.text(14, weight: .semibold))
                     .foregroundStyle(RexColor.foreground)
-                    .lineLimit(1)
+                    .lineLimit(showsFullTitle ? nil : 1)
+                    .fixedSize(horizontal: false, vertical: showsFullTitle)
+                    .multilineTextAlignment(.leading)
                 if let detail = detailLine, !detail.isEmpty {
                     Text(detail)
                         .font(RexFont.text(11.5))

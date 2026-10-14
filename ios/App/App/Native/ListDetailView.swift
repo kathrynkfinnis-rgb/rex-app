@@ -63,6 +63,11 @@ struct ListDetailView: View {
     /// Oct 14 — "for a list of places, can we have a map view?" State rather
     /// than AppStorage: see the note on ItineraryViewToggle.
     @State private var mapped = false
+    /// Oct 14 — "users should be able to show Lists as full titles if it's
+    /// more of a 'to do' list format rather than a list of Rexes." Stored on
+    /// the list, not the device: everyone reading it is reading the same list.
+    @State private var fullTitles = false
+    @State private var isSettingTitles = false
     @State private var isMutating = false
     @State private var mutationError: String?
     @State private var renamingHeading: String?
@@ -266,6 +271,23 @@ struct ListDetailView: View {
                     // remove items, notes — the same way a trip's Edit does.
                     Button("Edit") { showingListEditor = true }
                         .disabled(listRec == nil)
+                }
+                ToolbarItem(placement: .topBarTrailing) {
+                    // Oct 14 — what kind of list this is. Only its author can
+                    // answer that, and the answer travels with the list.
+                    Menu {
+                        Button {
+                            Task { await setFullTitles(!fullTitles) }
+                        } label: {
+                            Label(
+                                fullTitles ? "Shorten long titles" : "Show full titles",
+                                systemImage: fullTitles ? "text.alignleft" : "text.justify"
+                            )
+                        }
+                        .disabled(isSettingTitles)
+                    } label: {
+                        Image(systemName: "ellipsis.circle")
+                    }
                 }
             }
         }
@@ -487,7 +509,7 @@ struct ListDetailView: View {
     private func itemRow(_ item: FeedRecommendation) -> some View {
         if compact && !isEditing {
             NavigationLink(value: item.item_id) {
-                CompactItemRow(rec: item)
+                CompactItemRow(rec: item, showsFullTitle: fullTitles)
             }
             .buttonStyle(.plain)
             // The expanded view's Edit button is the one thing a compact
@@ -505,7 +527,7 @@ struct ListDetailView: View {
     private func expandedItemRow(_ item: FeedRecommendation) -> some View {
         VStack(alignment: .leading, spacing: 0) {
             NavigationLink(value: item.item_id) {
-                RecommendationCardView(rec: item)
+                RecommendationCardView(rec: item, showsFullTitle: fullTitles)
             }
             .buttonStyle(.plain)
 
@@ -581,6 +603,7 @@ struct ListDetailView: View {
             listItemId = listRec?.item_id
             subtitle = listRec?.items?.subtitle ?? ""
             longNote = await RexAPI.shared.fetchLongNote(recommendationId: route.recommendationId) ?? ""
+            fullTitles = await RexAPI.shared.listShowsFullTitles(recommendationId: route.recommendationId)
             // Best-effort, same as isOwner: not knowing shows no banner
             // rather than breaking the page. Kept out of an `&&` — its
             // right-hand side is an autoclosure, which can't be awaited.
@@ -591,6 +614,21 @@ struct ListDetailView: View {
             errorMessage = error.localizedDescription
         }
         isLoading = false
+    }
+
+    private func setFullTitles(_ on: Bool) async {
+        isSettingTitles = true
+        defer { isSettingTitles = false }
+        let was = fullTitles
+        // Flip first: this is a reading preference, and waiting on a round
+        // trip to see the list redraw makes the menu feel broken.
+        withAnimation(.snappy) { fullTitles = on }
+        do {
+            try await RexAPI.shared.setListShowsFullTitles(recommendationId: route.recommendationId, on)
+        } catch {
+            withAnimation(.snappy) { fullTitles = was }
+            mutationError = error.localizedDescription
+        }
     }
 
     /// Bulk-renames a heading across every item under it (see
