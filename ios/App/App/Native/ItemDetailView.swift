@@ -118,7 +118,23 @@ struct ItemDetailView: View {
     var body: some View {
         ScrollView {
             if isLoading {
-                ProgressView().padding(.top, 80)
+                // Oct 14 — "this is the weird bar on my loading screen. I was trying
+                // to load my profile."
+                //
+                // A ScrollView takes its content's width, and a bare
+                // ProgressView is about twenty points wide. The page's
+                // background is painted behind that content and told to ignore
+                // the safe area, so while the only thing on the page was a
+                // spinner it painted a narrow strip the full height of the
+                // screen instead of the whole page — the bar, sitting right
+                // behind the spinner, in every pushed screen that loads this
+                // way.
+                //
+                // Filling the width is also just what a loading state should
+                // do: hold the space the content is about to occupy.
+                ProgressView()
+                    .frame(maxWidth: .infinity)
+                    .padding(.top, 80)
             } else if let errorMessage {
                 errorState(errorMessage)
             } else if let item {
