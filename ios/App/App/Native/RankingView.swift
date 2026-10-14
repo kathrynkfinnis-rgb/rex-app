@@ -116,9 +116,28 @@ struct RankingCompareView: View {
                     .padding(RexSpacing.xxl)
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
                 } else {
-                    // Nothing placed yet: the first thing in a category needs
-                    // no comparison, it just goes in.
-                    ProgressView().frame(maxWidth: .infinity, maxHeight: .infinity)
+                    // Oct 14 — "the order it function isn't working": this
+                    // screen, open on a spinner that never resolved.
+                    //
+                    // This branch was a second ProgressView, so every way of
+                    // arriving here with nothing to ask looked identical to
+                    // still loading, forever. It is an end state, not a
+                    // waiting one, and now says so.
+                    VStack(spacing: RexSpacing.md) {
+                        Text("Nothing to compare this against yet.")
+                            .font(RexFont.text(15, weight: .semibold))
+                            .foregroundStyle(RexColor.foreground)
+                        Text("Rex a few more \(category.pluralLabel.lowercased()) and it'll have something to weigh this one up against.")
+                            .font(RexFont.text(13))
+                            .foregroundStyle(RexColor.mutedForeground)
+                            .multilineTextAlignment(.center)
+                        Button("Close") { dismiss() }
+                            .font(RexFont.text(15, weight: .semibold))
+                            .foregroundStyle(RexColor.primary)
+                            .padding(.top, RexSpacing.xs)
+                    }
+                    .padding(RexSpacing.xxl)
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
                 }
             }
             .background(RexColor.background.ignoresSafeArea())
@@ -238,6 +257,16 @@ struct RankingCompareView: View {
         // Comparing something against itself is not a question. Happens when
         // you re-rank a book that is already placed.
         placed.removeAll { $0.item_id == newItem.id }
+        // Nor is comparing it against something the page can't show. A ranking
+        // row whose item didn't come back with it — the item was deleted, or
+        // the embed returned nothing — used to be picked as the midpoint
+        // anyway, and then the screen had a question it could not draw: the
+        // spinner that never resolved. An entry we can't put on screen isn't
+        // a question, so it doesn't go in the search at all.
+        //
+        // Dropping it also keeps the binary search honest: the midpoint is
+        // chosen from what's left, so every question still halves the range.
+        placed.removeAll { $0.items == nil }
 
         if placed.isEmpty {
             // First in its category: straight in, nothing to weigh it against.

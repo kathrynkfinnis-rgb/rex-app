@@ -131,17 +131,10 @@ struct LikesCommentsView: View {
                         commentRow(comment)
                     }
                 }
-            } else if !isLoading, !isComposing {
-                // With no box on the page, this line is the other way in.
-                Button {
-                    openComposer()
-                } label: {
-                    Text("No comments yet — be the first.")
-                        .font(RexFont.text(13))
-                        .foregroundStyle(RexColor.mutedForeground)
-                }
-                .buttonStyle(.plain)
             }
+            // Oct 14 — "don't need to say 'no comments yet be the first'."
+            // A Rex nobody has commented on now says nothing about it; the
+            // bubble in the row above is the way in, and it's enough.
 
             if isComposing {
                 composer
