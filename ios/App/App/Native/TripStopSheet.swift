@@ -22,6 +22,9 @@ struct TripStopSheet: View {
     var subcategories: [String]
     /// Editing an existing stop rather than adding a new one.
     var existing: DraftStop? = nil
+    /// Oct 14 — where this trip already is, so a search for a bar finds one
+    /// near the trip rather than one on another continent with a similar name.
+    var near: (lat: Double, lng: Double)? = nil
     var onSave: (DraftStop) -> Void
 
     @Environment(\.dismiss) private var dismiss
@@ -296,7 +299,7 @@ struct TripStopSheet: View {
             try? await Task.sleep(nanoseconds: 500_000_000)
             guard !Task.isCancelled else { return }
             async let mine = (try? await RexAPI.shared.searchMyRexItems(query: q)) ?? []
-            async let web = RexSearch.search(category: .place, query: q)
+            async let web = RexSearch.search(category: .place, query: q, near: near)
             let (m, w) = await (mine, web)
             guard !Task.isCancelled else { return }
             // Picked while this was in flight: the answer is stale.

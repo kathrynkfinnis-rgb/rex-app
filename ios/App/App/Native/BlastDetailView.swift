@@ -68,6 +68,27 @@ struct BlastDetailView: View {
 
             Divider().overlay(RexColor.border)
             composer
+                .alert("Link \u{201C}\(linkWords)\u{201D}", isPresented: Binding(
+                    get: { linkRange != nil },
+                    set: { if !$0 { linkRange = nil } }
+                )) {
+                    TextField("example.com", text: $linkURL)
+                        .textInputAutocapitalization(.never)
+                        .autocorrectionDisabled()
+                        .keyboardType(.URL)
+                    Button("Cancel", role: .cancel) { linkRange = nil }
+                    Button("Link") {
+                        if let range = linkRange, !linkURL.trimmingCharacters(in: .whitespaces).isEmpty {
+                            draft = RexLinkableTextEditor.applyLink(
+                                to: draft, range: range,
+                                url: linkURL.trimmingCharacters(in: .whitespaces)
+                            )
+                        }
+                        linkRange = nil
+                    }
+                } message: {
+                    Text("Those words become the link. Nobody sees the address.")
+                }
         }
         .background(RexColor.background.ignoresSafeArea())
         .navigationTitle("Blast")
@@ -217,6 +238,11 @@ struct BlastDetailView: View {
         }
     }
 
+    /// Oct 14 — the words being linked, and where they sit in the draft.
+    @State private var linkRange: NSRange?
+    @State private var linkWords = ""
+    @State private var linkURL = ""
+
     private var composer: some View {
         VStack(spacing: RexSpacing.sm) {
             // Oct 3 — "when you reply to a blast, you should be able to tag
@@ -259,11 +285,20 @@ struct BlastDetailView: View {
             .buttonStyle(.plain)
             .accessibilityLabel("Attach one of your Rex")
 
-            TextField("Suggest something…", text: $draft, axis: .vertical)
+            // Oct 14 — select words, tap Link. See RexLinkableTextEditor for
+            // why this is a UITextView and not a TextField.
+            RexLinkableTextEditor(
+                text: $draft,
+                placeholder: "Suggest something\u{2026}",
+                onRequestLink: { range, words in
+                    linkRange = range
+                    linkWords = words
+                    linkURL = ""
+                }
+            )
                 .font(RexFont.text(15))
-                .lineLimit(1...4)
-                .padding(.horizontal, RexSpacing.md)
-                .padding(.vertical, RexSpacing.sm)
+                .frame(minHeight: 38, maxHeight: 110)
+                .padding(.horizontal, RexSpacing.sm)
                 .background(RexColor.card)
                 .clipShape(RoundedRectangle(cornerRadius: RexRadius.input, style: .continuous))
                 .overlay(

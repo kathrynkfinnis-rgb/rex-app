@@ -864,8 +864,55 @@ struct FlowChips: View {
 /// People paste booking links, menus and articles into notes; as plain Text
 /// those were dead. AttributedString's link attribute makes them open without
 /// us having to parse or re-render the surrounding text.
+/// Oct 14 — "please can we embed the links as hyperlinks that you can then
+/// click on", and then: hyperlinking *selected words*.
+///
+/// Two kinds of link now live in what people type. An address somebody pasted,
+/// which NSDataDetector finds, and words somebody deliberately linked, which
+/// are stored as markdown — [Ultra Violette](https://…). Markdown is the
+/// storage because it is plain text: it survives a database column, an edit on
+/// the web, a copy into a message, and it degrades to something readable
+/// rather than to mojibake if anything ever fails to parse it.
+///
+/// Markdown is resolved first, and the address it carries is removed from what
+/// the detector then sees — otherwise the URL inside the parentheses would be
+/// found a second time and printed beside the words it was meant to hide
+/// behind.
+private let markdownLink = try? NSRegularExpression(
+    pattern: #"\[([^\]\n]{1,120})\]\((https?://[^\s)]{1,500})\)"#
+)
+
 func linkified(_ text: String) -> AttributedString {
+    // Markdown first: rewrite [words](url) down to `words`, remembering where
+    // each landed so the link can be applied to the shortened string.
+    var plain = ""
+    var linkRanges: [(Range<String.Index>, URL)] = []
+    if let markdownLink {
+        let ns = text as NSString
+        var cursor = 0
+        for match in markdownLink.matches(in: text, range: NSRange(location: 0, length: ns.length)) {
+            guard match.numberOfRanges == 3,
+                  let url = URL(string: ns.substring(with: match.range(at: 2)))
+            else { continue }
+            plain += ns.substring(with: NSRange(location: cursor, length: match.range.location - cursor))
+            let start = plain.endIndex
+            plain += ns.substring(with: match.range(at: 1))
+            linkRanges.append((start..<plain.endIndex, url))
+            cursor = match.range.location + match.range.length
+        }
+        plain += ns.substring(from: cursor)
+    }
+    // No markdown found means nothing was rewritten, so the original stands.
+    let text = linkRanges.isEmpty ? text : plain
+
     var attributed = AttributedString(text)
+    for (range, url) in linkRanges {
+        guard let attrRange = Range(range, in: attributed) else { continue }
+        attributed[attrRange].link = url
+        attributed[attrRange].foregroundColor = RexColor.primary
+        attributed[attrRange].underlineStyle = .single
+    }
+
     guard let detector = try? NSDataDetector(types: NSTextCheckingResult.CheckingType.link.rawValue) else {
         return attributed
     }
@@ -874,7 +921,8 @@ func linkified(_ text: String) -> AttributedString {
     for match in matches {
         guard let url = match.url,
               let range = Range(match.range, in: text),
-              let attrRange = Range(range, in: attributed) else { continue }
+              let attrRange = Range(range, in: attributed),
+              attributed[attrRange].link == nil else { continue }
         attributed[attrRange].link = url
         // Oct 12 — "embed the links as hyperlinks that you can then click on."
         // They were already tappable; underlined body text doesn't read as a

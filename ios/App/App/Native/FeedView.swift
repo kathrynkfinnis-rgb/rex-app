@@ -852,8 +852,15 @@ struct FeedView: View {
                 // fixed ~44pt height no matter what value we gave it; text
                 // isn't bound by that the same way, so this actually reads
                 // bigger.
+                // Oct 13 — "Rex logo shouldn't be in the new font, it should
+                // be as per previous designs." The rebrand changed RexFont
+                // rather than each screen, which is what let the whole app
+                // pick up the new type at once — and swept the wordmark along
+                // with it. A logo is not body copy with a different size: it
+                // is a fixed drawing of a name, and it does not change because
+                // the typography around it did.
                 Text("REX")
-                    .font(RexFont.display(24, weight: .bold))
+                    .font(.system(size: 24, weight: .bold, design: .serif))
                     .foregroundStyle(RexColor.primary)
                     .fixedSize()
             }

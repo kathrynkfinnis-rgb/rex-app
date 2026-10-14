@@ -562,7 +562,8 @@ struct AddRexView: View {
             case .editTripStop(let entry):
                 TripStopSheet(
                     subcategories: rexOrderedSubcategories(.place),
-                    existing: entry.stop
+                    existing: entry.stop,
+                    near: tripCentre
                 ) { updated in
                     guard let index = tripEntries.firstIndex(where: { $0.id == entry.id }) else { return }
                     tripEntries[index].kind = .stop(updated)
@@ -605,7 +606,7 @@ struct AddRexView: View {
                     } : nil
                 )
             case .addTripStop:
-                TripStopSheet(subcategories: rexOrderedSubcategories(.place)) { stop in
+                TripStopSheet(subcategories: rexOrderedSubcategories(.place), near: tripCentre) { stop in
                     tripEntries.append(ItineraryEntry(kind: .stop(stop)))
                 }
             case .addListItem:
@@ -1361,6 +1362,18 @@ struct AddRexView: View {
         if found.truncated {
             errorMessage = "Instagram only gives out the first part of a caption \u{2014} check the end of this one and paste anything missing."
         }
+    }
+
+    /// Oct 14 — where this trip already is: the first stop that has
+    /// coordinates. Enough to put a search in the right country, which is the
+    /// whole complaint, and cheaper than averaging a route that may span one.
+    private var tripCentre: (lat: Double, lng: Double)? {
+        for entry in tripEntries {
+            if case .stop(let stop) = entry.kind, let lat = stop.lat, let lng = stop.lng {
+                return (lat, lng)
+            }
+        }
+        return nil
     }
 
     /// Debounced so we're not firing a request per keystroke.

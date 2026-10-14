@@ -642,8 +642,19 @@ struct ItemDetailView: View {
                 //
                 // First in the row on purpose: on a restaurant you have
                 // decided on, booking is the thing you came to do.
+                // Oct 14 — "Book goes to the website when there is one, and the
+                // Google listing when there isn't."
+                //
+                // Google tells us a place takes bookings and will not tell us
+                // where — that URL is behind its separate Place Actions
+                // product, which this key cannot reach. So the button goes to
+                // the best page we do have. A restaurant's own site usually
+                // has booking on the front, and is one tap shorter than the
+                // listing; the listing is the fallback, where Reserve is at
+                // least always there.
                 if let details = effectivePlaceDetails, details.takesBookings,
-                   let link = details.googleMapsURL, let url = URL(string: link) {
+                   let link = details.websiteURL ?? details.googleMapsURL,
+                   let url = URL(string: link) {
                     Link(destination: url) {
                         HStack(spacing: 4) {
                             Image(systemName: "calendar.badge.plus").font(.system(size: 12))

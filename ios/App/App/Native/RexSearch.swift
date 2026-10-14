@@ -68,7 +68,20 @@ enum RexSearch {
         Bundle.main.object(forInfoDictionaryKey: "GoogleCSEEngineId") as? String ?? ""
     }
 
-    static func search(category: RexCategory, query: String) async -> [RexSearchHit] {
+    /// Oct 14 — "coming up with silly irrelevant suggestions." She was adding
+    /// a bar to a Cartagena trip and being offered a one-bedroom apartment in
+    /// Germany, because the search had no idea where the trip was: every place
+    /// lookup went out against the whole world with a Europe lean, whatever
+    /// you happened to be building.
+    ///
+    /// `near` is where the thing being built already is — the first stop with
+    /// coordinates on the trip you are adding to. It makes a search for "the
+    /// bar by the square" mean the square you were just at.
+    static func search(
+        category: RexCategory,
+        query: String,
+        near: (lat: Double, lng: Double)? = nil
+    ) async -> [RexSearchHit] {
         let q = query.trimmingCharacters(in: .whitespacesAndNewlines)
         guard q.count >= 2 else { return [] }
         do {
@@ -77,7 +90,7 @@ enum RexSearch {
             case .movie:           return try await tmdb(q, kind: "movie")
             case .tv:              return try await tmdb(q, kind: "tv")
             case .podcast:         return try await podcasts(q)
-            case .place, .event:   return try await places(q)
+            case .place, .event:   return try await places(q, near: near)
             case .other:           return try await productLookup(q)
             default:               return []
             }
@@ -136,6 +149,15 @@ enum RexSearch {
             URLQueryItem(name: "explaintext", value: "1"),
             URLQueryItem(name: "exlimit", value: "max"),
             URLQueryItem(name: "piprop", value: "thumbnail"),
+            // Oct 14 — "I would really like the thumbnails etc to make it more
+            // interesting." pageimages defaults to freely-licensed pictures
+            // only, and a board game's box art almost never is — which is why
+            // the first cut came back with names and no pictures at all.
+            // `any` includes the fair-use image the article itself displays:
+            // Wingspan, Azul, Catan, Carcassonne all have their box now, where
+            // before none of them did. We show it exactly where Wikipedia
+            // shows it, at the size it serves.
+            URLQueryItem(name: "pilicense", value: "any"),
             // Without this only the first page gets an image, which is a
             // silent way to lose five of six thumbnails.
             URLQueryItem(name: "pilimit", value: "max"),
@@ -953,7 +975,7 @@ enum RexSearch {
     /// Places API (New), called directly with the iOS key. Google accepts an
     /// iOS-restricted key for REST when the bundle id is sent as a header,
     /// which keeps this off our Worker entirely.
-    private static func places(_ q: String) async throws -> [RexSearchHit] {
+    private static func places(_ q: String, near: (lat: Double, lng: Double)? = nil) async throws -> [RexSearchHit] {
         guard !googleKey.isEmpty else { return [] }
         var request = URLRequest(url: URL(string: "https://places.googleapis.com/v1/places:searchText")!)
         request.httpMethod = "POST"
@@ -975,15 +997,28 @@ enum RexSearch {
         // genuine non-European place, it just stops Europe from losing
         // ties it should win. Rough bounding rectangle for mainland Europe
         // + UK/Ireland + Scandinavia.
+        // Oct 14 — where you already are beats a continent you might not be
+        // on. A trip's own coordinates make a 60km box around it; with nothing
+        // to go on it falls back to the Europe rectangle, which is a guess
+        // about this app's users rather than about this search.
+        let bias: [String: Any]
+        if let near {
+            let degrees = 0.55   // roughly 60km of latitude
+            let lngDegrees = degrees / max(0.2, cos(near.lat * .pi / 180))
+            bias = ["rectangle": [
+                "low": ["latitude": near.lat - degrees, "longitude": near.lng - lngDegrees],
+                "high": ["latitude": near.lat + degrees, "longitude": near.lng + lngDegrees],
+            ]]
+        } else {
+            bias = ["rectangle": [
+                "low": ["latitude": 34.0, "longitude": -12.0],
+                "high": ["latitude": 71.0, "longitude": 40.0],
+            ]]
+        }
         request.httpBody = try JSONSerialization.data(withJSONObject: [
             "textQuery": q,
             "pageSize": 10,
-            "locationBias": [
-                "rectangle": [
-                    "low": ["latitude": 34.0, "longitude": -12.0],
-                    "high": ["latitude": 71.0, "longitude": 40.0],
-                ]
-            ],
+            "locationBias": bias,
         ])
 
         let (data, response) = try await URLSession.shared.data(for: request)
