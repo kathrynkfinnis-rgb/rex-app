@@ -5895,7 +5895,7 @@ final class RexAPI {
     /// SECURITY DEFINER read of one recommendation by id, which is how the web
     /// share page renders for strangers. The app never used it. A share is an
     /// invitation to look at the thing, so the thing is what should open.
-    func fetchSharedItemId(recommendationId: String) async -> (itemId: String, type: String?)? {
+    func fetchSharedItemId(recommendationId: String) async -> (itemId: String, type: String?, title: String?)? {
         guard let token = try? await validToken() else { return nil }
         var request = URLRequest(url: baseURL.appendingPathComponent("/rest/v1/rpc/get_shared_recommendation"))
         request.httpMethod = "POST"
@@ -5907,9 +5907,12 @@ final class RexAPI {
         guard let (data, response) = try? await URLSession.shared.data(for: request),
               let http = response as? HTTPURLResponse, http.statusCode < 400
         else { return nil }
-        struct Row: Codable { let item_id: String; let item_type: String? }
+        // Oct 14 — the title comes back too and always has; it simply was
+        // never read. A shared list needs it, because ListRoute carries the
+        // name the page shows before anything has loaded.
+        struct Row: Codable { let item_id: String; let item_type: String?; let item_title: String? }
         guard let row = (try? JSONDecoder().decode([Row].self, from: data))?.first else { return nil }
-        return (row.item_id, row.item_type)
+        return (row.item_id, row.item_type, row.item_title)
     }
 
     func resolveShareCode(_ code: String) async -> (kind: String, id: String)? {

@@ -1538,9 +1538,24 @@ struct FeedView: View {
             path.append(CollectionRoute(listId: listId, name: "Collection", isMine: false))
         case .recommendation(let recId):
             if let rec = (try? await RexAPI.shared.fetchRecommendations(ids: [recId]))?.first {
-                if RexCategory(rawType: rec.items?.type) == .trip {
+                switch RexCategory(rawType: rec.items?.type) {
+                case .trip:
                     path.append(TripRoute(recommendationId: rec.id, title: rec.items?.title ?? "Trip"))
-                } else {
+                // Oct 14 — "if you click the link from WhatsApp, it takes you
+                // to the list but doesn't show the content."
+                //
+                // It took you to the list's *item*, which is a different page
+                // that happens to share its name and photo: title, a Rexes
+                // heading and a box to rate it, with none of the things on
+                // the list. A trip had a case here and a list never did, so
+                // it fell through to the generic item page — the same reason
+                // tapping a list from the feed did it too.
+                case .list:
+                    path.append(ListRoute(
+                        recommendationId: rec.id,
+                        title: rec.items?.title ?? "List"
+                    ))
+                default:
                     path.append(rec.item_id)
                 }
             } else if let shared = await RexAPI.shared.fetchSharedItemId(recommendationId: recId) {
@@ -1550,9 +1565,12 @@ struct FeedView: View {
                 // the one screen that has nothing to do with what was shared.
                 // get_shared_recommendation reads it regardless, which is how
                 // the web page has rendered for strangers since July.
-                if RexCategory(rawType: shared.type) == .trip {
+                switch RexCategory(rawType: shared.type) {
+                case .trip:
                     path.append(TripRoute(recommendationId: recId, title: "Trip"))
-                } else {
+                case .list:
+                    path.append(ListRoute(recommendationId: recId, title: shared.title ?? "List"))
+                default:
                     path.append(shared.itemId)
                 }
             } else {
