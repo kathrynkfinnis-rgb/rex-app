@@ -525,6 +525,14 @@ struct ItemDetailView: View {
             // The thumbnail hangs past the band's bottom edge; without this
             // the stack clips it at the fold.
             .frame(height: RexHeaderMetrics.bandHeight, alignment: .top)
+            // Oct 13 — "alignment too close to the left-hand side, need to
+            // maintain the margins." The header this replaced ended with one
+            // .padding(16) around the whole stack, which is what gave Rex'd by,
+            // the rating row and everything else their margin. I put the
+            // padding on the title block alone, so only the title block kept
+            // it. The band bleeds back out instead.
+            .padding(.horizontal, -16)
+            .padding(.top, -16)
 
             VStack(alignment: .leading, spacing: 0) {
                 RexCategoryPill(category: category)
@@ -557,7 +565,6 @@ struct ItemDetailView: View {
                     .padding(.top, 9)
                 }
             }
-            .padding(.horizontal, 16)
             .padding(.top, 10)
 
             savedByRow
@@ -1375,7 +1382,6 @@ struct ItemDetailView: View {
                 }
                 Spacer(minLength: 0)
             }
-            .padding(.horizontal, 16)
             .padding(.top, RexSpacing.xs)
         }
     }

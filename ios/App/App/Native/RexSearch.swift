@@ -92,8 +92,95 @@ enum RexSearch {
     /// Programmable Search stands in as a generic "look this up on the web"
     /// catalogue for everything else — same search-then-pick flow as any
     /// other category, just backed by web results instead of a dedicated API.
+    /// Oct 14 — "I am trying to upload a list of board games — none of the
+    /// items are coming up in the search."
+    ///
+    /// Because Programmable Search has answered every request with 403 "this
+    /// project does not have the access to Custom Search JSON API" since the
+    /// 11th, and Other is the only category with nothing else behind it. So
+    /// Other had no catalogue at all, and a board game, a gadget, a brand —
+    /// anything that isn't a book, film, show, podcast or place — returned
+    /// nothing and looked broken.
+    ///
+    /// Wikipedia is the catalogue now: free, no key, no Google project, no
+    /// billing to enable, and it knows what Wingspan and Azul and Catan are.
+    /// Its page images are sparse, because box art is usually non-free, so
+    /// most results arrive without a picture — a name and a line of
+    /// description is still the difference between adding the thing and not.
+    ///
+    /// Programmable Search stays as the preferred source if it is ever given
+    /// access, because a product link beats an encyclopaedia entry for the
+    /// shopping half of Other. Its failure is remembered so the 403 is paid
+    /// once a session rather than on every keystroke.
+    private static var customSearchIsDead = false
+
     private static func productLookup(_ q: String) async throws -> [RexSearchHit] {
-        guard !cseApiKey.isEmpty, !cseEngineId.isEmpty else { return [] }
+        let web = (try? await customSearch(q)) ?? []
+        if !web.isEmpty { return web }
+        return await wikipedia(q)
+    }
+
+    /// Everything Wikipedia knows, which for Other is most of what anybody
+    /// would want to add. Titles and descriptions always; a thumbnail when the
+    /// page happens to have a freely-licensed one.
+    private static func wikipedia(_ q: String) async -> [RexSearchHit] {
+        var components = URLComponents(string: "https://en.wikipedia.org/w/api.php")!
+        components.queryItems = [
+            URLQueryItem(name: "action", value: "query"),
+            URLQueryItem(name: "format", value: "json"),
+            URLQueryItem(name: "generator", value: "search"),
+            URLQueryItem(name: "gsrsearch", value: q),
+            URLQueryItem(name: "gsrlimit", value: "6"),
+            URLQueryItem(name: "prop", value: "pageimages|extracts"),
+            URLQueryItem(name: "exintro", value: "1"),
+            URLQueryItem(name: "explaintext", value: "1"),
+            URLQueryItem(name: "exlimit", value: "max"),
+            URLQueryItem(name: "piprop", value: "thumbnail"),
+            // Without this only the first page gets an image, which is a
+            // silent way to lose five of six thumbnails.
+            URLQueryItem(name: "pilimit", value: "max"),
+            URLQueryItem(name: "pithumbsize", value: "400"),
+        ]
+        var request = URLRequest(url: components.url!)
+        // Wikipedia asks that clients identify themselves and rate-limits
+        // those that don't.
+        request.setValue("REX/1.0 (https://find-rex.com)", forHTTPHeaderField: "User-Agent")
+
+        guard let (data, response) = try? await URLSession.shared.data(for: request),
+              let http = response as? HTTPURLResponse, http.statusCode < 400,
+              let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+              let query = json["query"] as? [String: Any],
+              let pages = query["pages"] as? [String: [String: Any]]
+        else { return [] }
+
+        // `index` is Wikipedia's own relevance order; a dictionary has none.
+        return pages.values
+            .sorted { ($0["index"] as? Int ?? 99) < ($1["index"] as? Int ?? 99) }
+            .compactMap { page -> RexSearchHit? in
+                guard let title = page["title"] as? String,
+                      let pageId = page["pageid"] as? Int else { return nil }
+                // Disambiguation pages are a menu, not a thing you can Rex.
+                let extract = (page["extract"] as? String) ?? ""
+                guard !extract.contains("may refer to:") else { return nil }
+                let firstSentence = extract
+                    .split(separator: "\n").first
+                    .map(String.init)?
+                    .prefix(180)
+                let slug = title.replacingOccurrences(of: " ", with: "_")
+                    .addingPercentEncoding(withAllowedCharacters: .urlPathAllowed) ?? title
+                return RexSearchHit(
+                    externalId: "wikipedia-\(pageId)",
+                    externalSource: "wikipedia",
+                    title: title,
+                    subtitle: firstSentence.map(String.init),
+                    imageURL: ((page["thumbnail"] as? [String: Any])?["source"] as? String),
+                    productURL: "https://en.wikipedia.org/wiki/\(slug)"
+                )
+            }
+    }
+
+    private static func customSearch(_ q: String) async throws -> [RexSearchHit] {
+        guard !customSearchIsDead, !cseApiKey.isEmpty, !cseEngineId.isEmpty else { return [] }
         var components = URLComponents(string: "https://www.googleapis.com/customsearch/v1")!
         components.queryItems = [
             URLQueryItem(name: "key", value: cseApiKey),
@@ -105,7 +192,12 @@ enum RexSearch {
         var request = URLRequest(url: components.url!)
         request.setValue(bundleId, forHTTPHeaderField: "X-Ios-Bundle-Identifier")
         let (data, response) = try await URLSession.shared.data(for: request)
-        guard let http = response as? HTTPURLResponse, http.statusCode < 400 else { return [] }
+        guard let http = response as? HTTPURLResponse, http.statusCode < 400 else {
+            // 403 here means the Google project has no access to the API, which
+            // no amount of retrying fixes. Stop asking for this session.
+            if (response as? HTTPURLResponse)?.statusCode == 403 { customSearchIsDead = true }
+            return []
+        }
         guard let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
               let items = json["items"] as? [[String: Any]]
         else { return [] }
