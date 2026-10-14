@@ -291,7 +291,9 @@ struct RexNotification: Codable, Identifiable {
 
     var copy: String {
         let who = actor?.display_name ?? actor?.username ?? "Someone"
-        let preview = data?["preview"]?.stringValue ?? ""
+        // Flattened, because a notification is plain characters: the raw
+        // "[words](url)" of a link belongs in the editor, not here.
+        let preview = plainLinkText(data?["preview"]?.stringValue ?? "")
         let title = data?["title"]?.stringValue ?? ""
         switch type {
         case "rec_like": return "\(who) liked your Rex"

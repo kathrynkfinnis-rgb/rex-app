@@ -1002,6 +1002,21 @@ private let markdownLink = try? NSRegularExpression(
     pattern: #"\[([^\]\n]{1,120})\]\((https?://[^\s)]{1,500})\)"#
 )
 
+/// Oct 14 — the same markdown, flattened to its words, for the places that
+/// show a snippet of somebody's text as plain characters. A notification read
+/// `kathryn replied to your blast: "[Greenpan](https://greenpan.com)"`, which
+/// is the raw source of a link rather than the link — the one place the
+/// hyperlink work leaked out of the views that render it.
+func plainLinkText(_ text: String) -> String {
+    guard let markdownLink else { return text }
+    let ns = text as NSString
+    return markdownLink.stringByReplacingMatches(
+        in: text,
+        range: NSRange(location: 0, length: ns.length),
+        withTemplate: "$1"
+    )
+}
+
 func linkified(_ text: String) -> AttributedString {
     // Markdown first: rewrite [words](url) down to `words`, remembering where
     // each landed so the link can be applied to the shortened string.
