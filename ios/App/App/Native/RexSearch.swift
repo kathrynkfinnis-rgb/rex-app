@@ -273,70 +273,14 @@ enum RexSearch {
     /// shape per chain, and a store-finder is usually a script rather than a
     /// list, so it would work for some brands and quietly fail for the rest.
     /// A wrong branch list that looks authoritative is worse than this.
-    static func branches(
-        of name: String,
-        like originType: String?,
-        excludingPlaceId placeId: String?
-    ) async -> [RexSearchHit] {
-        guard !googleKey.isEmpty else { return [] }
-        let trimmed = name.trimmingCharacters(in: .whitespaces)
-        guard trimmed.count >= 3 else { return [] }
-
-        var request = URLRequest(url: URL(string: "https://places.googleapis.com/v1/places:searchText")!)
-        request.httpMethod = "POST"
-        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
-        request.setValue(googleKey, forHTTPHeaderField: "X-Goog-Api-Key")
-        request.setValue(bundleId, forHTTPHeaderField: "X-Ios-Bundle-Identifier")
-        request.setValue(
-            "places.id,places.displayName,places.formattedAddress,places.location," +
-            "places.primaryTypeDisplayName,places.photos,places.rating,places.userRatingCount",
-            forHTTPHeaderField: "X-Goog-FieldMask"
-        )
-        // No location bias at all: branches of a chain are by definition
-        // somewhere else, and biasing toward here would hide them.
-        request.httpBody = try? JSONSerialization.data(withJSONObject: [
-            "textQuery": trimmed,
-            "pageSize": 20,
-        ])
-
-        guard let (data, response) = try? await URLSession.shared.data(for: request),
-              let http = response as? HTTPURLResponse, http.statusCode < 400,
-              let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
-              let results = json["places"] as? [[String: Any]]
-        else { return [] }
-
-        let target = normalizeForChainMatch(trimmed)
-        var seenAddresses = Set<String>()
-        let branches = results.compactMap { place -> RexSearchHit? in
-            let candidateType = (place["primaryTypeDisplayName"] as? [String: Any])?["text"] as? String
-            guard let id = place["id"] as? String, id != placeId,
-                  let displayName = (place["displayName"] as? [String: Any])?["text"] as? String,
-                  isSameKindOfPlace(candidateType, as: originType),
-                  isSameChain(normalizeForChainMatch(displayName), as: target),
-                  let address = place["formattedAddress"] as? String,
-                  seenAddresses.insert(address).inserted
-            else { return nil }
-            let location = place["location"] as? [String: Any]
-            let photoName = (place["photos"] as? [[String: Any]])?.first?["name"] as? String
-            return RexSearchHit(
-                externalId: id,
-                externalSource: "google_places",
-                title: displayName,
-                subtitle: nil,
-                imageURL: photoName.map { "https://places.googleapis.com/v1/\($0)/media?maxWidthPx=800&key=\(googleKey)" },
-                genre: (place["primaryTypeDisplayName"] as? [String: Any])?["text"] as? String,
-                address: address,
-                lat: location?["latitude"] as? Double,
-                lng: location?["longitude"] as? Double,
-                googleRating: place["rating"] as? Double,
-                googleRatingCount: place["userRatingCount"] as? Int
-            )
-        }
-        // Her cap. A search that comes back full is probably a big chain
-        // rather than a small one, so say nothing rather than guess.
-        return branches.count >= 20 ? [] : branches
-    }
-
+    // Oct 14 — branches(of:like:excludingPlaceId:) lived here: the older
+    // finder that matched on the name and the kind of place. It is gone, with
+    // isSameKindOfPlace, isSameChain and normalizeForChainMatch, because it
+    // could not be made right. A name cannot tell a chain from a coincidence,
+    // and its type guard let everything through whenever the origin's type was
+    // unknown — which is how a Brooklyn restaurant came to offer three London
+    // churches. chainBranches below, keyed on the brand's own domain, is the
+    // only test in this file that holds up.
 
     // MARK: - Chains
 
@@ -445,76 +389,6 @@ enum RexSearch {
         // nobody means to recommend wholesale.
         guard matchesIncludingThisOne >= 2, matchesIncludingThisOne < 20 else { return [] }
         return branches
-    }
-
-    /// Oct 5 — the brand, allowing for the branch being written into the name.
-    ///
-    /// Requiring the two names to be equal looked safe and was useless:
-    /// Bancone's six branches are "Bancone Covent Garden", "Bancone City",
-    /// "Bancone Golden Square" and so on, so searching for Bancone matched
-    /// none of them. The only chains an exact rule could find were the ones
-    /// whose branches share one name — which are the big ones the twenty cap
-    /// deliberately excludes. So it found nothing, ever.
-    ///
-    /// One name being the start of the other is the signal that actually
-    /// describes a chain. The word boundary stops "Bancone" matching
-    /// "Banconese", and five characters minimum keeps the shortest names out.
-    ///
-    /// It is not airtight, and the honest limit is worth writing down: this
-    /// matches "The Crown" to "The Crown Inn Doncaster", which are two
-    /// different pubs. No rule over names alone can tell those apart from
-    /// Bancone and Bancone City. What makes that acceptable is the screen it
-    /// feeds: every branch is listed with its address and nothing is ticked,
-    /// so a wrong suggestion costs a line somebody ignores. The alternative
-    /// tried first — demanding the names be equal — was airtight and found
-    /// nothing at all, because a chain small enough to be worth offering is
-    /// exactly the kind that writes the branch into the name.
-    /// Whether two Google place types describe the same kind of venue.
-    ///
-    /// Compared on the final noun rather than the whole phrase, because a
-    /// chain's branches are typed inconsistently — one Bancone is a
-    /// "Restaurant" and the next an "Italian restaurant", and those are the
-    /// same thing. "Office suite" and "Climbing gym" share no noun, which is
-    /// the Catalyst case.
-    ///
-    /// An origin with no type at all can't judge anything, so it allows
-    /// everything through and the name match decides alone, as it did before.
-    /// A candidate with no type is dropped once the origin has one: the whole
-    /// problem here is unidentifiable businesses sharing a word.
-    private static func isSameKindOfPlace(_ candidate: String?, as origin: String?) -> Bool {
-        func lastNoun(_ s: String) -> String? {
-            s.lowercased()
-                .replacingOccurrences(of: "[^a-z ]", with: "", options: .regularExpression)
-                .split(separator: " ")
-                .last
-                .map(String.init)
-        }
-        guard let origin, let originNoun = lastNoun(origin) else { return true }
-        guard let candidate, let candidateNoun = lastNoun(candidate) else { return false }
-        return originNoun == candidateNoun
-    }
-
-    private static func isSameChain(_ candidate: String, as target: String) -> Bool {
-        if candidate == target { return true }
-        let (shorter, longer) = candidate.count < target.count
-            ? (candidate, target) : (target, candidate)
-        guard shorter.count >= 5 else { return false }
-        return longer.hasPrefix(shorter + " ")
-    }
-
-    /// Chain names carry the branch in them often enough that an exact
-    /// comparison misses real matches — "Bancone Covent Garden" and "Bancone
-    /// Borough Yards" are the same restaurant twice. Comparing the leading
-    /// words only would be too loose; this strips punctuation and the
-    /// boilerplate a listing adds, and otherwise demands the names be equal.
-    private static func normalizeForChainMatch(_ s: String) -> String {
-        var out = s.lowercased()
-            .folding(options: .diacriticInsensitive, locale: nil)
-            .replacingOccurrences(of: "[^a-z0-9 ]", with: "", options: .regularExpression)
-        for filler in [" restaurant", " cafe", " bar", " london", " ltd", " limited"] {
-            if out.hasSuffix(filler) { out = String(out.dropLast(filler.count)) }
-        }
-        return out.trimmingCharacters(in: .whitespaces)
     }
 
     /// Oct 3 — "When you click on a Rex and it says 'on Google' with a link to

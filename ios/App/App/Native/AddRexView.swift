@@ -2216,10 +2216,31 @@ struct AddRexView: View {
             withAnimation { didPost = true }
             // After the success screen is already up, so the Rex never waits
             // on a web lookup. If it finds nothing, nothing appears.
-            if category == .place {
-                chainBranches = await RexSearch.branches(
-                    of: title.trimmingCharacters(in: .whitespaces),
-                    like: picked?.genre,
+            // Oct 14 — "a restaurant that I went to is suggesting churches of
+            // the same name are linked." St Anselm in Brooklyn, offered three
+            // St Anselm's churches.
+            //
+            // There were two branch finders in the app. The item page used
+            // the one that matches on the brand's own web domain — the test
+            // this file already concluded was the only honest one, because a
+            // name cannot tell Bancone's five sites from thirty unrelated
+            // Crowns. This path used the older one, which matched on the name
+            // and the kind of place, and let anything through when it didn't
+            // know the kind. A restaurant picked without a type behind it
+            // opened the gate to every St Anselm in the country.
+            //
+            // One finder now, the domain one. No website on the place means
+            // no key, which means no offer — saying nothing is the right
+            // answer to a question we can't answer, when the alternative is
+            // copying somebody's review onto a church.
+            if category == .place,
+               let key = RexSearch.chainKey(
+                   name: title.trimmingCharacters(in: .whitespaces),
+                   websiteURL: picked?.websiteURL
+               ) {
+                chainBranches = await RexSearch.chainBranches(
+                    name: title.trimmingCharacters(in: .whitespaces),
+                    key: key,
                     excludingPlaceId: picked?.externalId
                 )
             }
