@@ -1736,6 +1736,10 @@ struct EditableIfMine: ViewModifier {
     /// nothing else — being on the team is not a licence to edit what your
     /// friends wrote about a restaurant.
     @State private var canEditAsRex = false
+    /// Oct 14 — "can admins get the ability to remove a post they made, and
+    /// save it to drafts so they can repost as Rex." Only on your own posts,
+    /// and only if you are one of the people who could repost as REX.
+    @State private var canUnpost = false
 
     private var editable: Bool { isMine || canEditAsRex }
 
@@ -1750,6 +1754,21 @@ struct EditableIfMine: ViewModifier {
                     Menu {
                         Button { onEdit(rec) } label: {
                             Label("Edit", systemImage: "pencil")
+                        }
+                        // Oct 14 — written under your own name when it was
+                        // meant to come from REX. Deleting and retyping loses
+                        // the note, the photos, the rating and the tags; this
+                        // keeps all of it and puts the row back where an
+                        // unposted one lives, ready to go out as REX.
+                        if canUnpost {
+                            Button {
+                                Task {
+                                    try? await RexAPI.shared.moveToDrafts(recommendationId: rec.id)
+                                    onChanged?()
+                                }
+                            } label: {
+                                Label("Move to drafts", systemImage: "tray.and.arrow.down")
+                            }
                         }
                         Button {
                             Task {
@@ -1791,6 +1810,10 @@ struct EditableIfMine: ViewModifier {
                     .accessibilityLabel("More")
                     .padding(2)
                 }
+                // Oct 14 — this ran only on the branch for somebody else's
+                // post, because until now there was nothing to work out about
+                // your own. Unposting is a question about yours.
+                .task { await checkRexPost() }
         } else {
             content
                 .task { await checkRexPost() }
@@ -1800,7 +1823,13 @@ struct EditableIfMine: ViewModifier {
     /// Both lookups are cached on RexAPI after their first call, so this costs
     /// one round trip per session rather than one per card.
     private func checkRexPost() async {
-        guard !isMine, !canEditAsRex else { return }
+        // Your own post: the only question is whether you could repost it as
+        // REX, which is what makes unposting worth offering.
+        if isMine {
+            if !canUnpost, await RexAPI.shared.isAdmin() { canUnpost = true }
+            return
+        }
+        guard !canEditAsRex else { return }
         guard await RexAPI.shared.isAdmin() else { return }
         canEditAsRex = rec.user_id == (await RexAPI.shared.officialAccountId())
     }

@@ -1317,6 +1317,40 @@ final class RexAPI {
     /// Sept 18 — "need to be able to save lists as drafts". Lists are built
     /// by the same screen as trips and stored the same way, so they only
     /// ever needed letting through here.
+    /// Oct 14 — "can admins get the ability to remove a post they made, and
+    /// save it to drafts so they can repost as Rex."
+    ///
+    /// The case is an admin writing something under their own name that was
+    /// meant to come from REX. Deleting and retyping it loses the note, the
+    /// photos, the rating and the tags; this keeps all of it and puts the row
+    /// back where an unposted one lives.
+    ///
+    /// A draft is a recommendation with no published_at — the same mechanism
+    /// "save as draft" has used since September — so unposting is one column
+    /// going null. It stops being in the feed the moment it does, because the
+    /// feed only reads published rows.
+    ///
+    /// Admin-only, because posting as REX is: offering to unpost to anyone
+    /// would be offering a button whose point is a thing they cannot do. The
+    /// database decides the real question when the repost is attempted — this
+    /// is only whether to show the door.
+    func moveToDrafts(recommendationId: String) async throws {
+        let token = try await validToken()
+        var components = URLComponents(url: baseURL.appendingPathComponent("/rest/v1/recommendations"), resolvingAgainstBaseURL: false)!
+        components.queryItems = [URLQueryItem(name: "id", value: "eq.\(recommendationId)")]
+        var request = URLRequest(url: components.url!)
+        request.httpMethod = "PATCH"
+        request.setValue(anonKey, forHTTPHeaderField: "apikey")
+        request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        request.httpBody = try JSONSerialization.data(withJSONObject: ["published_at": NSNull()])
+
+        let (data, response) = try await URLSession.shared.data(for: request)
+        guard let http = response as? HTTPURLResponse, http.statusCode < 400 else {
+            throw RexAPIError.server(friendlyError(data, fallback: "Couldn't move that back to drafts."))
+        }
+    }
+
     func fetchDrafts() async throws -> [FeedRecommendation] {
         let token = try await validToken()
         guard let userId = currentUserId else { throw RexAPIError.notSignedIn }
