@@ -24,6 +24,13 @@ struct LikesCommentsView: View {
     @State private var isPosting = false
     @State private var isLoading = true
     @FocusState private var draftFocused: Bool
+    /// Oct 14 — "don't need the comment box — can just open when you press
+    /// the comment icon."
+    ///
+    /// The item page draws one of these per friend's take, so a page with
+    /// four takes on it had four empty "Add a comment…" boxes down it,
+    /// asking four times. The box is a reply to a tap now, not furniture.
+    @State private var isComposing = false
     /// Phoebe, 17 Sept: "Can edit or delete comments". Only your own —
     /// the id of the one being edited, and the text as it's being changed.
     @State private var editingId: String?
@@ -91,12 +98,12 @@ struct LikesCommentsView: View {
 
                 // #130 — this had no action at all, unlike the like button
                 // right next to it: "Clicking on 'comment' isn't
-                // registering so I can't comment on the Rex." Comments
-                // already show inline below, so tapping this just focuses
-                // the comment field and brings up the keyboard, same as
-                // tapping the field itself.
+                // registering so I can't comment on the Rex."
+                //
+                // Oct 14 — and now it is what puts the box on screen, rather
+                // than focusing a box that was always there.
                 Button {
-                    draftFocused = true
+                    openComposer()
                 } label: {
                     HStack(spacing: RexSpacing.sm) {
                         Image(systemName: "bubble.left")
@@ -124,12 +131,72 @@ struct LikesCommentsView: View {
                         commentRow(comment)
                     }
                 }
-            } else if !isLoading {
-                Text("No comments yet — be the first.")
-                    .font(RexFont.text(13))
-                    .foregroundStyle(RexColor.mutedForeground)
+            } else if !isLoading, !isComposing {
+                // With no box on the page, this line is the other way in.
+                Button {
+                    openComposer()
+                } label: {
+                    Text("No comments yet — be the first.")
+                        .font(RexFont.text(13))
+                        .foregroundStyle(RexColor.mutedForeground)
+                }
+                .buttonStyle(.plain)
             }
 
+            if isComposing {
+                composer
+            }
+        }
+        .task {
+            await load()
+            friends = (try? await RexAPI.shared.fetchAcceptedFriendProfiles()) ?? []
+            // Focus set while a sheet is still animating in is dropped, so
+            // wait for it to settle first.
+            if focusOnAppear {
+                try? await Task.sleep(nanoseconds: 450_000_000)
+                isComposing = true
+                draftFocused = true
+            }
+        }
+        .confirmationDialog(
+            "Delete this comment?",
+            isPresented: Binding(
+                get: { pendingDelete != nil },
+                set: { if !$0 { pendingDelete = nil } }
+            ),
+            titleVisibility: .visible
+        ) {
+            Button("Delete", role: .destructive) {
+                if let comment = pendingDelete {
+                    pendingDelete = nil
+                    Task { await delete(comment) }
+                }
+            }
+            Button("Cancel", role: .cancel) { pendingDelete = nil }
+        }
+        .sheet(isPresented: $showingLikers) {
+            likersSheet
+        }
+    }
+
+    /// Opens the box and puts the cursor in it. One place, because the comment
+    /// icon, the "be the first" line and every Reply button all do this.
+    private func openComposer() {
+        isComposing = true
+        draftFocused = true
+    }
+
+    /// Once the comment is posted it's in the thread, so the box has done its
+    /// job and goes away again. Only on success — a failed post keeps the box
+    /// and what you typed in it.
+    private func closeComposer() {
+        draftFocused = false
+        isComposing = false
+    }
+
+    @ViewBuilder
+    private var composer: some View {
+        VStack(alignment: .leading, spacing: RexSpacing.md) {
             if let query = MentionDraft.inProgress(in: draft), !friends.isEmpty {
                 MentionPicker(query: query, friends: friends) { friend in
                     draft = MentionDraft.complete(draft, with: friend.username)
@@ -201,33 +268,10 @@ struct LikesCommentsView: View {
                 .disabled(isPosting || draft.trimmingCharacters(in: .whitespaces).isEmpty)
             }
         }
-        .task {
-            await load()
-            friends = (try? await RexAPI.shared.fetchAcceptedFriendProfiles()) ?? []
-            // Focus set while a sheet is still animating in is dropped, so
-            // wait for it to settle first.
-            if focusOnAppear {
-                try? await Task.sleep(nanoseconds: 450_000_000)
-                draftFocused = true
-            }
-        }
-        .confirmationDialog(
-            "Delete this comment?",
-            isPresented: Binding(
-                get: { pendingDelete != nil },
-                set: { if !$0 { pendingDelete = nil } }
-            ),
-            titleVisibility: .visible
-        ) {
-            Button("Delete", role: .destructive) {
-                if let comment = pendingDelete {
-                    pendingDelete = nil
-                    Task { await delete(comment) }
-                }
-            }
-            Button("Cancel", role: .cancel) { pendingDelete = nil }
-        }
-        .sheet(isPresented: $showingLikers) {
+    }
+
+    @ViewBuilder
+    private var likersSheet: some View {
             NavigationStack {
                 Group {
                     if isLoadingLikers && likers.isEmpty {
@@ -287,7 +331,6 @@ struct LikesCommentsView: View {
                 likers = (try? await RexAPI.shared.fetchLikers(recommendationId: recommendationId)) ?? []
                 isLoadingLikers = false
             }
-        }
     }
 
     private func load() async {
@@ -414,13 +457,24 @@ struct LikesCommentsView: View {
                     editor(for: comment)
                 } else {
                     MentionedText(text: comment.body)
+                    // Oct 14 — "can't reply to comments even when clicking
+                    // 'reply' button." It was eleven-point text with no
+                    // padding and no contentShape: a target about thirty
+                    // points by fourteen, sitting inside a row that also
+                    // carries a long-press context menu. Most taps landed
+                    // on the row. It gets a real target now, and the box it
+                    // opens appears with the keyboard, so a tap that does
+                    // register is unmistakable.
                     Button {
                         replyingTo = comment
-                        draftFocused = true
+                        openComposer()
                     } label: {
                         Text("Reply")
                             .font(RexFont.text(11.5, weight: .semibold))
                             .foregroundStyle(RexColor.mutedForeground)
+                            .padding(.vertical, 6)
+                            .padding(.trailing, RexSpacing.lg)
+                            .contentShape(Rectangle())
                     }
                     .buttonStyle(.plain)
                 }
@@ -453,6 +507,7 @@ struct LikesCommentsView: View {
                 try await RexAPI.shared.addWantComment(wantId: wantId, body: text)
                 draft = ""
                 comments = (try? await RexAPI.shared.fetchWantComments(wantId: wantId)) ?? comments
+                closeComposer()
             } else {
                 try await RexAPI.shared.addComment(
                     recommendationId: recommendationId,
@@ -464,6 +519,7 @@ struct LikesCommentsView: View {
                 draft = ""
                 replyingTo = nil
                 comments = (try? await RexAPI.shared.fetchComments(recommendationId: recommendationId)) ?? comments
+                closeComposer()
             }
         } catch {
             // Keep the draft so the user doesn't lose what they typed.
