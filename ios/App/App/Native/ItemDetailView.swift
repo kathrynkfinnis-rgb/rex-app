@@ -210,6 +210,14 @@ struct ItemDetailView: View {
                     chainSection
                     moreByAuthorSection
                     elsewhereSection
+                    // Oct 14 — "move the rank it against your others to the
+                    // bottom of the card." It was up in the header beside
+                    // Rex'd by and Want to try, where it read as one of the
+                    // things you do when you arrive. It isn't: you place a
+                    // book against your others once you've read the page and
+                    // formed a view, so it belongs at the end of it.
+                    rankRow
+                        .padding(.horizontal, 16)
                 }
             }
         }
@@ -617,7 +625,6 @@ struct ItemDetailView: View {
 
             savedByRow
             wantedByRow
-            rankRow
             ticketsSection
                 // Oct 14 — "need more space between Gemma's profile picture
                 // and the line below." The name under the last face and the
@@ -1484,7 +1491,10 @@ struct ItemDetailView: View {
                 }
                 Spacer(minLength: 0)
             }
-            .padding(.top, RexSpacing.xs)
+            // Last thing on the page now, so it needs room above it rather
+            // than the hairline gap it had as one row among several.
+            .padding(.top, RexSpacing.lg)
+            .padding(.bottom, RexSpacing.md)
         }
     }
 

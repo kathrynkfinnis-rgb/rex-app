@@ -39,6 +39,8 @@ struct ProfileView: View {
     @State private var isLoading = true
     @State private var errorMessage: String?
     @State private var selectedFilter: RexCategory?
+    /// Oct 14 — "you should also have a search bar on your profile."
+    @State private var searchQuery = ""
     /// Sept 9 — one sheet modifier, not four; see FeedView.ActiveSheet for
     /// the fault this fixes.
     private enum ActiveSheet: Identifiable {
@@ -81,8 +83,14 @@ struct ProfileView: View {
     }
 
     private var filteredRecommendations: [FeedRecommendation] {
-        guard let selectedFilter else { return recommendations }
-        return recommendations.filter { $0.items?.type == selectedFilter.rawValue }
+        var rows = recommendations
+        if let selectedFilter {
+            rows = rows.filter { $0.items?.type == selectedFilter.rawValue }
+        }
+        if !searchQuery.trimmingCharacters(in: .whitespaces).isEmpty {
+            rows = rows.filter { $0.matches(query: searchQuery) }
+        }
+        return rows
     }
 
 
@@ -113,6 +121,13 @@ struct ProfileView: View {
             } else {
                 VStack(alignment: .leading, spacing: 0) {
                     header
+                    // Only once there's enough on the page to need finding.
+                    // A profile with four Rex on it doesn't want a search box.
+                    if recommendations.count >= 8 {
+                        RexInlineSearchField(placeholder: "Search your Rex\u{2026}", text: $searchQuery)
+                            .padding(.horizontal, 16)
+                            .padding(.bottom, 12)
+                    }
                     if !availableCategories.isEmpty {
                         filterRow
                     }
@@ -451,9 +466,30 @@ struct ProfileView: View {
         .buttonStyle(.plain)
     }
 
+    private var isSearching: Bool {
+        !searchQuery.trimmingCharacters(in: .whitespaces).isEmpty
+    }
+
     @ViewBuilder
     private var recList: some View {
-        if filteredRecommendations.isEmpty {
+        if filteredRecommendations.isEmpty, isSearching {
+            // A search that found nothing is not an empty profile, so it gets
+            // a line rather than the dino and "Add your first Rex".
+            VStack(spacing: RexSpacing.sm) {
+                Text("Nothing matching \u{201C}\(searchQuery)\u{201D}")
+                    .font(RexFont.text(15, weight: .semibold))
+                    .foregroundStyle(RexColor.foreground)
+                if selectedFilter != nil {
+                    Button("Search all categories") { selectedFilter = nil }
+                        .font(RexFont.text(14, weight: .semibold))
+                        .foregroundStyle(RexColor.primary)
+                }
+            }
+            .frame(maxWidth: .infinity)
+            .multilineTextAlignment(.center)
+            .padding(.vertical, RexSpacing.xxl)
+            .padding(.horizontal, 16)
+        } else if filteredRecommendations.isEmpty {
             // Sept 17 — "make the profile page when someone hasn't Rex'd
             // anything yet more interesting (currently blank) maybe a Rex
             // Dino of some kind". A new account's profile was one grey

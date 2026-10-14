@@ -461,6 +461,27 @@ struct FeedRecommendation: Codable, Identifiable {
         FeedRecommendation.isoFormatter.date(from: created_at)
             ?? ISO8601DateFormatter().date(from: created_at)
     }
+
+    /// Oct 14 — "you should also have a search bar on your profile / friends
+    /// profiles."
+    ///
+    /// Matches on more than the title because a profile is how people find a
+    /// thing they half-remember: the note they wrote, the tags, the street,
+    /// the section of the list it sits under. "That tapas place in Lisbon"
+    /// should find it from either word.
+    func matches(query: String) -> Bool {
+        let needle = query.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+        if needle.isEmpty { return true }
+        // Every word has to land somewhere, not necessarily the same somewhere
+        // — "lisbon tapas" matches a title and an address between them.
+        let haystack: [String] = [
+            items?.title, items?.subtitle, items?.address, items?.genre,
+            note, trip_section, list_section, profiles?.display_name,
+        ].compactMap { $0?.lowercased() } + (tags ?? []).map { $0.lowercased() }
+        return needle.split(separator: " ").allSatisfy { word in
+            haystack.contains { $0.contains(word) }
+        }
+    }
 }
 
 /// #132 — a reply to a blast (public.request_comments). suggested_item_id

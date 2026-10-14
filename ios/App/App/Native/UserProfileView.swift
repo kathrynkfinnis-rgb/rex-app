@@ -18,6 +18,10 @@ struct UserProfileView: View {
     @State private var showingAsk = false
     @State private var errorMessage: String?
     @State private var filter: RexCategory?
+    /// Oct 14 — "you should also have a search bar on your profile / friends
+    /// profiles." More useful here than on your own, in fact: a friend with
+    /// three hundred Rex is exactly who you're searching.
+    @State private var searchQuery = ""
     @State private var theirLists: [RexList] = []
     @State private var myFollowedListIds: Set<String> = []
     @State private var followBusyIds: Set<String> = []
@@ -76,8 +80,18 @@ struct UserProfileView: View {
     }
 
     private var visible: [FeedRecommendation] {
-        guard let filter else { return recommendations }
-        return recommendations.filter { RexCategory(rawType: $0.items?.type) == filter }
+        var rows = recommendations
+        if let filter {
+            rows = rows.filter { RexCategory(rawType: $0.items?.type) == filter }
+        }
+        if isSearching {
+            rows = rows.filter { $0.matches(query: searchQuery) }
+        }
+        return rows
+    }
+
+    private var isSearching: Bool {
+        !searchQuery.trimmingCharacters(in: .whitespaces).isEmpty
     }
 
     var body: some View {
@@ -91,6 +105,14 @@ struct UserProfileView: View {
 
                 if !theirLists.isEmpty {
                     collectionsShelf
+                }
+
+                // Only once there's enough on the page to need finding.
+                if recommendations.count >= 8 {
+                    RexInlineSearchField(
+                        placeholder: "Search \(firstName)\u{2019}s Rex\u{2026}",
+                        text: $searchQuery
+                    )
                 }
 
                 if !availableCategories.isEmpty {
@@ -115,6 +137,21 @@ struct UserProfileView: View {
                     }
                 } else if let errorMessage {
                     errorState(errorMessage)
+                } else if visible.isEmpty, isSearching {
+                    // Their page isn't empty, your search is.
+                    VStack(spacing: RexSpacing.sm) {
+                        Text("Nothing matching \u{201C}\(searchQuery)\u{201D}")
+                            .font(RexFont.text(15, weight: .semibold))
+                            .foregroundStyle(RexColor.foreground)
+                        if filter != nil {
+                            Button("Search all categories") { filter = nil }
+                                .font(RexFont.text(14, weight: .semibold))
+                                .foregroundStyle(RexColor.primary)
+                        }
+                    }
+                    .frame(maxWidth: .infinity)
+                    .multilineTextAlignment(.center)
+                    .padding(.vertical, RexSpacing.xxl)
                 } else if visible.isEmpty {
                     // A stranger's Rex are friends-only, so "Nothing Rex'd
                     // yet" was untrue on Phoebe's page — she has hundreds.

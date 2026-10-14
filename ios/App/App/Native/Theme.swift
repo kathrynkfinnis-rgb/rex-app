@@ -759,6 +759,46 @@ let rexAllCategories: [RexCategory] = [
     .place, .trip, .list, .book, .movie, .tv, .podcast, .recipe, .event, .other,
 ]
 
+/// Oct 14 — "you should also have a search bar on your profile / friends
+/// profiles."
+///
+/// The same pill that sits above Collections, pulled out so a profile gets
+/// it without a seventh hand-rolled copy. Rounded field, leading glass,
+/// a clear button once there's something to clear.
+struct RexInlineSearchField: View {
+    let placeholder: String
+    @Binding var text: String
+
+    var body: some View {
+        HStack(spacing: RexSpacing.sm) {
+            Image(systemName: "magnifyingglass")
+                .font(.system(size: 15))
+                .foregroundStyle(RexColor.placeholder)
+            TextField(placeholder, text: $text)
+                .font(RexFont.text(15))
+                .foregroundStyle(RexColor.foreground)
+                .autocorrectionDisabled()
+                .textInputAutocapitalization(.never)
+            if !text.isEmpty {
+                Button { text = "" } label: {
+                    Image(systemName: "xmark.circle.fill")
+                        .font(.system(size: 15))
+                        .foregroundStyle(RexColor.placeholder)
+                }
+                .buttonStyle(.plain)
+            }
+        }
+        .padding(.horizontal, RexSpacing.lg)
+        .frame(height: 42)
+        .background(RexColor.card)
+        .clipShape(RoundedRectangle(cornerRadius: RexRadius.input, style: .continuous))
+        .overlay(
+            RoundedRectangle(cornerRadius: RexRadius.input, style: .continuous)
+                .stroke(RexColor.border, lineWidth: 1)
+        )
+    }
+}
+
 /// Wrapping row of multi-select chips, used for subcategories.
 struct FlowChips: View {
     let options: [String]
