@@ -1706,15 +1706,27 @@ struct ItemDetailView: View {
     /// are all the machinery of writing one, and there is nothing to write.
     /// They come back whole when you ask to edit, and when there is nothing
     /// there yet — which is the only time a form is the right thing on screen.
+    /// Oct 14 — "why are the spaces between these boxes not even?"
+    ///
+    /// Because your own review was in a section of its own, and both sections
+    /// pad themselves by 16 — so the gap between the last friend's card and
+    /// yours was 32 while the cards inside the list were 10 apart. Your card
+    /// has moved into the list with everybody else's, where it reads as the
+    /// one thing it is; this is now only the form for writing one.
+    @ViewBuilder
     private var yourTakeSection: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            if let myRec, !(myRec.note ?? "").isEmpty, !isEditingNote {
-                myTakeCard(myRec)
-            } else {
+        if !showsMyTakeCard {
+            VStack(alignment: .leading, spacing: 10) {
                 takeEditor
             }
+            .padding(16)
         }
-        .padding(16)
+    }
+
+    /// Whether your review is on the page as a card rather than a form.
+    private var showsMyTakeCard: Bool {
+        guard let myRec, !isEditingNote else { return false }
+        return !(myRec.note ?? "").isEmpty
     }
 
     /// What you wrote, in the shape a friend's take takes.
@@ -2220,6 +2232,13 @@ struct ItemDetailView: View {
                 // to just have the wants to try sticker." The chip already
                 // says what the card is; the border was saying it twice.
                 .overlay(RoundedRectangle(cornerRadius: 14).stroke(RexColor.border, lineWidth: 1))
+            }
+
+            // Yours last, in the same list and the same spacing. It is still
+            // the only card you can edit — everything you can do to it lives
+            // behind the three dots on it.
+            if showsMyTakeCard, let myRec {
+                myTakeCard(myRec)
             }
         }
         .padding(16)

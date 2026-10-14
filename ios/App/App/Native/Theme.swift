@@ -534,6 +534,80 @@ let rexCuisineSynonyms: [String: String] = [
     "english": "British", "scottish": "British", "welsh": "British",
 ]
 
+/// Oct 14 — "type of food are all countries or regions, but would it be good
+/// to break it down also by steak, pizza, burger etc."
+///
+/// A dish is a different question from a cuisine, and the one people actually
+/// go out asking. "Where's good for pizza" has an answer; "where's good for
+/// Italian" is a different and vaguer one, and a steak is not a cuisine at
+/// all — the three examples she gave sit under American, French and British
+/// depending on the restaurant, which is exactly why collapsing them into a
+/// country loses them.
+///
+/// Stored the same way, in the same comma-separated genre string, so a place
+/// reads "Restaurant, Italian, Pizza" with no new column — the same trick the
+/// cuisines use. Kept short on purpose: this is a vocabulary for finding
+/// somewhere to eat tonight, not a menu.
+let rexDishes: [String] = [
+    "Pizza", "Burgers", "Steak", "Sushi", "Tacos", "Curry", "Ramen",
+    "Pasta", "Dumplings", "Seafood", "Fried chicken", "Barbecue",
+    "Sandwiches", "Brunch", "Small plates", "Pastries",
+]
+
+/// What Google calls these, mapped onto the sixteen above. Same conservative
+/// rule as the cuisines: a term that isn't clearly one of ours is dropped
+/// rather than guessed at.
+let rexDishSynonyms: [String: String] = [
+    "pizzeria": "Pizza", "neapolitan": "Pizza",
+    "hamburger": "Burgers", "burger": "Burgers",
+    "steakhouse": "Steak", "churrascaria": "Steak", "asador": "Steak",
+    "sushi": "Sushi", "omakase": "Sushi", "sashimi": "Sushi",
+    "taco": "Tacos", "taqueria": "Tacos",
+    "curry": "Curry", "balti": "Curry", "tandoori": "Curry",
+    "ramen": "Ramen", "noodle": "Ramen", "noodles": "Ramen",
+    "pasta": "Pasta", "trattoria": "Pasta", "osteria": "Pasta",
+    "dumpling": "Dumplings", "dim sum": "Dumplings", "gyoza": "Dumplings",
+    "seafood": "Seafood", "oyster": "Seafood", "fish and chips": "Seafood",
+    "fish & chips": "Seafood", "crab": "Seafood", "lobster": "Seafood",
+    "fried chicken": "Fried chicken", "chicken wings": "Fried chicken",
+    "barbecue": "Barbecue", "bbq": "Barbecue", "smokehouse": "Barbecue",
+    "yakitori": "Barbecue", "korean bbq": "Barbecue",
+    "sandwich": "Sandwiches", "deli": "Sandwiches", "banh mi": "Sandwiches",
+    "bagel": "Sandwiches", "sub": "Sandwiches",
+    "brunch": "Brunch", "breakfast": "Brunch", "pancake": "Brunch",
+    "tapas": "Small plates", "mezze": "Small plates", "izakaya": "Small plates",
+    "small plates": "Small plates",
+    "patisserie": "Pastries", "bakery": "Pastries", "creperie": "Pastries",
+    "crêperie": "Pastries", "pastry": "Pastries", "croissant": "Pastries",
+]
+
+/// The dishes inside a stored genre string, in the order above.
+func rexDishesIn(_ genre: String?) -> [String] {
+    let parts = Set(splitGenres(genre).map { $0.lowercased() })
+    return rexDishes.filter { parts.contains($0.lowercased()) }
+}
+
+/// Reads dishes out of whatever Google called the place — the dish twin of
+/// rexCuisineFrom, and run alongside it rather than instead: a pizzeria is
+/// both Italian and Pizza, and losing either loses a way of finding it.
+func rexDishFrom(_ raw: String?) -> [String] {
+    var out: [String] = []
+    for piece in (raw ?? "").split(separator: ",") {
+        let term = piece.trimmingCharacters(in: .whitespaces).lowercased()
+        guard !term.isEmpty else { continue }
+        if let exact = rexDishes.first(where: { $0.lowercased() == term }) {
+            if !out.contains(exact) { out.append(exact) }
+            continue
+        }
+        for (needle, dish) in rexDishSynonyms where termContainsWord(term, needle) {
+            if !out.contains(dish) { out.append(dish) }
+        }
+    }
+    // Same cap as the cuisines: past two the tags stop meaning anything and
+    // the card has nowhere to put them.
+    return Array(out.prefix(2))
+}
+
 /// The cuisines inside a stored genre string, in the order Kathryn listed
 /// them rather than the order they happen to be stored in.
 func rexCuisinesIn(_ genre: String?) -> [String] {
@@ -544,8 +618,8 @@ func rexCuisinesIn(_ genre: String?) -> [String] {
 /// A genre string with its cuisines taken out — the place's shape on its own,
 /// for anywhere that wants "Restaurant" without "Restaurant, Italian".
 func rexGenreWithoutCuisines(_ genre: String?) -> [String] {
-    let cuisines = Set(rexCuisines.map { $0.lowercased() })
-    return splitGenres(genre).filter { !cuisines.contains($0.lowercased()) }
+    let food = Set((rexCuisines + rexDishes).map { $0.lowercased() })
+    return splitGenres(genre).filter { !food.contains($0.lowercased()) }
 }
 
 /// Reads a cuisine out of whatever Google called the place. Used both when
@@ -625,9 +699,15 @@ func rexNormalisedGenres(_ raw: String?, for category: RexCategory) -> String? {
         for cuisine in rexCuisineFrom(raw) where !out.contains(cuisine) {
             out.append(cuisine)
         }
+        // Oct 14 — and the dish, for the same reason one step down. A
+        // pizzeria is Italian and it is pizza, and "where's good for pizza"
+        // is the question people actually ask.
+        for dish in rexDishFrom(raw) where !out.contains(dish) {
+            out.append(dish)
+        }
     }
 
-    return out.isEmpty ? nil : out.prefix(4).joined(separator: ", ")
+    return out.isEmpty ? nil : out.prefix(5).joined(separator: ", ")
 }
 
 /// Whether a heading contains this genre as whole words, so "history" matches

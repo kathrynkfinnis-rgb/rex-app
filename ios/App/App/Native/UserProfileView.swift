@@ -22,6 +22,9 @@ struct UserProfileView: View {
     /// profiles." More useful here than on your own, in fact: a friend with
     /// three hundred Rex is exactly who you're searching.
     @State private var searchQuery = ""
+    /// Oct 14 — "are you able to share your ranking with a friend?" Which
+    /// categories this person has put in order, so their profile can offer it.
+    @State private var rankedCategories: [String] = []
     @State private var theirLists: [RexList] = []
     @State private var myFollowedListIds: Set<String> = []
     @State private var followBusyIds: Set<String> = []
@@ -105,6 +108,10 @@ struct UserProfileView: View {
 
                 if !theirLists.isEmpty {
                     collectionsShelf
+                }
+
+                if !rankedCategories.isEmpty {
+                    rankingsShelf
                 }
 
                 // Only once there's enough on the page to need finding.
@@ -472,6 +479,42 @@ struct UserProfileView: View {
     /// Their public and friends-visible collections — never `draft`, those
     /// aren't yours to see. Save one and it shows up in your own "Friends'
     /// Collections" shelf.
+    /// Oct 14 — the answer to "are you able to share your ranking with a
+    /// friend?" was no: RankedLibraryView has always taken anybody's user id,
+    /// and nothing anywhere offered somebody else's. One row per category
+    /// they've actually ordered.
+    private var rankingsShelf: some View {
+        VStack(alignment: .leading, spacing: RexSpacing.sm) {
+            Text("\(firstName)\u{2019}s rankings")
+                .font(RexFont.display(18, weight: .semibold))
+                .foregroundStyle(RexColor.foreground)
+
+            ScrollView(.horizontal, showsIndicators: false) {
+                HStack(spacing: RexSpacing.sm) {
+                    ForEach(rankedCategories, id: \.self) { raw in
+                        let category = RexCategory(rawType: raw)
+                        NavigationLink(value: RankedLibraryRoute(
+                            category: raw, userId: route.userId, name: displayName
+                        )) {
+                            HStack(spacing: 6) {
+                                Image(systemName: category.symbol)
+                                    .font(.system(size: 12, weight: .semibold))
+                                Text(category.pluralLabel)
+                                    .font(RexFont.text(13, weight: .semibold))
+                            }
+                            .foregroundStyle(RexColor.primary)
+                            .padding(.horizontal, 14)
+                            .frame(height: 34)
+                            .background(RexColor.badgeBackground, in: Capsule())
+                        }
+                        .buttonStyle(.plain)
+                    }
+                }
+                .padding(.horizontal, 1)
+            }
+        }
+    }
+
     private var collectionsShelf: some View {
         VStack(alignment: .leading, spacing: RexSpacing.sm) {
             HStack(spacing: RexSpacing.sm) {
@@ -622,6 +665,7 @@ struct UserProfileView: View {
             // Best-effort: before the 14 Sept migration the function doesn't
             // exist, and a stranger's list comes back empty by design.
             theirFriends = (try? await RexAPI.shared.fetchFriendsOf(userId: route.userId)) ?? []
+            rankedCategories = await RexAPI.shared.rankedCategories(userId: route.userId)
 
             // #148 — same per-list thumbnail fetch as ExploreView's friend-
             // collection cards, so this shelf matches the one on your own

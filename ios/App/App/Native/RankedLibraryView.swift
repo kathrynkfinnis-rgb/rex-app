@@ -72,6 +72,20 @@ struct RankedLibraryView: View {
         .background(RexColor.background.ignoresSafeArea())
         .navigationTitle("")
         .navigationBarTitleDisplayMode(.inline)
+        .toolbar {
+            // Oct 14 — "are you able to share your ranking with a friend?"
+            // In the app, yes: a friend's rankings now sit on their profile.
+            // Outside it, this — the order as plain text, which is what the
+            // thing actually is. No share page yet, so nothing pretends there
+            // is a link to open.
+            if !rows.isEmpty {
+                ToolbarItem(placement: .topBarTrailing) {
+                    ShareLink(item: shareText) {
+                        Image(systemName: "square.and.arrow.up")
+                    }
+                }
+            }
+        }
         .task { await load() }
     }
 
@@ -170,6 +184,19 @@ struct RankedLibraryView: View {
             }
         }
         .padding(.top, RexSpacing.xl)
+    }
+
+    /// The ordering as a numbered list. The number is the whole point, so it
+    /// survives being pasted into a message.
+    private var shareText: String {
+        let heading = isMine
+            ? "My \(category.pluralLabel.lowercased()), in order"
+            : "\(route.name ?? "Their") \(category.pluralLabel.lowercased()), in order"
+        let lines = rows.enumerated().compactMap { index, row -> String? in
+            guard let item = row.items else { return nil }
+            return "\(index + 1). \(item.title)"
+        }
+        return ([heading] + lines).joined(separator: "\n")
     }
 
     private func load() async {

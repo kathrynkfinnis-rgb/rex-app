@@ -168,7 +168,10 @@ struct FeedView: View {
         for rec in recommendations where RexCategory(rawType: rec.items?.type) == .place {
             for genre in splitGenres(rec.items?.genre) { inUse.insert(genre.lowercased()) }
         }
-        return rexCuisines.filter { inUse.contains($0.lowercased()) }
+        // Oct 14 — dishes alongside the cuisines, in the same row. Both are
+        // answers to "what do you fancy", and splitting them into two rows
+        // would make you read twice to find one chip.
+        return (rexCuisines + rexDishes).filter { inUse.contains($0.lowercased()) }
     }
 
     /// Bursts the reader has chosen to see in full.

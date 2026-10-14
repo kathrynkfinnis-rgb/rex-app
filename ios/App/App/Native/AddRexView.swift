@@ -291,6 +291,9 @@ struct AddRexView: View {
     /// Oct 7 — the cuisine, for somewhere you eat. Stored in the same genre
     /// string as the shape; held apart here so the two chip rows don't fight.
     @State private var cuisines: Set<String> = []
+    /// Oct 14 — "would it be good to break it down also by steak, pizza,
+    /// burger etc." A dish alongside the cuisine, not instead of it.
+    @State private var dishes: Set<String> = []
 
     /// The place shapes where a type of food is worth asking about.
     private var servesFood: Bool {
@@ -327,7 +330,8 @@ struct AddRexView: View {
     private var genreValue: String? {
         let shape = subcategories.sorted()
         let food = rexCuisines.filter { cuisines.contains($0) }
-        let all = shape + food
+        let dish = rexDishes.filter { dishes.contains($0) }
+        let all = shape + food + dish
         return all.isEmpty ? nil : all.joined(separator: ", ")
     }
     @State private var productLink = ""
@@ -911,6 +915,11 @@ struct AddRexView: View {
                     .font(.system(size: 14, weight: .semibold))
                     .foregroundStyle(RexColor.foreground)
                 FlowChips(options: rexCuisines, selected: $cuisines)
+
+                Text("Dish")
+                    .font(.system(size: 14, weight: .semibold))
+                    .foregroundStyle(RexColor.foreground)
+                FlowChips(options: rexDishes, selected: $dishes)
             }
 
             // A link to the thing itself: the point of Other (products,
@@ -2562,6 +2571,7 @@ struct AddRexView: View {
         photoURLs = []
         subcategories = []
         cuisines = []
+        dishes = []
         taggedFriendIds = []
         anonymous = false
         rating = 8

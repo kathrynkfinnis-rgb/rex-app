@@ -203,7 +203,9 @@ struct RexMapView: View {
     private var cuisinesBelow: [String] {
         let foodShapes = ["Restaurant", "Pub", "Bar", "Caf\u{00E9}", "Bakery"]
         guard let active = subFilter else { return [] }
-        guard foodShapes.contains(active) || rexCuisines.contains(active) else { return [] }
+        guard foodShapes.contains(active)
+                || rexCuisines.contains(active)
+                || rexDishes.contains(active) else { return [] }
         return cuisinesOnMap
     }
 
@@ -214,7 +216,9 @@ struct RexMapView: View {
         for place in places {
             for genre in splitGenres(place.genre) { inUse.insert(genre.lowercased()) }
         }
-        return rexCuisines.filter { inUse.contains($0.lowercased()) }
+        // Oct 14 — dishes read the same way as cuisines here: both are just
+        // words in the genre string, and both answer the same question.
+        return (rexCuisines + rexDishes).filter { inUse.contains($0.lowercased()) }
     }
 
     /// A sub-category chip, tinted with the colour its pins use.

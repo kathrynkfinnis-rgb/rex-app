@@ -1,4 +1,5 @@
 import Foundation
+import UIKit
 
 enum RexAPIError: LocalizedError {
     case invalidResponse
@@ -3065,11 +3066,42 @@ final class RexAPI {
         // NOTHING) needs only INSERT, and a token that's already saved has
         // nothing to update anyway.
         request.setValue("resolution=ignore-duplicates,return=minimal", forHTTPHeaderField: "Prefer")
-        request.httpBody = try JSONSerialization.data(withJSONObject: ["user_id": userId, "device_token": deviceToken])
+        // Oct 14 — "I'm still getting double push notifications."
+        //
+        // APNs rotates a device token, and nothing ever removed the row the
+        // old one left behind — so one phone became two rows and send-push
+        // sent to both. identifierForVendor is the part that doesn't rotate,
+        // so the phone can now say "that other row was also me" and clear it
+        // before registering. Sent only when the column exists, the same
+        // probe-and-skip every other new column here uses.
+        var body: [String: Any] = ["user_id": userId, "device_token": deviceToken]
+        let deviceId = await UIDevice.current.identifierForVendor?.uuidString
+        if let deviceId, await hasColumn("device_id", on: "/rest/v1/push_tokens") {
+            body["device_id"] = deviceId
+            await removeStaleTokens(userId: userId, deviceId: deviceId, keeping: deviceToken, token: token)
+        }
+        request.httpBody = try JSONSerialization.data(withJSONObject: body)
         let (data, response) = try await URLSession.shared.data(for: request)
         guard let http = response as? HTTPURLResponse, http.statusCode < 400 else {
             throw RexAPIError.server(friendlyError(data, fallback: "Couldn't register for push."))
         }
+    }
+
+    /// Every token this phone registered before the one it has now. Deleting
+    /// is a permission the table already grants its owner.
+    private func removeStaleTokens(userId: String, deviceId: String, keeping current: String, token: String) async {
+        var components = URLComponents(url: baseURL.appendingPathComponent("/rest/v1/push_tokens"), resolvingAgainstBaseURL: false)!
+        components.queryItems = [
+            URLQueryItem(name: "user_id", value: "eq.\(userId)"),
+            URLQueryItem(name: "device_id", value: "eq.\(deviceId)"),
+            URLQueryItem(name: "device_token", value: "neq.\(current)"),
+        ]
+        guard let url = components.url else { return }
+        var request = URLRequest(url: url)
+        request.httpMethod = "DELETE"
+        request.setValue(anonKey, forHTTPHeaderField: "apikey")
+        request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+        _ = try? await URLSession.shared.data(for: request)
     }
 
     func markNotificationsRead(ids: [String]) async throws {
@@ -6643,6 +6675,34 @@ final class RexAPI {
     ///
     /// Returning nil for "could not ask" and [] for "nothing there" is the
     /// whole fix: the caller can then say so instead of guessing.
+    /// Oct 14 — "are you able to share your ranking with a friend?"
+    ///
+    /// The ranked library already opened for anybody's id; nothing ever
+    /// offered somebody else's. This is what a profile needs to know to
+    /// offer it: which categories this person has actually put in order, so
+    /// the page shows "Their books, in order" and nothing else.
+    func rankedCategories(userId: String? = nil) async -> [String] {
+        guard let token = try? await validToken(),
+              let whose = userId ?? currentUserId else { return [] }
+        var components = URLComponents(url: baseURL.appendingPathComponent("/rest/v1/rankings"), resolvingAgainstBaseURL: false)!
+        components.queryItems = [
+            URLQueryItem(name: "select", value: "category"),
+            URLQueryItem(name: "user_id", value: "eq.\(whose)"),
+        ]
+        var request = URLRequest(url: components.url!)
+        request.setValue(anonKey, forHTTPHeaderField: "apikey")
+        request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+        guard let (data, response) = try? await URLSession.shared.data(for: request),
+              let http = response as? HTTPURLResponse, http.statusCode < 400 else { return [] }
+        struct Row: Codable { let category: String }
+        let rows = (try? JSONDecoder().decode([Row].self, from: data)) ?? []
+        // Two or fewer in a category isn't an ordering anybody wants to read.
+        let counts = rows.reduce(into: [String: Int]()) { $0[$1.category, default: 0] += 1 }
+        return rexAllCategories
+            .map(\.rawValue)
+            .filter { (counts[$0] ?? 0) >= 3 }
+    }
+
     func fetchRanking(userId: String? = nil, category: String) async -> [RankedItem]? {
         guard let token = try? await validToken(),
               let whose = userId ?? currentUserId else { return nil }

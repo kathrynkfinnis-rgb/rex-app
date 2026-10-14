@@ -76,9 +76,31 @@ struct EditRexView: View {
         Binding(
             get: { Set(rexCuisinesIn(genre)) },
             set: { picked in
-                let shape = rexGenreWithoutCuisines(genre)
+                // Strip only the cuisines, not every food word: dishes live in
+                // the same string now, and rexGenreWithoutCuisines takes both
+                // out — using it here would clear the dish every time you
+                // touched a cuisine.
+                let rest = splitGenres(genre).filter { part in
+                    !rexCuisines.contains(where: { $0.lowercased() == part.lowercased() })
+                }
                 let food = rexCuisines.filter { picked.contains($0) }
-                genre = (shape + food).joined(separator: ", ")
+                genre = (rest + food).joined(separator: ", ")
+            }
+        )
+    }
+
+    /// Oct 14 — the dish half of the same string. Same shape as the cuisine
+    /// binding above: read the dishes out of the genre, write them back in
+    /// the vocabulary's own order, leaving everything else in place.
+    private var dishSelection: Binding<Set<String>> {
+        Binding(
+            get: { Set(rexDishesIn(genre)) },
+            set: { picked in
+                let rest = splitGenres(genre).filter { part in
+                    !rexDishes.contains(where: { $0.lowercased() == part.lowercased() })
+                }
+                let dish = rexDishes.filter { picked.contains($0) }
+                genre = (rest + dish).joined(separator: ", ")
             }
         )
     }
@@ -336,6 +358,11 @@ struct EditRexView: View {
                             Text("Type of food")
                                 .font(RexFont.text(14, weight: .semibold))
                             FlowChips(options: rexCuisines, selected: cuisineSelection)
+
+                            Text("Dish")
+                                .font(.system(size: 14, weight: .semibold))
+                                .foregroundStyle(RexColor.foreground)
+                            FlowChips(options: rexDishes, selected: dishSelection)
                         }
                     }
 
