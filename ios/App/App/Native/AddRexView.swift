@@ -319,6 +319,22 @@ struct AddRexView: View {
     /// already been inset for it, so the same scrollTo lands where it should.
     /// The delay is longer than the system animation on purpose; being a
     /// moment late is invisible, being early is the bug.
+    /// The linked page's own picture, for anything the catalogue couldn't
+    /// give a cover. Debounced, because this fires on every keystroke of a
+    /// pasted URL, and best-effort throughout: no picture is the state we
+    /// were already in.
+    private func lookUpLinkedImage(_ link: String) async {
+        let trimmed = link.trimmingCharacters(in: .whitespaces)
+        linkedImageURL = nil
+        guard let url = URL(string: trimmed), url.scheme?.hasPrefix("http") == true else { return }
+        try? await Task.sleep(nanoseconds: 600_000_000)
+        // Typed on since; a later keystroke owns the answer.
+        guard productLink.trimmingCharacters(in: .whitespaces) == trimmed else { return }
+        let found = await RexSearch.openGraphImage(for: url)
+        guard productLink.trimmingCharacters(in: .whitespaces) == trimmed else { return }
+        linkedImageURL = found
+    }
+
     private func scrollToNote(_ proxy: ScrollViewProxy, settle: Bool = true) {
         Task { @MainActor in
             if settle { try? await Task.sleep(nanoseconds: 350_000_000) }
@@ -336,6 +352,9 @@ struct AddRexView: View {
         return all.isEmpty ? nil : all.joined(separator: ", ")
     }
     @State private var productLink = ""
+    /// A picture lifted from the linked page, when nothing else supplied one.
+    /// Fetched as the link is typed so posting never waits on the network.
+    @State private var linkedImageURL: String?
     /// Sept 2 trips rebuild — a trip's itinerary is an ordered list of
     /// headings and stops now (see ItineraryEntry), not a flat [DraftStop]
     /// with a heading string on each. It flattens back to that shape on
@@ -966,6 +985,9 @@ struct AddRexView: View {
             // inputted through notes)".
             if ![.book, .movie, .tv, .podcast, .list, .trip].contains(category) {
                 field("Link (optional)", text: $productLink, placeholder: "https://…")
+                    .onChange(of: productLink) { _, link in
+                        Task { await lookUpLinkedImage(link) }
+                    }
                     .textInputAutocapitalization(.never)
             }
 
@@ -2004,7 +2026,15 @@ struct AddRexView: View {
                 // all), promote whatever photo the post itself carries
                 // instead of leaving every card on the generic placeholder
                 // icon. A real photo, when there is one, beats no photo.
-                imageURL: (picked?.imageURL?.isEmpty ?? true) ? (photoURLs.first ?? listIconURL) : nil,
+                // Oct 15 — and when there is still nothing, the page you
+                // linked to has a picture of the thing: og:image is the shot
+                // the shop itself chose for sharing. Checked live — John
+                // Lewis gives it up, Amazon and Waterstones serve a bot page
+                // and don't, so this fills some gaps rather than all of
+                // them. It costs one request and nothing when it fails.
+                imageURL: (picked?.imageURL?.isEmpty ?? true)
+                    ? (photoURLs.first ?? listIconURL ?? linkedImageURL)
+                    : nil,
                 recipeText: category == .recipe && !recipeText.isEmpty ? recipeText : nil
             )
             // Trip stops become their own Rex, linked to the trip.

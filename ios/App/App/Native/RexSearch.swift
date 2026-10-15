@@ -1721,3 +1721,72 @@ extension RexSearch {
         }
     }
 }
+
+extension RexSearch {
+    /// Oct 15 — a picture for something whose only identity is a link.
+    ///
+    /// The Custom Search JSON API was meant to find these and never will: it
+    /// is closed to new customers, which is what the 403 has been saying all
+    /// along underneath a message that sounded like a permission we could be
+    /// granted. Wikipedia covers the things that have articles — board games,
+    /// books, films — and covers a kettle not at all.
+    ///
+    /// But a product someone links to already has a photograph, on the page
+    /// they linked: og:image is the picture the shop itself chose for sharing,
+    /// which is the product shot. No API, no key, no quota, and more accurate
+    /// than an image search would have been — the page is the right answer by
+    /// construction, where a search is a guess.
+    static func openGraphImage(for pageURL: URL) async -> String? {
+        guard let scheme = pageURL.scheme?.lowercased(),
+              scheme == "http" || scheme == "https" else { return nil }
+        var request = URLRequest(url: pageURL)
+        // Shops serve a different, thinner page to anything that looks like a
+        // crawler, and some serve nothing at all. Asking as a browser gets the
+        // page a person would see, which is the one with the metadata on it.
+        request.setValue(
+            "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Safari/605.1.15",
+            forHTTPHeaderField: "User-Agent"
+        )
+        request.timeoutInterval = 8
+
+        guard let (data, response) = try? await URLSession.shared.data(for: request),
+              let http = response as? HTTPURLResponse, http.statusCode < 400
+        else { return nil }
+        // The head is where the metadata lives; a megabyte of product page
+        // below it is nothing to do with us.
+        let head = String(decoding: data.prefix(200_000), as: UTF8.self)
+
+        for property in ["og:image:secure_url", "og:image", "twitter:image", "twitter:image:src"] {
+            if let found = metaContent(in: head, property: property),
+               let absolute = URL(string: found, relativeTo: pageURL)?.absoluteURL,
+               absolute.scheme?.hasPrefix("http") == true {
+                return absolute.absoluteString
+            }
+        }
+        return nil
+    }
+
+    /// `content` of the first meta tag with this property or name. Written
+    /// against the two orders real pages use — property first or content
+    /// first — rather than assuming one.
+    private static func metaContent(in html: String, property: String) -> String? {
+        let escaped = NSRegularExpression.escapedPattern(for: property)
+        let patterns = [
+            "<meta[^>]+(?:property|name)\\s*=\\s*[\"']\(escaped)[\"'][^>]*?content\\s*=\\s*[\"']([^\"']+)[\"']",
+            "<meta[^>]+content\\s*=\\s*[\"']([^\"']+)[\"'][^>]*?(?:property|name)\\s*=\\s*[\"']\(escaped)[\"']",
+        ]
+        for pattern in patterns {
+            guard let regex = try? NSRegularExpression(pattern: pattern, options: [.caseInsensitive]) else { continue }
+            let range = NSRange(html.startIndex..., in: html)
+            guard let match = regex.firstMatch(in: html, range: range),
+                  match.numberOfRanges > 1,
+                  let captured = Range(match.range(at: 1), in: html)
+            else { continue }
+            let value = String(html[captured])
+                .replacingOccurrences(of: "&amp;", with: "&")
+                .trimmingCharacters(in: .whitespacesAndNewlines)
+            if !value.isEmpty { return value }
+        }
+        return nil
+    }
+}
