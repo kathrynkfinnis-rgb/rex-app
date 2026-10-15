@@ -247,6 +247,7 @@ struct ProfileView: View {
         .navigationDestination(for: String.self) { ItemDetailView(itemId: $0) }
         .navigationDestination(for: UserProfileRoute.self) { UserProfileView(route: $0) }
         .navigationDestination(for: AuthorRoute.self) { AuthorBooksView(route: $0) }
+        .navigationDestination(for: PersonRoute.self) { PersonCreditsView(route: $0) }
         .navigationDestination(for: DraftsRoute.self) { _ in DraftsView() }
         .navigationDestination(for: NotificationPreferencesRoute.self) { _ in NotificationPreferencesView() }
         .navigationDestination(for: PrivacyRoute.self) { _ in PrivacyDataView(onSignedOut: { onSignedOut?() }) }

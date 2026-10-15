@@ -1345,6 +1345,13 @@ enum RexSearch {
         let name: String
         let role: String?
         let imageURL: String?
+        /// Oct 15 — "like authors, can we make the cast clickable? So you can
+        /// see what else they've been in?" TMDB's person id, which is what
+        /// their credits hang off. Optional because it has only been read
+        /// since this was asked for; a cast member fetched by an older build
+        /// and cached has a name and no id, and a name alone is not something
+        /// to go looking up a person by.
+        let personId: Int?
         var id: String { name + (role ?? "") }
     }
 
@@ -1449,7 +1456,8 @@ enum RexSearch {
                 return CastMember(
                     name: name,
                     role: role,
-                    imageURL: path.map { "https://image.tmdb.org/t/p/w185\($0)" }
+                    imageURL: path.map { "https://image.tmdb.org/t/p/w185\($0)" },
+                    personId: member["id"] as? Int
                 )
             }
         }
@@ -1647,5 +1655,69 @@ enum RexSearch {
         let (data, response) = try await URLSession.shared.data(from: parsed)
         guard let http = response as? HTTPURLResponse, http.statusCode < 400 else { return [:] }
         return try JSONSerialization.jsonObject(with: data) as? [String: Any] ?? [:]
+    }
+}
+
+extension RexSearch {
+    /// Oct 15 — what else this person has been in.
+    ///
+    /// TMDB's combined credits, which covers film and television in one call,
+    /// ordered by how well known the title is rather than by date: the point
+    /// of the screen is recognition — "oh, *that* one" — and a chronological
+    /// list buries that under everything they did before anyone noticed.
+    ///
+    /// Their own appearance in the thing you came from is dropped by the
+    /// caller, which knows what that is.
+    static func personCredits(personId: Int) async -> [RexSearchHit] {
+        guard !tmdbKey.isEmpty else { return [] }
+        guard let json = try? await getJSON(
+            "https://api.themoviedb.org/3/person/\(personId)/combined_credits?api_key=\(tmdbKey)"
+        ), let cast = json["cast"] as? [[String: Any]] else { return [] }
+
+        // Checked against the live endpoint: sorting ninety-eight credits by
+        // popularity put The Tonight Show, Colbert, The Daily Show and Kelly
+        // Clarkson in the first five — because a chat show is more popular
+        // than almost any film, and every actor has been on all of them.
+        //
+        // "What else have they been in" does not mean "where have they sat on
+        // a sofa", so appearances as themselves go, and so do the formats
+        // that are nothing but: talk (10767), news (10763) and reality
+        // (10764).
+        let chatShow: Set<Int> = [10767, 10763, 10764]
+        let acting = cast.filter { credit in
+            let character = (credit["character"] as? String ?? "").lowercased()
+            if character == "self" || character.hasPrefix("self ") || character.hasPrefix("self-") {
+                return false
+            }
+            let genres = Set(credit["genre_ids"] as? [Int] ?? [])
+            return genres.isDisjoint(with: chatShow)
+        }
+        let sorted = acting.sorted {
+            ($0["popularity"] as? Double ?? 0) > ($1["popularity"] as? Double ?? 0)
+        }
+        var seen = Set<String>()
+        return sorted.compactMap { credit -> RexSearchHit? in
+            // A person credited on both halves of a franchise, or on a show
+            // once per season, should appear once.
+            guard let mediaType = credit["media_type"] as? String,
+                  mediaType == "movie" || mediaType == "tv",
+                  let id = credit["id"] as? Int,
+                  let title = (credit["title"] as? String) ?? (credit["name"] as? String),
+                  !title.isEmpty,
+                  seen.insert("\(mediaType):\(id)").inserted
+            else { return nil }
+            let date = (credit["release_date"] as? String) ?? (credit["first_air_date"] as? String)
+            let year = date.flatMap { $0.count >= 4 ? String($0.prefix(4)) : nil }
+            let path = credit["poster_path"] as? String
+            return RexSearchHit(
+                externalId: String(id),
+                externalSource: mediaType == "movie" ? "tmdb_movie" : "tmdb_tv",
+                title: title,
+                subtitle: [credit["character"] as? String, year]
+                    .compactMap { $0 }.filter { !$0.isEmpty }.joined(separator: " \u{00B7} "),
+                imageURL: path.map { "https://image.tmdb.org/t/p/w342\($0)" },
+                genre: mediaType == "movie" ? "Movie" : "TV"
+            )
+        }
     }
 }

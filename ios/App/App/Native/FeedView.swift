@@ -744,6 +744,9 @@ struct FeedView: View {
             .navigationDestination(for: AuthorRoute.self) { r in
                 AuthorBooksView(route: r)
             }
+            .navigationDestination(for: PersonRoute.self) { r in
+                PersonCreditsView(route: r)
+            }
             .navigationDestination(for: FriendsRoute.self) { _ in
                 FriendsView()
             }

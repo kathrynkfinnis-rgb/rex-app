@@ -380,6 +380,36 @@ struct TripDetailView: View {
         }
     }
 
+    /// Which photo leads. Nil until somebody chooses, and then it is simply
+    /// moved to the front of the list the band already draws from.
+    private func coverLabel(for url: String) -> String {
+        if (tripRec?.photo_urls ?? []).contains(url) || tripRec?.photo_url == url {
+            return "Use your photo"
+        }
+        if let stop = stops.first(where: { $0.items?.image_url == url }),
+           let title = stop.items?.title {
+            return "Use \(title)'s photo"
+        }
+        return "Use this photo"
+    }
+
+    /// Writes the chosen photo to the front of the trip's own photo list, so
+    /// it leads on the card as well as here. A stop's listing photo picked as
+    /// the cover is copied onto the trip — it is the trip's cover now, and
+    /// the stop keeps its own.
+    private func setCover(_ url: String) async {
+        var ordered = (tripRec?.photo_urls ?? []).filter { $0 != url }
+        ordered.insert(url, at: 0)
+        do {
+            try await RexAPI.shared.updateRecommendationPhotos(
+                recommendationId: route.recommendationId, photoURLs: ordered
+            )
+            await load()
+        } catch {
+            mutationError = error.localizedDescription
+        }
+    }
+
     /// Oct 13 — the rebrand's header, matching the item and collection pages.
     ///
     /// A trip has no cover of its own either, so the card on the band shows
@@ -392,7 +422,29 @@ struct TripDetailView: View {
             Group {
                 if let hero = bandPhotos.first {
                     ZStack(alignment: .topTrailing) {
+                        // Oct 15 — "you should be able to hold down on that
+                        // photo to change it (either to the one we provided)."
+                        //
+                        // Every candidate the page already has: your own
+                        // uploads first, then each stop's listing photo. The
+                        // one on top is whichever you pick, and picking is the
+                        // only thing this does — nothing is uploaded or
+                        // deleted, it just reorders what is already there.
                         RexPhotoBand(url: hero)
+                            .contextMenu {
+                                if isOwner, bandPhotos.count > 1 {
+                                    ForEach(bandPhotos.dropFirst().prefix(8), id: \.self) { url in
+                                        Button {
+                                            Task { await setCover(url) }
+                                        } label: {
+                                            Label(
+                                                coverLabel(for: url),
+                                                systemImage: "photo"
+                                            )
+                                        }
+                                    }
+                                }
+                            }
                         tripArtwork
                             .frame(width: RexHeaderMetrics.thumbWidth, height: RexHeaderMetrics.thumbHeight)
                             .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))

@@ -2564,6 +2564,27 @@ final class RexAPI {
     ///
     /// The wants half of setTaggedFriends. Same shape, other table — see the
     /// want_tags migration for why a want can't use recommendation_tags.
+    /// Oct 15 — "you should be able to hold down on that photo to change it."
+    ///
+    /// Rewrites a recommendation's photo list, which is how a trip's cover is
+    /// chosen: the band draws the first one, so choosing is reordering.
+    func updateRecommendationPhotos(recommendationId: String, photoURLs: [String]) async throws {
+        let token = try await validToken()
+        var components = URLComponents(url: baseURL.appendingPathComponent("/rest/v1/recommendations"), resolvingAgainstBaseURL: false)!
+        components.queryItems = [URLQueryItem(name: "id", value: "eq.\(recommendationId)")]
+        var request = URLRequest(url: components.url!)
+        request.httpMethod = "PATCH"
+        request.setValue(anonKey, forHTTPHeaderField: "apikey")
+        request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        request.httpBody = try JSONSerialization.data(withJSONObject: ["photo_urls": photoURLs])
+
+        let (data, response) = try await URLSession.shared.data(for: request)
+        guard let http = response as? HTTPURLResponse, http.statusCode < 400 else {
+            throw RexAPIError.server(friendlyError(data, fallback: "Couldn't change the photo."))
+        }
+    }
+
     func setTaggedWantFriends(wantId: String, userIds: [String]) async throws {
         try await setTags(
             path: "/rest/v1/want_tags", column: "want_id", id: wantId, userIds: userIds
@@ -5730,6 +5751,41 @@ final class RexAPI {
     /// How many people have Rex'd each of these items. Counted client-side
     /// because PostgREST has no group-by; the id list is one feed page, so this
     /// stays small.
+    /// Oct 15 — how many people have Rex'd each of these, keyed by the
+    /// catalogue's own id rather than ours.
+    ///
+    /// A person's credits come from TMDB, so most of them are not items here
+    /// at all; the few that are need matching by external_id, which is the
+    /// only thing the two lists share. Best-effort — a missing count costs a
+    /// tile its line, not the screen.
+    func rexCountsByExternalId(externalIds: [String]) async -> [String: Int] {
+        guard !externalIds.isEmpty, let token = try? await validToken() else { return [:] }
+        var components = URLComponents(url: baseURL.appendingPathComponent("/rest/v1/items"), resolvingAgainstBaseURL: false)!
+        components.queryItems = [
+            URLQueryItem(name: "select", value: "id,external_id,recommendations(id)"),
+            URLQueryItem(name: "external_id", value: "in.(\(externalIds.joined(separator: ",")))"),
+            URLQueryItem(name: "type", value: "in.(movie,tv)"),
+        ]
+        guard let url = components.url else { return [:] }
+        var request = URLRequest(url: url)
+        request.setValue(anonKey, forHTTPHeaderField: "apikey")
+        request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+        guard let (data, response) = try? await URLSession.shared.data(for: request),
+              let http = response as? HTTPURLResponse, http.statusCode < 400 else { return [:] }
+        struct Row: Codable {
+            let external_id: String?
+            let recommendations: [Stub]?
+            struct Stub: Codable { let id: String }
+        }
+        let rows = (try? JSONDecoder().decode([Row].self, from: data)) ?? []
+        var out: [String: Int] = [:]
+        for row in rows {
+            guard let key = row.external_id else { continue }
+            out[key] = (row.recommendations ?? []).count
+        }
+        return out
+    }
+
     func fetchRexCounts(itemIds: [String]) async throws -> [String: Int] {
         // A blast has no real `items` row — FeedRecommendation gives it a
         // synthetic "blast-<uuid>" item_id purely so it has an Identifiable

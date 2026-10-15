@@ -1236,6 +1236,16 @@ struct ItemDetailView: View {
                 ScrollView(.horizontal, showsIndicators: false) {
                     HStack(spacing: RexSpacing.md) {
                         ForEach(details.cast) { member in
+                            // Oct 15 — "like authors, can we make the cast
+                            // clickable? So you can see what else they've
+                            // been in?" Only when TMDB gave us their id: a
+                            // name alone is not something to look a person
+                            // up by, and a tile that goes nowhere is worse
+                            // than one that was never tappable.
+                            CastTile(
+                                member: member,
+                                fromTitle: item?.title
+                            ) {
                             VStack(spacing: 4) {
                                 AsyncImage(url: member.imageURL.flatMap(URL.init(string:))) { phase in
                                     if let image = phase.image {
@@ -1262,6 +1272,7 @@ struct ItemDetailView: View {
                                 }
                             }
                             .frame(width: 68)
+                            }
                         }
                     }
                     .padding(.horizontal, 1)
