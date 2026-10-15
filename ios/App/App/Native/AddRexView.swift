@@ -288,6 +288,7 @@ struct AddRexView: View {
     /// Oct 4 — keeping the note box above the keyboard as it grows.
     @FocusState private var noteFocused: Bool
     private static let noteFieldID = "rex-note-field"
+    private static let successID = "rex-success"
     /// Oct 7 — the cuisine, for somewhere you eat. Stored in the same genre
     /// string as the shape; held apart here so the two chip rows don't fight.
     @State private var cuisines: Set<String> = []
@@ -424,6 +425,7 @@ struct AddRexView: View {
                         Group {
                             if didPost {
                                 successState
+                                    .id(Self.successID)
                             } else if let category {
                                 form(for: category)
                             } else {
@@ -438,6 +440,24 @@ struct AddRexView: View {
                         // nowhere left to go. Padding by the measured height
                         // gives it somewhere.
                         .padding(.bottom, keyboard.height)
+                        // Oct 15 — Danny: "this sometimes happens if I add a
+                        // Rex. If I scroll down the completed a Rex comes
+                        // down." His screenshot is an Add a place sheet with
+                        // nothing on it at all.
+                        //
+                        // The form is long and he had scrolled down it to
+                        // reach Post. Posting swaps the content for the
+                        // success screen, which is short — and a ScrollView
+                        // keeps its offset across that swap, so it stays
+                        // scrolled to where a form used to be and now nothing
+                        // is. Hence a blank sheet, with the thing he was
+                        // looking for below him.
+                        .onChange(of: didPost) { _, posted in
+                            guard posted else { return }
+                            withAnimation(.easeOut(duration: 0.2)) {
+                                proxy.scrollTo(Self.successID, anchor: .top)
+                            }
+                        }
                         .onChange(of: noteFocused) { _, focused in
                             guard focused else { return }
                             scrollToNote(proxy)
