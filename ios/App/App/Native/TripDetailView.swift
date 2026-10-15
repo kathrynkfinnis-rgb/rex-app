@@ -345,14 +345,29 @@ struct TripDetailView: View {
     /// The first few stops, which is what a trip is. Falls back to the trip
     /// symbol on a tinted ground rather than an empty card.
     /// The stops' photographs, for the folded band.
+    /// Oct 15 — "for a trip, if I upload a photo, this should be the banner
+    /// photo at the top of the card, not something from Google. Just tried
+    /// for the Antigua trip and it has a random photo."
+    ///
+    /// It wasn't random: it was the first stop's Google listing photo, which
+    /// is all this ever read. Her own photographs live on the trip's own
+    /// recommendation and nothing here looked at them.
+    ///
+    /// Same rule the item page took on 14 October — a picture somebody who
+    /// went there took outranks a listing photo — arriving late for trips
+    /// because the band was built from the stops rather than the trip.
     private var bandPhotos: [String] {
         var seen = Set<String>()
-        return stops.compactMap { $0.items?.image_url }.filter { seen.insert($0).inserted }
+        let mine = (tripRec?.photo_urls ?? []) + [tripRec?.photo_url].compactMap { $0 }
+        let theirs = stops.compactMap { $0.items?.image_url }
+        return (mine + theirs).filter { !$0.isEmpty && seen.insert($0).inserted }
     }
 
     @ViewBuilder
     private var tripArtwork: some View {
-        let urls = stops.compactMap { $0.items?.image_url }.prefix(4)
+        // Yours first here too, so the thumbnail grid and the band agree
+        // about what this trip looks like.
+        let urls = bandPhotos.prefix(4)
         if urls.isEmpty {
             ZStack {
                 RexColor.badgeBackground
