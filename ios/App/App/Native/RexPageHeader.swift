@@ -89,7 +89,20 @@ struct RexPhotoBand: View {
 
     var body: some View {
         ZStack(alignment: .bottom) {
-            GoogleSafeAsyncImage(url: URL(string: url)!) { image in
+            // Oct 15 — "random crash when scrolling through trips."
+            //
+            // This was URL(string: url)!, and the string is a photo address
+            // out of the database — somebody's upload, with whatever is in
+            // its filename. URL(string:) returns nil for a space or any other
+            // character that was never percent-encoded, and the force unwrap
+            // then takes the app down. Every page with a photograph across
+            // the top draws this, so the crash lands wherever the bad photo
+            // happens to be, which is exactly how it reads: random, while
+            // scrolling.
+            //
+            // A photo that can't be addressed is a photo we don't have, and
+            // the placeholder already knows how to say that.
+            GoogleSafeAsyncImage(url: parsed) { image in
                 image.resizable().aspectRatio(contentMode: .fill)
             } placeholder: {
                 RexColor.muted
@@ -105,6 +118,14 @@ struct RexPhotoBand: View {
         .frame(maxWidth: .infinity)
         .clipped()
         .accessibilityLabel("A photograph of this place")
+    }
+
+    /// Percent-encoding anything the uploader left raw, so a filename with a
+    /// space in it is a picture rather than a crash.
+    private var parsed: URL? {
+        URL(string: url)
+            ?? url.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed)
+                .flatMap(URL.init(string:))
     }
 }
 

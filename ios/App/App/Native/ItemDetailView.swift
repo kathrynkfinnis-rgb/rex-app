@@ -2022,8 +2022,14 @@ struct ItemDetailView: View {
                     .foregroundStyle(RexColor.mutedForeground)
                     .padding(.top, RexSpacing.sm)
 
-                ForEach(articles) { article in
-                    RexOutboundLinkButton(url: URL(string: article.url)!) {
+                // Oct 15 — the same force unwrap as the photo band, on a URL
+                // out of a web search rather than a database. An article whose
+                // address won't parse is one we can't open, so it isn't listed
+                // rather than listed and fatal.
+                ForEach(articles.compactMap { article in
+                    URL(string: article.url).map { (article, $0) }
+                }, id: \.0.id) { article, articleURL in
+                    RexOutboundLinkButton(url: articleURL) {
                         VStack(alignment: .leading, spacing: 3) {
                             Text(article.publication.uppercased())
                                 .font(.system(size: 9, weight: .semibold))
