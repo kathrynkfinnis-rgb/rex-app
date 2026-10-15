@@ -314,6 +314,17 @@ struct RexNotification: Codable, Identifiable {
             return title.isEmpty
                 ? "\(who) also replied: \"\(preview)\""
                 : "\(who) also replied on \"\(title)\": \"\(preview)\""
+        // Oct 15 — rec_tagged has been writing notifications since 22 August
+        // and never had a line here, so being tagged on a Rex has always read
+        // "New activity". want_tagged is its new twin.
+        case "rec_tagged":
+            return title.isEmpty
+                ? "\(who) tagged you in a Rex"
+                : "\(who) tagged you in their Rex of \(title)"
+        case "want_tagged":
+            return title.isEmpty
+                ? "\(who) wants to try something with you"
+                : "\(who) wants to try \(title) with you"
         case "mention": return "\(who) tagged you: \"\(preview)\""
         case "friend_new_rec": return "\(who) Rexed \(title.isEmpty ? "something new" : title)"
         default: return "New activity"

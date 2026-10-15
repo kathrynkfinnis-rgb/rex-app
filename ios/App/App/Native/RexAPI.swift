@@ -2377,13 +2377,17 @@ final class RexAPI {
     /// scratch. Only the second belongs in the feed — see fetchWantsFeed.
     /// Sent only when the column exists, same probe-and-skip the note field
     /// above uses, so this keeps working before the migration is run.
+    /// Returns the want's id. Discardable because most callers are just
+    /// bookmarking and have nothing to do with it; the Add form uses it to
+    /// tag friends on what it has just written.
+    @discardableResult
     func createWant(
         itemId: String,
         note: String? = nil,
         source: String = "save",
         photoURLs: [String] = [],
         showInFeed: Bool? = nil
-    ) async throws {
+    ) async throws -> String? {
         let token = try await validToken()
         guard let userId = currentUserId else { throw RexAPIError.notSignedIn }
         var request = URLRequest(url: baseURL.appendingPathComponent("/rest/v1/wants"))
@@ -2410,11 +2414,18 @@ final class RexAPI {
         var urlComponents = URLComponents(url: request.url!, resolvingAgainstBaseURL: false)!
         urlComponents.queryItems = [URLQueryItem(name: "on_conflict", value: "user_id,item_id")]
         request.url = urlComponents.url
+        // Oct 15 — the new row comes back now, because tagging a friend on a
+        // want needs its id and this was the only place that knew it. The
+        // merge-duplicates Prefer above already returns the row either way,
+        // so re-wanting something still answers with the want that exists.
+        request.setValue("resolution=merge-duplicates,return=representation", forHTTPHeaderField: "Prefer")
 
         let (data, response) = try await URLSession.shared.data(for: request)
         guard let http = response as? HTTPURLResponse, http.statusCode < 400 else {
             throw RexAPIError.server(friendlyError(data, fallback: "Couldn't save."))
         }
+        struct Created: Codable { let id: String }
+        return (try? JSONDecoder().decode([Created].self, from: data))?.first?.id
     }
 
     func fetchMyProfile() async throws -> RexProfileDetail {
@@ -2549,11 +2560,29 @@ final class RexAPI {
     /// simplest correct thing (delete then re-insert) rather than diffing,
     /// since this only ever runs from a picker that already knows the
     /// intended final set, not an incremental add/remove.
+    /// Oct 15 — "also need to be able to tag someone in a want to try."
+    ///
+    /// The wants half of setTaggedFriends. Same shape, other table — see the
+    /// want_tags migration for why a want can't use recommendation_tags.
+    func setTaggedWantFriends(wantId: String, userIds: [String]) async throws {
+        try await setTags(
+            path: "/rest/v1/want_tags", column: "want_id", id: wantId, userIds: userIds
+        )
+    }
+
     func setTaggedFriends(recommendationId: String, userIds: [String]) async throws {
+        try await setTags(
+            path: "/rest/v1/recommendation_tags", column: "recommendation_id",
+            id: recommendationId, userIds: userIds
+        )
+    }
+
+    /// Replace whoever is tagged: clear, then insert. Two tables, one shape.
+    private func setTags(path: String, column: String, id: String, userIds: [String]) async throws {
         let token = try await validToken()
 
-        var delComponents = URLComponents(url: baseURL.appendingPathComponent("/rest/v1/recommendation_tags"), resolvingAgainstBaseURL: false)!
-        delComponents.queryItems = [URLQueryItem(name: "recommendation_id", value: "eq.\(recommendationId)")]
+        var delComponents = URLComponents(url: baseURL.appendingPathComponent(path), resolvingAgainstBaseURL: false)!
+        delComponents.queryItems = [URLQueryItem(name: column, value: "eq.\(id)")]
         var delRequest = URLRequest(url: delComponents.url!)
         delRequest.httpMethod = "DELETE"
         delRequest.setValue(anonKey, forHTTPHeaderField: "apikey")
@@ -2561,12 +2590,12 @@ final class RexAPI {
         _ = try? await URLSession.shared.data(for: delRequest)
 
         guard !userIds.isEmpty else { return }
-        var insRequest = URLRequest(url: baseURL.appendingPathComponent("/rest/v1/recommendation_tags"))
+        var insRequest = URLRequest(url: baseURL.appendingPathComponent(path))
         insRequest.httpMethod = "POST"
         insRequest.setValue(anonKey, forHTTPHeaderField: "apikey")
         insRequest.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
         insRequest.setValue("application/json", forHTTPHeaderField: "Content-Type")
-        insRequest.httpBody = try JSONSerialization.data(withJSONObject: userIds.map { ["recommendation_id": recommendationId, "user_id": $0] })
+        insRequest.httpBody = try JSONSerialization.data(withJSONObject: userIds.map { [column: id, "user_id": $0] })
         let (data, response) = try await URLSession.shared.data(for: insRequest)
         guard let http = response as? HTTPURLResponse, http.statusCode < 400 else {
             throw RexAPIError.server(friendlyError(data, fallback: "Couldn't tag your friends."))

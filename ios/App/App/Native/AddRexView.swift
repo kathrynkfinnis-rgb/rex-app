@@ -1049,12 +1049,18 @@ struct AddRexView: View {
                     PhotoPickerView(photoURLs: $photoURLs)
                 }
 
-                Text("Tag friends (optional)").font(.system(size: 14, weight: .semibold)).foregroundStyle(RexColor.foreground)
-                FriendTagPickerView(selectedIds: $taggedFriendIds)
-
                 if isAdmin, officialAccountId != nil {
                     postAsRexSection
                 }
+
+                // Oct 15 — "also need to be able to tag someone in a want to
+                // try." This sat inside the rated-only half of the form, so a
+                // want had no way to say who you want to go with — which is
+                // arguably the more useful half: "went here with Phoebe" is a
+                // fact you record afterwards, "shall we go, Phoebe?" is why
+                // you wrote the want down at all.
+                Text("Tag friends (optional)").font(.system(size: 14, weight: .semibold)).foregroundStyle(RexColor.foreground)
+                FriendTagPickerView(selectedIds: $taggedFriendIds)
 
                 Toggle(isOn: $anonymous) {
                     VStack(alignment: .leading, spacing: 2) {
@@ -2212,7 +2218,7 @@ struct AddRexView: View {
                 // success screen shouldn't offer to share it.
                 didSaveDraft = asDraft || (postAsRex && scheduleRexPost)
             case .want:
-                try await RexAPI.shared.createWant(
+                let newWantId = try await RexAPI.shared.createWant(
                     itemId: itemId,
                     note: note.trimmingCharacters(in: .whitespaces).isEmpty ? nil : note,
                     // Added from scratch, not bookmarked off someone's Rex —
@@ -2225,6 +2231,11 @@ struct AddRexView: View {
                     // their own column rather than recommendations'.
                     showInFeed: hiddenFromFeed ? false : nil
                 )
+                if let newWantId, !taggedFriendIds.isEmpty {
+                    try? await RexAPI.shared.setTaggedWantFriends(
+                        wantId: newWantId, userIds: Array(taggedFriendIds)
+                    )
+                }
                 didWant = true
                 lastWantItemId = itemId
             }
