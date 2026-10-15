@@ -1007,17 +1007,62 @@ struct RexMapView: View {
         }
     }
 
+    /// Who has been, with their faces. Named rather than counted — a place
+    /// three people liked is a different thing depending which three.
+    @ViewBuilder
+    private func rexdByRow(_ place: MapPlace) -> some View {
+        let people = place.rexers.compactMap { rec -> (String, RexProfile)? in
+            guard let profile = rec.profiles else { return nil }
+            return (rec.user_id, profile)
+        }
+        if !people.isEmpty {
+            HStack(spacing: RexSpacing.sm) {
+                HStack(spacing: -7) {
+                    ForEach(Array(people.prefix(4)), id: \.0) { _, profile in
+                        UserAvatarView(
+                            url: profile.avatar_url,
+                            name: profile.display_name ?? profile.username,
+                            size: 24
+                        )
+                        .overlay(Circle().stroke(RexColor.background, lineWidth: 1.5))
+                    }
+                }
+                Text(rexdByNames(people.map { $0.1 }))
+                    .font(RexFont.text(13))
+                    .foregroundStyle(RexColor.foreground)
+                    .lineLimit(2)
+                    .fixedSize(horizontal: false, vertical: true)
+                Spacer(minLength: 0)
+            }
+        }
+    }
+
+    /// "Rex'd by Phoebe", "…by Phoebe and Gemma", "…by Phoebe, Gemma and 2
+    /// others". Two names is where a list stops reading as a sentence.
+    private func rexdByNames(_ profiles: [RexProfile]) -> String {
+        let names = profiles.map { profile -> String in
+            let full = profile.display_name ?? profile.username
+            return full.split(separator: " ").first.map(String.init) ?? full
+        }
+        switch names.count {
+        case 0: return "Rex'd by a friend"
+        case 1: return "Rex'd by \(names[0])"
+        case 2: return "Rex'd by \(names[0]) and \(names[1])"
+        default:
+            let others = names.count - 2
+            return "Rex'd by \(names[0]), \(names[1]) and \(others) other\(others == 1 ? "" : "s")"
+        }
+    }
+
+    /// What kind of place it is. It used to lead with the recommender — a
+    /// name, or "3 Rex" once there was more than one — and since 15 October
+    /// the row below says who properly, with their faces. Saying it twice in
+    /// two different shapes was worse than either.
     private func placeStandfirst(_ place: MapPlace) -> String {
-        var parts: [String] = []
-        if place.recommendations.count > 1 {
-            parts.append("\(place.recommendations.count) Rex")
-        } else {
-            parts.append(place.recommenderSummary)
+        guard let genre = place.genre?.trimmingCharacters(in: .whitespaces), !genre.isEmpty else {
+            return ""
         }
-        if let genre = place.genre?.trimmingCharacters(in: .whitespaces), !genre.isEmpty {
-            parts.append(splitGenres(genre).first ?? genre)
-        }
-        return parts.joined(separator: " \u{00B7} ")
+        return splitGenres(genre).first ?? genre
     }
 
     /// Google's photos first, then anything a friend attached — same order the
@@ -1094,7 +1139,7 @@ struct RexMapView: View {
                         // and no recommender. Saying so is the point of it;
                         // an average of nothing, or "A friend", would be the
                         // map claiming something nobody said.
-                        if place.recommendations.isEmpty {
+                        if place.rexers.isEmpty {
                             Image(systemName: "mappin.circle")
                                 .font(.system(size: 14))
                                 .foregroundStyle(RexColor.mutedForeground)
@@ -1103,16 +1148,35 @@ struct RexMapView: View {
                                 .foregroundStyle(RexColor.mutedForeground)
                                 .lineLimit(1)
                         } else {
-                            if place.recommendations.count == 1 {
-                                RexRatingBadge(raw: place.recommendations[0].rating)
-                            } else {
-                                RexRatingAverageBadge(ratings: place.recommendations.map { $0.rating })
+                            // Oct 15 — ratings, not rows. A trip-stop row has
+                            // a rating of zero because nobody gave it one, and
+                            // averaging it in was showing a score nobody said.
+                            let ratings = place.realRatings
+                            if ratings.count == 1 {
+                                RexRatingBadge(raw: ratings[0])
+                            } else if ratings.count > 1 {
+                                RexRatingAverageBadge(ratings: ratings)
                             }
-                            Text(placeStandfirst(place))
-                                .font(RexFont.text(13))
-                                .foregroundStyle(RexColor.mutedForeground)
-                                .lineLimit(1)
+                            let kind = placeStandfirst(place)
+                            if !kind.isEmpty {
+                                Text(kind)
+                                    .font(RexFont.text(13))
+                                    .foregroundStyle(RexColor.mutedForeground)
+                                    .lineLimit(1)
+                            }
                         }
+                    }
+
+                    // Oct 15 — "on the pop out for the map when you click on a
+                    // pin, please can it say who Rex'd it."
+                    //
+                    // The line above collapsed to "3 Rex" as soon as more than
+                    // one person had been, which is the count and not the
+                    // answer: whether you go depends on who liked it. The
+                    // faces are already on the pin's own data, so this costs
+                    // nothing to fetch — it was only ever being thrown away.
+                    if !place.rexers.isEmpty {
+                        rexdByRow(place)
                     }
 
                     if let hours = sheetDetails?.todayHours {

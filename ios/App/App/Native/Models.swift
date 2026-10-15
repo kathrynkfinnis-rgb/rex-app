@@ -415,9 +415,41 @@ struct MapPlace: Codable, Identifiable {
         Array(Set(recommendations.compactMap { $0.trip_id }))
     }
 
+    /// One row per person who has been.
+    ///
+    /// Oct 15 — the pin sheet read "Rex'd by phoebebragg and phoebebragg",
+    /// which is what put this here. Adding a place you had already Rex'd to a
+    /// trip writes a second recommendation row for it — trip_id set, rating 0,
+    /// no note — and the map's query has no trip_id filter, so the same person
+    /// arrives twice: once for what they said, once for the stop.
+    ///
+    /// The real one wins, which is also why this is sorted by rating: a stop
+    /// row carries no rating at all, so it loses to anything its author
+    /// actually said about the place.
+    var rexers: [MapRecStub] {
+        var best: [String: MapRecStub] = [:]
+        for stub in recommendations {
+            if let existing = best[stub.user_id], existing.rating >= stub.rating { continue }
+            best[stub.user_id] = stub
+        }
+        // Stable order: the people the query returned first, deduplicated.
+        var seen = Set<String>()
+        return recommendations.compactMap { stub in
+            guard seen.insert(stub.user_id).inserted else { return nil }
+            return best[stub.user_id]
+        }
+    }
+
+    /// What people actually rated it. A trip-stop row has a rating of zero
+    /// because nobody gave it one, and averaging that in drags the number
+    /// down with a score nobody said.
+    var realRatings: [Double] {
+        rexers.map(\.rating).filter { $0 > 0 }
+    }
+
     /// "Ava" if one recommender, "Rex'd by several friends" if more than one.
     var recommenderSummary: String {
-        let names = recommendations.compactMap { $0.profiles?.display_name ?? $0.profiles?.username }
+        let names = rexers.compactMap { $0.profiles?.display_name ?? $0.profiles?.username }
         if names.count == 1 { return names[0] }
         if names.isEmpty { return "A friend" }
         return "Rex'd by several friends"
