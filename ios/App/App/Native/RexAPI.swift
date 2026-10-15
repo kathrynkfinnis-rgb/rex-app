@@ -2214,17 +2214,36 @@ final class RexAPI {
         let candidates = (try? JSONDecoder().decode([Candidate].self, from: data)) ?? []
         let targetTitle = Self.normalizeForMatch(title)
         let targetAddress = Self.normalizeForMatch(address)
-        return candidates.first {
-            Self.normalizeForMatch($0.title) == targetTitle
-                && Self.normalizeForMatch($0.address ?? "") == targetAddress
+        let targetBranchless = Self.normalizeIgnoringBranch(title)
+        return candidates.first { candidate in
+            guard Self.normalizeForMatch(candidate.address ?? "") == targetAddress else { return false }
+            return Self.normalizeForMatch(candidate.title) == targetTitle
+                || Self.normalizeIgnoringBranch(candidate.title) == targetBranchless
         }?.id
     }
 
+    /// Oct 15 — "why are these two separate pins when they are the same
+    /// restaurant?" Le Relais de Venise, twice, at one address.
+    ///
+    /// This folded no accents, and the next line turns anything outside
+    /// a-z0-9 into a space — so "l'Entrecôte" normalised to "lentrec te" and
+    /// could never equal "L'Entrecote". The dedupe that should have caught
+    /// the pair was comparing a word against a hole in itself.
     private static func normalizeForMatch(_ s: String) -> String {
-        s.lowercased()
+        s.folding(options: [.diacriticInsensitive, .caseInsensitive], locale: nil)
             .replacingOccurrences(of: "['’‘\"]", with: "", options: .regularExpression)
             .replacingOccurrences(of: "[^a-z0-9]+", with: " ", options: .regularExpression)
             .trimmingCharacters(in: .whitespaces)
+    }
+
+    /// The same, with a branch label taken off the end: Google lists the same
+    /// restaurant as both "Le Relais de Venise L'Entrecote | Marylebone" and
+    /// "Le Relais de Venise l'Entrecôte". Only used where the address has
+    /// already matched exactly, which is what makes it safe — two places that
+    /// share a name, an address and differ only by a suffix are one place.
+    private static func normalizeIgnoringBranch(_ s: String) -> String {
+        let trimmed = s.split(whereSeparator: { "|–—".contains($0) }).first.map(String.init) ?? s
+        return normalizeForMatch(trimmed)
     }
 
     private static func haversineMeters(_ lat1: Double, _ lng1: Double, _ lat2: Double, _ lng2: Double) -> Double {
