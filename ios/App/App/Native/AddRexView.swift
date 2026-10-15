@@ -403,6 +403,7 @@ struct AddRexView: View {
     @State private var activeSheet: ActiveSheet?
     /// Sept 7 — an in-progress trip or list is written to disk as you build
     /// it, and offered back if the app was killed mid-way. See TripDraftStore.
+    @StateObject private var keyboard = RexKeyboardHeight()
     @State private var restorableDraft: TripDraft?
     @State private var showingRestorePrompt = false
 
@@ -429,9 +430,23 @@ struct AddRexView: View {
                                 categoryPicker
                             }
                         }
+                        // Oct 15 — the room the scroll needs. See
+                        // RexKeyboardHeight: the ZStack's background ignores
+                        // the safe area, which expands the frame this lays
+                        // out in, so SwiftUI's own avoidance left the bottom
+                        // of the form behind the keyboard and scrollTo had
+                        // nowhere left to go. Padding by the measured height
+                        // gives it somewhere.
+                        .padding(.bottom, keyboard.height)
                         .onChange(of: noteFocused) { _, focused in
                             guard focused else { return }
                             scrollToNote(proxy)
+                        }
+                        .onChange(of: keyboard.height) { _, height in
+                            // The padding arrives with the keyboard, so the
+                            // scroll has to run again once there is room.
+                            guard noteFocused, height > 0 else { return }
+                            scrollToNote(proxy, settle: false)
                         }
                         .onChange(of: note) { _, _ in
                             // Already typing, so the keyboard is up and there

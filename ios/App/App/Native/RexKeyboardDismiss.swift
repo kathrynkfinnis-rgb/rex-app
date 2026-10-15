@@ -85,3 +85,45 @@ extension View {
         task { RexKeyboardDismisser.shared.install() }
     }
 }
+
+/// Oct 15 — "repeated example of the keyboard hiding the text block so it's
+/// not a one off."
+///
+/// The Add form scrolls the note into view when it takes focus, and waits for
+/// the keyboard before doing it. That was the 8 October fix and it is still
+/// right — but it can only scroll as far as the content allows, and SwiftUI's
+/// own keyboard avoidance was not giving it the room. The form's ScrollView
+/// sits in a ZStack whose background ignores the safe area, which expands the
+/// frame the ScrollView lays out in, so the bottom of the content sits behind
+/// the keyboard rather than above it and scrollTo has nowhere left to go.
+///
+/// Rather than guess at the safe area, measure the keyboard and pad the
+/// content by exactly that much. The field can then always be scrolled clear,
+/// whatever the layout around it is doing.
+@MainActor
+final class RexKeyboardHeight: ObservableObject {
+    @Published private(set) var height: CGFloat = 0
+
+    init() {
+        let centre = NotificationCenter.default
+        centre.addObserver(
+            forName: UIResponder.keyboardWillChangeFrameNotification,
+            object: nil, queue: .main
+        ) { [weak self] note in
+            guard let frame = note.userInfo?[UIResponder.keyboardFrameEndUserInfoKey] as? CGRect,
+                  let screen = UIApplication.shared.connectedScenes
+                      .compactMap({ $0 as? UIWindowScene }).first?.screen
+            else { return }
+            // Off-screen keyboards (the hardware-keyboard bar, or one on its
+            // way out) report a frame below the screen; that is no height.
+            let overlap = max(0, screen.bounds.height - frame.origin.y)
+            MainActor.assumeIsolated { self?.height = overlap }
+        }
+        centre.addObserver(
+            forName: UIResponder.keyboardWillHideNotification,
+            object: nil, queue: .main
+        ) { [weak self] _ in
+            MainActor.assumeIsolated { self?.height = 0 }
+        }
+    }
+}
