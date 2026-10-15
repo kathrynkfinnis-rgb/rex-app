@@ -189,8 +189,10 @@ struct ExploreView: View {
                     } else if let errorMessage {
                         errorState(errorMessage)
                     } else if source == .friends {
+                        hotSection
                         friendsSections
                     } else {
+                        hotSection
                         rexpertsSections
                     }
                 }
@@ -560,6 +562,64 @@ struct ExploreView: View {
                         .foregroundStyle(RexColor.mutedForeground)
                         .lineLimit(1)
                 }
+            }
+            .frame(width: 132, alignment: .leading)
+        }
+        .buttonStyle(.plain)
+    }
+
+    /// Oct 15 — "can we please have a hot section on the Explore?"
+    ///
+    /// Trending already existed, but split one shelf per category and filed
+    /// under the Rexperts tab, which is where REX's own picks live — so what
+    /// everybody is actually Rexing this week was three taps from the top and
+    /// read as editorial. Hot is a different claim from a curated shelf: it
+    /// is nobody's opinion, just what is moving.
+    ///
+    /// One row, every category together, busiest first, above both tabs —
+    /// because what's hot is a fact about the app rather than about which
+    /// half of it you are looking at. The per-category trending shelves stay
+    /// where they are for browsing a kind of thing.
+    @ViewBuilder
+    private var hotSection: some View {
+        let hot = visibleTrending
+            .sorted { $0.rex_count > $1.rex_count }
+            .prefix(12)
+        // Two people Rexing the same thing in a week is a coincidence; the
+        // shelf should only claim heat when there is some.
+        if hot.contains(where: { $0.rex_count >= 3 }) {
+            shelf(title: "Hot right now", tag: "THIS WEEK") {
+                ForEach(Array(hot)) { item in
+                    hotCard(item)
+                }
+            }
+        }
+    }
+
+    private func hotCard(_ item: TrendingItem) -> some View {
+        Button {
+            pushedItemId = item.item_id
+        } label: {
+            VStack(alignment: .leading, spacing: RexSpacing.xs) {
+                ZStack(alignment: .topLeading) {
+                    shelfThumbnail(url: item.image_url, symbol: RexCategory(rawType: item.type).symbol)
+                    // The same flame a card gets when enough people pile on.
+                    Image(systemName: "flame.fill")
+                        .font(.system(size: 11, weight: .bold))
+                        .foregroundStyle(.white)
+                        .padding(5)
+                        .background(RexColor.primary, in: Circle())
+                        .padding(6)
+                }
+                Text(item.title)
+                    .font(RexFont.text(12.5, weight: .medium))
+                    .foregroundStyle(RexColor.foreground)
+                    .lineLimit(2)
+                    .multilineTextAlignment(.leading)
+                Text("\(item.rex_count) Rex this week")
+                    .font(RexFont.text(11))
+                    .foregroundStyle(RexColor.primary)
+                    .lineLimit(1)
             }
             .frame(width: 132, alignment: .leading)
         }
