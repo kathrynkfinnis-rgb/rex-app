@@ -2164,10 +2164,16 @@ struct ItemDetailView: View {
             if !theirs.isEmpty || myRec != nil {
                 Divider().overlay(RexColor.border)
 
-                // Oct 14 — "rather than 'Reviews' we do have 'Rexes' or
-                // something." A want isn't a review and it isn't a Rex
-                // either, so the heading says which of the two are under it.
-                Text(theirs.contains(where: { $0.isWant }) ? "Rexes and wants" : "Rexes")
+                // Oct 15 — "can we rename this to 'What friends say' and have
+                // your take at the bottom."
+                //
+                // Third name for this heading in two days, and this one is
+                // the one that survives a want sitting under it: "Reviews"
+                // and "Rexes" both describe the posts, and a want is neither.
+                // What friends say describes the people, and everything in
+                // the list is that — a Rex, a want, a note under either.
+                // Yours stays last, below all of them.
+                Text("What friends say")
                     .font(RexFont.display(20))
                     .foregroundStyle(RexColor.foreground)
                     .padding(.top, 6)
