@@ -36,13 +36,24 @@ enum RexHeaderMetrics {
     static let photoWaveHeight: CGFloat = 52
     static let photoSheetTop: CGFloat = 245
 
-    static let thumbTop: CGFloat = 52
+    static let thumbTop: CGFloat = 44
     /// On the taller photo band the card sits lower, so it still crosses the
     /// wave and still stops short of the title's first line.
-    static let photoThumbTop: CGFloat = 132
-    static let thumbWidth: CGFloat = 84
-    static let thumbHeight: CGFloat = 126
-    static let thumbTrailing: CGFloat = 20
+    static let photoThumbTop: CGFloat = 124
+    /// Oct 15 — "the thumbnail can be 30% bigger." 84×126 to 109×164, which
+    /// is 30% on each edge rather than 30% of the area — a poster you can
+    /// actually read the title off.
+    ///
+    /// The tops move up by the same 8 points the card has grown past the
+    /// wave, so it still crosses the curve by the amount it did and still
+    /// clears the title's first line.
+    static let thumbWidth: CGFloat = 109
+    static let thumbHeight: CGFloat = 164
+    /// Measured from the band, which bleeds 16 points past the page on each
+    /// side (see the header's negative horizontal padding) — so this has to
+    /// carry that 16 as well as the margin it wants, or the card sits four
+    /// points from the screen edge and, once it grew, past it.
+    static let thumbTrailing: CGFloat = 36
 }
 
 /// The curve that separates the painting from the page.
