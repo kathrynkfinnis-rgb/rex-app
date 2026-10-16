@@ -1137,7 +1137,36 @@ final class RexAPI {
         // shouldn't have its existing one blanked by a later refetch.
         if let summary = details.summary, !summary.isEmpty { body["summary"] = summary }
         if !details.openingHours.isEmpty { body["opening_hours"] = details.openingHours }
-        if !details.photoURLs.isEmpty { body["google_photo_urls"] = details.photoURLs }
+        // Oct 16 — £25.99 of Place Photos in a month, and the blank
+        // thumbnails, both from the same cause.
+        //
+        // createItem has kept its own copy of an item's main thumbnail since
+        // the start, but these six — the place page's carousel — were stored
+        // as Google URLs and refetched from Google on every single view. A
+        // Google photo URL also needs a bundle-id header that AsyncImage
+        // cannot send, which is why some of them render as empty grey boxes,
+        // and it carries our API key in a string we were writing to the
+        // database.
+        //
+        // Copying them here costs six fetches once per place per ninety days
+        // — the rate Details itself runs at — and then the carousel is served
+        // from storage forever: free, cached, header-free, key-free.
+        if !details.photoURLs.isEmpty {
+            let copied = await withTaskGroup(of: (Int, String?).self) { group in
+                for (index, url) in details.photoURLs.enumerated() {
+                    group.addTask {
+                        guard url.contains("places.googleapis.com") else { return (index, url) }
+                        return (index, await self.copyGooglePhoto(url))
+                    }
+                }
+                var out = [Int: String]()
+                for await (index, url) in group { if let url { out[index] = url } }
+                // Back into Google's order: the first photo is the one the
+                // listing leads with, and the carousel should agree.
+                return out.keys.sorted().compactMap { out[$0] }
+            }
+            if !copied.isEmpty { body["google_photo_urls"] = copied }
+        }
         if let rating = details.rating { body["google_rating"] = rating }
         if let count = details.ratingCount { body["google_rating_count"] = count }
         // Oct 8 — the other half of "we can't click through to the website for
@@ -1355,6 +1384,107 @@ final class RexAPI {
                 lng: row.items.lng
             )
             return MyRexHit(hit: hit, rating: row.rating ?? 0, note: row.note, itemId: row.items.id, type: row.items.type)
+        }
+    }
+
+    /// Oct 16 — the catalogue we already have, asked before Google is.
+    ///
+    /// REX knows about three thousand places, and until now typing the name
+    /// of one still went to Google: the local lookup beside it was only ever
+    /// read for the "Already Rex'd" badge, never used as an answer. That is
+    /// backwards for an app whose whole claim is that your friends know
+    /// better than a listing, and it is why the Google bill rises in a
+    /// straight line with the number of people using REX.
+    ///
+    /// This is everyone's items, not just yours — a place Phoebe added is a
+    /// perfectly good answer when you search for it.
+    ///
+    /// Hits carry the item's own `external_id`/`external_source` where it has
+    /// them, so picking one lands on the same catalogue row through
+    /// createItem's existing dedup rather than making a second copy of a
+    /// place we already hold.
+    func searchCatalogueItems(query: String, type: String?) async -> [RexSearchHit] {
+        let trimmed = query.trimmingCharacters(in: .whitespaces)
+        guard trimmed.count >= 2, let token = try? await validToken() else { return [] }
+
+        var components = URLComponents(url: baseURL.appendingPathComponent("/rest/v1/items"), resolvingAgainstBaseURL: false)!
+        components.queryItems = [
+            URLQueryItem(name: "select", value: "id,type,title,subtitle,image_url,genre,address,lat,lng,external_id,external_source,google_rating,google_rating_count"),
+            // PostgREST percent-encodes this, so a title with a comma or an
+            // asterisk in it can't break out of the filter.
+            URLQueryItem(name: "title", value: "ilike.*\(trimmed)*"),
+            URLQueryItem(name: "limit", value: "10"),
+        ]
+        if let type { components.queryItems?.append(URLQueryItem(name: "type", value: "eq.\(type)")) }
+
+        var request = URLRequest(url: components.url!)
+        request.setValue(anonKey, forHTTPHeaderField: "apikey")
+        request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+
+        guard let (data, response) = try? await URLSession.shared.data(for: request),
+              let http = response as? HTTPURLResponse, http.statusCode < 400
+        else { return [] }
+
+        struct Row: Codable {
+            let id: String
+            let title: String
+            let subtitle: String?
+            let image_url: String?
+            let genre: String?
+            let address: String?
+            let lat: Double?
+            let lng: Double?
+            let external_id: String?
+            let external_source: String?
+            let google_rating: Double?
+            let google_rating_count: Int?
+        }
+        guard let rows = try? JSONDecoder().decode([Row].self, from: data) else { return [] }
+
+        // Oct 16 — our catalogue still holds some places twice, and asking it
+        // before Google puts those duplicates in front of people for the
+        // first time: searching "Lore of the Land" returned two, one with the
+        // address and one with the photo. Google would have shown one.
+        //
+        // Richest row wins, and a row with no address collapses into a
+        // same-named one that has one — that is the shape every duplicate
+        // here takes. Two rows that both name an address stay separate,
+        // because that is how two branches of the same pub look and hiding
+        // one would be worse than showing both.
+        func bare(_ s: String?) -> String {
+            (s ?? "").lowercased().filter { $0.isLetter || $0.isNumber }
+        }
+        func richness(_ r: Row) -> Int {
+            ((r.address?.isEmpty == false) ? 4 : 0)
+                + ((r.image_url?.isEmpty == false) ? 2 : 0)
+                + ((r.lat != nil && r.lng != nil) ? 1 : 0)
+        }
+        var kept: [Row] = []
+        for row in rows.sorted(by: { richness($0) > richness($1) }) {
+            let title = bare(row.title)
+            let address = bare(row.address)
+            let isDuplicate = kept.contains { other in
+                guard bare(other.title) == title else { return false }
+                let otherAddress = bare(other.address)
+                return address.isEmpty || otherAddress.isEmpty || address == otherAddress
+            }
+            if !isDuplicate { kept.append(row) }
+        }
+
+        return kept.map { row in
+            RexSearchHit(
+                externalId: row.external_id ?? row.id,
+                externalSource: row.external_source ?? "rex",
+                title: row.title,
+                subtitle: row.subtitle,
+                imageURL: row.image_url,
+                genre: row.genre,
+                address: row.address,
+                lat: row.lat,
+                lng: row.lng,
+                googleRating: row.google_rating,
+                googleRatingCount: row.google_rating_count
+            )
         }
     }
 

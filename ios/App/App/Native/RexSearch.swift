@@ -90,12 +90,60 @@ enum RexSearch {
             case .movie:           return try await tmdb(q, kind: "movie")
             case .tv:              return try await tmdb(q, kind: "tv")
             case .podcast:         return try await podcasts(q)
-            case .place, .event:   return try await places(q, near: near)
+            case .place, .event:   return try await placesPreferringCatalogue(q, category: category, near: near)
             case .other:           return try await productLookup(q)
             default:               return []
             }
         } catch {
             return []
+        }
+    }
+
+    /// Oct 16 — ask ourselves before we ask Google.
+    ///
+    /// REX holds about three thousand places. Until now, typing the name of
+    /// one of them still went to Google: the local lookup running alongside
+    /// was only ever read for the "Already Rex'd" badge, never used as an
+    /// answer. So the Google bill rose in a straight line with the number of
+    /// people using the app, and the catalogue we were building paid for
+    /// nothing.
+    ///
+    /// The rule for stopping at our own catalogue is deliberately strict,
+    /// because the cost of being wrong is a worse search and that is the one
+    /// thing we are not willing to trade. Typing "pizza" must still reach
+    /// Google even though we hold a Pizza Pilgrims, because you are browsing.
+    /// Typing "Lore of the Land" need not, because you have named a specific
+    /// place and we already have it. The discriminator is how much of the
+    /// title your query fills: nearly all of it means you knew what you were
+    /// looking for.
+    ///
+    /// Everything else merges, ours first — somewhere three friends have been
+    /// belongs above a listing.
+    private static func placesPreferringCatalogue(
+        _ q: String, category: RexCategory, near: (lat: Double, lng: Double)?
+    ) async throws -> [RexSearchHit] {
+        let ours = await RexAPI.shared.searchCatalogueItems(query: q, type: category.rawValue)
+        if catalogueAnswersIt(q, ours) { return ours }
+
+        let theirs = try await places(q, near: near)
+        var seen = Set(ours.map(\.id))
+        return ours + theirs.filter { seen.insert($0.id).inserted }
+    }
+
+    /// Whether what somebody typed names a place we already hold, rather than
+    /// describing a kind of place they want to browse.
+    static func catalogueAnswersIt(_ query: String, _ hits: [RexSearchHit]) -> Bool {
+        func bare(_ s: String) -> String {
+            s.lowercased().filter { $0.isLetter || $0.isNumber }
+        }
+        let typed = bare(query)
+        guard typed.count >= 3 else { return false }
+        return hits.contains { hit in
+            let title = bare(hit.title)
+            guard !title.isEmpty, title.contains(typed) else { return false }
+            // Seven tenths: "loreoftheland" fills its own title entirely,
+            // "pizza" fills a third of "pizzapilgrims".
+            return Double(typed.count) / Double(title.count) >= 0.7
         }
     }
 
