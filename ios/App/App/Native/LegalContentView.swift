@@ -143,7 +143,7 @@ struct LegalContentView: View {
     13. Contact
     Three Lines Studio Ltd
     support@find-rex.com
-    Registered address: [TO CONFIRM — Kathryn to add the registered company address]
+    Registered address: The Bothy, Prince Charles Avenue, Orsett, Essex, RM16 3HS
     """
 
     private static let privacyBody = """
@@ -220,6 +220,6 @@ struct LegalContentView: View {
     13. Contact
     Three Lines Studio Ltd
     support@find-rex.com
-    Registered address: [TO CONFIRM — Kathryn to add the registered company address]
+    Registered address: The Bothy, Prince Charles Avenue, Orsett, Essex, RM16 3HS
     """
 }
