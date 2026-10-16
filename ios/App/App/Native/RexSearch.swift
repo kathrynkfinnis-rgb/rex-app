@@ -856,11 +856,25 @@ enum RexSearch {
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
         request.setValue(googleKey, forHTTPHeaderField: "X-Goog-Api-Key")
         request.setValue(bundleId, forHTTPHeaderField: "X-Ios-Bundle-Identifier")
+        // Oct 16 — 4,651 of these in a month, £91.54, two thirds of the bill.
+        //
+        // Google prices a place search by the most expensive field in the
+        // mask. rating, userRatingCount and websiteUri are Enterprise
+        // fields; everything else here is Pro. Asking for those three moved
+        // every search REX makes onto a tier with a thousand free calls a
+        // month instead of five thousand, and £25 per thousand after that.
+        //
+        // Nothing on screen used them. No search row draws a rating — the
+        // badge on a place page comes from Place Details, which fetches it
+        // separately and saves it, once per place per ninety days. The
+        // website is only ever read by chain detection, which runs its own
+        // search and keeps the field there.
+        //
+        // So: same query, same ranking, same places, same order. Only the
+        // tier changes, and at this volume the whole line goes free.
         request.setValue(
             "places.id,places.displayName,places.formattedAddress,places.location," +
-            "places.primaryTypeDisplayName,places.photos,places.rating,places.userRatingCount," +
-            // Oct 5 — the website is how a chain is recognised. See chainKey.
-            "places.websiteUri",
+            "places.primaryTypeDisplayName,places.photos",
             forHTTPHeaderField: "X-Goog-FieldMask"
         )
         // Text Search (New) defaults to biasing toward wherever Google
@@ -1136,16 +1150,62 @@ enum RexSearch {
 
     /// City centres, looked up once each. Cheap, and it stops a trip with
     /// twenty stops geocoding "Lisbon" twenty times.
-    private static var cityCentres: [String: (lat: Double, lng: Double)?] = [:]
+    /// Oct 16 — 16,224 Geocoding calls in a month, £19.55, from twenty users.
+    ///
+    /// This cache was correct and useless. It stores the *answer*, so a
+    /// second caller only benefits once the first has come back — and the
+    /// callers here do not arrive one at a time. repairMissingMapCoords
+    /// spawns one Task per place on every map load, so fifteen hundred
+    /// checks start at the same instant, every one of them asks for the
+    /// centre of the United Kingdom, and not one finds a cached value
+    /// because none of them has finished yet. A thundering herd: hundreds of
+    /// identical billable requests for one fact that does not change.
+    ///
+    /// Storing the Task instead of its result is the fix. The first caller
+    /// to ask for a country puts its in-flight lookup in the dictionary and
+    /// everyone behind it awaits that same lookup — one request per country
+    /// per launch, however many places are being checked at once.
+    private static var cityCentres: [String: Task<(lat: Double, lng: Double)?, Never>] = [:]
     private static let cityLock = NSLock()
 
     private static func centre(of city: String) async -> (lat: Double, lng: Double)? {
         let key = city.lowercased()
-        if let cached = cityLock.withLock({ cityCentres[key] }) { return cached }
-        let found = await geocode(city)
-        cityLock.withLock { cityCentres[key] = found }
-        return found
+        // A country's centre is a fact, not a lookup — the common ones never
+        // need asking at all. This table alone removes nearly every call
+        // this function used to make, since the addresses being checked are
+        // overwhelmingly in a handful of countries.
+        if let known = Self.knownCountryCentres[key] { return known }
+
+        let task: Task<(lat: Double, lng: Double)?, Never> = cityLock.withLock {
+            if let existing = cityCentres[key] { return existing }
+            let fresh = Task { await geocode(city) }
+            cityCentres[key] = fresh
+            return fresh
+        }
+        return await task.value
     }
+
+    /// Where the addresses in this app actually are. Centroids, to the
+    /// nearest degree or so, which is all a 2,500km sanity check can use.
+    private static let knownCountryCentres: [String: (lat: Double, lng: Double)] = [
+        "uk": (54.0, -2.0), "united kingdom": (54.0, -2.0), "gb": (54.0, -2.0),
+        "england": (52.5, -1.5), "scotland": (56.8, -4.2),
+        "wales": (52.3, -3.7), "northern ireland": (54.6, -6.7),
+        "ireland": (53.4, -8.0), "france": (46.6, 2.3), "spain": (40.2, -3.6),
+        "portugal": (39.5, -8.0), "italy": (42.8, 12.6), "germany": (51.2, 10.4),
+        "netherlands": (52.2, 5.3), "belgium": (50.6, 4.6), "switzerland": (46.8, 8.2),
+        "austria": (47.6, 14.1), "greece": (39.0, 22.0), "croatia": (45.1, 16.4),
+        "denmark": (56.0, 10.0), "sweden": (62.0, 15.0), "norway": (64.0, 11.0),
+        "iceland": (64.9, -19.0), "poland": (52.0, 19.4), "czechia": (49.8, 15.5),
+        "czech republic": (49.8, 15.5), "hungary": (47.2, 19.5), "turkey": (39.0, 35.2),
+        "morocco": (31.8, -7.1), "usa": (39.8, -98.6), "united states": (39.8, -98.6),
+        "us": (39.8, -98.6), "canada": (56.1, -106.3), "mexico": (23.6, -102.5),
+        "australia": (-25.3, 133.8), "new zealand": (-41.0, 174.0),
+        "japan": (36.2, 138.3), "thailand": (15.9, 101.0), "india": (20.6, 79.0),
+        "south africa": (-30.6, 22.9), "brazil": (-14.2, -51.9),
+        "argentina": (-38.4, -63.6), "uae": (23.4, 53.8),
+        "united arab emirates": (23.4, 53.8), "antigua and barbuda": (17.1, -61.8),
+    ]
 
     private static func metres(_ a: (lat: Double, lng: Double), _ b: (lat: Double, lng: Double)) -> Double {
         let earth = 6_371_000.0

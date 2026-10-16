@@ -851,7 +851,7 @@ struct ItemDetailView: View {
 
         guard let fetched = await RexSearch.placeDetails(placeId: placeId), !fetched.isEmpty else { return }
         placeDetails = fetched
-        await RexAPI.shared.saveItemPlaceDetails(itemId: item.id, details: fetched)
+        await RexAPI.shared.saveItemPlaceDetails(itemId: item.id, details: fetched, name: item.title)
     }
 
     /// Oct 3 — "please can we pull photos from Google?" Google's own photos of

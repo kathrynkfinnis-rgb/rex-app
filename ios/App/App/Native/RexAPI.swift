@@ -1120,7 +1120,7 @@ final class RexAPI {
     /// this place — and the next, and this same person tomorrow — costs
     /// nothing. Deliberately not throwing: failing to cache is not a reason to
     /// fail the page, which already has everything it needs to render.
-    func saveItemPlaceDetails(itemId: String, details: RexPlaceDetails) async {
+    func saveItemPlaceDetails(itemId: String, details: RexPlaceDetails, name: String? = nil) async {
         guard let token = try? await validToken() else { return }
         var components = URLComponents(url: baseURL.appendingPathComponent("/rest/v1/items"), resolvingAgainstBaseURL: false)!
         components.queryItems = [URLQueryItem(name: "id", value: "eq.\(itemId)")]
@@ -1147,6 +1147,17 @@ final class RexAPI {
         // backfills every place already in the database: the details fetch
         // runs once per place, and now it brings the website with it.
         if let website = details.websiteURL, !website.isEmpty { body["link_url"] = website }
+        // Oct 16 — and the chain key, for the same reason and from the same
+        // field. This used to be set only at creation, from the search hit,
+        // which is why the search had to ask Google for websiteUri on every
+        // query — an Enterprise-tier field that moved every search REX makes
+        // onto a tier with a fifth of the free allowance. Details already
+        // fetches the website, once per place per ninety days, so taking the
+        // chain key from here instead costs one tier on a call we were
+        // making anyway and saves it on the call we make constantly.
+        if let name, let key = RexSearch.chainKey(name: name, websiteURL: details.websiteURL) {
+            body["chain_key"] = key
+        }
 
         request.httpBody = try? JSONSerialization.data(withJSONObject: body)
         _ = try? await URLSession.shared.data(for: request)
