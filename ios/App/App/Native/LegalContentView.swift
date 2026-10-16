@@ -11,7 +11,7 @@ import SwiftUI
 /// differs is asked to agree again (RootView's consent gate), and the new
 /// acceptance is logged in consent_log with a timestamp.
 enum RexLegal {
-    static let version = "2026-09-29"
+    static let version = "2026-10-16"
 }
 
 struct LegalContentView: View {
@@ -61,7 +61,7 @@ struct LegalContentView: View {
 
     // MARK: - Copy
 
-    private static let lastUpdated = "29 September 2026"
+    private static let lastUpdated = "16 October 2026"
 
     // Sept 17 — rewritten from Kathryn's solicitor drafts ("Find Rex",
     // Three Lines Studio Ltd) merged with what the app actually does, which
@@ -158,10 +158,11 @@ struct LegalContentView: View {
     • Your device's location: only if you allow it, and only while you're using the App, to centre the map on where you are. Apple turns the coordinates into an area name for the map's header. It isn't saved to your account, isn't shared with friends, and REX never tracks your location in the background. The App works without it.
     • Your contacts: only if you choose "Find friends from your contacts". REX reads the email addresses and phone numbers in your contacts on your phone and scrambles each one (a SHA-256 hash) before anything leaves the device. Those scrambled values are compared with REX accounts to show which of your contacts are here, then discarded. We don't store your contacts, their names, their numbers or their addresses.
 
-    • Your own phone number, if you give it: we ask for it once so your friends can find you when they search their contacts, and you can skip it. We store only a scrambled version (a SHA-256 hash of the number in international format) — never the number itself, and it is never shown to anyone. You can remove it at any time in Profile > Edit profile. Being honest about the limits of that: a scrambled phone number is not a secret, because there are few enough possible numbers that someone determined could work through them. What it means is that REX never holds a list of its users' numbers, that nothing travels in the clear, and that the matching service is capped so it can't be used to test long lists of guessed numbers.
+    • Your own phone number, if you give it: we ask for it once so your friends can find you when they search their contacts, and you can skip it. We store only a scrambled version (a SHA-256 hash of the number in international format) — never the number itself, and it is never shown to anyone. You can ask us to remove it at any time by emailing support@find-rex.com. Being honest about the limits of that: a scrambled phone number is not a secret, because there are few enough possible numbers that someone determined could work through them. What it means is that REX never holds a list of its users' numbers, that nothing travels in the clear, and that the matching service is capped so it can't be used to test long lists of guessed numbers.
     • Imports: text you paste for import, and photos of recipes you choose to import (see section 4).
     • Device and technical data: push notification token if you turn notifications on, device type and operating system, IP address, and basic logs needed to run and secure the service.
     • Safety data: reports you make or that are made about your content, and who you have blocked.
+    • Ask Rex: the questions you ask it, and a short set of notes it keeps about your tastes so its later answers fit you. You can read every one of those notes, and delete any of them, in Profile > Settings > What Rex remembers.
     • Records of consent: which version of these documents you agreed to, and when.
     • Support: what you send us when you contact us or send feedback.
 
@@ -179,15 +180,24 @@ struct LegalContentView: View {
     • Supabase — database, file storage and authentication.
     • Google (Maps, Places) — maps, place and address lookup.
     • Apple — Sign in with Apple, push notification delivery, and turning coordinates into an area name. If you signed in with Apple, we keep one token from Apple for as long as your account exists, used for one thing only: telling Apple to forget the connection between you and REX when you delete your account.
-    • Anthropic — reading documents and recipe photos you choose to import (section 4).
-    • TMDB, Open Library and Google Books — descriptions and ratings for films, TV and books shown on item pages. These are lookups of the title, not of you.
+    • Anthropic — reading documents, recipe photos and pasted links you choose to import, and tidying lists you ask it to organise (section 4).
+    • Google (Gemini) — answering your questions in Ask Rex (section 4a).
+    • TMDB, Open Library, Google Books, OMDb and Wikipedia — descriptions, artwork and ratings for films, TV, books and other things shown on item pages. These are lookups of the title, not of you.
+    • Instagram and TikTok — when you paste a link from either, we ask that platform for the post's public caption and image so we can read the recommendation out of it. We send them the link, nothing about you.
 
     We may also disclose data where the law requires it, or to protect the rights and safety of our users.
 
     Other people see what you post: your friends see your Rex, profile and activity. Some things are public by design — a shared trip or collection link opens for anyone who has the link, and content you post to a public collection is visible to anyone on REX.
 
     4. Importing documents and recipe photos
-    When you use "Import from doc" or import a recipe from a photo, the text or image is sent to Anthropic's Claude to pick out the recommendations or read the recipe. REX doesn't store the photo — it isn't added to your account — and only the text you then choose to post is saved. Anthropic processes it under its commercial terms, doesn't use it to train its models, and deletes it after a limited retention period. If you'd rather not, type the details in yourself instead.
+    When you use "Import from doc", import a recipe from a photo, paste an Instagram or TikTok link, or ask Rex to organise a list, the text or image is sent to Anthropic's Claude to pick out the recommendations, read the recipe, or group the lines you wrote. REX doesn't store the photo — it isn't added to your account — and only the text you then choose to post is saved. Anthropic processes it under its commercial terms, doesn't use it to train its models, and deletes it after a limited retention period. If you'd rather not, type the details in yourself instead.
+
+    4a. Ask Rex
+    When you ask Rex a question, we send Google's Gemini model your question, the recent back-and-forth of that conversation, the notes Rex keeps about your tastes, and a shortlist of recommendations you are already allowed to see — which includes the names of the friends who posted them and what those friends wrote. That is how it can answer "where should I eat in Soho" with something your friends actually said rather than something generic.
+
+    Two things follow from that, and we would rather say them plainly. Your friends' words and names are sent when they appear in your shortlist, and they do not get a separate say in that — if you would prefer your own posts were never used this way, email us and we will exclude them. And Rex writes down a few notes about what you like as you talk to it. Those notes shape later answers, you can read and delete every one of them in Profile > Settings > What Rex remembers, and they are deleted with your account.
+
+    Rex is told not to record anything about health, politics, religion, sexuality or money, and we check what it returns before saving it. It is a filter, not a guarantee, which is why the delete button is there.
 
     5. Anonymous posts
     Marking a post anonymous hides your name and photo from other users in the App's normal display. It doesn't anonymise the underlying record: REX keeps the link between you and the post, and can be required to disclose it. Don't rely on it to post anything you wouldn't want linked to you.
@@ -198,7 +208,7 @@ struct LegalContentView: View {
     When you delete your account (Profile → Settings → Your data & privacy), your profile, recommendations, trips, lists, collections, comments, likes, photos, friend connections and notification settings are deleted immediately. Copies may remain in our providers' routine backups for a short period until those are overwritten, and we may keep a minimal record of reports and safety actions where we need to for legal reasons.
 
     7. International transfers
-    Our providers may process data outside the UK and European Economic Area. Where they do, we rely on appropriate safeguards such as the UK International Data Transfer Agreement or Standard Contractual Clauses.
+    Our providers may process data outside the UK and European Economic Area — Supabase, Google, Apple, Anthropic and the lookup services in section 3 all do. Where a provider offers the UK International Data Transfer Agreement or Standard Contractual Clauses, we rely on those. We are working through that paperwork provider by provider, and if you want to know where a particular piece of your data goes, email support@find-rex.com and we will tell you.
 
     8. Your rights
     Under UK and EU data protection law you can: access a copy of your data; correct it; delete it; export it in a portable format; restrict or object to processing; and withdraw consent at any time.
