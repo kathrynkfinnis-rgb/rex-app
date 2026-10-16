@@ -1,6 +1,11 @@
 import SwiftUI
 import AppTrackingTransparency
-import AdSupport
+// Oct 16, security review — `import AdSupport` was here with no
+// ASIdentifierManager use anywhere in the app. Apple's scanner reads the
+// import and expects an IDFA declaration, which would have contradicted the
+// privacy label's "no tracking". REX never reads the advertising identifier:
+// the ATT prompt exists because of what a Skimlinks redirect does, not
+// because we want an ID. See the note on isAffiliateProgrammeActive.
 
 /// Sept 21 — affiliate links, and the permission they require.
 ///

@@ -38,6 +38,7 @@
 		FEED013B0000000000000000 /* CollectionsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = FEED013A0000000000000000 /* CollectionsView.swift */; };
 		FEED18010000000000000000 /* RexLinkableTextEditor.swift in Sources */ = {isa = PBXBuildFile; fileRef = FEED18000000000000000000 /* RexLinkableTextEditor.swift */; };
 		FEED17030000000000000000 /* RankedLibraryView.swift in Sources */ = {isa = PBXBuildFile; fileRef = FEED17020000000000000000 /* RankedLibraryView.swift */; };
+		FEED17300000000000000000 /* PrivacyInfo.xcprivacy in Resources */ = {isa = PBXBuildFile; fileRef = FEED17310000000000000000 /* PrivacyInfo.xcprivacy */; };
 		FEED17200000000000000000 /* PersonCreditsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = FEED17210000000000000000 /* PersonCreditsView.swift */; };
 		FEED17100000000000000000 /* ListMapSection.swift in Sources */ = {isa = PBXBuildFile; fileRef = FEED17110000000000000000 /* ListMapSection.swift */; };
 		FEED17010000000000000000 /* RankingView.swift in Sources */ = {isa = PBXBuildFile; fileRef = FEED17000000000000000000 /* RankingView.swift */; };
@@ -158,6 +159,7 @@
 		FEED013A0000000000000000 /* CollectionsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CollectionsView.swift; sourceTree = "<group>"; };
 		FEED18000000000000000000 /* RexLinkableTextEditor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RexLinkableTextEditor.swift; sourceTree = "<group>"; };
 		FEED17020000000000000000 /* RankedLibraryView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RankedLibraryView.swift; sourceTree = "<group>"; };
+		FEED17310000000000000000 /* PrivacyInfo.xcprivacy */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = PrivacyInfo.xcprivacy; sourceTree = "<group>"; };
 		FEED17210000000000000000 /* PersonCreditsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PersonCreditsView.swift; sourceTree = "<group>"; };
 		FEED17110000000000000000 /* ListMapSection.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ListMapSection.swift; sourceTree = "<group>"; };
 		FEED17000000000000000000 /* RankingView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RankingView.swift; sourceTree = "<group>"; };
@@ -285,6 +287,7 @@
 				504EC30E1FED79650016851F /* Assets.xcassets */,
 				504EC3101FED79650016851F /* LaunchScreen.storyboard */,
 				504EC3131FED79650016851F /* Info.plist */,
+				FEED17310000000000000000 /* PrivacyInfo.xcprivacy */,
 				2FAD9762203C412B000D30F8 /* config.xml */,
 				50B271D01FEDC1A000F3C39B /* public */,
 			);
@@ -471,6 +474,7 @@
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				FEED17300000000000000000 /* PrivacyInfo.xcprivacy in Resources */,
 				504EC3121FED79650016851F /* LaunchScreen.storyboard in Resources */,
 				50B271D11FEDC1A000F3C39B /* public in Resources */,
 				504EC30F1FED79650016851F /* Assets.xcassets in Resources */,

@@ -3,7 +3,9 @@
 --
 -- One mistake, eleven times. A policy asks "is this row mine?" and forgets
 -- "am I allowed to see the thing it hangs off?". Ownership is not visibility,
--- and on a database the app talks to directly, the policy is the only place
+-- and on a database the app taltablename,policyname
+recommendation_tags,Tags are visible with the Rex
+want_tags,Want tags are visible with the wantks to directly, the policy is the only place
 -- that distinction can be made.
 --
 -- Written against `pg_policies` on the live database rather than against this

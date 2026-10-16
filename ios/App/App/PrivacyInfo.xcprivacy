@@ -1,0 +1,121 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<!-- Oct 16, security review — this file did not exist, and an app using a
+	     Required Reason API without one is rejected at submission.
+
+	     Scanned the whole of App/Native for the Required Reason categories:
+	     UserDefaults is the only one in use. No file-timestamp APIs, no
+	     systemUptime, no disk-space queries, no activeInputModes. -->
+
+	<!-- REX does no tracking. No analytics SDK, no crash reporter, no ad
+	     identifier. The Skimlinks affiliate layer that would qualify is behind
+	     isAffiliateProgrammeActive = false and cannot fire — see
+	     RexOutboundLinks.swift. If that flag is ever turned on, this value and
+	     NSPrivacyTrackingDomains both have to change in the same breath, along
+	     with NSUserTrackingUsageDescription and the App Store privacy label. -->
+	<key>NSPrivacyTracking</key>
+	<false/>
+	<key>NSPrivacyTrackingDomains</key>
+	<array/>
+
+	<key>NSPrivacyAccessedAPITypes</key>
+	<array>
+		<dict>
+			<!-- CA92.1 — reading and writing only this app's own defaults.
+			     REX stores the session, the feed's view preferences, dismissed
+			     blasts and onboarding state. Nothing is read from or written to
+			     another app's container. -->
+			<key>NSPrivacyAccessedAPIType</key>
+			<string>NSPrivacyAccessedAPICategoryUserDefaults</string>
+			<key>NSPrivacyAccessedAPITypeReasons</key>
+			<array>
+				<string>CA92.1</string>
+			</array>
+		</dict>
+	</array>
+
+	<!-- What leaves the device and is tied to an account. Each entry is
+	     "linked to you" because it hangs off a REX account, and none is used
+	     for tracking. This must match the App Store Connect privacy label —
+	     Apple compares them. -->
+	<key>NSPrivacyCollectedDataTypes</key>
+	<array>
+		<dict>
+			<key>NSPrivacyCollectedDataType</key>
+			<string>NSPrivacyCollectedDataTypeEmailAddress</string>
+			<key>NSPrivacyCollectedDataTypeLinked</key>
+			<true/>
+			<key>NSPrivacyCollectedDataTypeTracking</key>
+			<false/>
+			<key>NSPrivacyCollectedDataTypePurposes</key>
+			<array>
+				<string>NSPrivacyCollectedDataTypePurposeAppFunctionality</string>
+			</array>
+		</dict>
+		<dict>
+			<!-- Display name and username. -->
+			<key>NSPrivacyCollectedDataType</key>
+			<string>NSPrivacyCollectedDataTypeName</string>
+			<key>NSPrivacyCollectedDataTypeLinked</key>
+			<true/>
+			<key>NSPrivacyCollectedDataTypeTracking</key>
+			<false/>
+			<key>NSPrivacyCollectedDataTypePurposes</key>
+			<array>
+				<string>NSPrivacyCollectedDataTypePurposeAppFunctionality</string>
+			</array>
+		</dict>
+		<dict>
+			<!-- Photos attached to a Rex, a want or a profile. -->
+			<key>NSPrivacyCollectedDataType</key>
+			<string>NSPrivacyCollectedDataTypePhotosorVideos</string>
+			<key>NSPrivacyCollectedDataTypeLinked</key>
+			<true/>
+			<key>NSPrivacyCollectedDataTypeTracking</key>
+			<false/>
+			<key>NSPrivacyCollectedDataTypePurposes</key>
+			<array>
+				<string>NSPrivacyCollectedDataTypePurposeAppFunctionality</string>
+			</array>
+		</dict>
+		<dict>
+			<!-- The reviews, notes, lists and blasts people write — the app's
+			     whole point. -->
+			<key>NSPrivacyCollectedDataType</key>
+			<string>NSPrivacyCollectedDataTypeOtherUserContent</string>
+			<key>NSPrivacyCollectedDataTypeLinked</key>
+			<true/>
+			<key>NSPrivacyCollectedDataTypeTracking</key>
+			<false/>
+			<key>NSPrivacyCollectedDataTypePurposes</key>
+			<array>
+				<string>NSPrivacyCollectedDataTypePurposeAppFunctionality</string>
+			</array>
+		</dict>
+		<dict>
+			<!-- Contact matching. Emails and phone numbers are SHA-256'd on the
+			     device and only the hashes are sent; names are never read and
+			     nothing is stored server-side (FindFriendsViews.swift,
+			     PhoneNumberSupport.swift).
+
+			     Declared anyway, and deliberately: hashed contact data is still
+			     contact data once it leaves the handset, and under-declaring is
+			     the mistake that costs a review. Kathryn — this is the one
+			     judgement call in this file, and the App Store label must say
+			     the same thing. -->
+			<key>NSPrivacyCollectedDataType</key>
+			<string>NSPrivacyCollectedDataTypeContacts</string>
+			<key>NSPrivacyCollectedDataTypeLinked</key>
+			<true/>
+			<key>NSPrivacyCollectedDataTypeTracking</key>
+			<false/>
+			<key>NSPrivacyCollectedDataTypePurposes</key>
+			<array>
+				<string>NSPrivacyCollectedDataTypePurposeAppFunctionality</string>
+			</array>
+		</dict>
+	</array>
+</dict>
+</plist>

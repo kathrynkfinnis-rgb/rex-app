@@ -35,7 +35,7 @@
 	<key>NSCameraUsageDescription</key>
 	<string>Rex uses the camera so you can photograph a recipe — a cookbook page, a card, a menu — and have it read into the editor. The photo is sent to our AI provider to transcribe it and is never saved.</string>
 	<key>NSContactsUsageDescription</key>
-	<string>Rex checks the email addresses in your contacts to show which of your friends are already on Rex. They're scrambled on your phone first, and nothing is stored.</string>
+	<string>Rex checks the email addresses and phone numbers in your contacts to show which of your friends are already on Rex. They're scrambled on your phone first, only the scrambled version is sent, and nothing is stored.</string>
 	<key>NSLocationWhenInUseUsageDescription</key>
 	<string>Rex uses your location only while you're using the app, to centre the map on where you are. It isn't saved to your account or shared with your friends.</string>
 	<key>TMDBApiKey</key>
