@@ -60,8 +60,8 @@ private func friendlyError(_ data: Data, fallback: String) -> String {
 
 /// Minimal hand-rolled Supabase REST client (PostgREST + GoTrue over HTTPS).
 /// Same project/keys the web app uses (see .env: VITE_SUPABASE_URL / VITE_SUPABASE_PUBLISHABLE_KEY).
-/// NOTE: stores the session in UserDefaults for this prototype pass — move to Keychain before
-/// this ships beyond simulator testing. Refresh-token rotation IS implemented (see validToken()),
+/// The session lives in the Keychain (RexKeychain), not UserDefaults — see the
+/// note there for the accessibility class. Refresh-token rotation IS implemented (see validToken()),
 /// which is what actually fixes "constantly logged out" — access tokens expire in ~1hr and were
 /// never being refreshed before.
 final class RexAPI {
@@ -70,16 +70,28 @@ final class RexAPI {
     private let baseURL = URL(string: "https://uhpzkbkwxcgqfxmlyktj.supabase.co")!
     private let anonKey = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVocHprYmt3eGNncWZ4bWx5a3RqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODU4Mzk2NDMsImV4cCI6MjEwMTQxNTY0M30.IvQ8byDwHErLhuJI1Pg3bRcb4AKK4sb9Bm6cr_6sHbI"
 
-    private init() {}
+    private init() {
+        // Everyone already signed in has their session in UserDefaults. Move
+        // it before the first read, so the upgrade doesn't sign them out — and
+        // clear the plaintext copy so it doesn't linger in the next backup.
+        RexKeychain.migrateFromUserDefaults(keys: [Self.accessTokenKey, Self.refreshTokenKey])
+    }
+
+    // Oct 16, security review (F6) — these were UserDefaults, an unencrypted
+    // plist in the app container that lands in unencrypted backups. The note
+    // at the top of this file had said to move them before shipping since the
+    // first commit. See RexKeychain for the accessibility class and why.
+    private static let accessTokenKey = "rex.accessToken"
+    private static let refreshTokenKey = "rex.refreshToken"
 
     private var accessToken: String? {
-        get { UserDefaults.standard.string(forKey: "rex.accessToken") }
-        set { UserDefaults.standard.set(newValue, forKey: "rex.accessToken") }
+        get { RexKeychain.string(Self.accessTokenKey) }
+        set { RexKeychain.set(newValue, for: Self.accessTokenKey) }
     }
 
     private var refreshTokenValue: String? {
-        get { UserDefaults.standard.string(forKey: "rex.refreshToken") }
-        set { UserDefaults.standard.set(newValue, forKey: "rex.refreshToken") }
+        get { RexKeychain.string(Self.refreshTokenKey) }
+        set { RexKeychain.set(newValue, for: Self.refreshTokenKey) }
     }
 
     var isSignedIn: Bool { accessToken != nil }
@@ -676,7 +688,11 @@ final class RexAPI {
             throw RexAPIError.server(friendlyError(data, fallback: "Couldn't delete your account. Please try again, or email kathryn.k.finnis@gmail.com."))
         }
 
-        // Nothing of this account should linger on the phone either.
+        // Nothing of this account should linger on the phone either. The
+        // session itself lives in the Keychain now, and signOut() below is
+        // what clears that — this loop is for the preferences that are still
+        // legitimately in UserDefaults (dismissed blasts, view modes,
+        // onboarding state).
         for key in UserDefaults.standard.dictionaryRepresentation().keys where key.hasPrefix("rex.") {
             UserDefaults.standard.removeObject(forKey: key)
         }
@@ -718,9 +734,25 @@ final class RexAPI {
         refreshTokenValue = decoded.refresh_token
     }
 
+    /// Oct 16, security review (F7) — this cleared the tokens locally and told
+    /// nobody, so a refresh token lifted off a backup kept working after the
+    /// person had signed out. GoTrue's /logout revokes it.
+    ///
+    /// Fire-and-forget on purpose, and local state is cleared first: signing
+    /// out must not depend on the network, or a user on a bad connection is
+    /// stuck signed in. The worst case if the call fails is the old behaviour.
     func signOut() {
+        let token = accessToken
         accessToken = nil
         refreshTokenValue = nil
+        guard let token else { return }
+        Task.detached { [baseURL, anonKey] in
+            var request = URLRequest(url: baseURL.appendingPathComponent("/auth/v1/logout"))
+            request.httpMethod = "POST"
+            request.setValue(anonKey, forHTTPHeaderField: "apikey")
+            request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+            _ = try? await URLSession.shared.data(for: request)
+        }
     }
 
     /// `category`/`searchText` are the fix for a real bug: the default,

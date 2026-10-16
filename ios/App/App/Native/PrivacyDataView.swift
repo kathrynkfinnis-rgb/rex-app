@@ -414,7 +414,10 @@ struct ConsentUpdateView: View {
             Text("We\u{2019}ve updated our policies")
                 .font(RexFont.display(26, weight: .semibold))
                 .foregroundStyle(RexColor.foreground)
-            Text("Our Privacy Policy now explains how Rex handles your location, contacts and imported photos, and how to download your data or delete your account. Please take a look and agree to carry on.")
+            // Oct 16 — this described the September update. The gate re-fires on
+            // every version bump, so the copy has to move with it, or people are
+            // told to re-agree to something that isn't what changed.
+            Text("Our Privacy Policy now explains what Ask Rex sends to Google's AI \u{2014} including your friends' recommendations and what they wrote \u{2014} and the notes it keeps about your tastes, which you can read and delete. Please take a look and agree to carry on.")
                 .font(RexFont.text(15))
                 .foregroundStyle(RexColor.mutedForeground)
                 .fixedSize(horizontal: false, vertical: true)
