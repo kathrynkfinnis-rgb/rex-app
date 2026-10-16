@@ -459,24 +459,42 @@ struct ItemDetailView: View {
             item = fetchedItem
             // Nothing from someone on either side of a block.
             recs = Self.onePerPerson(RexAPI.shared.filterHidden(fetchedRecs))
-            wanters = await RexAPI.shared.fetchWanters(itemIds: [itemId])[itemId] ?? []
-            wantPosts = await RexAPI.shared.fetchWants(forItem: itemId)
-            // Only events have these, so only events pay for the request.
-            if RexCategory(rawType: fetchedItem.type) == .event {
-                ticketReminderPeople = await RexAPI.shared.ticketReminders(itemId: itemId)
-                myTicketLeads = await RexAPI.shared.myTicketLeads(itemId: itemId)
-            }
-            await loadMyRank()
-            Task { await loadDetails(fetchedItem) }
-            wanted = (try? await wantedTask) ?? false
             if let mine = fetchedRecs.first(where: { $0.user_id == RexAPI.shared.currentUserId }) {
                 rating = mine.rating
                 note = mine.note ?? ""
             }
+
+            // Oct 16 — "when you open a card, particularly a place card, it
+            // takes ages to load."
+            //
+            // The item and its Rexes are the page. Everything below is one
+            // more strip on it — who wants to try this, where it ranks, the
+            // ticket reminders — and each was being awaited in turn before
+            // the spinner came down, so opening a place cost four round
+            // trips in sequence when only the first one had anything on
+            // screen riding on it. The page draws after that first one now
+            // and the strips land as they arrive, which is also why they all
+            // start empty and render nothing until they don't.
+            isLoading = false
+
+            async let wantersTask = RexAPI.shared.fetchWanters(itemIds: [itemId])
+            async let wantPostsTask = RexAPI.shared.fetchWants(forItem: itemId)
+            Task { await loadDetails(fetchedItem) }
+            Task { await loadMyRank() }
+            // Only events have these, so only events pay for the request.
+            if RexCategory(rawType: fetchedItem.type) == .event {
+                async let people = RexAPI.shared.ticketReminders(itemId: itemId)
+                async let leads = RexAPI.shared.myTicketLeads(itemId: itemId)
+                ticketReminderPeople = await people
+                myTicketLeads = await leads
+            }
+            wanted = (try? await wantedTask) ?? false
+            wanters = (await wantersTask)[itemId] ?? []
+            wantPosts = await wantPostsTask
         } catch {
             errorMessage = error.localizedDescription
+            isLoading = false
         }
-        isLoading = false
     }
 
     private func toggleWant() async {
