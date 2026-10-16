@@ -59,8 +59,78 @@ begin
 end;
 $$;
 
+-- Oct 16, security review — this function as first written was a mass-delete
+-- primitive available to anybody.
+--
+-- SECURITY DEFINER means it runs as the owner, ignoring RLS. It takes no
+-- caller identity at all: no auth.uid() test, no role check. And a new
+-- function in Postgres is granted EXECUTE to PUBLIC by default, which on
+-- Supabase additionally means anon and authenticated. PostgREST exposes the
+-- public schema, so it would have been live at /rest/v1/rpc/merge_items —
+-- where items.id is readable by any signed-in user (the SELECT policy is
+-- USING (true)), so the arguments were there for the taking. Called in a
+-- loop it deletes other people's recommendations and wants and empties the
+-- catalogue.
+--
+-- Every other definer function here is revoked and then granted narrowly;
+-- delete_place_without_pin, which does far less, checks has_role admin
+-- internally. This one was written as a migration helper and never given
+-- either. Both now: the gate inside, so it holds however it is called, and
+-- the revoke outside, so it cannot be called by the wrong people at all.
+-- (The revoke comes after the create — you cannot revoke on a function that
+-- does not exist yet, and create or replace does not reset existing grants.)
+create or replace function public.merge_items(loser uuid, keeper uuid)
+returns void
+language plpgsql
+security definer
+set search_path = public
+as $$
+begin
+  -- Belt and braces with the revoke above. A definer function that deletes
+  -- other people's rows should say who may call it in its own body, so the
+  -- answer survives a future grant somebody adds without reading this.
+  if auth.uid() is not null and not public.has_role(auth.uid(), 'admin') then
+    raise exception 'merge_items is for administrators';
+  end if;
+
+  if loser = keeper then return; end if;
+
+  delete from public.recommendations r
+  where r.item_id = loser
+    and exists (
+      select 1 from public.recommendations k
+      where k.item_id = keeper
+        and k.user_id = r.user_id
+        and k.trip_id is not distinct from r.trip_id
+        and k.list_id is not distinct from r.list_id
+    );
+  update public.recommendations set item_id = keeper where item_id = loser;
+
+  delete from public.wants w
+  where w.item_id = loser
+    and exists (select 1 from public.wants k where k.item_id = keeper and k.user_id = w.user_id);
+  update public.wants set item_id = keeper where item_id = loser;
+
+  delete from public.rex_suggestions s
+  where s.item_id = loser
+    and exists (select 1 from public.rex_suggestions k where k.item_id = keeper and k.user_id = s.user_id);
+  update public.rex_suggestions set item_id = keeper where item_id = loser;
+
+  update public.editorial_collection_items set item_id = keeper where item_id = loser;
+  update public.check_ins set item_id = keeper where item_id = loser;
+  update public.request_comments set suggested_item_id = keeper where suggested_item_id = loser;
+  update public.import_staging set resolved_item_id = keeper where resolved_item_id = loser;
+
+  delete from public.items where id = loser;
+end;
+$$;
+
+-- The one-off pass below runs in the SQL editor, where auth.uid() is null —
+-- which the guard above allows, and which is the only context this needs.
+revoke all on function public.merge_items(uuid, uuid) from public, anon, authenticated;
+
 comment on function public.merge_items is
-  'Folds one item into another: everything pointing at the loser is repointed at the keeper, except rows that would collide with one the same person already has, which are dropped. The loser is deleted.';
+  'Administrators only, and revoked from anon/authenticated. Folds one item into another: everything pointing at the loser is repointed at the keeper, except rows that would collide with one the same person already has, which are dropped. The loser is deleted.';
 
 -- 2. Normalising a name the way the app does, so the two agree about what
 --    counts as the same place.

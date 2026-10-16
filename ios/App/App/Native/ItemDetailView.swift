@@ -100,6 +100,38 @@ struct ItemDetailView: View {
     /// already had one (#133), the full item page never did.
     @Environment(\.viewOnMap) private var viewOnMap
 
+    /// Oct 16 — "Phoebe shouldn't be able to Rex the same place twice", and
+    /// "I can't see my own review here".
+    ///
+    /// She hadn't, and it was there. Adding a place you have Rex'd to a trip
+    /// writes a second recommendation row for it — trip_id set, rating 0, no
+    /// note — which is deliberate and is what lets a trip revisit somewhere
+    /// (3 Oct). This page asked for every row on the item and drew each one,
+    /// so one person showed up twice: once for what they said, and once for
+    /// an empty stop.
+    ///
+    /// One row per person, the real one winning. Same rule the map pin took
+    /// yesterday, and the same reason — a stop is a fact about an itinerary,
+    /// not a second opinion. Decided on what the row carries rather than on
+    /// trip_id, because that column isn't in this select and a row with a
+    /// rating and a note is the one worth showing whatever put it there.
+    static func onePerPerson(_ recs: [FeedRecommendation]) -> [FeedRecommendation] {
+        func weight(_ rec: FeedRecommendation) -> Int {
+            (rec.rating > 0 ? 2 : 0) + ((rec.note ?? "").isEmpty ? 0 : 1)
+        }
+        var best: [String: FeedRecommendation] = [:]
+        for rec in recs {
+            guard let held = best[rec.user_id] else { best[rec.user_id] = rec; continue }
+            if weight(rec) > weight(held) { best[rec.user_id] = rec }
+        }
+        // Keep the order the query returned, which is newest first.
+        var seen = Set<String>()
+        return recs.compactMap { rec in
+            guard seen.insert(rec.user_id).inserted else { return nil }
+            return best[rec.user_id]
+        }
+    }
+
     /// Whether anybody other than you has said something about this.
     private var othersHaveSpoken: Bool {
         recs.contains { $0.user_id != RexAPI.shared.currentUserId && !($0.note ?? "").isEmpty }
@@ -426,7 +458,7 @@ struct ItemDetailView: View {
             let (fetchedItem, fetchedRecs) = try await (itemTask, recsTask)
             item = fetchedItem
             // Nothing from someone on either side of a block.
-            recs = RexAPI.shared.filterHidden(fetchedRecs)
+            recs = Self.onePerPerson(RexAPI.shared.filterHidden(fetchedRecs))
             wanters = await RexAPI.shared.fetchWanters(itemIds: [itemId])[itemId] ?? []
             wantPosts = await RexAPI.shared.fetchWants(forItem: itemId)
             // Only events have these, so only events pay for the request.
