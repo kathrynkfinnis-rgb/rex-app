@@ -19,6 +19,7 @@
 // it renders a paste that arrived with structure already in it, so there is
 // one set of rules for how a list looks, not two.
 
+import { withinBudget, overBudget, recordUse } from "../_shared/ai-budget.ts";
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "jsr:@supabase/supabase-js@2";
 
@@ -32,6 +33,10 @@ const CORS = {
 
 /** Long enough for a real list, short enough that one call stays cheap. */
 const MAX_LINES = 400;
+const MAX_LINE_CHARS = 500;
+// Organising a list is a once-in-a-while action, not something anybody does
+// twenty times a day by hand.
+const DAILY_ORGANISE_LIMIT = 20;
 
 const TOOL = {
   name: "mark_structure",
@@ -89,6 +94,11 @@ Deno.serve(async (req) => {
     return new Response(JSON.stringify({ error: "Not signed in." }), { status: 401, headers: CORS });
   }
 
+  const caller = { userId: auth.user.id, client: asUser };
+  if (!(await withinBudget(caller, "organise-list", DAILY_ORGANISE_LIMIT))) {
+    return overBudget("That's a lot of organising for one day. Try again tomorrow.", CORS);
+  }
+
   let body: { lines?: string[] };
   try {
     body = await req.json();
@@ -96,7 +106,12 @@ Deno.serve(async (req) => {
     return new Response(JSON.stringify({ error: "Bad request." }), { status: 400, headers: CORS });
   }
 
-  const lines = (body.lines ?? []).slice(0, MAX_LINES);
+  // Oct 16, security review (F21) — MAX_LINES bounded the array and nothing
+  // bounded a line, so four hundred hundred-kilobyte strings were one enormous
+  // Sonnet request. A list line is a line.
+  const lines = (body.lines ?? [])
+    .slice(0, MAX_LINES)
+    .map((line) => String(line ?? "").slice(0, MAX_LINE_CHARS));
   if (lines.length < 3) {
     // Nothing to organise, and no reason to bill a call to find that out.
     return new Response(JSON.stringify({ headings: [], bullets: [] }), {
@@ -150,6 +165,8 @@ Deno.serve(async (req) => {
 
   const headings = clean(input.headings);
   const bullets = clean(input.bullets).filter((n) => !headings.includes(n));
+
+  await recordUse(caller, "organise-list");
 
   return new Response(JSON.stringify({ headings, bullets }), {
     headers: { ...CORS, "Content-Type": "application/json" },

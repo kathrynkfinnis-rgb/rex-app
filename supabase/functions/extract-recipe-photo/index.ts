@@ -13,6 +13,7 @@
 // keeps this function simple and keeps photo-import and paste-import
 // behaving identically once the text exists.
 
+import { resolveCaller, withinBudget, overBudget, recordUse } from "../_shared/ai-budget.ts";
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 
 const TRANSCRIBE_TOOL = {
@@ -63,6 +64,11 @@ function callerRole(req: Request): string | null {
   }
 }
 
+// Oct 16 — the ceilings. Base64 is about 4/3 of the bytes it encodes, so
+// 8 MB of base64 is roughly a 6 MB photograph.
+const DAILY_PHOTO_LIMIT = 30;
+const MAX_IMAGE_BASE64 = 8 * 1024 * 1024;
+
 function rejectUnlessAuthenticated(req: Request): Response | null {
   if (callerRole(req) === "authenticated") return null;
   return new Response(JSON.stringify({ error: "Not allowed" }), {
@@ -76,10 +82,19 @@ Deno.serve(async (req: Request) => {
     return new Response(JSON.stringify({ error: "POST only" }), { status: 405 });
   }
 
-  // A signed-in person, not the anon key — these calls cost real money at
-  // Anthropic, and the anon key is public by design.
-  const denied = rejectUnlessAuthenticated(req);
-  if (denied) return denied;
+  // Oct 16, security review (F21) — see extract-recommendations for why the
+  // role claim alone was not enough. Resolving the caller also gives us
+  // somebody to meter.
+  const caller = await resolveCaller(req);
+  if (!caller) {
+    return new Response(JSON.stringify({ error: "Not signed in." }), {
+      status: 401,
+      headers: { "Content-Type": "application/json" },
+    });
+  }
+  if (!(await withinBudget(caller, "extract-recipe-photo", DAILY_PHOTO_LIMIT))) {
+    return overBudget("That's a lot of recipe photos for one day. Try again tomorrow.");
+  }
 
   let body: { imageBase64?: string; mediaType?: string };
   try {
@@ -92,6 +107,15 @@ Deno.serve(async (req: Request) => {
   const mediaType = body.mediaType ?? "image/jpeg";
   if (!imageBase64) {
     return new Response(JSON.stringify({ error: "imageBase64 is required" }), { status: 400 });
+  }
+  // There was no size cap at all, so an arbitrarily large base64 blob went
+  // straight to the model. A photograph of a recipe page is comfortably under
+  // this; anything larger is a mistake or an attempt.
+  if (imageBase64.length > MAX_IMAGE_BASE64) {
+    return new Response(
+      JSON.stringify({ error: "That image is too large. Try a smaller photo." }),
+      { status: 413, headers: { "Content-Type": "application/json" } },
+    );
   }
 
   const key = Deno.env.get("ANTHROPIC_API_KEY");
@@ -138,6 +162,8 @@ Deno.serve(async (req: Request) => {
   );
   const title = typeof toolUse?.input?.title === "string" ? toolUse.input.title : null;
   const text = typeof toolUse?.input?.text === "string" ? toolUse.input.text : "";
+
+  await recordUse(caller, "extract-recipe-photo");
 
   return new Response(JSON.stringify({ title, text }), {
     headers: { "Content-Type": "application/json" },

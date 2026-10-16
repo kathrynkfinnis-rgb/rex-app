@@ -1,3 +1,4 @@
+import { resolveCaller, withinBudget, overBudget, recordUse } from "../_shared/ai-budget.ts";
 // Thin, single-purpose proxy for the native app's "Lists" importer (#109)
 // and native trip import (#15/#38). The web app already does this same
 // extraction inline in a TanStack server function (src/lib/import.functions.ts,
@@ -129,6 +130,13 @@ function callerRole(req: Request): string | null {
   }
 }
 
+// Oct 16 — the ceilings. Twenty imports a day is far above honest use (a
+// person importing a document does it once or twice) and far below anything
+// that costs real money. 200,000 characters was already the slice; it is named
+// here so the limit is visible rather than a magic number mid-function.
+const DAILY_IMPORT_LIMIT = 20;
+const MAX_IMPORT_CHARS = 200_000;
+
 function rejectUnlessAuthenticated(req: Request): Response | null {
   if (callerRole(req) === "authenticated") return null;
   return new Response(JSON.stringify({ error: "Not allowed" }), {
@@ -142,10 +150,21 @@ Deno.serve(async (req: Request) => {
     return new Response(JSON.stringify({ error: "POST only" }), { status: 405 });
   }
 
-  // A signed-in person, not the anon key — these calls cost real money at
-  // Anthropic, and the anon key is public by design.
-  const denied = rejectUnlessAuthenticated(req);
-  if (denied) return denied;
+  // Oct 16, security review (F21) — this read the `role` claim out of the JWT
+  // payload without verifying the signature, trusting the platform gate. That
+  // gate is a deploy flag recorded nowhere in this repo, and the check gave no
+  // user id, so there was nobody to meter. Resolving the token through GoTrue
+  // answers both: a real account, and something to count against.
+  const caller = await resolveCaller(req);
+  if (!caller) {
+    return new Response(JSON.stringify({ error: "Not signed in." }), {
+      status: 401,
+      headers: { "Content-Type": "application/json" },
+    });
+  }
+  if (!(await withinBudget(caller, "extract-recommendations", DAILY_IMPORT_LIMIT))) {
+    return overBudget("That's a lot of importing for one day. Try again tomorrow.");
+  }
 
   let body: { text?: string };
   try {
@@ -154,7 +173,7 @@ Deno.serve(async (req: Request) => {
     return new Response(JSON.stringify({ error: "Invalid JSON body" }), { status: 400 });
   }
 
-  const text = (body.text ?? "").slice(0, 200000);
+  const text = (body.text ?? "").slice(0, MAX_IMPORT_CHARS);
   if (!text.trim()) {
     return new Response(JSON.stringify({ error: "text is required" }), { status: 400 });
   }
@@ -209,6 +228,10 @@ Deno.serve(async (req: Request) => {
   const filtered = items.filter(
     (i: { title?: string }) => typeof i.title === "string" && i.title.trim().length > 0,
   );
+
+  // Counted after the call, not before: an outage at Anthropic should not
+  // spend somebody's daily allowance. Same ordering ask-rex chose.
+  await recordUse(caller, "extract-recommendations");
 
   return new Response(JSON.stringify({ items: filtered }), {
     headers: { "Content-Type": "application/json" },
