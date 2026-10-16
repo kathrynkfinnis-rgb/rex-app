@@ -87,7 +87,16 @@ struct AddRexView: View {
         _title = State(initialValue: trip.items?.title ?? "")
         _note = State(initialValue: trip.note ?? "")
         _rating = State(initialValue: trip.rating > 0 ? trip.rating : 10)
-        _photoURLs = State(initialValue: trip.photo_urls ?? [])
+        // Oct 16 — "cover photo isn't saving or showing up when you save it
+        // on a trip." It saved; the next edit erased it.
+        //
+        // A trip's cover lives on the *item* as its thumbnail, not on the
+        // recommendation — saveTripEdits says so at the point it writes it,
+        // and posting does the same. This rehydrated from photo_urls, which
+        // is deliberately empty for a trip, so the editor always opened with
+        // an empty Cover photo box. Then saving wrote that empty box back
+        // over items.image_url. Open the editor, press Save, lose the cover.
+        _photoURLs = State(initialValue: [trip.items?.image_url].compactMap { $0 })
         _subcategories = State(initialValue: Set(splitGenres(trip.items?.genre)))
 
         let draftStops = stops.map { rec in

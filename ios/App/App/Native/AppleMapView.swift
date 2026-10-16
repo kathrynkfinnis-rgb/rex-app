@@ -438,16 +438,42 @@ struct AppleMapView: UIViewRepresentable {
                     return
                 }
 
+                // Oct 16 — "if you press a number of compressed pins on the
+                // map, the map zooms out but in fact you want it to zoom in."
+                //
+                // The union of a tight cluster is a rect a few tens of metres
+                // across, and setVisibleMapRect was being handed that along
+                // with 440 points of vertical padding. Fitting a tiny rect
+                // inside a viewport shrunk by that much makes MapKit solve for
+                // a *wider* region than the one you were already looking at —
+                // so tapping a knot of pins pulled the camera back, which is
+                // the opposite of what the tap means.
+                //
+                // Work in regions rather than rects so the span is something we
+                // can reason about, floor it so a near-degenerate cluster still
+                // gets a sensible frame, and never return a span wider than the
+                // current one: a tap on a cluster means "closer", always.
                 var rect = MKMapRect.null
                 for member in cluster.memberAnnotations {
                     let point = MKMapPoint(member.coordinate)
                     rect = rect.union(MKMapRect(x: point.x, y: point.y, width: 0, height: 0))
                 }
-                mapView.setVisibleMapRect(
-                    rect,
-                    edgePadding: UIEdgeInsets(top: 280, left: 60, bottom: 160, right: 60),
-                    animated: true
-                )
+
+                var target = MKCoordinateRegion(rect)
+                // Roughly 150m across at the tightest, so the pins separate
+                // without the map slamming into its maximum zoom.
+                let minimumSpan = 0.0015
+                target.span.latitudeDelta = max(target.span.latitudeDelta * 2.2, minimumSpan)
+                target.span.longitudeDelta = max(target.span.longitudeDelta * 2.2, minimumSpan)
+
+                let current = mapView.region.span
+                if target.span.latitudeDelta >= current.latitudeDelta {
+                    // Whatever the arithmetic says, going out is wrong here.
+                    target.span.latitudeDelta = current.latitudeDelta / 2
+                    target.span.longitudeDelta = current.longitudeDelta / 2
+                }
+
+                mapView.setRegion(mapView.regionThatFits(target), animated: true)
                 return
             }
             guard let annotation = view.annotation as? RexPlaceAnnotation,

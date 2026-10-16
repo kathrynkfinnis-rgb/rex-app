@@ -358,7 +358,12 @@ struct TripDetailView: View {
     /// because the band was built from the stops rather than the trip.
     private var bandPhotos: [String] {
         var seen = Set<String>()
-        let mine = (tripRec?.photo_urls ?? []) + [tripRec?.photo_url].compactMap { $0 }
+        // Oct 16 — yesterday this read the recommendation's photo_urls, which
+        // for a trip is always empty: the cover lives on the item, as its
+        // thumbnail. So an uploaded cover never led the band, and the
+        // hold-to-change menu had only the stops' photos to offer.
+        let mine = [tripRec?.items?.image_url].compactMap { $0 }
+            + (tripRec?.photo_urls ?? [])
         let theirs = stops.compactMap { $0.items?.image_url }
         return (mine + theirs).filter { !$0.isEmpty && seen.insert($0).inserted }
     }
@@ -383,7 +388,7 @@ struct TripDetailView: View {
     /// Which photo leads. Nil until somebody chooses, and then it is simply
     /// moved to the front of the list the band already draws from.
     private func coverLabel(for url: String) -> String {
-        if (tripRec?.photo_urls ?? []).contains(url) || tripRec?.photo_url == url {
+        if tripRec?.items?.image_url == url || (tripRec?.photo_urls ?? []).contains(url) {
             return "Use your photo"
         }
         if let stop = stops.first(where: { $0.items?.image_url == url }),
@@ -397,13 +402,14 @@ struct TripDetailView: View {
     /// it leads on the card as well as here. A stop's listing photo picked as
     /// the cover is copied onto the trip — it is the trip's cover now, and
     /// the stop keeps its own.
+    /// Oct 16 — this wrote to the recommendation's photo_urls, which is the
+    /// wrong place twice over: a trip's cover is the item's thumbnail, and
+    /// saveTripEdits clears photo_urls to [] on every trip edit, so a cover
+    /// chosen here survived only until the next edit.
     private func setCover(_ url: String) async {
-        var ordered = (tripRec?.photo_urls ?? []).filter { $0 != url }
-        ordered.insert(url, at: 0)
+        guard let itemId = tripItemId else { return }
         do {
-            try await RexAPI.shared.updateRecommendationPhotos(
-                recommendationId: route.recommendationId, photoURLs: ordered
-            )
+            try await RexAPI.shared.updateItemImageURL(itemId: itemId, imageURL: url)
             await load()
         } catch {
             mutationError = error.localizedDescription
