@@ -2123,6 +2123,22 @@ struct AddRexView: View {
                     throw error
                 }
                 postingProgress = nil
+                // Oct 16 — "people aren't getting notifications when you tag
+                // them in a trip."
+                //
+                // They weren't getting tagged at all. This branch returns
+                // before the `.rated` case below, and the only
+                // setTaggedFriends call was down there — so tagging someone
+                // on a trip with stops wrote nothing: no row, no name on the
+                // card, and no notification, because the notification is a
+                // trigger on the insert that never happened. A trip with no
+                // stops falls through to `.rated` and has always worked,
+                // which is why this looked intermittent rather than total.
+                if !taggedFriendIds.isEmpty {
+                    try? await RexAPI.shared.setTaggedFriends(
+                        recommendationId: tripRecId, userIds: Array(taggedFriendIds)
+                    )
+                }
                 didSaveDraft = asDraft
                 lastPostedRecId = tripRecId
                 // Posted (or saved as a server-side draft) — the local
@@ -2221,6 +2237,14 @@ struct AddRexView: View {
                     throw error
                 }
                 postingProgress = nil
+                // The same defect as the trip branch above, same cause: this
+                // returns before the `.rated` case, so a list with items in
+                // it dropped whoever you tagged on the floor.
+                if !taggedFriendIds.isEmpty {
+                    try? await RexAPI.shared.setTaggedFriends(
+                        recommendationId: listRecId, userIds: Array(taggedFriendIds)
+                    )
+                }
                 lastPostedRecId = listRecId
                 // Posted (or saved as a server-side draft) — the local
                 // unfinished copy is spent either way. See the note further down.

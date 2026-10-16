@@ -57,6 +57,30 @@ struct RexMapView: View {
     @State private var tripFitNonce = 0
     @State private var userCoordinate: CLLocationCoordinate2D?
     @State private var areaName: String?
+    /// Oct 16 — "I want to be able to press the location in the top left and
+    /// select a place to find Rex", and 15 Oct, "can we make it so that you
+    /// can change this place if you're looking for REX in a specific town /
+    /// village / part of London?"
+    ///
+    /// Somewhere chosen by hand, which outranks where the phone says you are
+    /// until it's cleared. Every pin is already loaded — fetchMapPlaces has
+    /// no radius — so this only ever moves the camera and renames the header.
+    @State private var chosenArea: MapArea?
+    @State private var showingAreaPicker = false
+    /// Where the camera has been told to go, separately from the label: the
+    /// clear button renames the header back to "near you" *and* flies home,
+    /// and those are two different pieces of state.
+    @State private var cameraTarget: MapRecentre?
+    @State private var recentreToken = 0
+
+    private func recentre(on coordinate: CLLocationCoordinate2D) {
+        recentreToken += 1
+        cameraTarget = MapRecentre(
+            latitude: coordinate.latitude,
+            longitude: coordinate.longitude,
+            token: recentreToken
+        )
+    }
     /// Sept 15 — location declined (or restricted). The map works without
     /// it — it centres on the pins instead — but the header shouldn't claim
     /// "near you", and there should be a way to change your mind.
@@ -303,7 +327,8 @@ struct RexMapView: View {
                     highlightGenre: subFilter,
                     onRegionChange: { visibleRegion = $0 },
                     unvisitedBranches: wantsOnly || tripFilter != nil ? [] : unvisitedBranches,
-                    fitToPlacesNonce: tripFitNonce
+                    fitToPlacesNonce: tripFitNonce,
+                    recentreOn: cameraTarget
                 )
                 .ignoresSafeArea(edges: .bottom)
                 .overlay(alignment: .bottom) { tripsInViewBar }
@@ -347,6 +372,15 @@ struct RexMapView: View {
         // first appeared (tapping a card's map icon switches tabs and sets
         // the request in the same action), not only for later changes.
         .task(id: focusRequest) { await focusOn(focusRequest) }
+        // Its own modifier rather than a case in MapSheet below: that binding
+        // exists to stop three sheets fighting over the same slot, and this
+        // one is opened from the header, never at the same time as a pin.
+        .sheet(isPresented: $showingAreaPicker) {
+            MapAreaPickerView(near: chosenArea?.coordinate ?? center) { area in
+                chosenArea = area
+                recentre(on: area.coordinate)
+            }
+        }
         // Sept 9 — one sheet modifier, not three; see FeedView.ActiveSheet.
         // "Follow a trip" and long-press-to-add-a-place were both losing to
         // the place sheet above them.
@@ -493,12 +527,49 @@ struct RexMapView: View {
     private var topBar: some View {
         VStack(alignment: .leading, spacing: RexSpacing.sm) {
             HStack(spacing: RexSpacing.sm) {
-                Image(systemName: "location.fill")
-                    .font(.system(size: 12))
-                    .foregroundStyle(RexColor.primary)
-                Text(areaName ?? (locationDenied ? "Places" : "Places near you"))
-                    .font(RexFont.display(18, weight: .semibold))
-                    .foregroundStyle(RexColor.foreground)
+                // Oct 16 — the heading is the control now. A chevron rather
+                // than a button-looking button: it sits over the map, and the
+                // place name reading as tappable is the whole affordance.
+                Button {
+                    showingAreaPicker = true
+                } label: {
+                    HStack(spacing: RexSpacing.sm) {
+                        Image(systemName: chosenArea == nil ? "location.fill" : "mappin.circle.fill")
+                            .font(.system(size: 12))
+                            .foregroundStyle(RexColor.primary)
+                        Text(chosenArea?.name
+                            ?? areaName
+                            ?? (locationDenied ? "Places" : "Places near you"))
+                            .font(RexFont.display(18, weight: .semibold))
+                            .foregroundStyle(RexColor.foreground)
+                            .lineLimit(1)
+                        Image(systemName: "chevron.down")
+                            .font(.system(size: 10, weight: .semibold))
+                            .foregroundStyle(RexColor.mutedForeground)
+                    }
+                    .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel("Change the area")
+
+                // Only while somewhere is chosen — "near you" has nothing to
+                // go back to.
+                if chosenArea != nil {
+                    Button {
+                        chosenArea = nil
+                        // Clearing has to move the camera too, or the header
+                        // says "near you" over a map of Margate. Nowhere to
+                        // go if we never got a fix — then it just renames.
+                        if let userCoordinate { recentre(on: userCoordinate) }
+                    } label: {
+                        Image(systemName: "xmark.circle.fill")
+                            .font(.system(size: 14))
+                            .foregroundStyle(RexColor.mutedForeground)
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityLabel("Back to places near you")
+                }
+
                 Spacer()
                 Text("\(visiblePlaces.count)")
                     .font(RexFont.text(12, weight: .semibold))

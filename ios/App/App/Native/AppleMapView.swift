@@ -63,6 +63,14 @@ struct AppleMapView: UIViewRepresentable {
     /// following a trip, so all its stops are on screen at once rather than
     /// wherever the map happened to be sitting.
     var fitToPlacesNonce: Int = 0
+    /// Oct 16 — "I want to be able to press the location in the top left and
+    /// select a place to find Rex."
+    ///
+    /// Deliberately not `center`, which fires once on first load and must
+    /// keep doing so: this one moves the camera every time somebody picks
+    /// somewhere, including back to the same place after panning away, which
+    /// is what the token in it is for.
+    var recentreOn: MapRecentre? = nil
 
     /// Oct 2 — "the new map seems to have deleted lots of stuff, missing many
     /// pins". Nothing was deleted: this was 2,200m, which is a couple of
@@ -254,6 +262,25 @@ struct AppleMapView: UIViewRepresentable {
             )
             context.coordinator.lastFocusRequest = focusRequest
         }
+
+        // Last, so choosing somewhere wins over the opening centre and over a
+        // trip fit that may have landed in the same pass.
+        if let recentreOn, recentreOn != context.coordinator.lastRecentre {
+            mapView.setRegion(
+                MKCoordinateRegion(
+                    center: CLLocationCoordinate2D(
+                        latitude: recentreOn.latitude, longitude: recentreOn.longitude
+                    ),
+                    latitudinalMeters: Self.openingSpanMeters,
+                    longitudinalMeters: Self.openingSpanMeters
+                ),
+                animated: true
+            )
+            context.coordinator.lastRecentre = recentreOn
+            // Otherwise the opening centre, which may not have arrived yet
+            // when somebody picks a place fast, would snap them back.
+            context.coordinator.didCenter = true
+        }
     }
 
     /// Events get the gold accent; everything else forest green, matching the
@@ -281,6 +308,7 @@ struct AppleMapView: UIViewRepresentable {
         var didCenter = false
         var lastFocusRequest: MapFocusRequest?
         var lastFitNonce = 0
+        var lastRecentre: MapRecentre?
         /// Whether the map is currently close enough in to draw icons.
         var showGlyphs = true
 
