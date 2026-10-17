@@ -1411,6 +1411,16 @@ enum RexSearch {
     static func isPlausible(_ lat: Double, _ lng: Double, for address: String) async -> Bool {
         let tail = address.split(separator: ",").map { $0.trimmingCharacters(in: .whitespaces) }
         guard let country = tail.last, country.count > 2,
+              // Oct 17 — only ask about something that could be a country.
+              //
+              // The last comma-separated piece of an address is usually one,
+              // but plenty of our rows end in a postcode or a street instead,
+              // and each distinct one of those was a cache key of its own and
+              // therefore a billable lookup. A country name has no digits in
+              // it and is not a sentence; anything else we decline to judge,
+              // which means the pin is left alone rather than re-found.
+              !country.contains(where: \.isNumber),
+              country.count <= 40,
               let centre = await centre(of: country) else { return true }
         // A country is a big thing: this is a continent-scale sanity check,
         // not a precision one. Colombia's centre to anywhere in Europe is
