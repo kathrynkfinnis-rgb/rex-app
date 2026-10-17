@@ -6612,18 +6612,48 @@ final class RexAPI {
     /// repairPlaceCoordsIfNeeded's own dedup guard keeps this from re-firing
     /// for the same item within a session, and it persists successes to the
     /// item row, so the backlog only ever gets smaller across app launches.
+    /// Oct 17 — rewritten the morning after a £111 overnight Google bill.
+    ///
+    /// This was the runaway. It spawned one Task per place, so opening the
+    /// map started fifteen hundred concurrent jobs, each of which could make
+    /// two billable Google calls — a Geocoding lookup to sanity-check the
+    /// country, and a Places Text Search to re-find the venue. The only thing
+    /// holding it back was a dedup set that lived in memory, so every cold
+    /// launch did the whole thing again. Open the app ten times in an evening
+    /// and you have paid for the catalogue ten times.
+    ///
+    /// Three things keep it honest now:
+    ///
+    ///   * a budget — at most `perLaunch` places are even considered, so the
+    ///     work is bounded by a constant rather than by how much REX knows;
+    ///   * serial, not concurrent — one at a time, so a mistake costs one
+    ///     call and not fifteen hundred before anyone can react;
+    ///   * a dedup set that survives relaunching, so a place we have already
+    ///     tried and failed to place is never paid for twice.
+    ///
+    /// And it does not run at all in a debug build. Testing against the
+    /// production key is what turned a slow leak into a spike.
     func repairMissingMapCoords(_ places: [MapPlace], onRepaired: @escaping (MapPlace) -> Void) {
-        for place in places {
-            guard let address = place.address, !address.isEmpty else { continue }
-            let existing: (lat: Double, lng: Double)? = {
-                guard let lat = place.lat, let lng = place.lng else { return nil }
-                return (lat, lng)
-            }()
-            Task {
+        #if DEBUG
+        return
+        #else
+        let perLaunch = 20
+        Task {
+            var budget = perLaunch
+            for place in places {
+                guard budget > 0 else { break }
+                guard let address = place.address, !address.isEmpty else { continue }
+                guard !Self.alreadyTriedCoordRepair(place.id) else { continue }
+                let existing: (lat: Double, lng: Double)? = {
+                    guard let lat = place.lat, let lng = place.lng else { return nil }
+                    return (lat, lng)
+                }()
+                budget -= 1
+                Self.rememberCoordRepairAttempt(place.id)
                 guard let located = await self.repairPlaceCoordsIfNeeded(
                     itemId: place.id, address: address,
                     existing: existing, name: place.title
-                ) else { return }
+                ) else { continue }
                 let repaired = MapPlace(
                     id: place.id, title: place.title, subtitle: place.subtitle, type: place.type,
                     genre: place.genre, address: place.address, lat: located.lat, lng: located.lng,
@@ -6632,6 +6662,28 @@ final class RexAPI {
                 await MainActor.run { onRepaired(repaired) }
             }
         }
+        #endif
+    }
+
+    /// The backlog shrinks by at most twenty a launch, so this list stays
+    /// small and bounded by how many places have ever failed to resolve.
+    private static let triedRepairKey = "rex.coordRepairAttempted"
+
+    private static func alreadyTriedCoordRepair(_ itemId: String) -> Bool {
+        if geocodeRepairedItemIds.contains(itemId) { return true }
+        let stored = UserDefaults.standard.stringArray(forKey: triedRepairKey) ?? []
+        return stored.contains(itemId)
+    }
+
+    private static func rememberCoordRepairAttempt(_ itemId: String) {
+        var stored = UserDefaults.standard.stringArray(forKey: triedRepairKey) ?? []
+        guard !stored.contains(itemId) else { return }
+        stored.append(itemId)
+        // A place that resolves gets written to its row and never comes back
+        // here; this list is only the ones that did not. Keeping the most
+        // recent thousand is plenty and stops it growing without end.
+        if stored.count > 1_000 { stored.removeFirst(stored.count - 1_000) }
+        UserDefaults.standard.set(stored, forKey: triedRepairKey)
     }
 
     /// Sept 8 — re-geocodes every stop in a trip, using the trip's name as

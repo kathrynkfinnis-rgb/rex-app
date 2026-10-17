@@ -1,5 +1,69 @@
 import Foundation
 
+/// Oct 17 — a hard ceiling on what one device can spend at Google in a day.
+///
+/// Written the morning after a £111 overnight spike. The money is only half
+/// the lesson: the app had no limit of any kind on how many paid calls it
+/// could make, so a loop over the whole catalogue — which is what the map's
+/// coordinate self-heal is — could run up a bill with nothing in the way.
+/// Ask Rex has had a per-person daily ceiling since September and the other
+/// AI functions got one yesterday; Google never had one at all.
+///
+/// Deliberately a *device* ceiling in UserDefaults rather than a per-account
+/// one in the database. A runaway guard has to work when the thing running
+/// away is the app itself, before any network call, and it has to cost
+/// nothing to check. It is not a security control — somebody determined
+/// could clear it — it is a brake on our own code.
+///
+/// The numbers are far above normal use and far below a surprise: a heavy day
+/// of adding places is twenty or thirty searches.
+enum GoogleBudget {
+    enum Kind: String {
+        case places     // Text Search, Nearby, Place Details, Place Photos
+        case geocoding
+    }
+
+    private static let ceiling: [Kind: Int] = [.places: 250, .geocoding: 250]
+    private static let lock = NSLock()
+
+    private static func key(_ kind: Kind) -> String {
+        let day = DateFormatter.rexBudgetDay.string(from: Date())
+        return "rex.googleBudget.\(kind.rawValue).\(day)"
+    }
+
+    /// Counts one call and says whether it may go ahead. Call it immediately
+    /// before the request, never after: a call we refuse must not be counted
+    /// against tomorrow, and a call we make must be counted even if it fails.
+    static func allow(_ kind: Kind) -> Bool {
+        lock.lock()
+        defer { lock.unlock() }
+        let name = key(kind)
+        let used = UserDefaults.standard.integer(forKey: name)
+        guard used < (ceiling[kind] ?? 250) else {
+            // Once per day per kind is enough to notice in a log.
+            if used == ceiling[kind] { print("[GoogleBudget] \(kind.rawValue) ceiling reached for today.") }
+            UserDefaults.standard.set(used + 1, forKey: name)
+            return false
+        }
+        UserDefaults.standard.set(used + 1, forKey: name)
+        return true
+    }
+
+    /// What today has cost so far, for the admin screen.
+    static func used(_ kind: Kind) -> Int {
+        UserDefaults.standard.integer(forKey: key(kind))
+    }
+}
+
+private extension DateFormatter {
+    static let rexBudgetDay: DateFormatter = {
+        let f = DateFormatter()
+        f.dateFormat = "yyyy-MM-dd"
+        f.locale = Locale(identifier: "en_US_POSIX")
+        return f
+    }()
+}
+
 /// A search suggestion from an external catalogue, mirroring the web SearchHit.
 struct RexSearchHit: Identifiable, Hashable {
     let externalId: String
@@ -380,6 +444,8 @@ enum RexSearch {
     /// recommend wholesale.
     static func chainBranches(name: String, key: String, excludingPlaceId: String?) async -> [RexSearchHit] {
         guard !googleKey.isEmpty else { return [] }
+        // Oct 17 — the ceiling, checked before the request goes out.
+        guard GoogleBudget.allow(.places) else { return [] }
         var request = URLRequest(url: URL(string: "https://places.googleapis.com/v1/places:searchText")!)
         request.httpMethod = "POST"
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
@@ -899,6 +965,8 @@ enum RexSearch {
     /// which keeps this off our Worker entirely.
     private static func places(_ q: String, near: (lat: Double, lng: Double)? = nil) async throws -> [RexSearchHit] {
         guard !googleKey.isEmpty else { return [] }
+        // Oct 17 — the ceiling, checked before the request goes out.
+        guard GoogleBudget.allow(.places) else { return [] }
         var request = URLRequest(url: URL(string: "https://places.googleapis.com/v1/places:searchText")!)
         request.httpMethod = "POST"
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
@@ -1000,6 +1068,8 @@ enum RexSearch {
     /// asked about this place before. Once per place, not once per view.
     static func placeDetails(placeId: String) async -> RexPlaceDetails? {
         guard !googleKey.isEmpty, !placeId.isEmpty else { return nil }
+        // Oct 17 — the ceiling, checked before the request goes out.
+        guard GoogleBudget.allow(.places) else { return nil }
         guard let url = URL(string: "https://places.googleapis.com/v1/places/\(placeId)") else { return nil }
         var request = URLRequest(url: url)
         request.setValue(googleKey, forHTTPHeaderField: "X-Goog-Api-Key")
@@ -1073,6 +1143,8 @@ enum RexSearch {
     /// venue-less spot — the middle of a park, a random field).
     static func nearby(lat: Double, lng: Double) async -> RexSearchHit? {
         guard !googleKey.isEmpty else { return nil }
+        // Oct 17 — the ceiling, checked before the request goes out.
+        guard GoogleBudget.allow(.places) else { return nil }
         guard let url = URL(string: "https://places.googleapis.com/v1/places:searchNearby") else { return nil }
         var request = URLRequest(url: url)
         request.httpMethod = "POST"
@@ -1147,6 +1219,8 @@ enum RexSearch {
     static func geocodeDetailed(_ query: String) async -> (lat: Double, lng: Double, address: String?)? {
         let q = query.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !q.isEmpty, !googleKey.isEmpty else { return nil }
+        // Oct 17 — the ceiling, checked before the request goes out.
+        guard GoogleBudget.allow(.geocoding) else { return nil }
         guard let url = URL(string: "https://maps.googleapis.com/maps/api/geocode/json?address=\(esc(q))&bounds=34.0,-12.0|71.0,40.0&key=\(googleKey)") else { return nil }
         var request = URLRequest(url: url)
         request.setValue(bundleId, forHTTPHeaderField: "X-Ios-Bundle-Identifier")
@@ -1383,6 +1457,8 @@ enum RexSearch {
     static func geocode(_ query: String) async -> (lat: Double, lng: Double)? {
         let q = query.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !q.isEmpty, !googleKey.isEmpty else { return nil }
+        // Oct 17 — the ceiling, checked before the request goes out.
+        guard GoogleBudget.allow(.geocoding) else { return nil }
         guard let url = URL(string: "https://maps.googleapis.com/maps/api/geocode/json?address=\(esc(q))&bounds=34.0,-12.0|71.0,40.0&key=\(googleKey)") else { return nil }
         var request = URLRequest(url: url)
         request.setValue(bundleId, forHTTPHeaderField: "X-Ios-Bundle-Identifier")
