@@ -22,6 +22,12 @@
 	<string>$(MARKETING_VERSION)</string>
 	<key>CFBundleVersion</key>
 	<string>$(CURRENT_PROJECT_VERSION)</string>
+	<!-- Oct 17: the key Debug builds use. Its own Google Cloud project,
+	     its own quota, so development can never spend production money.
+	     Left as a placeholder on purpose — a debug build with no dev key
+	     makes no Google calls at all rather than falling back. -->
+	<key>GMSApiKeyDebug</key>
+	<string>PASTE_DEV_KEY_HERE</string>
 	<key>GMSApiKey</key>
 	<string>AIzaSyDl2PCHjjKbAje0C-NjJNkb-AKn5LwAtGU</string>
 	<key>GoogleCSEApiKey</key>

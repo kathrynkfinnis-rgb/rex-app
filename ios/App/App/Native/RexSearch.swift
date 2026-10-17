@@ -119,8 +119,26 @@ enum RexSearch {
     private static var tmdbKey: String {
         Bundle.main.object(forInfoDictionaryKey: "TMDBApiKey") as? String ?? ""
     }
+    /// Oct 17 — a debug build cannot spend production money.
+    ///
+    /// Every guard added today is a brake on our own code, and brakes can be
+    /// got around by the next piece of code somebody writes. This is the only
+    /// change that makes last night structurally impossible rather than
+    /// merely unlikely: a build running from Xcode uses a different key, with
+    /// its own project and its own quota, so the worst a runaway can do while
+    /// being developed is exhaust a budget nobody is relying on.
+    ///
+    /// When no development key is configured it returns nothing at all rather
+    /// than falling back to the production one. Searching then quietly finds
+    /// no places in debug builds, which looks like a bug and is meant to —
+    /// a loud, free failure beats a silent, billable success.
     private static var googleKey: String {
-        Bundle.main.object(forInfoDictionaryKey: "GMSApiKey") as? String ?? ""
+        #if DEBUG
+        let dev = Bundle.main.object(forInfoDictionaryKey: "GMSApiKeyDebug") as? String ?? ""
+        return dev.hasPrefix("AIza") ? dev : ""
+        #else
+        return Bundle.main.object(forInfoDictionaryKey: "GMSApiKey") as? String ?? ""
+        #endif
     }
     private static var bundleId: String {
         Bundle.main.bundleIdentifier ?? ""
