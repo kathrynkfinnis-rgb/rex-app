@@ -812,6 +812,30 @@ struct AddRexView: View {
             suggestions(for: category)
 
             if searchFirst {
+                // Oct 17 — after the Google incident. A quota refusal and
+                // "there is genuinely nothing called that" produced the same
+                // empty list, so a working cap looked like a broken app and
+                // nobody would ever have reported it. Only shown when the
+                // search came back empty *and* Google turned us away, so it
+                // never contradicts results that are on screen.
+                if hits.isEmpty, !title.trimmingCharacters(in: .whitespaces).isEmpty,
+                   !isSearching, GoogleAvailability.isRefusingUs {
+                    HStack(alignment: .top, spacing: RexSpacing.sm) {
+                        Image(systemName: "exclamationmark.triangle")
+                            .font(.system(size: 12))
+                            .foregroundStyle(RexColor.mutedForeground)
+                        Text("Place search is unavailable right now. You can still add it by hand below \u{2014} everything else works as normal.")
+                            .font(RexFont.text(12.5))
+                            .foregroundStyle(RexColor.mutedForeground)
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
+                    .padding(.horizontal, RexSpacing.md)
+                    .padding(.vertical, RexSpacing.sm)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .background(RexColor.badgeBackground)
+                    .clipShape(RoundedRectangle(cornerRadius: RexRadius.input, style: .continuous))
+                }
+
                 // Escape hatch for anything the catalogues don't have.
                 Button {
                     manualEntry = true

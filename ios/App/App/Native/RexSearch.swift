@@ -43,6 +43,9 @@ enum GoogleBudget {
             // Once per day per kind is enough to notice in a log.
             if used == ceiling[kind] { print("[GoogleBudget] \(kind.rawValue) ceiling reached for today.") }
             UserDefaults.standard.set(used + 1, forKey: name)
+            // Our own ceiling and Google's quota look the same to the person
+            // searching, so they get the same message.
+            GoogleAvailability.noteRefusal()
             return false
         }
         UserDefaults.standard.set(used + 1, forKey: name)
@@ -52,6 +55,43 @@ enum GoogleBudget {
     /// What today has cost so far, for the admin screen.
     static func used(_ kind: Kind) -> Int {
         UserDefaults.standard.integer(forKey: key(kind))
+    }
+}
+
+/// Oct 17 — so an empty search can explain itself.
+///
+/// A quota refusal and "there is genuinely nothing called that" looked
+/// identical: the search swallowed the error and returned an empty list
+/// either way. Nobody would report that as a bug — they would just decide REX
+/// is bad at finding places, which is the worst possible outcome for the one
+/// control we have that protects the bill.
+///
+/// Deliberately a recent-past flag rather than a thrown error. Changing what
+/// search returns would mean touching ten call sites for a message only two
+/// of them want to show, and the sheets already redraw when results arrive,
+/// so reading this straight afterwards is enough. It clears itself, because a
+/// stale "unavailable" is worse than none.
+enum GoogleAvailability {
+    private static let lock = NSLock()
+    nonisolated(unsafe) private static var refusedAt: Date?
+
+    /// True if Google turned us away in the last few minutes.
+    static var isRefusingUs: Bool {
+        lock.lock(); defer { lock.unlock() }
+        guard let refusedAt else { return false }
+        return Date().timeIntervalSince(refusedAt) < 180
+    }
+
+    static func noteRefusal() {
+        lock.lock(); defer { lock.unlock() }
+        refusedAt = Date()
+    }
+
+    /// Any call that comes back normally clears it — whatever was wrong isn't
+    /// any more, and the message should go with it.
+    static func noteSuccess() {
+        lock.lock(); defer { lock.unlock() }
+        refusedAt = nil
     }
 }
 
@@ -982,7 +1022,13 @@ enum RexSearch {
     /// iOS-restricted key for REST when the bundle id is sent as a header,
     /// which keeps this off our Worker entirely.
     private static func places(_ q: String, near: (lat: Double, lng: Double)? = nil) async throws -> [RexSearchHit] {
-        guard !googleKey.isEmpty else { return [] }
+        guard !googleKey.isEmpty else {
+            // No key is "search is unavailable" too, and saying so is the
+            // difference between a debug build that looks broken and one that
+            // tells you the dev key isn't set yet.
+            GoogleAvailability.noteRefusal()
+            return []
+        }
         // Oct 17 — the ceiling, checked before the request goes out.
         guard GoogleBudget.allow(.places) else { return [] }
         var request = URLRequest(url: URL(string: "https://places.googleapis.com/v1/places:searchText")!)
@@ -1044,7 +1090,16 @@ enum RexSearch {
         ])
 
         let (data, response) = try await URLSession.shared.data(for: request)
-        guard let http = response as? HTTPURLResponse, http.statusCode < 400 else { return [] }
+        guard let http = response as? HTTPURLResponse, http.statusCode < 400 else {
+            // 429 is the daily quota gone — the control that protects the
+            // bill, doing its job. Worth telling the person searching, because
+            // otherwise it is indistinguishable from "no such place".
+            if (response as? HTTPURLResponse)?.statusCode == 429 {
+                GoogleAvailability.noteRefusal()
+            }
+            return []
+        }
+        GoogleAvailability.noteSuccess()
         let json = try JSONSerialization.jsonObject(with: data) as? [String: Any] ?? [:]
         let results = json["places"] as? [[String: Any]] ?? []
         return results.compactMap { p in

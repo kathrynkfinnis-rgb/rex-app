@@ -677,6 +677,38 @@ struct RexMapView: View {
                 .buttonStyle(.plain)
             }
 
+            // Oct 17 — after the Google incident, and admins only.
+            //
+            // The quota that protects the bill is invisible until it bites,
+            // and when it bites it looks like the app being broken. This is
+            // the gauge: what this phone has spent against its own daily
+            // ceiling. It stays quiet until the day is half gone, because a
+            // counter nobody needs to read is just clutter on a map.
+            //
+            // Per-device, so it does not show the whole account's usage —
+            // that lives in the Google console. What it does tell you is
+            // whether the device in your hand is the one doing the spending,
+            // which is the question worth asking first.
+            if isAdmin {
+                let places = GoogleBudget.used(.places)
+                let geo = GoogleBudget.used(.geocoding)
+                if places >= 125 || geo >= 125 {
+                    HStack(spacing: RexSpacing.sm) {
+                        Image(systemName: geo >= 250 || places >= 250 ? "exclamationmark.triangle.fill" : "gauge.medium")
+                            .font(.system(size: 11))
+                        Text("Google today: \(places) places, \(geo) geocoding")
+                            .font(RexFont.text(13, weight: .medium))
+                        Spacer()
+                    }
+                    .foregroundStyle(geo >= 250 || places >= 250 ? RexColor.primary : RexColor.mutedForeground)
+                    .padding(.horizontal, RexSpacing.sm + 2)
+                    .padding(.vertical, 7)
+                    .background(RexColor.card)
+                    .clipShape(Capsule())
+                    .overlay(Capsule().stroke(RexColor.border, lineWidth: 1))
+                }
+            }
+
             // Sept 5 — sub-category chips replace Places/Events. They filter,
             // and because each carries its pin's colour they double as the
             // key for the colour-coding — a coloured map with no legend is
