@@ -488,7 +488,19 @@ struct RecommendationCardView: View {
     @ViewBuilder
     private var rexdByRow: some View {
         let others = max(0, rexCount - 1)
-        if others > 0 || rec.isWant || rec.isBlast {
+        // Oct 18 — "making clear if others have also wanted to try something
+        // on the feed like if there were multiple rex's."
+        //
+        // A want card has carried its own count for a while. A Rex card
+        // carried none: somebody had been, three friends meant to go, and the
+        // card mentioned only the visit. Not on a want card, where the badge
+        // beside it already says this, and not counting yourself — the Saved
+        // button in the action bar says that, and saying it twice is the
+        // mistake the bookmark pair already made once.
+        let alsoWant = rec.isWant || rec.isBlast
+            ? []
+            : wanters.filter { $0.id != RexAPI.shared.currentUserId }
+        if others > 0 || rec.isWant || rec.isBlast || !alsoWant.isEmpty {
             HStack(spacing: RexSpacing.sm) {
                 if rec.isWant {
                     wantedByBadge
@@ -521,9 +533,23 @@ struct RecommendationCardView: View {
                     .clipShape(Capsule())
                 }
 
+                if !alsoWant.isEmpty { alsoWantedBadge(alsoWant) }
+
                 Spacer(minLength: 0)
             }
             .padding(.top, RexSpacing.xs)
+        }
+    }
+
+    /// The same sentence a want card makes, in the quieter register a Rex
+    /// card can spare: the Rex is the headline, the wants are context.
+    @ViewBuilder
+    private func alsoWantedBadge(_ people: [RexProfileDetail]) -> some View {
+        HStack(spacing: RexSpacing.xs) {
+            facePile(people)
+            Text(people.count == 1 ? "wants to try" : "\(people.count) want to try")
+                .font(RexFont.text(11, weight: .medium))
+                .foregroundStyle(RexColor.mutedForeground)
         }
     }
 
@@ -560,8 +586,11 @@ struct RecommendationCardView: View {
     /// faster than a row you have to swipe. Tapping the card still opens the
     /// page, where the full strip lives.
     @ViewBuilder
-    private var wanterFaces: some View {
-        let shown = Array(wanters.prefix(4))
+    private var wanterFaces: some View { facePile(wanters) }
+
+    @ViewBuilder
+    private func facePile(_ people: [RexProfileDetail]) -> some View {
+        let shown = Array(people.prefix(4))
         HStack(spacing: -7) {
             ForEach(Array(shown.enumerated()), id: \.element.id) { index, profile in
                 UserAvatarView(
