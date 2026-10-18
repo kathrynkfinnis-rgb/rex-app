@@ -24,9 +24,16 @@ struct FeedbackView: View {
                         Text("Thank you")
                             .font(RexFont.display(24, weight: .semibold))
                             .foregroundStyle(RexColor.foreground)
-                        Text("That's gone straight to the team.")
+                        // Oct 18 — "Where is this feedback going?", asked by
+                        // a tester through TestFlight because this screen
+                        // never said. "The team" is nobody in particular;
+                        // naming Team Rex, and saying it is read, answers the
+                        // question at the point it gets asked.
+                        Text("That's gone straight to Team Rex \u{2014} we read every one.")
                             .font(RexFont.text(15))
                             .foregroundStyle(RexColor.mutedForeground)
+                            .multilineTextAlignment(.center)
+                            .fixedSize(horizontal: false, vertical: true)
                         Button("Done") { dismiss() }
                             .buttonStyle(RexPrimaryButtonStyle())
                             .padding(.top, RexSpacing.md)
@@ -38,7 +45,7 @@ struct FeedbackView: View {
                         .font(RexFont.display(30, weight: .semibold))
                         .foregroundStyle(RexColor.foreground)
 
-                    Text("Bugs, ideas, things that annoyed you — all of it helps.")
+                    Text("Bugs, ideas, things that annoyed you \u{2014} all of it helps. It goes to Team Rex.")
                         .font(RexFont.text(15))
                         .foregroundStyle(RexColor.mutedForeground)
 

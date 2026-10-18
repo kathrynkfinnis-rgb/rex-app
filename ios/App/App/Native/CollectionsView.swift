@@ -10,6 +10,9 @@ import SwiftUI
 struct CollectionsView: View {
     @State private var wants: [WantRow] = []
     @State private var lists: [RexList] = []
+    /// Oct 18 — categorising from the Collections screen itself, not only
+    /// from inside each collection. See CollectionTopicsView.
+    @State private var organisingTopics = false
     @State private var followed: [RexList] = []
     @State private var sharedWithMe: [RexList] = []
     @State private var owners: [String: RexProfileDetail] = [:]
@@ -113,6 +116,9 @@ struct CollectionsView: View {
         .navigationBarTitleDisplayMode(.inline)
         .sheet(isPresented: $creatingCollection) {
             NewCollectionView { _ in Task { await load() } }
+        }
+        .sheet(isPresented: $organisingTopics) {
+            CollectionTopicsView(lists: lists) { Task { await load() } }
         }
         .task { await load() }
     }
@@ -250,7 +256,12 @@ struct CollectionsView: View {
                 if !group.lists.isEmpty || group.topic == nil {
                     shelf(
                         title: group.topic ?? "My Collections",
-                        systemImage: group.topic == nil ? "folder.fill" : "folder"
+                        systemImage: group.topic == nil ? "folder.fill" : "folder",
+                        // Only on the first shelf, so the control appears once
+                        // rather than against every topic.
+                        action: group.topic == nil && lists.count > 1
+                            ? ("Organise", { organisingTopics = true })
+                            : nil
                     ) {
                         ForEach(group.lists.prefix(8)) { list in
                             NavigationLink(value: CollectionRoute(listId: list.id, name: list.name, isMine: true)) {
@@ -263,6 +274,15 @@ struct CollectionsView: View {
                                 )
                             }
                             .buttonStyle(.plain)
+                            // The shortcut for moving this one, alongside the
+                            // Organise button for doing several.
+                            .contextMenu {
+                                Button {
+                                    organisingTopics = true
+                                } label: {
+                                    Label("Organise into topics", systemImage: "folder.badge.gearshape")
+                                }
+                            }
                         }
                         // Only on the ungrouped shelf: a new collection has no
                         // topic yet, so that is where it would land.
@@ -326,7 +346,12 @@ struct CollectionsView: View {
 
     // MARK: - Shelf scaffolding
 
-    private func shelf<Content: View>(title: String, systemImage: String, @ViewBuilder content: () -> Content) -> some View {
+    private func shelf<Content: View>(
+        title: String,
+        systemImage: String,
+        action: (label: String, perform: () -> Void)? = nil,
+        @ViewBuilder content: () -> Content
+    ) -> some View {
         VStack(alignment: .leading, spacing: RexSpacing.sm) {
             HStack(spacing: RexSpacing.sm) {
                 Image(systemName: systemImage)
@@ -335,6 +360,15 @@ struct CollectionsView: View {
                 Text(title)
                     .font(RexFont.display(19, weight: .semibold))
                     .foregroundStyle(RexColor.foreground)
+                if let action {
+                    Spacer(minLength: RexSpacing.sm)
+                    Button(action: action.perform) {
+                        Text(action.label)
+                            .font(RexFont.text(13, weight: .semibold))
+                            .foregroundStyle(RexColor.primary)
+                    }
+                    .buttonStyle(.plain)
+                }
             }
             .padding(.horizontal, RexSpacing.page)
 
