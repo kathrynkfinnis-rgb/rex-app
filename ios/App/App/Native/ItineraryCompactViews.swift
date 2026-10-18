@@ -63,7 +63,14 @@ struct ItineraryViewToggle: View {
         } label: {
             HStack(spacing: 5) {
                 Image(systemName: systemImage).font(.system(size: 11, weight: .semibold))
-                Text(label).font(RexFont.text(13, weight: .semibold))
+                // Oct 18 — three segments do not fit two words at full size,
+                // and "Expanded" was wrapping to "Expande / d" the moment the
+                // map appeared. One line, shrunk a little if it has to be,
+                // rather than a word broken across two.
+                Text(label)
+                    .font(RexFont.text(13, weight: .semibold))
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.75)
             }
             .foregroundStyle(selected ? RexColor.primaryForeground : RexColor.mutedForeground)
             .frame(maxWidth: .infinity)

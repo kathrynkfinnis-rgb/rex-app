@@ -5468,7 +5468,11 @@ final class RexAPI {
         guard let token = try? await validToken() else { return [:] }
         let (resourcePath, profilesSelect) = await recommendationsReadPath()
         let select = "id,rating,note,created_at,photo_url,photo_urls,tags\(await anonymousField()),user_id,item_id," +
-            "items(id,type,title,subtitle,image_url,genre,recipe_text)," +
+            // Oct 18 — address and coordinates, for "please can we add the
+            // view on map toggle like we have in lists?" A collection's rows
+            // are what the map draws from, and without a pin's coordinates
+            // nothing was mappable, so the toggle never appeared.
+            "items(id,type,title,subtitle,image_url,genre,recipe_text,address,lat,lng)," +
             "\(profilesSelect)"
         var components = URLComponents(url: baseURL.appendingPathComponent(resourcePath), resolvingAgainstBaseURL: false)!
         components.queryItems = [

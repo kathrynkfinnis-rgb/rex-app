@@ -35,6 +35,11 @@ struct CollectionDetailView: View {
     /// we have for trips and lists)". Same @AppStorage key as those, so the
     /// choice carries across all three rather than being three settings.
     @AppStorage(ItineraryViewMode.storageKey) private var compact = false
+    /// Oct 18 — "please can we add the view on map toggle like we have in
+    /// lists?" Not remembered between visits, for the same reason a list's
+    /// isn't: whether you want the map is a question about the collection in
+    /// front of you, not a habit.
+    @State private var mapped = false
     @State private var isLoading = true
     @State private var errorMessage: String?
     @State private var renaming = false
@@ -103,6 +108,29 @@ struct CollectionDetailView: View {
     /// Every topic this person already uses, so moving a collection into one
     /// is a choice rather than a spelling test — two collections under "London"
     /// and "london" would be two topics, and nobody meant that.
+    /// The collection's places, as pins. Built from rows already in memory
+    /// — a collection is not a recommendation, so there is nothing to fetch
+    /// it by, and nothing that needs fetching.
+    private var mappablePlaces: [MapPlace] {
+        var seen = Set<String>()
+        return rows.compactMap { row -> MapPlace? in
+            guard let rec = row.recommendations, let item = rec.items,
+                  ["place", "event"].contains(item.type),
+                  let lat = item.lat, let lng = item.lng,
+                  seen.insert(item.id).inserted
+            else { return nil }
+            return MapPlace(
+                id: item.id, title: item.title, subtitle: item.subtitle,
+                type: item.type, genre: item.genre, address: item.address,
+                lat: lat, lng: lng, image_url: item.image_url,
+                recommendations: [MapRecStub(
+                    id: rec.id, rating: rec.rating, user_id: rec.user_id,
+                    trip_id: nil, profiles: nil
+                )]
+            )
+        }
+    }
+
     private var existingTopics: [String] {
         Array(Set(allMyLists.compactMap {
             $0.topic?.trimmingCharacters(in: .whitespaces)
@@ -148,7 +176,11 @@ struct CollectionDetailView: View {
                 if !rows.isEmpty {
                     HStack(spacing: RexSpacing.sm) {
                         if !isArranging {
-                            ItineraryViewToggle(compact: $compact)
+                            ItineraryViewToggle(
+                                compact: $compact,
+                                showsMap: !mappablePlaces.isEmpty,
+                                mapped: $mapped
+                            )
                         }
                         Spacer(minLength: 0)
                         if route.isMine {
@@ -198,7 +230,11 @@ struct CollectionDetailView: View {
                     .foregroundStyle(RexColor.destructive)
                 }
 
-                if isLoading {
+                if mapped, !mappablePlaces.isEmpty, !isArranging {
+                    // Same section a list uses, handed the pins rather than
+                    // an id to go and fetch them with.
+                    ListMapSection(suppliedPlaces: mappablePlaces, listName: name)
+                } else if isLoading {
                     ForEach(0..<3, id: \.self) { _ in
                         RoundedRectangle(cornerRadius: RexRadius.card)
                             .fill(RexColor.muted)

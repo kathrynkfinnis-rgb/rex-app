@@ -13,7 +13,14 @@ import CoreLocation
 /// use a still image on their *card*, in a scrolling feed, where a dozen live
 /// maps at once would be the wrong trade; this is one map on one page.
 struct ListMapSection: View {
-    let listRecommendationId: String
+    /// Fetch mode: the list's own recommendation id.
+    var listRecommendationId: String? = nil
+    /// Oct 18 — supplied mode, for "please can we add the view on map toggle
+    /// like we have in lists?" on collections. A collection is not a
+    /// recommendation, so there is nothing to fetch by — but its rows are
+    /// already in memory by the time anyone asks for the map, so it hands
+    /// them over rather than asking the server for what it has.
+    var suppliedPlaces: [MapPlace]? = nil
     var listName: String?
     var height: CGFloat = 420
 
@@ -137,6 +144,12 @@ struct ListMapSection: View {
     private func load() async {
         isLoading = true
         defer { isLoading = false }
+        if let suppliedPlaces {
+            places = suppliedPlaces
+            fitNonce += 1
+            return
+        }
+        guard let listRecommendationId else { return }
         do {
             places = try await RexAPI.shared.fetchMapPlaces(
                 forList: listRecommendationId, listName: listName
