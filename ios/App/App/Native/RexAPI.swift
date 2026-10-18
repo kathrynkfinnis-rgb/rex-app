@@ -2459,6 +2459,126 @@ final class RexAPI {
     }
 
     /// The REX account's id, or nil if it hasn't been set up on this project.
+    /// Oct 18 — "is there a way that you can suggest stuff and we can choose
+    /// to post or not?"
+    ///
+    /// There already was: a REX post with no published_at is a suggestion,
+    /// and has been since 18 September. It was simply drained by a timer
+    /// every fifteen minutes with nobody looking first. This is what the
+    /// looking reads.
+    ///
+    /// Straight from the base table rather than the display view: the view is
+    /// built for what people see, and the whole point here is the rows they
+    /// cannot. The admin policy from 18 September allows it.
+    func fetchOfficialQueue() async -> [FeedRecommendation] {
+        guard let token = try? await validToken(),
+              let official = await officialAccountId()
+        else { return [] }
+        let select = "id,scheduled_at,rating,note,created_at,photo_url,photo_urls,tags,user_id,item_id,trip_id," +
+            "items!inner(id,type,title,subtitle,image_url,genre,address,link_url,recipe_text,lat,lng)," +
+            "profiles!recommendations_user_id_fkey(username,display_name,avatar_url)"
+        var components = URLComponents(url: baseURL.appendingPathComponent("/rest/v1/recommendations"), resolvingAgainstBaseURL: false)!
+        components.queryItems = [
+            URLQueryItem(name: "select", value: select),
+            URLQueryItem(name: "user_id", value: "eq.\(official)"),
+            URLQueryItem(name: "published_at", value: "is.null"),
+            // Soonest first, and anything without a time after it.
+            URLQueryItem(name: "order", value: "scheduled_at.asc.nullslast,created_at.desc"),
+            URLQueryItem(name: "limit", value: "100"),
+        ]
+        guard let url = components.url else { return [] }
+        var request = URLRequest(url: url)
+        request.setValue(anonKey, forHTTPHeaderField: "apikey")
+        request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+        guard let (data, response) = try? await URLSession.shared.data(for: request),
+              let http = response as? HTTPURLResponse, http.statusCode < 400
+        else { return [] }
+        return (try? JSONDecoder().decode([FeedRecommendation].self, from: data)) ?? []
+    }
+
+    /// Posts a queued suggestion now. Clears the schedule as well, so a row
+    /// published by hand is not left looking like it is still waiting.
+    func publishQueuedPost(id: String) async throws {
+        let token = try await validToken()
+        var components = URLComponents(url: baseURL.appendingPathComponent("/rest/v1/recommendations"), resolvingAgainstBaseURL: false)!
+        components.queryItems = [URLQueryItem(name: "id", value: "eq.\(id)")]
+        var request = URLRequest(url: components.url!)
+        request.httpMethod = "PATCH"
+        request.setValue(anonKey, forHTTPHeaderField: "apikey")
+        request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        request.httpBody = try JSONSerialization.data(withJSONObject: [
+            "published_at": ISO8601DateFormatter().string(from: Date()),
+            "scheduled_at": NSNull(),
+        ])
+        let (data, response) = try await URLSession.shared.data(for: request)
+        guard let http = response as? HTTPURLResponse, http.statusCode < 400 else {
+            throw RexAPIError.server(friendlyError(data, fallback: "Couldn't post that."))
+        }
+    }
+
+    /// Oct 18 — "is that where I'd see the feedback too?"
+    ///
+    /// The ! button has written to public.feedback since 30 July and nothing
+    /// ever read it back, in the app or anywhere else. The policy from that
+    /// day already lets an admin select every row, so this needs nothing
+    /// server-side.
+    ///
+    /// Names come from a second request: feedback.user_id references
+    /// auth.users, not public.profiles, so there is no foreign key for
+    /// PostgREST to follow and asking for an embed is a 400 — which would
+    /// have shown an empty list reading as "nobody has sent anything".
+    func fetchAppFeedback() async -> [RexFeedbackEntry] {
+        guard let token = try? await validToken() else { return [] }
+        struct Row: Codable {
+            let id: String
+            let message: String?
+            let page: String?
+            let is_anonymous: Bool?
+            let user_id: String?
+            let created_at: String?
+        }
+        var components = URLComponents(url: baseURL.appendingPathComponent("/rest/v1/feedback"), resolvingAgainstBaseURL: false)!
+        components.queryItems = [
+            URLQueryItem(name: "select", value: "id,message,page,is_anonymous,user_id,created_at"),
+            URLQueryItem(name: "order", value: "created_at.desc"),
+            URLQueryItem(name: "limit", value: "200"),
+        ]
+        guard let url = components.url else { return [] }
+        var request = URLRequest(url: url)
+        request.setValue(anonKey, forHTTPHeaderField: "apikey")
+        request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+        guard let (data, response) = try? await URLSession.shared.data(for: request),
+              let http = response as? HTTPURLResponse, http.statusCode < 400,
+              let rows = try? JSONDecoder().decode([Row].self, from: data)
+        else { return [] }
+
+        let ids = Array(Set(rows.filter { $0.is_anonymous != true }.compactMap { $0.user_id }))
+        let people = (try? await fetchProfiles(ids: ids)) ?? []
+        let byId = Dictionary(uniqueKeysWithValues: people.map { ($0.id, $0) })
+
+        let formatter = DateFormatter()
+        formatter.dateFormat = "d MMM, HH:mm"
+        return rows.map { row in
+            let who = row.is_anonymous == true
+                ? "anonymous"
+                : (byId[row.user_id ?? ""].map { $0.display_name ?? $0.username } ?? "someone")
+            let when = row.created_at.flatMap { ISO8601DateFormatter.rexDate(from: $0) }
+                .map { formatter.string(from: $0) } ?? ""
+            let where_ = (row.page?.isEmpty == false) ? " \u{00B7} \(row.page!)" : ""
+            let message = row.message ?? ""
+            return RexFeedbackEntry(
+                id: row.id,
+                message: message,
+                meta: "\(when) \u{00B7} \(who)\(where_)",
+                // The app logs failed push registrations through the same
+                // table. Useful, but not something a person wrote.
+                isDiagnostic: row.page == "push-registration"
+                    || message.hasPrefix("[push diagnostic")
+            )
+        }
+    }
+
     func officialAccountId() async -> String? {
         if let cachedOfficialId { return cachedOfficialId }
         guard let token = try? await validToken() else { return nil }

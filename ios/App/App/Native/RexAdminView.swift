@@ -1,0 +1,251 @@
+import SwiftUI
+
+struct RexAdminRoute: Hashable {}
+
+/// Oct 18 — "Rex is uploading recipes with no content — please stop uploading
+/// anything at the moment, but is there a way that you can suggest stuff and
+/// we can choose to post or not?" And then: "is that where I'd see the
+/// feedback too?"
+///
+/// Both, in one place, on the phone.
+///
+/// The queue needed no new machinery. A post by the REX account with no
+/// `published_at` is already exactly a suggestion — that state has existed
+/// since 18 September, it was simply drained by a timer every fifteen minutes
+/// with nobody looking at it first. This is the looking.
+///
+/// The feedback half answers the other question. The ! button in the app has
+/// written to `public.feedback` since 30 July and nothing ever read it back,
+/// so months of it sat unseen. The website admin page reads it now too; this
+/// is the same thing where you already are.
+struct RexAdminView: View {
+    @State private var queue: [FeedRecommendation] = []
+    @State private var feedback: [RexFeedbackEntry] = []
+    @State private var isLoading = true
+    @State private var errorMessage: String?
+    @State private var busyId: String?
+    @State private var confirmingDiscard: FeedRecommendation?
+
+    var body: some View {
+        ScrollView {
+            VStack(alignment: .leading, spacing: RexSpacing.lg) {
+                if let errorMessage {
+                    Text(errorMessage)
+                        .font(RexFont.text(13))
+                        .foregroundStyle(RexColor.destructive)
+                        .padding(.horizontal, RexSpacing.page)
+                }
+
+                queueSection
+                feedbackSection
+            }
+            .padding(.vertical, RexSpacing.lg)
+        }
+        .background(RexColor.background.ignoresSafeArea())
+        .navigationTitle("REX admin")
+        .navigationBarTitleDisplayMode(.inline)
+        .refreshable { await load() }
+        .task { await load() }
+        .alert(
+            "Discard this?",
+            isPresented: Binding(
+                get: { confirmingDiscard != nil },
+                set: { if !$0 { confirmingDiscard = nil } }
+            )
+        ) {
+            Button("Cancel", role: .cancel) { confirmingDiscard = nil }
+            Button("Discard", role: .destructive) {
+                if let rec = confirmingDiscard { Task { await discard(rec) } }
+            }
+        } message: {
+            Text("It won't be posted, and it won't come back.")
+        }
+    }
+
+    // MARK: - Waiting to post
+
+    @ViewBuilder
+    private var queueSection: some View {
+        VStack(alignment: .leading, spacing: RexSpacing.sm) {
+            header("Waiting to post", count: queue.count)
+
+            if isLoading && queue.isEmpty {
+                ProgressView().padding(.horizontal, RexSpacing.page)
+            } else if queue.isEmpty {
+                empty("Nothing queued. Anything REX writes lands here first, and goes out only when you say so.")
+            } else {
+                ForEach(queue) { rec in
+                    VStack(alignment: .leading, spacing: RexSpacing.sm) {
+                        // The card as it will actually appear, which is the
+                        // whole point of reviewing on the phone rather than
+                        // reading a row in a table.
+                        RecommendationCardView(rec: rec)
+
+                        if let scheduled = rec.scheduled_at, !scheduled.isEmpty {
+                            Label(scheduledLine(scheduled), systemImage: "clock")
+                                .font(RexFont.text(12))
+                                .foregroundStyle(RexColor.mutedForeground)
+                        }
+
+                        HStack(spacing: RexSpacing.sm) {
+                            Button {
+                                Task { await publish(rec) }
+                            } label: {
+                                if busyId == rec.id {
+                                    ProgressView().tint(RexColor.primaryForeground)
+                                        .frame(maxWidth: .infinity)
+                                } else {
+                                    Text("Post it").fontWeight(.semibold)
+                                        .frame(maxWidth: .infinity)
+                                }
+                            }
+                            .frame(height: 42)
+                            .background(RexColor.primary)
+                            .foregroundStyle(RexColor.primaryForeground)
+                            .clipShape(Capsule())
+                            .disabled(busyId != nil)
+
+                            Button(role: .destructive) {
+                                confirmingDiscard = rec
+                            } label: {
+                                Text("Discard").fontWeight(.semibold)
+                                    .frame(maxWidth: .infinity)
+                            }
+                            .frame(height: 42)
+                            .foregroundStyle(RexColor.destructive)
+                            .overlay(Capsule().stroke(RexColor.border, lineWidth: 1))
+                            .disabled(busyId != nil)
+                        }
+                        .buttonStyle(.plain)
+                    }
+                    .padding(.horizontal, RexSpacing.page)
+                }
+            }
+        }
+    }
+
+    /// "Scheduled for 21 Oct, 09:00", or nothing if the stamp won't parse.
+    private func scheduledLine(_ raw: String) -> String {
+        guard let date = ISO8601DateFormatter.rexDate(from: raw) else { return "Scheduled" }
+        return "Scheduled for " + date.formatted(.dateTime.day().month().hour().minute())
+    }
+
+    // MARK: - Feedback
+
+    @ViewBuilder
+    private var feedbackSection: some View {
+        VStack(alignment: .leading, spacing: RexSpacing.sm) {
+            header("From the app's feedback button", count: written.count)
+
+            if written.isEmpty {
+                empty("Nothing sent yet. This is the ! button in the app \u{2014} TestFlight reports live in App Store Connect.")
+            } else {
+                VStack(spacing: 0) {
+                    ForEach(written) { entry in
+                        VStack(alignment: .leading, spacing: 3) {
+                            Text(entry.meta)
+                                .font(RexFont.text(11.5))
+                                .foregroundStyle(RexColor.mutedForeground)
+                            Text(entry.message)
+                                .font(RexFont.text(14))
+                                .foregroundStyle(RexColor.foreground)
+                                .fixedSize(horizontal: false, vertical: true)
+                        }
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .padding(.horizontal, RexSpacing.page)
+                        .padding(.vertical, RexSpacing.md)
+                        Divider().overlay(RexColor.divider)
+                            .padding(.leading, RexSpacing.page)
+                    }
+                }
+            }
+
+            if !diagnostics.isEmpty {
+                Text("\(diagnostics.count) push diagnostic\(diagnostics.count == 1 ? "" : "s") hidden \u{2014} the app logs those here too.")
+                    .font(RexFont.text(12))
+                    .foregroundStyle(RexColor.mutedForeground)
+                    .padding(.horizontal, RexSpacing.page)
+                    .padding(.top, RexSpacing.xs)
+            }
+        }
+    }
+
+    /// What a person actually wrote.
+    private var written: [RexFeedbackEntry] { feedback.filter { !$0.isDiagnostic } }
+    private var diagnostics: [RexFeedbackEntry] { feedback.filter(\.isDiagnostic) }
+
+    // MARK: - Chrome
+
+    private func header(_ title: String, count: Int) -> some View {
+        HStack(spacing: RexSpacing.sm) {
+            Text(title)
+                .font(RexFont.display(19, weight: .semibold))
+                .foregroundStyle(RexColor.foreground)
+            if count > 0 {
+                Text("\(count)")
+                    .font(RexFont.text(12, weight: .semibold))
+                    .foregroundStyle(RexColor.badgeForeground)
+                    .padding(.horizontal, RexSpacing.sm)
+                    .padding(.vertical, 3)
+                    .background(RexColor.badgeBackground)
+                    .clipShape(Capsule())
+            }
+            Spacer(minLength: 0)
+        }
+        .padding(.horizontal, RexSpacing.page)
+    }
+
+    private func empty(_ text: String) -> some View {
+        Text(text)
+            .font(RexFont.text(13))
+            .foregroundStyle(RexColor.mutedForeground)
+            .fixedSize(horizontal: false, vertical: true)
+            .padding(.horizontal, RexSpacing.page)
+    }
+
+    // MARK: - Work
+
+    private func load() async {
+        errorMessage = nil
+        async let queued = RexAPI.shared.fetchOfficialQueue()
+        async let sent = RexAPI.shared.fetchAppFeedback()
+        queue = await queued
+        feedback = await sent
+        isLoading = false
+    }
+
+    private func publish(_ rec: FeedRecommendation) async {
+        busyId = rec.id
+        defer { busyId = nil }
+        do {
+            try await RexAPI.shared.publishQueuedPost(id: rec.id)
+            queue.removeAll { $0.id == rec.id }
+        } catch {
+            errorMessage = error.localizedDescription
+        }
+    }
+
+    private func discard(_ rec: FeedRecommendation) async {
+        confirmingDiscard = nil
+        busyId = rec.id
+        defer { busyId = nil }
+        do {
+            try await RexAPI.shared.deleteRecommendation(id: rec.id)
+            queue.removeAll { $0.id == rec.id }
+        } catch {
+            errorMessage = error.localizedDescription
+        }
+    }
+}
+
+/// One line someone sent through the app's feedback button.
+struct RexFeedbackEntry: Identifiable {
+    let id: String
+    let message: String
+    let meta: String
+    /// Oct 18 — the table carries automated push-registration diagnostics as
+    /// well as what people type, and there are far more of the former. Mixed
+    /// together they bury the thing worth reading: the first screen of this
+    /// list was eight push failures and one real sentence.
+    let isDiagnostic: Bool
+}

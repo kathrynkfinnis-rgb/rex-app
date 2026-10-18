@@ -465,6 +465,10 @@ struct RexCreator: Codable {
 
 struct FeedRecommendation: Codable, Identifiable {
     let id: String
+    /// Oct 18 — when a queued REX post is meant to go out, so the admin
+    /// screen can say. Null on every ordinary row and absent from most
+    /// selects, hence the default.
+    var scheduled_at: String? = nil
     let rating: Double
     let note: String?
     let created_at: String

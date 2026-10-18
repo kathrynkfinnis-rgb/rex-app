@@ -16,6 +16,10 @@ struct SettingsView: View {
 
     @Environment(\.dismiss) private var dismiss
     @State private var confirmingLogOut = false
+    /// Oct 18 — the way into the REX admin screen. Settings rather than a
+    /// fourth toolbar icon on the profile: three is already a row, and this
+    /// is something two people ever tap.
+    @State private var isAdmin = false
 
     var body: some View {
         List {
@@ -32,6 +36,14 @@ struct SettingsView: View {
                     row("bell", "Notifications", "What you're told about, and push")
                 }
             }
+            if isAdmin {
+                Section("REX") {
+                    NavigationLink(value: RexAdminRoute()) {
+                        row("tray.full", "Waiting to post", "Review what REX wants to say, and the feedback people send")
+                    }
+                }
+            }
+
             Section("Privacy") {
                 NavigationLink(value: PrivacyRoute()) {
                     row("hand.raised", "Your data & privacy", "Download your data, delete your account, our policies")
@@ -68,6 +80,7 @@ struct SettingsView: View {
         .navigationTitle("Settings")
         .navigationBarTitleDisplayMode(.inline)
         .tint(RexColor.primary)
+        .task { isAdmin = await RexAPI.shared.isAdmin() }
         .alert("Log out of Rex?", isPresented: $confirmingLogOut) {
             Button("Cancel", role: .cancel) {}
             Button("Log out", role: .destructive) { onSignedOut?() }

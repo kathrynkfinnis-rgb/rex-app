@@ -251,6 +251,7 @@ struct ProfileView: View {
         .navigationDestination(for: DraftsRoute.self) { _ in DraftsView() }
         .navigationDestination(for: NotificationPreferencesRoute.self) { _ in NotificationPreferencesView() }
         .navigationDestination(for: PrivacyRoute.self) { _ in PrivacyDataView(onSignedOut: { onSignedOut?() }) }
+        .navigationDestination(for: RexAdminRoute.self) { _ in RexAdminView() }
         .navigationDestination(for: SettingsRoute.self) { _ in
             SettingsView(
                 onEditProfile: { activeSheet = .editProfile },

@@ -122,6 +122,7 @@
 		FEED020B0000000000000000 /* LikesCommentsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = FEED020A0000000000000000 /* LikesCommentsView.swift */; };
 		FEED019B0000000000000000 /* RexSearch.swift in Sources */ = {isa = PBXBuildFile; fileRef = FEED019A0000000000000000 /* RexSearch.swift */; };
 		FEED018B0000000000000000 /* AppleMapView.swift in Sources */ = {isa = PBXBuildFile; fileRef = FEED018A0000000000000000 /* AppleMapView.swift */; };
+		FEED19210000000000000000 /* RexAdminView.swift in Sources */ = {isa = PBXBuildFile; fileRef = FEED19200000000000000000 /* RexAdminView.swift */; };
 		FEED19110000000000000000 /* CollectionTopicsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = FEED19100000000000000000 /* CollectionTopicsView.swift */; };
 		FEED19010000000000000000 /* MapAreaPickerView.swift in Sources */ = {isa = PBXBuildFile; fileRef = FEED19000000000000000000 /* MapAreaPickerView.swift */; };
 		FEED017B0000000000000000 /* UserAvatarView.swift in Sources */ = {isa = PBXBuildFile; fileRef = FEED017A0000000000000000 /* UserAvatarView.swift */; };
@@ -247,6 +248,7 @@
 		FEED020A0000000000000000 /* LikesCommentsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LikesCommentsView.swift; sourceTree = "<group>"; };
 		FEED019A0000000000000000 /* RexSearch.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RexSearch.swift; sourceTree = "<group>"; };
 		FEED018A0000000000000000 /* AppleMapView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppleMapView.swift; sourceTree = "<group>"; };
+		FEED19200000000000000000 /* RexAdminView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RexAdminView.swift; sourceTree = "<group>"; };
 		FEED19100000000000000000 /* CollectionTopicsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CollectionTopicsView.swift; sourceTree = "<group>"; };
 		FEED19000000000000000000 /* MapAreaPickerView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MapAreaPickerView.swift; sourceTree = "<group>"; };
 		FEED017A0000000000000000 /* UserAvatarView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UserAvatarView.swift; sourceTree = "<group>"; };
@@ -408,6 +410,7 @@
 				FEED020A0000000000000000 /* LikesCommentsView.swift */,
 				FEED019A0000000000000000 /* RexSearch.swift */,
 				FEED018A0000000000000000 /* AppleMapView.swift */,
+				FEED19200000000000000000 /* RexAdminView.swift */,
 				FEED19100000000000000000 /* CollectionTopicsView.swift */,
 				FEED19000000000000000000 /* MapAreaPickerView.swift */,
 				FEED017A0000000000000000 /* UserAvatarView.swift */,
@@ -607,6 +610,7 @@
 				FEED020B0000000000000000 /* LikesCommentsView.swift in Sources */,
 				FEED019B0000000000000000 /* RexSearch.swift in Sources */,
 				FEED018B0000000000000000 /* AppleMapView.swift in Sources */,
+				FEED19210000000000000000 /* RexAdminView.swift in Sources */,
 				FEED19110000000000000000 /* CollectionTopicsView.swift in Sources */,
 				FEED19010000000000000000 /* MapAreaPickerView.swift in Sources */,
 				FEED017B0000000000000000 /* UserAvatarView.swift in Sources */,
