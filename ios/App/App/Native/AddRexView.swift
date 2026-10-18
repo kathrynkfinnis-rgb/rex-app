@@ -314,6 +314,41 @@ struct AddRexView: View {
     /// the notification trigger — rewriting them on every save would tell
     /// Danny he had been tagged again each time the trip was touched.
     @State private var originalTaggedFriendIds: Set<String> = []
+
+    /// Oct 18 — "when you click close on a trip after clicking edit and
+    /// haven't made any edits it shouldn't give you the option to save as
+    /// draft or discard."
+    ///
+    /// hasUnsavedWork only ever asked "is there anything in this form", which
+    /// is true the moment an editor opens, because an editor opens full. So
+    /// opening a trip and closing it again always asked whether to keep it.
+    /// Captured at init and compared on close, so the question is asked about
+    /// changes rather than about content.
+    private struct EditSnapshot: Equatable {
+        var title = ""
+        var note = ""
+        var listNotes = ""
+        var rating: Double = 0
+        var photoURLs: [String] = []
+        var subcategories: Set<String> = []
+        var dateText: String?
+        var listKind = ""
+        var tripEntries: [ItineraryEntry] = []
+        var listEntries: [ItineraryEntry] = []
+        var tagged: Set<String> = []
+    }
+
+    @State private var originalEdit: EditSnapshot?
+
+    private var currentEdit: EditSnapshot {
+        EditSnapshot(
+            title: title, note: note, listNotes: listNotes, rating: rating,
+            photoURLs: photoURLs, subcategories: subcategories,
+            dateText: tripDateText, listKind: listKind,
+            tripEntries: tripEntries, listEntries: listEntries,
+            tagged: taggedFriendIds
+        )
+    }
     @State private var subcategories: Set<String> = []
     /// Oct 4 — keeping the note box above the keyboard as it grows.
     @FocusState private var noteFocused: Bool
@@ -601,6 +636,15 @@ struct AddRexView: View {
         // losing, so its button set a flag that nothing was listening to.
         // Routing every sheet through a single enum-driven presentation is
         // the documented way to have more than one.
+        .onAppear {
+            // Oct 18 — what the editor opened with, so closing it can tell a
+            // change from a form that was simply already full. Only when
+            // editing; a fresh post keeps the old "is there anything here"
+            // test, which is the right question for it.
+            if originalEdit == nil, editingTripRecId != nil || editingListRecId != nil {
+                originalEdit = currentEdit
+            }
+        }
         .onChange(of: tripEntries) { _, _ in persistDraft() }
         .onChange(of: listEntries) { _, _ in persistDraft() }
         .onChange(of: title) { _, _ in persistDraft() }
@@ -1979,6 +2023,9 @@ struct AddRexView: View {
     /// its own doesn't count — that's one tap to redo.
     private var hasUnsavedWork: Bool {
         guard !didPost, !isSaving else { return false }
+        // Editing: the form is full by definition, so the only thing worth
+        // asking about is whether any of it moved.
+        if let originalEdit { return currentEdit != originalEdit }
         return !title.trimmingCharacters(in: .whitespaces).isEmpty
             || !note.trimmingCharacters(in: .whitespaces).isEmpty
             || !listNotes.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
