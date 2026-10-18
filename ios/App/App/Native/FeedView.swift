@@ -375,9 +375,41 @@ struct FeedView: View {
             }
         }
         let itemsWithARealRex = Set(primaryIdByItem.keys)
+
+        // Oct 18 — "these are the same thing, the cards should be combined."
+        //
+        // Searching "Elsinor" returned Elsinore twice: Kathryn wanting to try
+        // it and Phoebe wanting to try it, back to back, identical but for
+        // the name at the bottom. Wants only folded away when a *real* Rex of
+        // the item existed, so two wants and no Rex left both standing — the
+        // one case the rule above never covered.
+        //
+        // Same preference as a Rex: mine if I have one, else the most recent.
+        // Nothing is lost by collapsing, because the card already carries how
+        // many people want it (see the wanted-by badge).
+        var primaryWantByItem: [String: String] = [:]
+        for rec in rows where rec.isWant && !itemsWithARealRex.contains(rec.item_id) {
+            guard let existingId = primaryWantByItem[rec.item_id],
+                  let existing = rows.first(where: { $0.id == existingId })
+            else {
+                primaryWantByItem[rec.item_id] = rec.id
+                continue
+            }
+            let recIsMine = rec.user_id == myId
+            let existingIsMine = existing.user_id == myId
+            if recIsMine && !existingIsMine {
+                primaryWantByItem[rec.item_id] = rec.id
+            } else if recIsMine == existingIsMine, rec.created_at > existing.created_at {
+                primaryWantByItem[rec.item_id] = rec.id
+            }
+        }
+
         return rows.filter { rec in
             if rec.isBlast { return true }
-            if rec.isWant { return !itemsWithARealRex.contains(rec.item_id) }
+            if rec.isWant {
+                guard !itemsWithARealRex.contains(rec.item_id) else { return false }
+                return primaryWantByItem[rec.item_id] == rec.id
+            }
             return primaryIdByItem[rec.item_id] == rec.id
         }
     }
