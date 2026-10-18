@@ -107,3 +107,20 @@ blockquote {
    amount of copy does as well. Full-bleed within the column. */
 .shot { margin: 2.6rem 0 0; }
 .shot img { display: block; width: 100%; height: auto; border-radius: 16px; }
+
+/* Oct 18 — the in-app feedback list on the admin page. Nothing had ever
+   read that table back, so it had no styling either. */
+.fb-list { display: flex; flex-direction: column; gap: .75rem; }
+.fb {
+  border: 1px solid var(--border, #e4e4e0);
+  border-radius: 10px;
+  padding: .75rem .9rem;
+  background: #fff;
+}
+.fb-meta {
+  margin: 0 0 .3rem;
+  font-size: .78rem;
+  letter-spacing: .01em;
+  color: #767a70;
+}
+.fb-body { margin: 0; font-size: .95rem; line-height: 1.45; white-space: pre-wrap; }

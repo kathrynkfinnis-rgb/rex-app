@@ -414,22 +414,14 @@ struct FeedView: View {
         }
     }
 
-    /// #171 — a Rex you're tagged on ("went here with Phoebe") is worth
-    /// surfacing even if strict chronological (or most-liked) order would
-    /// bury it a few posts back. Bounded to a few days so an old tag
-    /// doesn't permanently outrank new content once it's had its moment —
-    /// this is a boost, not a pin.
+    /// The window a pinned blast and `isRecent` both work in. Named for the
+    /// tagged-me boost it was introduced for on #171; that boost was removed
+    /// on 18 October (see the ordering above) but the window it defined is
+    /// still what "recent" means here.
     private var taggedBoostThreshold: Date {
         Calendar.current.date(byAdding: .day, value: -3, to: Date()) ?? .distantPast
     }
 
-    private func isRecentlyTaggedMe(_ rec: FeedRecommendation) -> Bool {
-        guard let myId = RexAPI.shared.currentUserId,
-              rec.taggedFriends.contains(where: { $0.id == myId }),
-              let created = rec.createdDate
-        else { return false }
-        return created > taggedBoostThreshold
-    }
 
     /// Newest-first is already how loadFeed merges everything, so only
     /// "Most liked" needs an actual re-sort here.
@@ -458,19 +450,29 @@ struct FeedView: View {
         // it's scrolled past. Same bounded-boost shape as the tagged-me one
         // above rather than a permanent pin — after a few days it drops
         // back into chronological order with everything else.
+        // Oct 18 — "why are these two posts pinned to the top of the feed? I
+        // guess cos I'm tagged in them, but they shouldn't be. I should just
+        // get a notification."
+        //
+        // The tagged-me boost (#171) is gone. The reasoning for it was that a
+        // Rex you are tagged on is worth surfacing even if chronology would
+        // bury it — but being tagged already sends a notification, and that
+        // is the right place for "this is about you". Reordering someone's
+        // feed on top of it says the same thing twice, and louder, in the one
+        // place they expect to be chronological.
+        //
+        // Blasts keep theirs: a question nobody has answered yet goes stale
+        // in a way a Rex does not, and the person who asked is waiting.
         var blasts: [FeedRecommendation] = []
-        var tagged: [FeedRecommendation] = []
         var rest: [FeedRecommendation] = []
         for rec in deduped {
             if rec.isBlast, isPinnedBlast(rec) {
                 blasts.append(rec)
-            } else if isRecentlyTaggedMe(rec) {
-                tagged.append(rec)
             } else {
                 rest.append(rec)
             }
         }
-        return blasts + tagged + rest
+        return blasts + rest
     }
 
     /// Within the same few days the tagged-me boost uses.

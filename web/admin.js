@@ -47,6 +47,38 @@ async function rpc(name, token) {
   return data;
 }
 
+/// Oct 18 — "where is this feedback going?", asked through TestFlight, and
+/// then "i haven't seen this feedback so where actually is it going?"
+///
+/// The in-app ! button has written to public.feedback since 30 July and
+/// nothing has ever read it back: not this page, not the app. Months of it
+/// has been sitting there unseen, which is exactly what the question was
+/// about.
+///
+/// Read straight from the table rather than through an RPC like the KPIs:
+/// the policy from 30 July already says an admin can select every row, so
+/// there is nothing to add server-side and no migration to run.
+async function table(path, token) {
+  const response = await fetch(`${SUPABASE_URL}/rest/v1/${path}`, {
+    headers: { apikey: ANON_KEY, Authorization: `Bearer ${token}` },
+  });
+  if (response.status === 401) throw new Error("expired");
+  if (!response.ok) return [];
+  return response.json();
+}
+
+function feedbackRow(row) {
+  const when = row.created_at
+    ? new Date(row.created_at).toLocaleString("en-GB", { dateStyle: "medium", timeStyle: "short" })
+    : "";
+  const who = row.is_anonymous ? "anonymous" : (row.who?.display_name || row.who?.username || "someone");
+  const where = row.page ? ` · ${esc(row.page)}` : "";
+  return `<div class="fb">
+    <p class="fb-meta">${esc(when)} · ${esc(who)}${where}</p>
+    <p class="fb-body">${esc(row.message || "")}</p>
+  </div>`;
+}
+
 function kpi(label, value, { sub, accent } = {}) {
   return `<div class="kpi${accent ? " accent" : ""}">
     <div class="v">${esc(value)}</div>
@@ -90,7 +122,7 @@ function renderSignIn(message) {
   });
 }
 
-function render(users, content, engagement, email) {
+function render(users, content, engagement, email, feedback) {
   const ratio = (a, b) => (!b ? "—" : (a / b).toFixed(2));
   root.innerHTML = `
     <p class="who">Signed in as ${esc(email)} · <button id="out">sign out</button></p>
@@ -156,6 +188,11 @@ function render(users, content, engagement, email) {
       <div class="pair"><span>Document imports</span><span class="n">${num(engagement.imports_total)}</span></div>
     </div>
 
+    <h2>Feedback from inside the app</h2>
+    ${feedback.length
+      ? `<div class="fb-list">${feedback.map(feedbackRow).join("")}</div>`
+      : `<p class="muted">Nothing yet. This is the ! button in the app header, not TestFlight \u2014 those live in App Store Connect.</p>`}
+
     <p class="muted" style="margin-top:2rem;font-size:.85rem">
       DAU, WAU and MAU mean “posted a Rex”, not “opened the app” — nobody posts daily, so read them as
       contribution rather than engagement. Refreshes when you reload.
@@ -171,12 +208,30 @@ async function load() {
   if (!current) return renderSignIn();
   root.innerHTML = `<p class="muted">Loading…</p>`;
   try {
-    const [users, content, engagement] = await Promise.all([
+    const [users, content, engagement, feedback] = await Promise.all([
       rpc("admin_kpis_users", current.token),
       rpc("admin_kpis_content", current.token),
       rpc("admin_kpis_engagement", current.token),
+      // Newest first, and a generous limit because nobody has ever read it.
+      // No profiles embed: feedback.user_id references auth.users, not
+      // public.profiles, so there is no foreign key for PostgREST to follow
+      // and asking for one is a 400 — which would have shown an empty list
+      // and read as "nobody has sent anything".
+      table(
+        "feedback?select=created_at,message,page,is_anonymous,user_id" +
+        "&order=created_at.desc&limit=200",
+        current.token
+      ),
     ]);
-    render(users, content, engagement, current.email);
+    // Names in a second pass. profiles.id is the same uuid as auth.users.id,
+    // so the ids line up even though no foreign key joins them.
+    const ids = [...new Set(feedback.filter((f) => !f.is_anonymous && f.user_id).map((f) => f.user_id))];
+    const people = ids.length
+      ? await table(`profiles?select=id,username,display_name&id=in.(${ids.join(",")})`, current.token)
+      : [];
+    const byId = Object.fromEntries(people.map((p) => [p.id, p]));
+    for (const row of feedback) row.who = byId[row.user_id];
+    render(users, content, engagement, current.email, feedback);
   } catch (error) {
     session(null);
     if (error.message === "forbidden") {
