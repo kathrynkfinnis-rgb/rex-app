@@ -9,6 +9,8 @@ struct RecommendationCardView: View {
     /// Oct 7 — everyone who wants to try this, oldest first. Only drawn on a
     /// want card, where "how many other people fancy this" is the whole point.
     var wanters: [RexProfileDetail] = []
+    @State private var chipsContentWidth: CGFloat = 0
+    @State private var chipsRowWidth: CGFloat = 0
     /// Opening the author's profile. The card is one tap target now (so it can
     /// swipe), so the author row can't be its own NavigationLink — the parent
     /// swallowed it. The feed hands the push back in through here.
@@ -426,10 +428,26 @@ struct RecommendationCardView: View {
             // overflow has somewhere to go, and a second row of chips would
             // make every card taller to fix a few.
             .padding(.trailing, titleTrailingReserve)
+            .background(GeometryReader { geo in
+                Color.clear.preference(key: ChipsContentWidthKey.self, value: geo.size.width)
+            })
         }
+        .background(GeometryReader { geo in
+            Color.clear.preference(key: ChipsRowWidthKey.self, value: geo.size.width)
+        })
+        .onPreferenceChange(ChipsContentWidthKey.self) { chipsContentWidth = $0 }
+        .onPreferenceChange(ChipsRowWidthKey.self) { chipsRowWidth = $0 }
         // The chips are a label, not a control — a drag on them should still
-        // swipe the card away.
-        .scrollDisabled(splitGenres(item.genre).count <= 2)
+        // swipe the card away, so scrolling stays off unless there is
+        // genuinely something out of sight.
+        //
+        // Oct 18 — "I should be able to scroll across these buttons." This
+        // used to be `genres.count <= 2`, on the assumption that two chips
+        // always fit. "Mediterranean restaurant" is one chip and most of a
+        // row: the screenshot shows PLACE, that, and a third cut off at the
+        // edge with no way to reach it. Count was never the question —
+        // width is — so it is measured now.
+        .scrollDisabled(chipsContentWidth <= chipsRowWidth + 1)
     }
 
     private func hasMedia(item: RexItem) -> Bool {
@@ -779,6 +797,22 @@ struct RecommendationCardView: View {
 /// The note's natural height, and the height it was given. Two keys rather
 /// than one because they are measured in different places and SwiftUI would
 /// otherwise reduce them together.
+/// Oct 18 — the chip row's natural width against the width it was given, so
+/// it scrolls exactly when something is out of sight and not otherwise.
+private struct ChipsContentWidthKey: PreferenceKey {
+    static var defaultValue: CGFloat = 0
+    static func reduce(value: inout CGFloat, nextValue: () -> CGFloat) {
+        value = max(value, nextValue())
+    }
+}
+
+private struct ChipsRowWidthKey: PreferenceKey {
+    static var defaultValue: CGFloat = 0
+    static func reduce(value: inout CGFloat, nextValue: () -> CGFloat) {
+        value = max(value, nextValue())
+    }
+}
+
 private struct NoteHeightKey: PreferenceKey {
     static var defaultValue: CGFloat = 0
     static func reduce(value: inout CGFloat, nextValue: () -> CGFloat) {

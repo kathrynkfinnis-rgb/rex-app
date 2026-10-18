@@ -20,6 +20,15 @@ struct TripDetailView: View {
     let route: TripRoute
 
     @State private var stops: [FeedRecommendation] = []
+    /// Oct 18 — "when a place is part of a trip the individual stops should
+    /// also show if the place has been Rex'd by someone else."
+    ///
+    /// The card has drawn an "Also Rex'd by" badge for a while, but it needs
+    /// a count passed in and the stops were built without one, so it
+    /// defaulted to zero and the badge never appeared. A stop on somebody's
+    /// trip is exactly where knowing two other friends have been is worth
+    /// something.
+    @State private var rexCounts: [String: Int] = [:]
     /// Oct 18 — "Profiles should be clickable."
     ///
     /// The card hands the author tap back up rather than pushing itself (the
@@ -228,9 +237,13 @@ struct TripDetailView: View {
                                         if compact {
                                             CompactItemRow(rec: stop)
                                         } else {
-                                            RecommendationCardView(rec: stop, onAuthorTap: { id, name in
-                                                authorRoute = UserProfileRoute(userId: id, name: name)
-                                            })
+                                            RecommendationCardView(
+                                                rec: stop,
+                                                rexCount: rexCounts[stop.item_id] ?? 0,
+                                                onAuthorTap: { id, name in
+                                                    authorRoute = UserProfileRoute(userId: id, name: name)
+                                                }
+                                            )
                                         }
                                     }
                                     .buttonStyle(.plain)
@@ -647,6 +660,11 @@ struct TripDetailView: View {
             // Add-a-trip form — see the toolbar.
             self.tripRec = tripRec
             if let title = tripRec?.items?.title { displayTitle = title }
+            // Best-effort: a stop without a count just shows no badge, which
+            // is what every stop did before this.
+            rexCounts = (try? await RexAPI.shared.fetchRexCounts(
+                itemIds: Array(Set(stops.map(\.item_id)))
+            )) ?? [:]
         } catch {
             errorMessage = error.localizedDescription
         }
