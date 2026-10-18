@@ -75,6 +75,12 @@ struct CollectionDetailView: View {
     @State private var mutationError: String?
     @State private var renamingSection: String?
     @State private var sectionDraft = ""
+    /// Oct 18 — "Profiles should be clickable."
+    ///
+    /// The card hands the author tap back up rather than pushing itself (the
+    /// whole card is one target so it can swipe — see onAuthorTap), and only
+    /// the feed was catching it. Everywhere else the name did nothing.
+    @State private var authorRoute: UserProfileRoute?
     /// Oct 14 — "I would also like to be able to add a short note alongside
     /// each item on a list." The row being annotated, and what is being typed.
     @State private var notingRow: SavedPost?
@@ -307,7 +313,9 @@ struct CollectionDetailView: View {
                                 if compact && !isArranging {
                                     CompactItemRow(rec: rec)
                                 } else {
-                                RecommendationCardView(rec: rec)
+                                RecommendationCardView(rec: rec, onAuthorTap: { id, name in
+                                    authorRoute = UserProfileRoute(userId: id, name: name)
+                                })
                                     // Drag a card out to drop it into another
                                     // collection. Dropping copies — a Rex can
                                     // live in several lists.
@@ -382,6 +390,10 @@ struct CollectionDetailView: View {
         }
         .background(RexColor.background.ignoresSafeArea())
         .navigationTitle(name)
+        // Scoped to this screen with navigationDestination(item:) rather
+        // than registering UserProfileRoute on the whole stack, which an
+        // ancestor may already have claimed.
+        .navigationDestination(item: $authorRoute) { UserProfileView(route: $0) }
         .navigationBarTitleDisplayMode(.inline)
         .navigationDestination(item: $pushedItemId) { ItemDetailView(itemId: $0) }
         .sheet(item: $activeSheet) { sheet in

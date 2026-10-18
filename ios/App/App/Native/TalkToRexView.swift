@@ -25,6 +25,12 @@ struct TalkToRexView: View {
     var onOpenItem: (String) -> Void
 
     @State private var question = ""
+    /// Oct 18 — "Profiles should be clickable."
+    ///
+    /// The card hands the author tap back up rather than pushing itself (the
+    /// whole card is one target so it can swipe — see onAuthorTap), and only
+    /// the feed was catching it. Everywhere else the name did nothing.
+    @State private var authorRoute: UserProfileRoute?
     @State private var answers: [AskRexAnswer] = []
     @State private var isThinking = false
     /// The question currently in flight, so it can stay on screen.
@@ -52,7 +58,10 @@ struct TalkToRexView: View {
                         AskRexAnswerBlock(
                             answer: answer,
                             onOpenItem: onOpenItem,
-                            onRexThis: { addingFromWeb = $0 }
+                            onRexThis: { addingFromWeb = $0 },
+                            onOpenProfile: { id, name in
+                                authorRoute = UserProfileRoute(userId: id, name: name)
+                            }
                         )
                         .id(answer.id)
                     }
@@ -98,6 +107,10 @@ struct TalkToRexView: View {
         }
         .safeAreaInset(edge: .bottom) { askBar }
         .navigationTitle("Ask Rex")
+        // Scoped to this screen with navigationDestination(item:) rather
+        // than registering UserProfileRoute on the whole stack, which an
+        // ancestor may already have claimed.
+        .navigationDestination(item: $authorRoute) { UserProfileView(route: $0) }
         .navigationBarTitleDisplayMode(.inline)
         .rexDismissableKeyboard()
         .sheet(item: $addingFromWeb) { result in
@@ -279,6 +292,9 @@ struct AskRexAnswerBlock: View {
     @ObservedObject var answer: AskRexAnswer
     var onOpenItem: (String) -> Void
     var onRexThis: (AskRexWebResult) -> Void
+    /// Oct 18 — the author tap, handed up like onOpenItem because the state
+    /// it needs lives on TalkToRexView, not here.
+    var onOpenProfile: (String, String) -> Void
 
     var body: some View { content }
 
@@ -321,7 +337,7 @@ struct AskRexAnswerBlock: View {
                     }
                     // The card draws its own interior taps (author, comments);
                     // the body of it opens the item, the way the feed does.
-                    RecommendationCardView(rec: rec)
+                    RecommendationCardView(rec: rec, onAuthorTap: onOpenProfile)
                         .contentShape(Rectangle())
                         .onTapGesture { onOpenItem(rec.item_id) }
                 }
