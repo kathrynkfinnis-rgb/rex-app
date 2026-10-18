@@ -133,6 +133,22 @@ struct ItemDetailView: View {
         }
     }
 
+    /// Oct 18 — "this should be a want to try for Phoebe."
+    ///
+    /// Adding something to a list creates a recommendation row to hang the
+    /// list entry on: list_id set, rating 0, no note. It is structure, not an
+    /// opinion — and this page was reading it as "Phoebe Rex'd this", putting
+    /// her face under Rex'd by for a film she had only filed. A trip stop can
+    /// be the same shape, which is what produced the 15 October report about
+    /// stops showing as separate reviews.
+    ///
+    /// Whether a row is a Rex is decided by what is on it, not by what it
+    /// belongs to: a stop or a list item that does carry a rating or a note is
+    /// a real take and still counts.
+    private static func carriesAnOpinion(_ rec: FeedRecommendation) -> Bool {
+        rec.rating > 0 || !(rec.note ?? "").isEmpty
+    }
+
     /// Whether anybody other than you has said something about this.
     private var othersHaveSpoken: Bool {
         recs.contains { $0.user_id != RexAPI.shared.currentUserId && !($0.note ?? "").isEmpty }
@@ -1265,7 +1281,12 @@ struct ItemDetailView: View {
     /// interesting.
     private var orderedRexers: [FeedRecommendation] {
         var seen = Set<String>()
-        return recs.reversed().filter { seen.insert($0.user_id).inserted }
+        // carriesAnOpinion first so short-circuiting keeps a person eligible:
+        // a filed-only row must not claim their slot and hide a real take
+        // they left elsewhere on the same item.
+        return recs.reversed().filter {
+            Self.carriesAnOpinion($0) && seen.insert($0.user_id).inserted
+        }
     }
 
 
@@ -2206,7 +2227,7 @@ struct ItemDetailView: View {
     /// it or the replies to it.
     private var theirs: [FeedRecommendation] {
         let mine = RexAPI.shared.currentUserId
-        let merged = recs.filter { $0.user_id != mine } + wantPosts
+        let merged = recs.filter { $0.user_id != mine && Self.carriesAnOpinion($0) } + wantPosts
         return merged.sorted { a, b in
             switch (a.createdDate, b.createdDate) {
             case let (x?, y?): return x > y

@@ -2195,7 +2195,16 @@ struct AddRexView: View {
                     // trip and never shown alone. They are shown alone: a stop
                     // is a Rex of a place, it appears on that place's page and
                     // against that place's pin, with whoever posted it.
-                    postAs: postAsRex ? officialAccountId : nil
+                    postAs: postAsRex ? officialAccountId : nil,
+                    // Oct 18 — "scheduling still not working."
+                    //
+                    // The timer never left the device. scheduledAt was passed
+                    // only by the single-Rex branch, so a trip or a list
+                    // scheduled as REX was created with scheduled_at null and
+                    // published_at set — out immediately, timer ignored. The
+                    // 7 October fix added the cron that publishes the queue;
+                    // nothing was ever reaching the queue from here.
+                    scheduledAt: postAsRex && scheduleRexPost ? rexPostDate : nil
                 )
                 // Posting is several sequential network calls; if one stop
                 // partway through fails, the trip used to just be left half
@@ -2265,7 +2274,7 @@ struct AddRexView: View {
                         recommendationId: tripRecId, userIds: Array(taggedFriendIds)
                     )
                 }
-                didSaveDraft = asDraft
+                didSaveDraft = asDraft || (postAsRex && scheduleRexPost)
                 lastPostedRecId = tripRecId
                 // Posted (or saved as a server-side draft) — the local
                 // unfinished copy is spent either way. See the note further down.
@@ -2301,7 +2310,10 @@ struct AddRexView: View {
                     // Oct 5 — admins can post a list as REX. Its items stay
                     // under the admin's own account for the same reason a
                     // trip's stops do: they aren't posts of their own.
-                    postAs: postAsRex ? officialAccountId : nil
+                    postAs: postAsRex ? officialAccountId : nil,
+                    // The same omission as the trip branch above — see its
+                    // note. A list scheduled as REX went out immediately.
+                    scheduledAt: postAsRex && scheduleRexPost ? rexPostDate : nil
                 )
                 if !listNotes.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
                     try? await RexAPI.shared.updateLongNote(recommendationId: listRecId, text: listNotes)

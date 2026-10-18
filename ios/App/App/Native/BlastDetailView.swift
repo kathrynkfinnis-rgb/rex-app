@@ -208,11 +208,21 @@ struct BlastDetailView: View {
                 .buttonStyle(.plain)
 
                 Button {
-                    replyingTo = response
+                    withAnimation(.snappy) { replyingTo = response }
                 } label: {
+                    // Oct 18 — "not letting me click reply on comments."
+                    //
+                    // Twelve-point text with no padding and no contentShape:
+                    // a target around thirty-six points by fifteen. The same
+                    // fault the Rex comments had on 14 October ("can't reply
+                    // to comments even when clicking 'reply' button"), fixed
+                    // there and never here.
                     Text("Reply")
                         .font(RexFont.text(12, weight: .semibold))
                         .foregroundStyle(RexColor.primary)
+                        .padding(.horizontal, RexSpacing.sm)
+                        .padding(.vertical, 6)
+                        .contentShape(Rectangle())
                 }
                 .buttonStyle(.plain)
 
@@ -308,6 +318,29 @@ struct BlastDetailView: View {
                 .padding(.vertical, RexSpacing.sm)
                 .background(RexColor.badgeBackground)
                 .clipShape(RoundedRectangle(cornerRadius: RexRadius.input, style: .continuous))
+            }
+
+            // The other half of the same report: replyingTo was set and
+            // nothing on screen ever said so, so even a tap that worked
+            // looked like one that hadn't.
+            if let replyingTo {
+                HStack(spacing: 6) {
+                    Image(systemName: "arrowshape.turn.up.left.fill").font(.system(size: 10))
+                    Text("Replying to \(replyingTo.profiles?.display_name ?? replyingTo.profiles?.username ?? "someone")")
+                        .font(RexFont.text(11.5))
+                        .lineLimit(1)
+                    Spacer(minLength: 0)
+                    Button {
+                        withAnimation(.snappy) { self.replyingTo = nil }
+                    } label: {
+                        Image(systemName: "xmark.circle.fill").font(.system(size: 13))
+                    }
+                    .buttonStyle(.plain)
+                }
+                .foregroundStyle(RexColor.mutedForeground)
+                .padding(.horizontal, RexSpacing.sm)
+                .padding(.vertical, 5)
+                .background(RexColor.badgeBackground, in: Capsule())
             }
 
             if let query = MentionDraft.inProgress(in: draft), !friends.isEmpty {
