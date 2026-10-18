@@ -27,7 +27,7 @@
 	     Left as a placeholder on purpose — a debug build with no dev key
 	     makes no Google calls at all rather than falling back. -->
 	<key>GMSApiKeyDebug</key>
-	<string>PASTE_DEV_KEY_HERE</string>
+	<string>AIzaSyBDmBb_UWyo2uDBo5cQxj16__6G_wK3Syo</string>
 	<key>GMSApiKey</key>
 	<string>AIzaSyDl2PCHjjKbAje0C-NjJNkb-AKn5LwAtGU</string>
 	<key>GoogleCSEApiKey</key>
