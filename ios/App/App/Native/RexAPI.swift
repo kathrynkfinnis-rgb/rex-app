@@ -6092,23 +6092,46 @@ final class RexAPI {
     /// recommendation they point at (e.g. you deleted the Rex after someone
     /// liked it), so a missing key here just means "nothing to open" rather
     /// than an error — callers should treat an absent id as non-fatal.
+    /// Oct 18 — "Cannot click on the notifications."
+    ///
+    /// This feeds every notification row about a recommendation, and it used
+    /// to ask for all of them in one `in.()` filter and return an empty map on
+    /// any non-2xx. So a single unusable id — or one request that failed for
+    /// its own reasons — took out the destination of *every* comment, like and
+    /// tag notification at once, which is exactly the "none of them work"
+    /// shape of the report.
+    ///
+    /// Chunked now, and a failed chunk costs only its own rows. The caller no
+    /// longer renders a dead row either way (see NotificationsView.actorRow),
+    /// but a partial answer is still much better than none.
     func fetchItemIds(forRecommendations recommendationIds: [String]) async throws -> [String: String] {
         guard !recommendationIds.isEmpty else { return [:] }
         let token = try await validToken()
-        var components = URLComponents(url: baseURL.appendingPathComponent("/rest/v1/recommendations"), resolvingAgainstBaseURL: false)!
-        components.queryItems = [
-            URLQueryItem(name: "select", value: "id,item_id"),
-            URLQueryItem(name: "id", value: "in.(\(recommendationIds.joined(separator: ",")))"),
-        ]
-        var request = URLRequest(url: components.url!)
-        request.setValue(anonKey, forHTTPHeaderField: "apikey")
-        request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
-
-        let (data, response) = try await URLSession.shared.data(for: request)
-        guard let http = response as? HTTPURLResponse, http.statusCode < 400 else { return [:] }
         struct Row: Codable { let id: String; let item_id: String }
-        let rows = (try? JSONDecoder().decode([Row].self, from: data)) ?? []
-        return Dictionary(uniqueKeysWithValues: rows.map { ($0.id, $0.item_id) })
+
+        var found: [String: String] = [:]
+        for chunk in stride(from: 0, to: recommendationIds.count, by: 25).map({
+            Array(recommendationIds[$0..<min($0 + 25, recommendationIds.count)])
+        }) {
+            var components = URLComponents(url: baseURL.appendingPathComponent("/rest/v1/recommendations"), resolvingAgainstBaseURL: false)!
+            components.queryItems = [
+                URLQueryItem(name: "select", value: "id,item_id"),
+                URLQueryItem(name: "id", value: "in.(\(chunk.joined(separator: ",")))"),
+            ]
+            guard let url = components.url else { continue }
+            var request = URLRequest(url: url)
+            request.setValue(anonKey, forHTTPHeaderField: "apikey")
+            request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+
+            guard let (data, response) = try? await URLSession.shared.data(for: request),
+                  let http = response as? HTTPURLResponse, http.statusCode < 400,
+                  let rows = try? JSONDecoder().decode([Row].self, from: data)
+            else { continue }
+            // Not uniqueKeysWithValues: a duplicate id would trap, and this
+            // runs on whatever the notifications happen to reference.
+            for row in rows { found[row.id] = row.item_id }
+        }
+        return found
     }
 
     /// Oct 5 — the item behind each of these wants, so a notification about

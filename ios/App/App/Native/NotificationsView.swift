@@ -158,6 +158,25 @@ struct NotificationsView: View {
             .buttonStyle(.plain)
         } else if let recId = n.linkedRecommendationId, let itemId = recItemIds[recId] {
             NavigationLink(value: itemId) { rowContent(n) }.buttonStyle(.plain)
+        } else if n.linkedRecommendationId != nil {
+            // Oct 18 — "Cannot click on the notifications."
+            //
+            // Every notification about a recommendation — comments, likes,
+            // being tagged — routes through recItemIds, and when the lookup
+            // has no entry the row fell through to the plain content at the
+            // bottom with no destination at all. A dead row that looks
+            // identical to a live one.
+            //
+            // The lookup reads the recommendations table as you, so RLS
+            // decides: a Rex you are not entitled to see returns nothing. The
+            // likely case is being tagged in something still unpublished,
+            // which would also explain "Phoebe tagged me in this rec but I
+            // have no way of seeing it" an hour earlier the same evening.
+            //
+            // Whatever the cause, the row should not be dead. The person who
+            // did the thing is always somewhere worth going, and the row
+            // already says what they did.
+            actorRow(n)
         } else if let blastId = n.linkedBlastId {
             // The blast itself, where the replies live — including the one
             // this notification is about.
@@ -186,6 +205,23 @@ struct NotificationsView: View {
             )) { rowContent(n) }.buttonStyle(.plain)
         } else if n.linksToFriends {
             NavigationLink(value: FriendsRoute()) { rowContent(n) }.buttonStyle(.plain)
+        } else {
+            // Same reasoning as the recommendation fallback above: anything
+            // that got this far still had somebody do it.
+            actorRow(n)
+        }
+    }
+
+    /// A row that leads to whoever did the thing, for notifications whose own
+    /// subject we cannot open. Falls back to plain content only when there is
+    /// no actor either, which is a notification nobody can act on anyway.
+    @ViewBuilder
+    private func actorRow(_ n: RexNotification) -> some View {
+        if let actorId = n.actor_id {
+            NavigationLink(value: UserProfileRoute(
+                userId: actorId,
+                name: n.actor?.display_name ?? n.actor?.username ?? ""
+            )) { rowContent(n) }.buttonStyle(.plain)
         } else {
             rowContent(n)
         }

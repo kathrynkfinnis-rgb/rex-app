@@ -47,6 +47,7 @@ struct ItemDetailView: View {
 
     @State private var rating: Double = 10
     @State private var note: String = ""
+    @FocusState private var noteFocused: Bool
     @State private var isSaving = false
     /// Oct 4 — whether the note is being edited. A take you've already written
     /// shows as text until you ask to change it.
@@ -1890,6 +1891,7 @@ struct ItemDetailView: View {
             // prerequisite.
             if rating > 0 {
                 TextField("What did you love about it?", text: $note, axis: .vertical)
+                    .focused($noteFocused)
                     .lineLimit(3...14)
                     .padding(12)
                     .background(RexColor.card)
@@ -1909,6 +1911,21 @@ struct ItemDetailView: View {
                 .foregroundStyle(RexColor.primaryForeground)
                 .clipShape(Capsule())
                 .disabled(isSaving)
+
+                // Oct 18 — "I can't move my cursor in the text box."
+                //
+                // The keyboard's Done bar sits above the keyboard, and
+                // SwiftUI's keyboard avoidance only makes room for the
+                // keyboard itself — so the bottom of this field ended up
+                // underneath that bar. Tapping there to place the cursor hit
+                // Done instead, which reads exactly as "the cursor won't
+                // move". The screenshot on the report shows the field clipped
+                // mid-line with the Done pill sitting over it.
+                //
+                // Slack for avoidance to lift the field clear, only while the
+                // field is focused, so there is no standing gap above the
+                // button.
+                if noteFocused { Color.clear.frame(height: 56) }
             }
         }
         .animation(.snappy, value: rating > 0)
