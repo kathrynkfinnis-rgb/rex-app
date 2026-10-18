@@ -18,6 +18,11 @@ import SwiftUI
 /// right place when you are already in there and only want to move that one.
 struct CollectionTopicsView: View {
     let lists: [RexList]
+    /// Oct 18 — "I'd like to be able to put friends collections into my
+    /// topics." Theirs sit in their own section here, because filing one
+    /// writes to your follow row rather than to their collection, and the
+    /// difference is worth showing rather than hiding.
+    var followed: [RexList] = []
     /// Called after every change, so the shelves behind this re-draw.
     var onChanged: () -> Void
 
@@ -32,7 +37,7 @@ struct CollectionTopicsView: View {
     /// than a spelling test — "London" and "london" would be two shelves and
     /// nobody meant that.
     private var existingTopics: [String] {
-        let live = lists.map { topics[$0.id] ?? $0.topic }
+        let live = (lists + followed).map { topics[$0.id] ?? $0.topic }
         return Array(Set(live.compactMap {
             $0?.trimmingCharacters(in: .whitespaces)
         }.filter { !$0.isEmpty })).sorted { $0.lowercased() < $1.lowercased() }
@@ -66,6 +71,21 @@ struct CollectionTopicsView: View {
                                 Divider().overlay(RexColor.divider)
                                     .padding(.leading, RexSpacing.page)
                             }
+
+                            if !followed.isEmpty {
+                                Text("Saved from friends")
+                                    .font(RexFont.text(12, weight: .semibold))
+                                    .foregroundStyle(RexColor.mutedForeground)
+                                    .frame(maxWidth: .infinity, alignment: .leading)
+                                    .padding(.horizontal, RexSpacing.page)
+                                    .padding(.top, RexSpacing.lg)
+                                    .padding(.bottom, RexSpacing.xs)
+                                ForEach(followed) { list in
+                                    row(list, isFollowed: true)
+                                    Divider().overlay(RexColor.divider)
+                                        .padding(.leading, RexSpacing.page)
+                                }
+                            }
                         }
                         .padding(.top, RexSpacing.md)
                     }
@@ -91,7 +111,7 @@ struct CollectionTopicsView: View {
                 let name = newTopicDraft.trimmingCharacters(in: .whitespaces)
                 guard !name.isEmpty, let list = namingFor else { return }
                 namingFor = nil
-                Task { await set(name, on: list) }
+                Task { await set(name, on: list, isFollowed: followed.contains { $0.id == list.id }) }
             }
         } message: {
             Text("A shelf of its own on the Collections screen \u{2014} \u{201C}Film collections\u{201D}, say.")
@@ -107,7 +127,7 @@ struct CollectionTopicsView: View {
     }
 
     @ViewBuilder
-    private func row(_ list: RexList) -> some View {
+    private func row(_ list: RexList, isFollowed: Bool = false) -> some View {
         let current = topic(for: list)
         HStack(spacing: RexSpacing.md) {
             Text(list.emoji ?? "\u{1F4C1}")
@@ -133,14 +153,14 @@ struct CollectionTopicsView: View {
                 Menu {
                     ForEach(existingTopics, id: \.self) { name in
                         Button {
-                            Task { await set(name, on: list) }
+                            Task { await set(name, on: list, isFollowed: isFollowed) }
                         } label: {
                             Label(name, systemImage: current == name ? "checkmark" : "folder")
                         }
                     }
                     if current?.isEmpty == false {
                         Button {
-                            Task { await set(nil, on: list) }
+                            Task { await set(nil, on: list, isFollowed: isFollowed) }
                         } label: {
                             Label("No topic", systemImage: "folder.badge.minus")
                         }
@@ -167,11 +187,17 @@ struct CollectionTopicsView: View {
     /// Writes the change and keeps it on screen. The local override means the
     /// row updates before the Collections screen behind has refetched, so the
     /// menu never shows a tick against what it used to say.
-    private func set(_ name: String?, on list: RexList) async {
+    private func set(_ name: String?, on list: RexList, isFollowed: Bool = false) async {
         busyId = list.id
         defer { busyId = nil }
         do {
-            try await RexAPI.shared.setCollectionTopic(id: list.id, topic: name)
+            // Someone else's collection is filed on your follow row; your own
+            // is filed on the collection itself.
+            if isFollowed {
+                try await RexAPI.shared.setFollowedCollectionTopic(listId: list.id, topic: name)
+            } else {
+                try await RexAPI.shared.setCollectionTopic(id: list.id, topic: name)
+            }
             topics[list.id] = name
             onChanged()
         } catch {

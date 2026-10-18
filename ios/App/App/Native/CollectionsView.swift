@@ -118,7 +118,7 @@ struct CollectionsView: View {
             NewCollectionView { _ in Task { await load() } }
         }
         .sheet(isPresented: $organisingTopics) {
-            CollectionTopicsView(lists: lists) { Task { await load() } }
+            CollectionTopicsView(lists: lists, followed: followed) { Task { await load() } }
         }
         .task { await load() }
     }
@@ -211,7 +211,14 @@ struct CollectionsView: View {
     /// sorted yet, and putting it above the headings you deliberately made
     /// would bury them under it.
     private var myCollectionsByTopic: [(topic: String?, lists: [RexList])] {
-        let matched = filteredLists(lists)
+        // Oct 18 — "I'd like to be able to put friends collections into my
+        // topics." A followed collection you have filed joins your shelves;
+        // one you haven't stays below under Friends' Collections rather than
+        // landing in your unsorted pile, which is yours alone.
+        let filedFromFriends = filteredLists(followed).filter {
+            !($0.topic ?? "").trimmingCharacters(in: .whitespaces).isEmpty
+        }
+        let matched = filteredLists(lists) + filedFromFriends
         var byTopic: [String: [RexList]] = [:]
         var ungrouped: [RexList] = []
         for list in matched {
@@ -317,7 +324,11 @@ struct CollectionsView: View {
 
     @ViewBuilder
     private var friendsCollectionsShelf: some View {
-        let matched = filteredLists(friendsLists)
+        // Anything filed into one of your topics is drawn there instead, so
+        // it is not on screen twice.
+        let matched = filteredLists(friendsLists).filter {
+            ($0.topic ?? "").trimmingCharacters(in: .whitespaces).isEmpty
+        }
         if !matched.isEmpty {
             shelf(title: "Friends' Collections", systemImage: "person.2.fill") {
                 ForEach(matched.prefix(8)) { list in

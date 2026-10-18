@@ -5154,7 +5154,11 @@ final class RexAPI {
         guard let userId = currentUserId else { throw RexAPIError.notSignedIn }
         var components = URLComponents(url: baseURL.appendingPathComponent("/rest/v1/list_follows"), resolvingAgainstBaseURL: false)!
         components.queryItems = [
-            URLQueryItem(name: "select", value: "hitlist_lists(id,name,emoji,item_type,visibility,created_at,user_id)"),
+            // Oct 18 — "I'd like to be able to put friends collections into
+            // my topics." `topic` here is yours, on your follow row; the one
+            // on hitlist_lists belongs to whoever owns the collection and is
+            // not yours to set. Yours wins on your own shelves.
+            URLQueryItem(name: "select", value: "topic,hitlist_lists(id,name,emoji,item_type,visibility,created_at,user_id)"),
             URLQueryItem(name: "user_id", value: "eq.\(userId)"),
             URLQueryItem(name: "order", value: "created_at.desc"),
         ]
@@ -5165,8 +5169,67 @@ final class RexAPI {
         // The table may not exist yet (migration pending) — treat that as empty
         // rather than failing the whole screen.
         guard let http = response as? HTTPURLResponse, http.statusCode < 400 else { return [] }
-        struct Row: Codable { let hitlist_lists: RexList? }
-        return ((try? JSONDecoder().decode([Row].self, from: data)) ?? []).compactMap { $0.hitlist_lists }
+        var rows = (try? JSONDecoder().decode([FollowRow].self, from: data)) ?? []
+        if rows.isEmpty {
+            // Before the column exists the select above is a 400, so fall back
+            // to the shape that has always worked rather than showing none of
+            // somebody's followed collections.
+            rows = await fetchFollowedRowsWithoutTopic(userId: userId, token: token)
+        }
+        return rows.compactMap { row in
+            guard var list = row.hitlist_lists else { return nil }
+            if let mine = row.topic?.trimmingCharacters(in: .whitespaces), !mine.isEmpty {
+                list.topic = mine
+            }
+            return list
+        }
+    }
+
+    /// One followed collection, plus your own name for where it sits.
+    private struct FollowRow: Codable {
+        var topic: String? = nil
+        let hitlist_lists: RexList?
+    }
+
+    /// The pre-`topic` shape of the query above. See its note.
+    private func fetchFollowedRowsWithoutTopic(userId: String, token: String) async -> [FollowRow] {
+        var components = URLComponents(url: baseURL.appendingPathComponent("/rest/v1/list_follows"), resolvingAgainstBaseURL: false)!
+        components.queryItems = [
+            URLQueryItem(name: "select", value: "hitlist_lists(id,name,emoji,item_type,visibility,created_at,user_id)"),
+            URLQueryItem(name: "user_id", value: "eq.\(userId)"),
+            URLQueryItem(name: "order", value: "created_at.desc"),
+        ]
+        guard let url = components.url else { return [] }
+        var request = URLRequest(url: url)
+        request.setValue(anonKey, forHTTPHeaderField: "apikey")
+        request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+        guard let (data, response) = try? await URLSession.shared.data(for: request),
+              let http = response as? HTTPURLResponse, http.statusCode < 400
+        else { return [] }
+        return (try? JSONDecoder().decode([FollowRow].self, from: data)) ?? []
+    }
+
+    /// Your shelf for someone else's collection. Writes to your follow row,
+    /// never to their list — see the migration.
+    func setFollowedCollectionTopic(listId: String, topic: String?) async throws {
+        let token = try await validToken()
+        guard let userId = currentUserId else { throw RexAPIError.notSignedIn }
+        var components = URLComponents(url: baseURL.appendingPathComponent("/rest/v1/list_follows"), resolvingAgainstBaseURL: false)!
+        components.queryItems = [
+            URLQueryItem(name: "user_id", value: "eq.\(userId)"),
+            URLQueryItem(name: "list_id", value: "eq.\(listId)"),
+        ]
+        var request = URLRequest(url: components.url!)
+        request.httpMethod = "PATCH"
+        request.setValue(anonKey, forHTTPHeaderField: "apikey")
+        request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        let value: Any = topic.map { $0 as Any } ?? NSNull()
+        request.httpBody = try JSONSerialization.data(withJSONObject: ["topic": value])
+        let (data, response) = try await URLSession.shared.data(for: request)
+        guard let http = response as? HTTPURLResponse, http.statusCode < 400 else {
+            throw RexAPIError.server(friendlyError(data, fallback: "Couldn't move that collection."))
+        }
     }
 
     /// A friend's collections worth discovering — never their private
