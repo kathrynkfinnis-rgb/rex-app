@@ -21,6 +21,13 @@ struct BlastDetailView: View {
     @State private var isLoading = true
     @State private var errorMessage: String?
     @State private var draft = ""
+    /// Oct 18 — "you should be able to tag someone in comments on blasts
+    /// (and all comments everywhere)." A blast is the one place a mention is
+    /// most useful: the whole point is "who would know the answer to this",
+    /// and naming them is how you ask.
+    @State private var friends: [RexProfileDetail] = []
+    @State private var mentionedProfile: UserProfileRoute?
+    @State private var mentionLookupFailed = false
     /// Oct 3 — one of your own Rex, attached to the reply.
     @State private var attachedRex: RexItem?
     @State private var choosingRex = false
@@ -95,6 +102,31 @@ struct BlastDetailView: View {
         .navigationBarTitleDisplayMode(.inline)
         .scrollDismissesKeyboard(.interactively)
         .task { await load() }
+        .task {
+            // The picker's candidates, loaded the same way the Rex comment
+            // composer loads them.
+            friends = (try? await RexAPI.shared.fetchAcceptedFriendProfiles()) ?? []
+        }
+        .sheet(item: $mentionedProfile) { route in
+            NavigationStack { UserProfileView(route: route) }
+                .tint(RexColor.primary)
+        }
+        .alert("Couldn't open that", isPresented: $mentionLookupFailed) {
+            Button("OK", role: .cancel) {}
+        } message: {
+            Text("That username doesn't match anyone you can see.")
+        }
+    }
+
+    /// Turns a tapped `@name` into the person behind it. A mention is only
+    /// text — nothing records which profile it meant — so the username is
+    /// resolved on the way. Same as LikesCommentsView.
+    private func openMention(_ username: String) async {
+        guard let id = await RexAPI.shared.profileId(forUsername: username) else {
+            mentionLookupFailed = true
+            return
+        }
+        mentionedProfile = UserProfileRoute(userId: id, name: username)
     }
 
     /// Sept 7 — "it would be nice to 'like' or reply to someone's Rex on
@@ -115,7 +147,9 @@ struct BlastDetailView: View {
                     Text(response.profiles?.display_name ?? response.profiles?.username ?? "Someone")
                         .font(RexFont.text(13, weight: .semibold))
                         .foregroundStyle(RexColor.foreground)
-                    Text(linked: response.body)
+                    MentionedText(text: response.body, font: RexFont.text(15)) { name in
+                        Task { await openMention(name) }
+                    }
                         .font(RexFont.text(14))
                         .foregroundStyle(RexColor.foreground.opacity(0.9))
 
@@ -197,7 +231,9 @@ struct BlastDetailView: View {
                         Text(reply.profiles?.display_name ?? reply.profiles?.username ?? "Someone")
                             .font(RexFont.text(12, weight: .semibold))
                             .foregroundStyle(RexColor.foreground)
-                        Text(linked: reply.body)
+                        MentionedText(text: reply.body, font: RexFont.text(14)) { name in
+                            Task { await openMention(name) }
+                        }
                             .font(RexFont.text(13))
                             .foregroundStyle(RexColor.foreground.opacity(0.9))
                     }
@@ -272,6 +308,12 @@ struct BlastDetailView: View {
                 .padding(.vertical, RexSpacing.sm)
                 .background(RexColor.badgeBackground)
                 .clipShape(RoundedRectangle(cornerRadius: RexRadius.input, style: .continuous))
+            }
+
+            if let query = MentionDraft.inProgress(in: draft), !friends.isEmpty {
+                MentionPicker(query: query, friends: friends) { friend in
+                    draft = MentionDraft.complete(draft, with: friend.username)
+                }
             }
 
             HStack(spacing: RexSpacing.sm) {
