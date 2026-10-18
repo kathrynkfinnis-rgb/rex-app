@@ -30,9 +30,19 @@ struct RexMapView: View {
         case newRex(RexSearchHit)
         /// Oct 14 — several places at one point, which no zoom can separate.
         case pickOne([MapPlace])
+        /// Oct 18 — "fix the edit from a map pin function."
+        ///
+        /// This was its own `.sheet(item:)` alongside the one below, which is
+        /// the exact arrangement the note on that binding warns about: a
+        /// second sheet on the same view loses to the one already showing.
+        /// And the editor is always opened from inside the place sheet, so it
+        /// was always the one losing. Editing takes priority here, because
+        /// you asked for it from the sheet it replaces.
+        case edit(FeedRecommendation)
 
-        init?(place: MapPlace?, tripSearch: Bool, hit: RexSearchHit?, stacked: [MapPlace]) {
-            if let place { self = .place(place) }
+        init?(place: MapPlace?, tripSearch: Bool, hit: RexSearchHit?, stacked: [MapPlace], editing: FeedRecommendation?) {
+            if let editing { self = .edit(editing) }
+            else if let place { self = .place(place) }
             else if !stacked.isEmpty { self = .pickOne(stacked) }
             else if tripSearch { self = .tripSearch }
             else if let hit { self = .newRex(hit) }
@@ -45,6 +55,7 @@ struct RexMapView: View {
             case .tripSearch: return "tripSearch"
             case .newRex(let hit): return "newRex-\(hit.id)"
             case .pickOne(let places): return "pickOne-" + places.map(\.id).joined(separator: "-")
+            case .edit(let rec): return "edit-\(rec.id)"
             }
         }
     }
@@ -385,7 +396,7 @@ struct RexMapView: View {
         // "Follow a trip" and long-press-to-add-a-place were both losing to
         // the place sheet above them.
         .sheet(item: Binding(
-            get: { MapSheet(place: selectedPlace, tripSearch: showingTripSearch, hit: pendingPlaceHit, stacked: stackedPlaces) },
+            get: { MapSheet(place: selectedPlace, tripSearch: showingTripSearch, hit: pendingPlaceHit, stacked: stackedPlaces, editing: editingRec) },
             set: { next in
                 if next == nil {
                     selectedPlace = nil
@@ -393,6 +404,7 @@ struct RexMapView: View {
                     placeSheetDetent = .fraction(0.5)
                     showingTripSearch = false
                     pendingPlaceHit = nil
+                    editingRec = nil
                 }
             }
         )) { sheet in
@@ -453,18 +465,17 @@ struct RexMapView: View {
                 TripSearchView(onSelect: { id, title in followTrip(id: id, title: title) })
             case .newRex(let hit):
                 AddRexView(onDone: { pendingPlaceHit = nil; Task { await load() } }, initialPlaceHit: hit)
+            case .edit(let rec):
+                EditRexView(
+                    rec: rec,
+                    onSaved: { editingRec = nil; Task { await load() } },
+                    onDeleted: { editingRec = nil; selectedPlace = nil; Task { await load() } }
+                )
             }
         }
         .navigationDestination(item: $openTrip) { TripDetailView(route: $0) }
         .sheet(item: $addingToTrip) { place in
             AddToTripView(itemId: place.id, itemTitle: place.title, onDone: {})
-        }
-        .sheet(item: $editingRec) { rec in
-            EditRexView(
-                rec: rec,
-                onSaved: { Task { await load() } },
-                onDeleted: { selectedPlace = nil; Task { await load() } }
-            )
         }
         .alert("Couldn't find that place", isPresented: Binding(
             get: { longPressError != nil },
