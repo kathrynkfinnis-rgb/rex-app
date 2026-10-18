@@ -83,6 +83,10 @@ struct AddRexView: View {
         _category = State(initialValue: .trip)
         _manualEntry = State(initialValue: true)
         _editingTripRecId = State(initialValue: trip.id)
+        // Oct 18 — the tag picker opens showing who is actually tagged.
+        let tagged = Set(trip.taggedFriends.map { $0.id })
+        _taggedFriendIds = State(initialValue: tagged)
+        _originalTaggedFriendIds = State(initialValue: tagged)
         _editingTripItemId = State(initialValue: trip.item_id)
         _title = State(initialValue: trip.items?.title ?? "")
         _note = State(initialValue: trip.note ?? "")
@@ -153,6 +157,10 @@ struct AddRexView: View {
         _category = State(initialValue: .list)
         _manualEntry = State(initialValue: true)
         _editingListRecId = State(initialValue: list.id)
+        // Oct 18 — the tag picker opens showing who is actually tagged.
+        let tagged = Set(list.taggedFriends.map { $0.id })
+        _taggedFriendIds = State(initialValue: tagged)
+        _originalTaggedFriendIds = State(initialValue: tagged)
         _editingListItemId = State(initialValue: list.item_id)
         _title = State(initialValue: list.items?.title ?? "")
         _note = State(initialValue: list.note ?? "")
@@ -293,6 +301,19 @@ struct AddRexView: View {
     @State private var searchTask: Task<Void, Never>?
     @State private var photoURLs: [String] = []
     @State private var taggedFriendIds: Set<String> = []
+    /// Oct 18 — "editing a trip untags Danny."
+    ///
+    /// Both editors opened with an empty tag picker, because neither init
+    /// rehydrated it, and neither save path wrote tags at all. So editing a
+    /// trip showed nobody tagged, and tagging somebody *while* editing was
+    /// discarded on save. The rows themselves survived in the database, which
+    /// is why this reads as "untagged" rather than "lost".
+    ///
+    /// Kept alongside the live set so a save only rewrites tags that actually
+    /// changed. setTaggedFriends deletes and re-inserts, and an insert fires
+    /// the notification trigger — rewriting them on every save would tell
+    /// Danny he had been tagged again each time the trip was touched.
+    @State private var originalTaggedFriendIds: Set<String> = []
     @State private var subcategories: Set<String> = []
     /// Oct 4 — keeping the note box above the keyboard as it grows.
     @FocusState private var noteFocused: Bool
@@ -1200,7 +1221,9 @@ struct AddRexView: View {
             // and published when they're finished. A single Rex is a one-shot
             // post; there's nothing to draft. (Sept 18 — "need to be able to
             // save lists as drafts".)
-            if (category == .trip || category == .list) && mode == .rated {
+            if (category == .trip || category == .list) && mode == .rated,
+               // Not while editing — see canSaveDraft for why.
+               editingTripRecId == nil, editingListRecId == nil {
                 Button {
                     Task { await post(category: category, asDraft: true) }
                 } label: {
@@ -1739,6 +1762,16 @@ struct AddRexView: View {
         errorMessage = nil
         do {
             postingProgress = "Saving trip…"
+            // Oct 18 — tags, only when they changed. setTaggedFriends
+            // deletes and re-inserts, and an insert fires the notify
+            // trigger, so an unconditional rewrite would tell someone
+            // they had been tagged again every time the trip was saved.
+            if taggedFriendIds != originalTaggedFriendIds {
+                try? await RexAPI.shared.setTaggedFriends(
+                    recommendationId: tripRecId, userIds: Array(taggedFriendIds)
+                )
+                originalTaggedFriendIds = taggedFriendIds
+            }
             let trimmedTitle = title.trimmingCharacters(in: .whitespaces)
             try await RexAPI.shared.updateItemTitle(itemId: tripItemId, title: trimmedTitle)
             try await RexAPI.shared.updateItemSubtitle(itemId: tripItemId, subtitle: tripDateText)
@@ -1855,6 +1888,16 @@ struct AddRexView: View {
         errorMessage = nil
         do {
             postingProgress = "Saving list…"
+            // Oct 18 — tags, only when they changed. setTaggedFriends
+            // deletes and re-inserts, and an insert fires the notify
+            // trigger, so an unconditional rewrite would tell someone
+            // they had been tagged again every time the list was saved.
+            if taggedFriendIds != originalTaggedFriendIds {
+                try? await RexAPI.shared.setTaggedFriends(
+                    recommendationId: listRecId, userIds: Array(taggedFriendIds)
+                )
+                originalTaggedFriendIds = taggedFriendIds
+            }
             try await RexAPI.shared.updateItemTitle(itemId: listItemId, title: title.trimmingCharacters(in: .whitespaces))
             try await RexAPI.shared.updateItemGenre(itemId: listItemId, genre: listKind)
             try await RexAPI.shared.updateItemImageURL(itemId: listItemId, imageURL: photoURLs.first ?? listIconURL)
@@ -1945,8 +1988,20 @@ struct AddRexView: View {
     }
 
     /// Only trips and lists have somewhere to be saved to — see DraftsView.
+    /// Oct 18 — the other half of "'Save as draft' currently publishes."
+    ///
+    /// Editing an already-posted trip or list routes through saveTripEdits /
+    /// saveListEdits, which update in place and never look at asDraft. So the
+    /// draft button, offered while editing, saved the changes live — the exact
+    /// thing it says it won't do. Hiding it there rather than teaching those
+    /// paths to unpublish: taking something back off the feed after people
+    /// have seen and commented on it is a different feature, and not one this
+    /// button should quietly perform. A thing that is already a draft stays
+    /// one when you press Save changes, because neither path touches
+    /// published_at.
     private var canSaveDraft: Bool {
         (category == .trip || category == .list)
+            && editingTripRecId == nil && editingListRecId == nil
             && !title.trimmingCharacters(in: .whitespaces).isEmpty
     }
 
@@ -2188,6 +2243,14 @@ struct AddRexView: View {
                     rating: rating,
                     note: note.isEmpty ? nil : note,
                     returningId: true,
+                    // Oct 18 — "'Save as draft' currently publishes."
+                    //
+                    // For a list it did, every time. The trip branch above has
+                    // passed asDraft since drafts existed; this one never took
+                    // the argument at all, so it defaulted to false and a list
+                    // saved as a draft went straight onto everyone's feed. The
+                    // button did the one thing it promised not to.
+                    asDraft: asDraft,
                     // Oct 5 — admins can post a list as REX. Its items stay
                     // under the admin's own account for the same reason a
                     // trip's stops do: they aren't posts of their own.
@@ -2237,6 +2300,10 @@ struct AddRexView: View {
                             // card.
                             showInFeed: false,
                             returningId: true,
+                            // A draft list's items are part of the draft. The
+                            // list itself was the visible half of this bug;
+                            // these would have stayed published underneath it.
+                            asDraft: asDraft,
                             // Oct 12 — "ensure the individual Rex don't come
                             // under our own accounts (see Phoebe's Halloween
                             // list)." They did. The list itself was posted as
