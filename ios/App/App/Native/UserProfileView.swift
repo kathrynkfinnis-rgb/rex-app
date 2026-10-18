@@ -7,6 +7,12 @@ struct UserProfileRoute: Hashable {
     let name: String
 }
 
+/// Oct 18 — so a tapped @mention in a comment can open this as a sheet.
+/// Pushing isn't available everywhere LikesCommentsView is presented.
+extension UserProfileRoute: Identifiable {
+    var id: String { userId }
+}
+
 /// Someone else's profile: who they are, what they've Rex'd, filterable by
 /// category — the read-only counterpart to ProfileView.
 struct UserProfileView: View {

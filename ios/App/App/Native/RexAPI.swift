@@ -2815,6 +2815,40 @@ final class RexAPI {
         }
     }
 
+    /// Oct 18 — "I should be able to see who Phoebe tagged in the comment."
+    ///
+    /// Mentions in a comment have been highlighted since 28 September but
+    /// were only ever coloured text: the one thing you want from seeing
+    /// `@phoebebragg` is to find out who that is, and there was nothing to
+    /// tap. This is the lookup that turns the name into somebody.
+    ///
+    /// Returns nil when the profile isn't visible, which RLS decides — a
+    /// username that resolves to nobody you can see is indistinguishable
+    /// from one that doesn't exist, and the caller treats both the same way.
+    func profileId(forUsername username: String) async -> String? {
+        let name = username.trimmingCharacters(in: .whitespaces)
+        guard !name.isEmpty, let token = try? await validToken() else { return nil }
+        var components = URLComponents(url: baseURL.appendingPathComponent("/rest/v1/profiles"), resolvingAgainstBaseURL: false)!
+        components.queryItems = [
+            URLQueryItem(name: "select", value: "id"),
+            // Usernames are compared case-insensitively here because people
+            // type them from memory; the trigger that sends the notification
+            // does the same.
+            URLQueryItem(name: "username", value: "ilike.\(name)"),
+            URLQueryItem(name: "limit", value: "1"),
+        ]
+        guard let url = components.url else { return nil }
+        var request = URLRequest(url: url)
+        request.setValue(anonKey, forHTTPHeaderField: "apikey")
+        request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+
+        guard let (data, response) = try? await URLSession.shared.data(for: request),
+              let http = response as? HTTPURLResponse, http.statusCode < 400
+        else { return nil }
+        struct Row: Codable { let id: String }
+        return (try? JSONDecoder().decode([Row].self, from: data))?.first?.id
+    }
+
     func fetchProfiles(ids: [String]) async throws -> [RexProfileDetail] {
         guard !ids.isEmpty else { return [] }
         let token = try await validToken()

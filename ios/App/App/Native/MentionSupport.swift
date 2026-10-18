@@ -114,6 +114,17 @@ struct MentionPicker: View {
 struct MentionedText: View {
     let text: String
     var font: Font = RexFont.text(14)
+    /// Oct 18 — "I should be able to see who Phoebe tagged in the comment."
+    ///
+    /// Highlighting told you a mention was a mention and then offered nothing
+    /// to do about it. Given this, each `@name` becomes tappable and hands
+    /// back the username; without it the text behaves exactly as before, so
+    /// every other caller is unaffected.
+    var onMention: ((String) -> Void)? = nil
+
+    /// A scheme of our own, so the tap handler can tell a mention from a real
+    /// link in the same comment and leave the latter alone.
+    private static let scheme = "rex-mention"
 
     /// Same pattern as the database trigger, so what's highlighted here is
     /// exactly what will have notified someone.
@@ -145,6 +156,12 @@ struct MentionedText: View {
                let range = Range(at..<end, in: result) {
                 result[range].foregroundColor = RexColor.primary
                 result[range].font = font.weight(.semibold)
+                // Only when somebody is listening. A link with no handler
+                // would hand the tap to the system, which would try to open
+                // rex-mention:// and do nothing visible.
+                if onMention != nil, let url = URL(string: "\(Self.scheme)://\(name)") {
+                    result[range].link = url
+                }
             }
             guard end < text.endIndex else { break }
             searchStart = end
@@ -156,5 +173,15 @@ struct MentionedText: View {
         Text(attributed)
             .font(font)
             .fixedSize(horizontal: false, vertical: true)
+            .environment(\.openURL, OpenURLAction { url in
+                // Ours, or somebody's actual link. A comment can hold both,
+                // and an http link in one must keep opening the way it
+                // always has.
+                guard url.scheme == Self.scheme, let name = url.host() else {
+                    return .systemAction
+                }
+                onMention?(name)
+                return .handled
+            })
     }
 }

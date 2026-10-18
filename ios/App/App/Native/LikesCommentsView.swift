@@ -18,6 +18,12 @@ struct LikesCommentsView: View {
     }
 
     @State private var likeCount = 0
+    /// Oct 18 — whoever was tapped in a comment, once their username has
+    /// been resolved to a profile. A sheet rather than a push: this view is
+    /// presented from several places, some with a navigation stack of their
+    /// own and some without, and a sheet works the same in all of them.
+    @State private var mentionedProfile: UserProfileRoute?
+    @State private var mentionLookupFailed = false
     @State private var likedByMe = false
     @State private var comments: [RexComment] = []
     @State private var draft = ""
@@ -170,6 +176,30 @@ struct LikesCommentsView: View {
         .sheet(isPresented: $showingLikers) {
             likersSheet
         }
+        .sheet(item: $mentionedProfile) { route in
+            NavigationStack { UserProfileView(route: route) }
+                .tint(RexColor.primary)
+        }
+        .alert("Couldn't open that", isPresented: $mentionLookupFailed) {
+            Button("OK", role: .cancel) {}
+        } message: {
+            Text("That username doesn't match anyone you can see.")
+        }
+    }
+
+    /// Turns a tapped `@name` into the person behind it.
+    ///
+    /// A mention is only text — the trigger that notifies someone matches the
+    /// same pattern, but nothing stores which profile it meant, so this looks
+    /// it up on the way. A name that resolves to nobody visible says so
+    /// rather than doing nothing, because a tap that silently fails is how
+    /// the highlighted-but-dead version felt in the first place.
+    private func openMention(_ username: String) async {
+        guard let id = await RexAPI.shared.profileId(forUsername: username) else {
+            mentionLookupFailed = true
+            return
+        }
+        mentionedProfile = UserProfileRoute(userId: id, name: username)
     }
 
     /// Opens the box and puts the cursor in it. One place, because the comment
@@ -449,7 +479,9 @@ struct LikesCommentsView: View {
                 if editingId == comment.id {
                     editor(for: comment)
                 } else {
-                    MentionedText(text: comment.body)
+                    MentionedText(text: comment.body) { username in
+                        Task { await openMention(username) }
+                    }
                     // Oct 14 — "can't reply to comments even when clicking
                     // 'reply' button." It was eleven-point text with no
                     // padding and no contentShape: a target about thirty
