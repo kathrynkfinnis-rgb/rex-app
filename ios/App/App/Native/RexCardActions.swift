@@ -18,6 +18,17 @@ struct RexCardActions: View {
 
     @State private var liked = false
     @State private var likeCount = 0
+    /// Oct 18 — "perhaps here it should say 'Kathryn and X others' so that
+    /// it's easier to click on the hyperlink. At the moment, hard to press on
+    /// the number to see who's liked it."
+    ///
+    /// The number sat inside the heart button, so pressing it liked the post
+    /// rather than showing who had. A line of its own, with a name on it, is
+    /// both a real target and something you can read at a glance. Empty for a
+    /// want, whose likes live in their own table and carry no names yet, and
+    /// for anyone whose profile is hidden — then the row stays as it was.
+    @State private var likerNames: [String] = []
+    @State private var showingLikers = false
     @State private var wanted = false
     @State private var commentCount = 0
     @State private var busy = false
@@ -67,6 +78,7 @@ struct RexCardActions: View {
         // the fight against the poster's name on the other end of the row,
         // which is what actually truncated first since Text compresses
         // before a Button's intrinsic icon size does.
+        VStack(alignment: .leading, spacing: RexSpacing.xs) {
         HStack(spacing: RexSpacing.md) {
             // Shown always, count included, same as the reference design —
             // unlike heart/comment (which hide a zero count), this one's
@@ -162,10 +174,34 @@ struct RexCardActions: View {
                 .accessibilityLabel("Share with friends")
             }
         }
+        if !likerNames.isEmpty {
+            Button { showingLikers = true } label: {
+                Text(likedByLine)
+                    .font(RexFont.text(12))
+                    .foregroundStyle(RexColor.mutedForeground)
+                    .lineLimit(1)
+                    .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+            .accessibilityLabel("See who liked this")
+        }
+        }
         .sheet(isPresented: $showingRexers) {
             RexersSheetView(itemId: rec.item_id, itemTitle: rec.items?.title ?? "this")
         }
+        .sheet(isPresented: $showingLikers) {
+            LikersSheetView(recommendationId: rec.id)
+        }
         .task { await loadState() }
+    }
+
+    /// "Liked by Phoebe", "Liked by Phoebe and 3 others". Your own like is
+    /// never the name — the filled heart beside it already says that.
+    private var likedByLine: String {
+        guard let first = likerNames.first else { return "" }
+        let others = likeCount - 1
+        if others <= 0 { return "Liked by \(first)" }
+        return "Liked by \(first) and \(others) \(others == 1 ? "other" : "others")"
     }
 
     /// `label` doubles as the accessibility label and, when the action is on,
@@ -220,6 +256,7 @@ struct RexCardActions: View {
         if let entry = try? await RexAPI.shared.fetchLikeState(recommendationIds: [rec.id])[rec.id] {
             likeCount = entry.count
             liked = entry.likedByMe
+            likerNames = entry.names
         }
         commentCount = (try? await RexAPI.shared.fetchCommentCounts(recommendationIds: [rec.id])[rec.id]) ?? 0
     }
@@ -262,5 +299,78 @@ struct RexCardActions: View {
             wanted = !next
         }
         busy = false
+    }
+}
+
+/// Oct 18 — who liked this, opened from the "Liked by…" line on a card.
+///
+/// LikesCommentsView has had a likers sheet since 3 October ("You can't see
+/// who liked a post", reported twice), but only reachable from inside that
+/// screen. The card now has a line worth tapping, so it needs somewhere to
+/// go without first opening comments.
+struct LikersSheetView: View {
+    let recommendationId: String
+
+    @Environment(\.dismiss) private var dismiss
+    @State private var likers: [RexProfileDetail] = []
+    @State private var isLoading = true
+
+    var body: some View {
+        NavigationStack {
+            Group {
+                if isLoading && likers.isEmpty {
+                    ProgressView().frame(maxWidth: .infinity, maxHeight: .infinity)
+                } else if likers.isEmpty {
+                    Text("Nobody yet.")
+                        .font(RexFont.text(14))
+                        .foregroundStyle(RexColor.mutedForeground)
+                        .frame(maxWidth: .infinity, maxHeight: .infinity)
+                } else {
+                    ScrollView {
+                        VStack(spacing: 0) {
+                            ForEach(likers) { person in
+                                NavigationLink(value: UserProfileRoute(
+                                    userId: person.id,
+                                    name: person.display_name ?? person.username
+                                )) {
+                                    HStack(spacing: RexSpacing.md) {
+                                        UserAvatarView(
+                                            url: person.avatar_url,
+                                            name: person.display_name ?? person.username,
+                                            size: 34
+                                        )
+                                        Text(person.display_name ?? person.username)
+                                            .font(RexFont.text(15, weight: .medium))
+                                            .foregroundStyle(RexColor.foreground)
+                                        Spacer(minLength: 0)
+                                    }
+                                    .padding(.horizontal, RexSpacing.page)
+                                    .padding(.vertical, RexSpacing.md)
+                                    .contentShape(Rectangle())
+                                }
+                                .buttonStyle(.plain)
+                                Divider().overlay(RexColor.divider)
+                                    .padding(.leading, RexSpacing.page)
+                            }
+                        }
+                    }
+                }
+            }
+            .background(RexColor.background.ignoresSafeArea())
+            .navigationTitle(likers.count == 1 ? "1 like" : "\(likers.count) likes")
+            .navigationBarTitleDisplayMode(.inline)
+            .navigationDestination(for: UserProfileRoute.self) { UserProfileView(route: $0) }
+            .toolbar {
+                ToolbarItem(placement: .topBarTrailing) {
+                    Button("Done") { dismiss() }
+                }
+            }
+        }
+        .presentationDetents([.medium, .large])
+        .tint(RexColor.primary)
+        .task {
+            likers = (try? await RexAPI.shared.fetchLikers(recommendationId: recommendationId)) ?? []
+            isLoading = false
+        }
     }
 }

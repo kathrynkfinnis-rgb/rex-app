@@ -4397,30 +4397,70 @@ final class RexAPI {
         }
     }
 
-    func fetchLikeState(recommendationIds: [String]) async throws -> [String: (count: Int, likedByMe: Bool)] {
+    /// Oct 18 — "perhaps here it should say 'Kathryn and X others' so that
+    /// it's easier to click on the hyperlink."
+    ///
+    /// The query already pulls every like row, so a name costs nothing extra
+    /// — only a join on the way. Names come back empty for anyone whose
+    /// profile RLS hides, and the caller falls back to the bare count, which
+    /// is what it showed before.
+    ///
+    /// The join is attempted and then dropped if the server refuses it: an
+    /// embed naming a foreign key that does not exist is a 400, and likes
+    /// disappearing from every card is far worse than a missing name.
+    func fetchLikeState(recommendationIds: [String]) async throws -> [String: (count: Int, likedByMe: Bool, names: [String])] {
         guard !recommendationIds.isEmpty else { return [:] }
         let token = try await validToken()
         let list = recommendationIds.joined(separator: ",")
-        var components = URLComponents(url: baseURL.appendingPathComponent("/rest/v1/recommendation_likes"), resolvingAgainstBaseURL: false)!
-        components.queryItems = [
-            URLQueryItem(name: "select", value: "recommendation_id,user_id"),
-            URLQueryItem(name: "recommendation_id", value: "in.(\(list))"),
-        ]
-        var request = URLRequest(url: components.url!)
-        request.setValue(anonKey, forHTTPHeaderField: "apikey")
-        request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
 
-        let (data, response) = try await URLSession.shared.data(for: request)
-        guard let http = response as? HTTPURLResponse, http.statusCode < 400 else { return [:] }
+        struct LikeRow: Codable {
+            struct Profile: Codable { let username: String?; let display_name: String? }
+            let recommendation_id: String
+            let user_id: String
+            var profiles: Profile? = nil
+        }
 
-        struct LikeRow: Codable { let recommendation_id: String; let user_id: String }
-        let rows = try JSONDecoder().decode([LikeRow].self, from: data)
+        func rows(withNames: Bool) async -> [LikeRow]? {
+            var components = URLComponents(url: baseURL.appendingPathComponent("/rest/v1/recommendation_likes"), resolvingAgainstBaseURL: false)!
+            components.queryItems = [
+                URLQueryItem(name: "select", value: withNames
+                    ? "recommendation_id,user_id,profiles!recommendation_likes_user_id_fkey(username,display_name)"
+                    : "recommendation_id,user_id"),
+                URLQueryItem(name: "recommendation_id", value: "in.(\(list))"),
+            ]
+            guard let url = components.url else { return nil }
+            var request = URLRequest(url: url)
+            request.setValue(anonKey, forHTTPHeaderField: "apikey")
+            request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+            guard let (data, response) = try? await URLSession.shared.data(for: request),
+                  let http = response as? HTTPURLResponse, http.statusCode < 400,
+                  let decoded = try? JSONDecoder().decode([LikeRow].self, from: data)
+            else { return nil }
+            return decoded
+        }
+
+        // `??` would need an autoclosure, which cannot be async.
+        let decoded: [LikeRow]
+        if let named = await rows(withNames: true) {
+            decoded = named
+        } else if let plain = await rows(withNames: false) {
+            decoded = plain
+        } else {
+            return [:]
+        }
+
         let me = currentUserId
-        var result: [String: (count: Int, likedByMe: Bool)] = [:]
-        for row in rows {
-            var entry = result[row.recommendation_id] ?? (0, false)
+        var result: [String: (count: Int, likedByMe: Bool, names: [String])] = [:]
+        for row in decoded {
+            var entry = result[row.recommendation_id] ?? (0, false, [])
             entry.count += 1
-            if row.user_id == me { entry.likedByMe = true }
+            if row.user_id == me {
+                entry.likedByMe = true
+            } else if let name = row.profiles?.display_name ?? row.profiles?.username, !name.isEmpty {
+                // Yours is never the name shown — "you and 3 others" reads
+                // oddly on your own card, and the heart already says it.
+                entry.names.append(name)
+            }
             result[row.recommendation_id] = entry
         }
         return result
