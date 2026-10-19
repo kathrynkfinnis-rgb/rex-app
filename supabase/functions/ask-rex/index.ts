@@ -72,6 +72,9 @@ const CORS = {
 /** How many of a friend's Rex the model is allowed to see. Forty is enough to
  *  choose well from and small enough to keep the bill flat. */
 const CANDIDATE_LIMIT = 40;
+// Per keyword, not in total — four words at eight each, merged ahead of the
+// rating list and then cut to CANDIDATE_LIMIT with everything else.
+const KEYWORD_LIMIT = 8;
 /** When the question names a person, the shortlist is only their Rex, so a
  *  bigger slice costs the same order of tokens and covers more of their taste. */
 const PERSON_CANDIDATE_LIMIT = 60;
@@ -308,7 +311,34 @@ async function fetchCandidates(
     return [];
   }
 
-  return (data ?? []).map((row: Record<string, unknown>) => {
+  // Oct 19 — "Explore not working as there is a list on good bottles of
+  // wine." Asked for a good bottle of wine, Rex said nobody had Rex'd one
+  // and offered a wine bar in Dublin, while a list of exactly that sat in
+  // the app.
+  //
+  // The shortlist above is the highest-rated rows, in rating order, capped.
+  // typesFor() has no rule for wine — nor for most nouns — so nothing
+  // narrowed it to the question, and a list rated 9 simply lost its place to
+  // forty things rated 10. The model was asked about wine and handed whatever
+  // happened to be top of the table.
+  //
+  // So: a second pass that looks for the question's own words, merged in
+  // ahead of the rating list. Rating is a fine tiebreak between things that
+  // are about the right subject and a poor way of choosing the subject.
+  const matched = about ? [] : await fetchByKeywords(db, question, types);
+  const seen = new Set<string>();
+  const deduped: Record<string, unknown>[] = [];
+  // Keyword matches first, so they survive the cut; the rating list fills
+  // whatever room is left.
+  for (const row of [...matched, ...(data ?? [])]) {
+    const id = String((row as Record<string, unknown>).id);
+    if (seen.has(id)) continue;
+    seen.add(id);
+    deduped.push(row as Record<string, unknown>);
+    if (deduped.length >= CANDIDATE_LIMIT) break;
+  }
+
+  return deduped.map((row: Record<string, unknown>) => {
     const item = row.items as Record<string, unknown>;
     const who = row.profiles as Record<string, unknown> | null;
     return {
@@ -325,6 +355,70 @@ async function fetchCandidates(
       mine: String(row.user_id) === meId,
     };
   });
+}
+
+/** The words in a question worth searching for: the nouns, roughly. Stop
+ *  words removed so "a good bottle of wine" searches for bottle and wine
+ *  rather than for "a" and "good". */
+function keywordsFor(question: string): string[] {
+  const stop = new Set([
+    "a", "an", "the", "any", "some", "good", "best", "great", "nice", "top",
+    "what", "whats", "where", "which", "who", "can", "you", "i", "me", "my",
+    "we", "us", "for", "of", "to", "in", "on", "at", "is", "are", "do", "does",
+    "recommend", "recommendation", "recommendations", "rec", "recs", "rex",
+    "got", "have", "has", "anyone", "anybody", "something", "anything", "and",
+    "or", "with", "near", "nearby", "please", "find", "looking", "look",
+  ]);
+  return question
+    .toLowerCase()
+    .replace(/[^a-z0-9\s]/g, " ")
+    .split(/\s+/)
+    .filter((word) => word.length >= 3 && !stop.has(word))
+    .slice(0, 4);
+}
+
+/** Rows whose title, subtitle, genre or note mentions what was asked about.
+ *
+ *  Unlike the rating shortlist this includes things on a list or a trip: a
+ *  bottle of wine on somebody's wine list is a list item, and excluding those
+ *  is precisely why the wine list could not be found. It also allows an
+ *  unrated row, because a list itself carries no rating — what it is worth is
+ *  what is inside it. */
+async function fetchByKeywords(
+  db: ReturnType<typeof createClient>,
+  question: string,
+  types: string[],
+): Promise<Record<string, unknown>[]> {
+  const words = keywordsFor(question);
+  if (words.length === 0) return [];
+
+  const out: Record<string, unknown>[] = [];
+  for (const word of words) {
+    const escaped = word.replace(/[%,()]/g, "");
+    if (!escaped) continue;
+    let query = db
+      .from("recommendations")
+      .select(
+        "id,rating,note,item_id,user_id," +
+          "items!inner(id,type,title,subtitle,genre,address)," +
+          "profiles!recommendations_user_id_fkey(username,display_name)",
+      )
+      .or(
+        `title.ilike.*${escaped}*,subtitle.ilike.*${escaped}*,genre.ilike.*${escaped}*`,
+        { foreignTable: "items" },
+      )
+      .order("rating", { ascending: false })
+      .limit(KEYWORD_LIMIT);
+    if (types.length > 0) query = query.in("items.type", types);
+
+    const { data, error } = await query;
+    if (error) {
+      console.error("ask-rex keyword fetch failed", word, error);
+      continue;
+    }
+    out.push(...(data ?? []));
+  }
+  return out;
 }
 
 type Person = { id: string; name: string };

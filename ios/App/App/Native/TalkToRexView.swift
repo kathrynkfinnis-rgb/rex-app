@@ -214,6 +214,22 @@ struct TalkToRexView: View {
     // MARK: - Asking
 
     private var askBar: some View {
+        VStack(spacing: RexSpacing.xs) {
+            // Oct 19 — Kathryn: "maybe for Ask Rex we have a note that says
+            // we're testing and fine-tuning this feature so answers might not
+            // be the most polished or reliable."
+            //
+            // Above the field rather than under the answers: it sets the
+            // expectation before somebody asks, which is when it is worth
+            // having, instead of excusing a reply after they have read it.
+            Text("We're still fine-tuning this \u{2014} answers may not be the most polished or reliable yet.")
+                .font(RexFont.text(11))
+                .foregroundStyle(RexColor.mutedForeground)
+                .multilineTextAlignment(.center)
+                .fixedSize(horizontal: false, vertical: true)
+                .frame(maxWidth: .infinity)
+                .padding(.horizontal, RexSpacing.page)
+
         HStack(spacing: RexSpacing.sm) {
             TextField("Ask for anything", text: $question, axis: .vertical)
                 .lineLimit(1...4)
@@ -244,6 +260,8 @@ struct TalkToRexView: View {
                 .stroke(RexColor.border, lineWidth: 1)
         )
         .padding(.horizontal, RexSpacing.page)
+        }
+        .padding(.top, RexSpacing.xs)
         .padding(.bottom, RexSpacing.sm)
         .background(RexColor.background)
     }
