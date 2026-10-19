@@ -180,7 +180,11 @@ struct ContactsFriendFinderView: View {
 
     @State private var stage: Stage = .intro
     @State private var matches: [FoundPerson] = []
-    @State private var contactCount = 0
+    /// Counted separately so the empty case can say what was actually
+    /// checked. These used to be collapsed into one max() of the two, which
+    /// reported a number belonging to neither.
+    @State private var emailCount = 0
+    @State private var phoneCount = 0
     @State private var busyIds: Set<String> = []
     @State private var errorMessage: String?
 
@@ -231,7 +235,11 @@ struct ContactsFriendFinderView: View {
             Text("See who you know on Rex")
                 .font(RexFont.display(22, weight: .semibold))
                 .foregroundStyle(RexColor.foreground)
-            Text("We check the email addresses in your contacts against people on Rex. They\u{2019}re scrambled on your phone before anything is sent, and nothing is stored.")
+            // Oct 19 — "it appears to be searching by email rather than phone
+            // number". It hasn't been email-only since 29 September, but this
+            // line was written before numbers were added and never caught up,
+            // so the screen has been describing half of what it does.
+            Text("We check the phone numbers and email addresses in your contacts against people on Rex. They\u{2019}re scrambled on your phone before anything is sent, and nothing is stored.")
                 .font(RexFont.text(14))
                 .foregroundStyle(RexColor.mutedForeground)
             Button {
@@ -267,9 +275,7 @@ struct ContactsFriendFinderView: View {
                 Text("No one yet")
                     .font(RexFont.display(20, weight: .semibold))
                     .foregroundStyle(RexColor.foreground)
-                Text(contactCount == 0
-                     ? "None of your contacts have an email address saved, so there was nothing to check."
-                     : "None of the \(contactCount) email addresses in your contacts are on Rex yet \u{2014} invite a few below.")
+                Text(checkedLine)
                     .font(RexFont.text(14))
                     .foregroundStyle(RexColor.mutedForeground)
             }
@@ -284,6 +290,22 @@ struct ContactsFriendFinderView: View {
                     }
                 }
             }
+        }
+    }
+
+    /// What was actually checked, named rather than totalled — somebody whose
+    /// contacts are all numbers and no addresses should be told that, not
+    /// given a count of a thing they don't have.
+    private var checkedLine: String {
+        switch (phoneCount, emailCount) {
+        case (0, 0):
+            return "Your contacts have no phone numbers or email addresses saved, so there was nothing to check."
+        case (let phones, 0):
+            return "None of the \(phones) phone number\(phones == 1 ? "" : "s") in your contacts are on Rex yet — invite a few below."
+        case (0, let emails):
+            return "None of the \(emails) email address\(emails == 1 ? "" : "es") in your contacts are on Rex yet — invite a few below."
+        case (let phones, let emails):
+            return "None of the \(phones) number\(phones == 1 ? "" : "s") and \(emails) address\(emails == 1 ? "" : "es") in your contacts are on Rex yet — invite a few below."
         }
     }
 
@@ -340,11 +362,10 @@ struct ContactsFriendFinderView: View {
             }
             return (Array(emails), Array(phones))
         }.value
-        let hashes = emailHashes
-
-        contactCount = max(emailHashes.count, phoneHashes.count)
+        emailCount = emailHashes.count
+        phoneCount = phoneHashes.count
         do {
-            async let byEmail = RexAPI.shared.matchContactEmails(hashes: hashes)
+            async let byEmail = RexAPI.shared.matchContactEmails(hashes: emailHashes)
             async let byPhone = RexAPI.shared.matchContactPhones(hashes: phoneHashes)
             // The same person can match on both; keyed by id so they appear once.
             var merged: [String: FoundPerson] = [:]
