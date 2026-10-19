@@ -2482,6 +2482,11 @@ final class RexAPI {
             URLQueryItem(name: "select", value: select),
             URLQueryItem(name: "user_id", value: "eq.\(official)"),
             URLQueryItem(name: "published_at", value: "is.null"),
+            // A trip's stops are not separately postable — publishing a stop
+            // while its trip is still queued would put a loose place in the
+            // feed belonging to an itinerary nobody can see. One card per
+            // trip; publishQueuedPost takes the stops with it.
+            URLQueryItem(name: "trip_id", value: "is.null"),
             // Soonest first, and anything without a time after it.
             URLQueryItem(name: "order", value: "scheduled_at.asc.nullslast,created_at.desc"),
             URLQueryItem(name: "limit", value: "100"),
@@ -2499,16 +2504,25 @@ final class RexAPI {
     /// Posts a queued suggestion now. Clears the schedule as well, so a row
     /// published by hand is not left looking like it is still waiting.
     func publishQueuedPost(id: String) async throws {
+        let stamp = ISO8601DateFormatter().string(from: Date())
+        // The trip itself first. If this is a trip, its stops follow on the
+        // same stamp — a published itinerary whose stops are still queued
+        // opens as an empty trip, which is worse than not posting it.
+        try await publishRows(matching: URLQueryItem(name: "id", value: "eq.\(id)"), at: stamp)
+        try await publishRows(matching: URLQueryItem(name: "trip_id", value: "eq.\(id)"), at: stamp)
+    }
+
+    private func publishRows(matching filter: URLQueryItem, at stamp: String) async throws {
         let token = try await validToken()
         var components = URLComponents(url: baseURL.appendingPathComponent("/rest/v1/recommendations"), resolvingAgainstBaseURL: false)!
-        components.queryItems = [URLQueryItem(name: "id", value: "eq.\(id)")]
+        components.queryItems = [filter]
         var request = URLRequest(url: components.url!)
         request.httpMethod = "PATCH"
         request.setValue(anonKey, forHTTPHeaderField: "apikey")
         request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
         request.httpBody = try JSONSerialization.data(withJSONObject: [
-            "published_at": ISO8601DateFormatter().string(from: Date()),
+            "published_at": stamp,
             "scheduled_at": NSNull(),
         ])
         let (data, response) = try await URLSession.shared.data(for: request)
