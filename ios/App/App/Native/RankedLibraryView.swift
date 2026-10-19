@@ -75,13 +75,24 @@ struct RankedLibraryView: View {
         .toolbar {
             // Oct 14 — "are you able to share your ranking with a friend?"
             // In the app, yes: a friend's rankings now sit on their profile.
-            // Outside it, this — the order as plain text, which is what the
-            // thing actually is. No share page yet, so nothing pretends there
-            // is a link to open.
+            // Outside it, this was the order as plain text, with a note
+            // saying no share page existed so nothing pretended there was a
+            // link to open.
+            //
+            // Oct 19 — there is one now: find-rex.com/k/<user>/<category>,
+            // which renders the whole ordered list. The text goes with it,
+            // because a ranking read in a group chat is useful on its own and
+            // not everybody taps a link.
             if !rows.isEmpty {
                 ToolbarItem(placement: .topBarTrailing) {
-                    ShareLink(item: shareText) {
-                        Image(systemName: "square.and.arrow.up")
+                    if let shareURL {
+                        ShareLink(item: shareURL, message: Text(shareText)) {
+                            Image(systemName: "square.and.arrow.up")
+                        }
+                    } else {
+                        ShareLink(item: shareText) {
+                            Image(systemName: "square.and.arrow.up")
+                        }
                     }
                 }
             }
@@ -188,6 +199,13 @@ struct RankedLibraryView: View {
 
     /// The ordering as a numbered list. The number is the whole point, so it
     /// survives being pasted into a message.
+    /// Whose ordering this is, as a link. Falls back to nothing — and so to
+    /// sharing plain text — if we somehow have no id for them.
+    private var shareURL: URL? {
+        guard let whose = route.userId ?? RexAPI.shared.currentUserId else { return nil }
+        return RexShareLink.rankingURL(userId: whose, category: route.category)
+    }
+
     private var shareText: String {
         let heading = isMine
             ? "My \(category.pluralLabel.lowercased()), in order"

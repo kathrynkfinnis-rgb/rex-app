@@ -24,6 +24,17 @@ enum RexShareLink {
         URL(string: "\(site)/c/\(listId)")
     }
 
+    /// Oct 19 — "are you able to share your ranking with a friend?" → "a
+    /// link to a page showing your ordered list."
+    ///
+    /// Keyed by whose and which, because a ranking is not one row with an id
+    /// the way a Rex is — it is every item you have placed in a category, in
+    /// order. Hence its own path rather than a share_links code, whose target
+    /// is a single uuid.
+    static func rankingURL(userId: String, category: String) -> URL? {
+        URL(string: "\(site)/k/\(userId)/\(category)")
+    }
+
     /// Oct 5 — "and can we truncate the link?" The short form of every link
     /// above: find-rex.com/s/k3n9pqd rather than sixty characters of UUID.
     /// The page it leads to is the same one, via a redirect — see
