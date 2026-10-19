@@ -73,6 +73,14 @@ struct FriendsView: View {
                 errorState(errorMessage)
             } else {
                 VStack(alignment: .leading, spacing: 0) {
+                    // Oct 19 — search first is right once you know people on
+                    // Rex and wrong before you do: it needs a username, and
+                    // on day one you don't have anybody's. So when you have
+                    // no friends yet, contacts and the invite link come
+                    // first and search sits under them. This is also the
+                    // order the onboarding find-friends step inherits, which
+                    // is where it matters most.
+                    if accepted.isEmpty { findFriendsCard }
                     searchSection
                     if let searchMessage {
                         Text(searchMessage)
@@ -82,7 +90,7 @@ struct FriendsView: View {
                             .padding(.bottom, 16)
                     }
                     if !searchResults.isEmpty { searchResultsSection }
-                    findFriendsCard
+                    if !accepted.isEmpty { findFriendsCard }
                     let suggestedVisible = suggested.filter { !alreadyConnected($0.id) }
                     if !suggestedVisible.isEmpty {
                         section("Suggested for you", rows: suggestedVisible.map { .suggested($0) })

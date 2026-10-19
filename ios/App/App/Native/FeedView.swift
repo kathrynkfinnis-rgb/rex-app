@@ -784,6 +784,9 @@ struct FeedView: View {
             .navigationDestination(for: FriendsRoute.self) { _ in
                 FriendsView()
             }
+            .navigationDestination(for: ContactsRoute.self) { _ in
+                ContactsFriendFinderView()
+            }
             .navigationDestination(for: FeedbackRoute.self) { _ in
                 FeedbackView()
             }
@@ -1735,19 +1738,74 @@ struct FeedView: View {
         }
     }
 
+    /// Oct 19 — "new joiners land with an empty app and no obvious way to
+    /// find anyone". This screen said "Add friends or follow a creator" and
+    /// then offered no way to do either: no button, nothing tappable, and
+    /// the only route to people was a small two-person icon in the toolbar.
+    ///
+    /// So the first thing a new person sees now carries the three routes
+    /// that actually work on day one, in the order they work in. Contacts
+    /// first, because matching addresses is the only mechanism that finds
+    /// anyone when you have no friends at all — Suggested-for-you on the
+    /// Friends screen is friends-of-friends, and with zero friends it
+    /// returns nothing. Then the invite link, for when nobody you know has
+    /// joined yet. Then search, which needs a username you probably don't
+    /// have.
+    ///
+    /// Top Rexxers sits underneath: real people on Rex, tappable through to
+    /// their profiles, and the quickest way to a feed that isn't empty.
     private var emptyState: some View {
-        VStack(spacing: RexSpacing.md) {
-            Text("Your feed is empty")
-                .font(RexFont.display(22, weight: .semibold))
-                .foregroundStyle(RexColor.foreground)
-            Text("Add friends or follow a creator — their picks will land here.")
-                .font(RexFont.text(14))
-                .foregroundStyle(RexColor.mutedForeground)
-                .multilineTextAlignment(.center)
+        VStack(spacing: RexSpacing.lg) {
+            VStack(spacing: RexSpacing.sm) {
+                Text("Your feed is empty")
+                    .font(RexFont.display(22, weight: .semibold))
+                    .foregroundStyle(RexColor.foreground)
+                Text("Rex works best with the people you actually ask. Find them, and their picks land here.")
+                    .font(RexFont.text(14))
+                    .foregroundStyle(RexColor.mutedForeground)
+                    .multilineTextAlignment(.center)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+
+            VStack(spacing: RexSpacing.sm) {
+                NavigationLink(value: ContactsRoute()) {
+                    Text("See who you know on Rex")
+                        .font(.system(size: 16, weight: .semibold))
+                        .foregroundStyle(RexColor.primaryForeground)
+                        .frame(maxWidth: .infinity)
+                        .frame(height: 50)
+                        .background(RexColor.primary)
+                        .clipShape(RoundedRectangle(cornerRadius: RexRadius.button, style: .continuous))
+                }
+                .buttonStyle(.plain)
+
+                ShareLink(item: RexInvite.link, message: Text(RexInvite.message)) {
+                    Text("Invite a friend")
+                        .font(.system(size: 16, weight: .semibold))
+                        .foregroundStyle(RexColor.primary)
+                        .frame(maxWidth: .infinity)
+                        .frame(height: 50)
+                        .overlay(
+                            RoundedRectangle(cornerRadius: RexRadius.button, style: .continuous)
+                                .stroke(RexColor.primary, lineWidth: 1)
+                        )
+                }
+                .buttonStyle(.plain)
+
+                NavigationLink(value: FriendsRoute()) {
+                    Text("Search by name")
+                        .font(RexFont.text(14, weight: .semibold))
+                        .foregroundStyle(RexColor.mutedForeground)
+                        .frame(height: 32)
+                }
+                .buttonStyle(.plain)
+            }
+
+            TopRexxersView()
         }
-        .padding(RexSpacing.xxl)
+        .padding(.horizontal, RexSpacing.page)
+        .padding(.vertical, RexSpacing.xl)
         .frame(maxWidth: .infinity)
-        .padding(.top, RexSpacing.xxl)
     }
 
     private var noMatchesState: some View {

@@ -13,6 +13,12 @@ enum RexInvite {
     static let message = "I\u{2019}m using Rex to share recommendations with friends \u{2014} places, books, trips, the lot. Join me:"
 }
 
+/// Oct 19 — the contacts finder used to be reachable only from inside the
+/// Friends screen, which is two taps behind an icon a new person has no
+/// reason to press. It has a route of its own now so the empty feed can
+/// send someone straight to it.
+struct ContactsRoute: Hashable {}
+
 // MARK: - Person row
 
 /// One person with the right button for where you stand with them: Add,

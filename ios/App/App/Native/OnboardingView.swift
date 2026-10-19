@@ -177,7 +177,12 @@ struct OnboardingView: View {
                 Text("Find your friends")
                     .font(RexFont.display(28, weight: .semibold))
                     .foregroundStyle(RexColor.foreground)
-                Text("REX is only as good as the people in it. Search for anyone you know who's already here.")
+                // Oct 19 — this used to say "search for anyone you know
+                // who's already here", which is the one thing that can't
+                // work yet: searching needs a username, and nobody has
+                // anybody's on their first morning. Checking contacts does
+                // work, so that's what it points at.
+                Text("REX is only as good as the people in it. Check your contacts to see who's already here \u{2014} or send a friend the link.")
                     .font(RexFont.text(15))
                     .foregroundStyle(RexColor.mutedForeground)
                     .fixedSize(horizontal: false, vertical: true)
