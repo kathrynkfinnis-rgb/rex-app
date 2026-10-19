@@ -58,6 +58,17 @@ const PREF_COLUMN: Record<string, string> = {
   blast_new: "blast_new",
   blast_comment: "blast_comment",
   friend_new_rec: "friend_new_rec",
+  // Oct 19 — these five had no entry, which did two things. They fell
+  // through notifCopy to "New activity on REX" ("this gave me the
+  // notification 'new activity on REX' but it should say 'someone has also
+  // replied to a blast'", and before that Rachel's reply) — and, worse, an
+  // unmapped type skipped the preference block entirely, so it never checked
+  // push_enabled either. A type nobody had taught this map about pushed to
+  // people who had push switched off.
+  blast_comment_thread: "blast_comment",
+  want_tagged: "rec_tagged",
+  mention: "mention",
+  rec_saved: "rec_saved",
 };
 
 function notifCopy(type: string, actorName: string, data: Record<string, unknown>): string {
@@ -69,7 +80,23 @@ function notifCopy(type: string, actorName: string, data: Record<string, unknown
     case "friend_request": return `${actorName} sent you a friend request`;
     case "friend_accepted": return `${actorName} accepted your friend request`;
     case "blast_new": return `${actorName} put out a blast${data?.title ? `: "${data.title}"` : ""}`;
-    case "blast_comment": return `${actorName} replied to your blast`;
+    case "blast_comment":
+      return data?.has_suggestion
+        ? `${actorName} suggested something on your blast`
+        : `${actorName} replied to your blast`;
+    // Oct 14 in the app, and only now here: "if I reply on a blast, and then
+    // someone else replies, I should also get a notification." "Also",
+    // because you are in this one already.
+    case "blast_comment_thread":
+      return data?.title
+        ? `${actorName} also replied on "${data.title}"`
+        : `${actorName} also replied to a blast`;
+    case "want_tagged":
+      return data?.title
+        ? `${actorName} wants to try ${data.title} with you`
+        : `${actorName} wants to try something with you`;
+    case "mention": return `${actorName} tagged you in a comment`;
+    case "rec_saved": return `${actorName} saved your Rex`;
     case "friend_new_rec": return `${actorName} Rex'd ${data?.title || "something new"}`;
     default: return "New activity on REX";
   }
@@ -172,17 +199,26 @@ Deno.serve(async (req: Request) => {
   const supabase = createClient(SUPABASE_URL, SERVICE_ROLE_KEY);
 
   const prefColumn = PREF_COLUMN[notification.type];
-  if (prefColumn) {
+  {
+    // Oct 19 — this used to be `if (prefColumn)`, so a type missing from the
+    // map above skipped the whole block: no category check, and no
+    // push_enabled check either. Push defaults off until someone opts in, and
+    // an unrecognised type was quietly ignoring that. Unknown types are
+    // gated on push_enabled alone now — the category cannot be judged, but
+    // "I turned push off" always can.
+    const columns = prefColumn ? `push_enabled, ${prefColumn}` : "push_enabled";
     const { data: prefs } = await supabase
       .from("notification_preferences")
-      .select(`push_enabled, ${prefColumn}`)
+      .select(columns)
       .eq("user_id", notification.user_id)
       .maybeSingle();
     // Defaults mirror notif_pref_enabled() in SQL: missing row means every
     // category is on except friend_new_rec, but push itself defaults off
     // until the user has explicitly opted in on the preferences screen.
     const pushEnabled = prefs?.push_enabled ?? false;
-    const categoryEnabled = prefs ? Boolean(prefs[prefColumn as keyof typeof prefs]) : prefColumn !== "friend_new_rec";
+    const categoryEnabled = !prefColumn
+      ? true
+      : (prefs ? Boolean(prefs[prefColumn as keyof typeof prefs]) : prefColumn !== "friend_new_rec");
     if (!pushEnabled || !categoryEnabled) {
       return new Response(JSON.stringify({ skipped: "preference off" }), { status: 200 });
     }
