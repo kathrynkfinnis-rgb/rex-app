@@ -5848,6 +5848,33 @@ final class RexAPI {
         }
     }
 
+    /// Oct 19 — "I added this to my want to try list and then I should be
+    /// able to see it both on my profile and add it to collections but I
+    /// can't do either."
+    ///
+    /// The second half needs the want itself. The item page knows whether you
+    /// want something — isWanted returns a bool — but not which row it is,
+    /// and AddWantToListView files the row. One lookup rather than fetching
+    /// every want you have to find one.
+    func myWant(forItem itemId: String) async -> WantRow? {
+        guard let token = try? await validToken(), let userId = currentUserId else { return nil }
+        var components = URLComponents(url: baseURL.appendingPathComponent("/rest/v1/wants"), resolvingAgainstBaseURL: false)!
+        components.queryItems = [
+            URLQueryItem(name: "select", value: "id,created_at,item_id,list_id,items(id,type,title,subtitle,image_url,genre,address)"),
+            URLQueryItem(name: "user_id", value: "eq.\(userId)"),
+            URLQueryItem(name: "item_id", value: "eq.\(itemId)"),
+            URLQueryItem(name: "limit", value: "1"),
+        ]
+        guard let url = components.url else { return nil }
+        var request = URLRequest(url: url)
+        request.setValue(anonKey, forHTTPHeaderField: "apikey")
+        request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+        guard let (data, response) = try? await URLSession.shared.data(for: request),
+              let http = response as? HTTPURLResponse, http.statusCode < 400
+        else { return nil }
+        return (try? JSONDecoder().decode([WantRow].self, from: data))?.first
+    }
+
     func fetchWants() async throws -> [WantRow] {
         let token = try await validToken()
         guard let userId = currentUserId else { throw RexAPIError.notSignedIn }
@@ -6579,6 +6606,48 @@ final class RexAPI {
                     recommendation_tags: nil
                 )
             }
+    }
+
+    /// Oct 19 — "I added this to my want to try list and then I should be
+    /// able to see it both on my profile..."
+    ///
+    /// Your profile has only ever shown recommendations — the comment on
+    /// open(_:) in ProfileView states it as fact: "Profile's own rows are
+    /// always real recommendations (never a want or blast)". So something you
+    /// said you wanted to try was nowhere on the page that is supposed to be
+    /// your things.
+    ///
+    /// Built on fetchWants() rather than the wants feed, because that one
+    /// leaves `items` nil and a card with no title is no use on a profile.
+    func fetchMyWantsAsRows() async -> [FeedRecommendation] {
+        guard let mine = currentUserId, let wants = try? await fetchWants() else { return [] }
+        let me = try? await fetchMyProfile()
+        let profile = me.map {
+            RexProfile(username: $0.username, display_name: $0.display_name, avatar_url: $0.avatar_url)
+        }
+        return wants.map { want in
+            FeedRecommendation(
+                id: "want-\(want.id)",
+                // A want has no rating, and zero is how the rest of the app
+                // already says so.
+                rating: 0,
+                note: nil,
+                created_at: want.created_at,
+                photo_url: nil,
+                photo_urls: nil,
+                tags: nil,
+                user_id: mine,
+                item_id: want.item_id,
+                items: want.items,
+                profiles: profile,
+                creators: nil,
+                trip_section: nil,
+                is_anonymous: false,
+                list_section: nil,
+                show_in_feed: nil,
+                recommendation_tags: nil
+            )
+        }
     }
 
     /// Best-effort: an empty result costs the card its faces, not its content.

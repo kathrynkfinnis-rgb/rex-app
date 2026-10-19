@@ -48,6 +48,9 @@ struct ItemDetailView: View {
     @State private var rating: Double = 10
     @State private var note: String = ""
     @FocusState private var noteFocused: Bool
+    /// Oct 19 — the want row behind "Want to try", so it can be filed into a
+    /// collection from here. Only fetched when you actually want this.
+    @State private var myWant: WantRow?
     @State private var isSaving = false
     /// Oct 4 — whether the note is being edited. A take you've already written
     /// shows as text until you ask to change it.
@@ -82,12 +85,17 @@ struct ItemDetailView: View {
     /// FeedView.ActiveSheet.
     private enum ActiveSheet: Identifiable {
         case collection(FeedRecommendation)
+        /// Oct 19 — filing a want. A collection holds recommendations, and a
+        /// want has no recommendation row, so it is filed on the want itself
+        /// (wants.list_id) by a different sheet.
+        case wantCollection(WantRow)
         case edit(FeedRecommendation)
         /// Oct 13 — Joe's ordering: place this one against the rest.
         case rank
         var id: String {
             switch self {
             case .collection(let rec): return "collection-\(rec.id)"
+            case .wantCollection(let want): return "wantCollection-\(want.id)"
             case .edit(let rec): return "edit-\(rec.id)"
             case .rank: return "rank"
             }
@@ -289,10 +297,30 @@ struct ItemDetailView: View {
         // An icon rather than words, because the bar has room for one of
         // those and the sheet it opens says what it is.
         .toolbar {
+            // Oct 19 — "I added this to my want to try list and then I should
+            // be able to... add it to collections but I can't."
+            //
+            // The button only appeared when there was a recommendation to
+            // hang the collection entry on. Want something nobody has Rex'd
+            // and there is none, so the button was simply absent — the one
+            // case where you most want to file it for later. A want is filed
+            // on itself instead; the sheet to do it has existed since 18
+            // September and was reachable only from the feed.
             if let collectionTargetRec {
                 ToolbarItem(placement: .topBarTrailing) {
                     Button {
                         activeSheet = .collection(collectionTargetRec)
+                    } label: {
+                        Image(systemName: "folder.badge.plus")
+                            .font(.system(size: 15, weight: .medium))
+                            .foregroundStyle(RexColor.primary)
+                    }
+                    .accessibilityLabel("Save to collection")
+                }
+            } else if let myWant {
+                ToolbarItem(placement: .topBarTrailing) {
+                    Button {
+                        activeSheet = .wantCollection(myWant)
                     } label: {
                         Image(systemName: "folder.badge.plus")
                             .font(.system(size: 15, weight: .medium))
@@ -309,6 +337,10 @@ struct ItemDetailView: View {
             switch sheet {
             case .collection(let rec):
                 AddToCollectionView(rec: rec, onDone: {})
+            case .wantCollection(let want):
+                AddWantToListView(want: want) { newListId in
+                    myWant?.list_id = newListId
+                }
             case .edit(let rec):
                 EditRexView(
                     rec: rec,
@@ -506,6 +538,7 @@ struct ItemDetailView: View {
                 myTicketLeads = await leads
             }
             wanted = (try? await wantedTask) ?? false
+            myWant = wanted ? await RexAPI.shared.myWant(forItem: itemId) : nil
             wanters = (await wantersTask)[itemId] ?? []
             wantPosts = await wantPostsTask
         } catch {

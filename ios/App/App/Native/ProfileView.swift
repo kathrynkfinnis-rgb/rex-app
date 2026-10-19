@@ -36,6 +36,11 @@ struct ProfileView: View {
 
     @State private var profile: RexProfileDetail?
     @State private var recommendations: [FeedRecommendation] = []
+    /// Oct 19 — how many of those rows are actual Rexes. Wants joined the
+    /// list so they show on your profile, but the stat card counts what you
+    /// have Rex'd and a want is the opposite of that: something you have not
+    /// got to yet.
+    @State private var rexTotal = 0
     @State private var isLoading = true
     @State private var errorMessage: String?
     @State private var selectedFilter: RexCategory?
@@ -336,12 +341,24 @@ struct ProfileView: View {
             // failing to load over it.
             async let friendshipsTask = RexAPI.shared.fetchFriendships()
             async let listsTask = RexAPI.shared.fetchLists()
+            // Oct 19 — "I added this to my want to try list and then I should
+            // be able to see it on my profile." It was nowhere on the page
+            // that is meant to be your things. Best-effort like the rest: a
+            // profile that loads without its wants beats one that fails over
+            // them.
+            async let wantsTask = RexAPI.shared.fetchMyWantsAsRows()
 
             profile = try await profileTask
-            recommendations = try await recommendationsTask
+            let myRex = try await recommendationsTask
+            // Newest first across both, so a want sits where its date puts it
+            // rather than in a block of its own.
+            recommendations = (myRex + (await wantsTask)).sorted {
+                ($0.createdDate ?? .distantPast) > ($1.createdDate ?? .distantPast)
+            }
             // "Who else has Rex'd this" was missing on your own profile —
             // it's the same social proof the feed already shows.
-            let itemIds = Array(Set(recommendations.map { $0.item_id }))
+            rexTotal = myRex.count
+            let itemIds = Array(Set(myRex.map { $0.item_id }))
             async let rexCountsTask = RexAPI.shared.fetchRexCounts(itemIds: itemIds)
 
             let friendships = (try? await friendshipsTask) ?? []
@@ -392,7 +409,7 @@ struct ProfileView: View {
             // "What you Rex" bars the web profile also had below it, which
             // Kathryn asked to drop in favour of going straight to the feed.
             HStack(spacing: RexSpacing.sm) {
-                statCard(value: "\(recommendations.count)", label: "REX")
+                statCard(value: "\(rexTotal)", label: "REX")
                 statCard(value: averageRatingText, label: "AVG RATING")
                 statCard(value: "\(friendCount)", label: "FRIENDS") {
                     // Pushed onto the same stack now that Friends isn't a
