@@ -324,12 +324,29 @@ enum RexSearch {
     /// "Barr Hill Gin" give nothing away — so asking both and merging beats
     /// guessing which to ask.
     private static func productLookup(_ q: String) async throws -> [RexSearchHit] {
+        // Oct 20 — "the product search now over defaults to food items. I just
+        // tried to search balance bike... that is not coming up."
+        //
+        // Two mistakes in how this was wired, both mine from an hour ago.
+        //
+        // The first was merging the two sources instead of falling back. Open
+        // Food Facts was appended to whatever Programmable Search returned, so
+        // a query it had no business answering still filled the list with
+        // groceries — and when the shops came back empty, groceries were the
+        // whole list. Programmable Search is nine retailers we chose: if it
+        // answers, that answer is better than anything a food database has, so
+        // it is asked first and alone.
+        //
+        // Both are still started together, because the common case is that
+        // the first one is empty and waiting for it before beginning the
+        // second would double the wait on exactly the searches that already
+        // feel slow.
         async let webResults = (try? await customSearch(q)) ?? []
         async let groceryResults = openFoodFacts(q)
         let web = await webResults
+        if !web.isEmpty { return web }
         let grocery = await groceryResults
-        let combined = web + grocery
-        if !combined.isEmpty { return combined }
+        if !grocery.isEmpty { return grocery }
         return await wikipedia(q)
     }
 
@@ -359,6 +376,18 @@ enum RexSearch {
         // they want to Rex.
         let local = await openFoodFactsHits(trimmed, country: localCountryTag)
         return local.isEmpty ? await openFoodFactsHits(trimmed, country: nil) : local
+    }
+
+    /// Whether every meaningful word of the query appears in the text. Words
+    /// of one or two letters are ignored — "of", "a", "no" carry no weight and
+    /// requiring them would reject good matches.
+    private static func matchesEveryWord(of query: String, in text: String) -> Bool {
+        let haystack = text.lowercased()
+        let words = query.lowercased()
+            .components(separatedBy: CharacterSet.alphanumerics.inverted)
+            .filter { $0.count >= 3 }
+        guard !words.isEmpty else { return true }
+        return words.allSatisfy { haystack.contains($0) }
     }
 
     /// The phone's own country as Open Food Facts spells it.
@@ -411,6 +440,14 @@ enum RexSearch {
                     .trimmingCharacters(in: .whitespaces), !brand.isEmpty,
                   let image = hit["image_front_small_url"] as? String, !image.isEmpty
             else { continue }
+            // The second mistake: no relevance check at all. Their search is
+            // an OR across tokens, so "balance bike" matched Butter Bike
+            // peanut butter and a protein brand called Balance — 49 results,
+            // not one of them a bike. Every word of three letters or more has
+            // to appear somewhere in the name or the brand, which keeps
+            // "olive oil" matching Tesco Extra Virgin Olive Oil and stops a
+            // single shared word dragging in a shelf of groceries.
+            guard matchesEveryWord(of: terms, in: "\(name) \(brand)") else { continue }
             let key = "\(name.lowercased())|\(brand.lowercased())"
             guard seen.insert(key).inserted else { continue }
             out.append(RexSearchHit(
