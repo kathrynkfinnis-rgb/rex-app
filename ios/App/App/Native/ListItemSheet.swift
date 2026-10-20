@@ -32,6 +32,21 @@ struct ListItemSheet: View {
     @State private var picked: RexSearchHit?
     @State private var title = ""
     @State private var linkURL = ""
+    /// Oct 20 — "When I'm creating a list, I can only add the place, I can't
+    /// add any commentary about it" (Danny).
+    ///
+    /// This was removed on 5 September on the reasoning in this view's doc —
+    /// a list item is usually a thing you'd buy or read, and a note is a box
+    /// nobody fills in. That held for a list of books and stopped holding
+    /// when lists started being used for places: "A Guide to Brixton Market"
+    /// is fifteen restaurants, and which one to go to for what is the whole
+    /// value of the list. Kathryn's call to put it back.
+    ///
+    /// Nothing else needed changing. DraftStop has carried `note` all along
+    /// for the trip builder's sake, and AddRexView's list loop already passes
+    /// it to createRecommendation — this sheet was hard-coding it to "" on
+    /// the way past, so the only thing missing was somewhere to type.
+    @State private var note = ""
     /// Sept 15 — fetching the picture (and name) from a pasted link.
     @State private var previewTask: Task<Void, Never>?
     @State private var isFetchingPreview = false
@@ -79,6 +94,16 @@ struct ListItemSheet: View {
                     Text("Paste a link and the picture fills in from the page.")
                         .font(RexFont.text(11.5))
                         .foregroundStyle(RexColor.mutedForeground)
+
+                    // Above the thumbnail rather than below it: what you have
+                    // to say about the thing matters more than its picture,
+                    // and a field under a photo picker reads as an
+                    // afterthought.
+                    field("Anything to say about it?") {
+                        TextField("Optional \u{2014} what makes it worth it", text: $note, axis: .vertical)
+                            .textFieldStyle(.plain)
+                            .lineLimit(2...5)
+                    }
 
                     VStack(alignment: .leading, spacing: RexSpacing.xs) {
                         Text("Thumbnail").font(RexFont.text(13, weight: .semibold))
@@ -243,6 +268,7 @@ struct ListItemSheet: View {
         type = existing.type
         title = existing.title
         linkURL = existing.linkURL ?? ""
+        note = existing.note
         photoURLs = [existing.photoURL ?? existing.imageURL].compactMap { $0 }
     }
 
@@ -354,9 +380,11 @@ struct ListItemSheet: View {
             imageURL: picked?.imageURL,
             externalId: picked?.externalSource == "rex" ? nil : picked?.externalId,
             externalSource: picked?.externalSource == "rex" ? nil : picked?.externalSource,
-            // No rating and no note by design — see this view's own doc.
+            // No rating by design — see this view's own doc. The note came
+            // back on 20 October; the rating did not, because a list is an
+            // ordered set of suggestions rather than a set of scores.
             rating: 0,
-            note: "",
+            note: note.trimmingCharacters(in: .whitespacesAndNewlines),
             section: existing?.section,
             photoURL: photoURLs.first,
             linkURL: trimmedLink.isEmpty ? nil : trimmedLink
