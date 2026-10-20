@@ -6095,7 +6095,7 @@ final class RexAPI {
         }
         let categoryFilter: [(String, String)] = ownerFilter + (category.map { [("items.type", "eq.\($0)")] } ?? [])
         let rows: [Row]
-        let profilesById: [String: RexProfile]
+        var profilesById: [String: RexProfile]
         if let trimmedSearch, !trimmedSearch.isEmpty {
             // Poster username/display_name search used to go through the
             // same profiles!wants_user_id_fkey embed that turned out to be
@@ -6128,6 +6128,29 @@ final class RexAPI {
             profilesById = Dictionary(
                 uniqueKeysWithValues: ((try? await fetchProfiles(ids: Array(Set(rows.map { $0.user_id })))) ?? [])
                     .map { ($0.id, RexProfile(username: $0.username, display_name: $0.display_name, avatar_url: $0.avatar_url)) }
+            )
+        }
+
+        // Oct 20 — "This Rex attributed the post to 'someone' in the feed but
+        // it's mine." The screenshot is a Wants-to-try card with no name, no
+        // avatar and no timestamp, which is precisely what the card renders
+        // when profiles is nil: that whole branch is a bare Text("Someone").
+        //
+        // The author comes from a batch profile lookup rather than an embed —
+        // the embed on wants has been broken since September, see this
+        // function's doc comment — and any id that lookup misses silently
+        // becomes a stranger. Your own want reading as somebody else's is the
+        // worst version of that, and it is also the one case the app can
+        // always answer for itself without another round trip to guess at.
+        //
+        // The same backstop is already on the collections builder above, put
+        // there for the same report in a different place. It belongs on both.
+        if let me = currentUserId, profilesById[me] == nil, rows.contains(where: { $0.user_id == me }),
+           let mine = try? await fetchMyProfile() {
+            profilesById[me] = RexProfile(
+                username: mine.username,
+                display_name: mine.display_name,
+                avatar_url: mine.avatar_url
             )
         }
 
