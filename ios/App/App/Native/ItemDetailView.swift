@@ -839,35 +839,6 @@ struct ItemDetailView: View {
                     .buttonStyle(.plain)
                 }
 
-                // Oct 20 — the Amazon pill, for the two categories where REX
-                // knows what the thing is and has no link to it. A book from
-                // Google Books carries no product URL, and a film's watch
-                // providers are TMDB's subscription list, which is a display
-                // of where it streams rather than somewhere to buy it.
-                //
-                // Last in the row deliberately. Booking a restaurant, opening
-                // the map, or the link somebody actually chose to attach are
-                // all things the person came here to do; this is the one that
-                // earns us money, and it does not get to go first.
-                //
-                // Labelled for what it does. "Rent or buy" on a film, because
-                // sending someone to Amazon for something already included
-                // with a subscription they have would be a worse answer to
-                // "where can I watch this" than the provider row above.
-                if let amazonURL = amazonSearchURL(for: item, category: category) {
-                    RexOutboundLinkButton(url: amazonURL) {
-                        HStack(spacing: 4) {
-                            Image(systemName: "cart").font(.system(size: 12))
-                            Text(category == .book ? "Buy on Amazon" : "Rent or buy on Amazon")
-                                .font(RexFont.text(12, weight: .semibold))
-                        }
-                        .foregroundStyle(RexColor.primary)
-                        .padding(.horizontal, RexSpacing.sm)
-                        .padding(.vertical, 6)
-                        .overlay(Capsule().stroke(RexColor.primary, lineWidth: 1))
-                    }
-                }
-
                 if let link = item.link_url, let url = URL(string: link), url.scheme?.hasPrefix("http") == true {
                     // Opens in Safari. Labelled with the site's own name so
                     // it's clear where you're going. Sept 21 — goes through
@@ -891,6 +862,42 @@ struct ItemDetailView: View {
             // Each pill keeps its natural width; the row scrolls if they
             // don't all fit.
             .fixedSize(horizontal: true, vertical: false)
+            }
+
+            // Oct 20 — the Amazon pill, for the two categories where REX knows
+            // what the thing is and has no link to it. A book from Google
+            // Books carries no product URL, and a film's watch providers are
+            // TMDB's subscription list: a display of where it streams, not
+            // somewhere to buy it.
+            //
+            // On its own line rather than in the row above, which is where it
+            // started. In that row it wrapped underneath the "wants to try"
+            // group and came to rest directly below somebody's avatar and
+            // truncated name, reading as though it were a label on them rather
+            // than an action on the book. A button that earns us money should
+            // not be ambiguous about what it refers to.
+            //
+            // Still after everything else, though. Booking a table, the map,
+            // and the link somebody chose to attach are all things the reader
+            // came for; this is the one that pays us, and it goes last.
+            //
+            // Labelled for what it does: "Rent or buy" on a film, because
+            // sending somebody to Amazon to pay for something already included
+            // with a subscription they have would be a worse answer than the
+            // provider row above it.
+            if let amazonURL = amazonSearchURL(for: item, category: category) {
+                RexOutboundLinkButton(url: amazonURL) {
+                    HStack(spacing: 4) {
+                        Image(systemName: "cart").font(.system(size: 12))
+                        Text(category == .book ? "Buy on Amazon" : "Rent or buy on Amazon")
+                            .font(RexFont.text(12, weight: .semibold))
+                    }
+                    .foregroundStyle(RexColor.primary)
+                    .padding(.horizontal, RexSpacing.sm)
+                    .padding(.vertical, 6)
+                    .overlay(Capsule().stroke(RexColor.primary, lineWidth: 1))
+                }
+                .padding(.top, RexSpacing.sm)
             }
         }
         .padding(16)
