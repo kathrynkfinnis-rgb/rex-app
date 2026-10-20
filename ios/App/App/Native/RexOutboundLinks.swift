@@ -51,6 +51,75 @@ enum RexOutboundLink {
     /// From the Skimlinks dashboard: publisher 309502, site X1797857.
     private static let skimlinksId = "309502X1797857"
 
+    // MARK: - Amazon Associates
+
+    /// Oct 20 — "sort out the amazon affiliate link".
+    ///
+    /// Amazon Associates is not the same shape as Skimlinks and is worth
+    /// keeping separate rather than folding into the flag above.
+    ///
+    /// Skimlinks bounces the person through go.skimresources.com, which lets
+    /// a third party watch them travel from REX to a purchase. That is
+    /// tracking under App Tracking Transparency, which is why everything
+    /// above waits on a system prompt. An Associates tag is a query
+    /// parameter on a link to Amazon that the person was already opening:
+    /// no third party, no redirect, no identifier, and nothing about them
+    /// sent anywhere. So this path does not ask, and does not need
+    /// NSUserTrackingUsageDescription back in Info.plist.
+    ///
+    /// Two things it does need, neither of them code, both noted in full in
+    /// the brief that goes with this:
+    ///
+    ///   * An approved Associates account per region. The tag is per store —
+    ///     a .co.uk tag earns nothing on .com — and approval requires three
+    ///     qualifying sales within 180 days or the account is closed.
+    ///   * The disclosure Amazon's Operating Agreement requires, displayed
+    ///     where people see the links. AffiliateLinksSection carries it.
+    ///
+    /// Empty until a tag exists: an unapproved or misspelled tag earns
+    /// nothing and is indistinguishable from a working one, so the only safe
+    /// default is to add no parameter at all and leave the link exactly as
+    /// the person wrote it.
+    private static let amazonTags: [String: String] = [
+        "amazon.co.uk": "",
+        "amazon.com": "",
+        "amazon.de": "",
+        "amazon.fr": "",
+        "amazon.es": "",
+        "amazon.it": "",
+        "amazon.ie": "",
+    ]
+
+    /// Whether any store has a tag configured. Drives the disclosure.
+    static var isAmazonAssociateActive: Bool {
+        amazonTags.values.contains { !$0.isEmpty }
+    }
+
+    /// The tag for whichever Amazon store this URL points at, matching on the
+    /// registrable domain so www., smile. and m. all resolve the same way.
+    private static func amazonTag(for host: String) -> String? {
+        let lower = host.lowercased()
+        for (domain, tag) in amazonTags where !tag.isEmpty {
+            if lower == domain || lower.hasSuffix(".\(domain)") { return tag }
+        }
+        return nil
+    }
+
+    /// Adds the Associates tag, or returns nil if this isn't an Amazon link
+    /// we have a tag for. An existing `tag` is left alone: it is somebody
+    /// else's, and overwriting another creator's attribution to take their
+    /// commission is not a thing REX should do quietly.
+    static func amazonTagged(_ url: URL) -> URL? {
+        guard let host = url.host, let tag = amazonTag(for: host),
+              var components = URLComponents(url: url, resolvingAgainstBaseURL: false)
+        else { return nil }
+        var items = components.queryItems ?? []
+        guard !items.contains(where: { $0.name == "tag" }) else { return nil }
+        items.append(URLQueryItem(name: "tag", value: tag))
+        components.queryItems = items
+        return components.url
+    }
+
     /// Asked once, the first time someone actually taps through to a shop —
     /// not at launch, where it arrives with no context and is refused out of
     /// hand. iOS only ever shows the real prompt once per install; after that
@@ -69,6 +138,13 @@ enum RexOutboundLink {
     /// The URL to actually open. Only ever decorated for http(s) links, and
     /// only when the person has said yes — anything else is returned untouched.
     static func resolved(_ url: URL) -> URL {
+        // Amazon first, and without asking: a tag on a link to the shop the
+        // person already chose is not tracking, so making them sit through a
+        // permission prompt to earn it would be asking for something we don't
+        // need. If they said no to Skimlinks, this still applies — the answer
+        // they gave was about being followed by a third party.
+        if let tagged = amazonTagged(url) { return tagged }
+
         guard isAffiliateProgrammeActive,
               isTrackingAllowed,
               let scheme = url.scheme?.lowercased(),
@@ -120,6 +196,12 @@ struct AffiliateLinksSection: View {
     @State private var status = ATTrackingManager.trackingAuthorizationStatus
 
     private var summary: String {
+        // With only Amazon live there is no permission to describe — nothing
+        // was asked and nothing is being tracked — so the ATT wording below
+        // would be describing a prompt that never appears.
+        if !RexOutboundLink.isAffiliateProgrammeActive {
+            return "Some shop links earn REX a small commission. It never costs you anything, it never changes what your friends recommend or the order you see it in, and nothing about you is shared with anyone."
+        }
         switch status {
         case .authorized:
             return "Shop links you tap may earn REX a small commission. It never costs you anything, and it never changes what your friends recommend or the order you see it in."
@@ -131,7 +213,12 @@ struct AffiliateLinksSection: View {
     }
 
     var body: some View {
-        if RexOutboundLink.isAffiliateProgrammeActive {
+        // Oct 20 — this used to appear only when Skimlinks was live. Amazon
+        // Associates needs it too, and for a stronger reason: their Operating
+        // Agreement requires the disclosure to be displayed, so a live tag
+        // with this section hidden is a breach of the terms rather than just
+        // an omission. Either programme being on is enough to show it.
+        if RexOutboundLink.isAffiliateProgrammeActive || RexOutboundLink.isAmazonAssociateActive {
         VStack(alignment: .leading, spacing: RexSpacing.sm) {
             Text("Shop links")
                 .font(RexFont.text(14, weight: .semibold))
@@ -141,10 +228,19 @@ struct AffiliateLinksSection: View {
                 .foregroundStyle(RexColor.mutedForeground)
                 .fixedSize(horizontal: false, vertical: true)
 
+            // The wording Amazon require, near enough verbatim — this is one
+            // of the few places where the phrasing is not ours to improve.
+            if RexOutboundLink.isAmazonAssociateActive {
+                Text("As an Amazon Associate, REX earns from qualifying purchases.")
+                    .font(RexFont.text(12))
+                    .foregroundStyle(RexColor.mutedForeground)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+
             // iOS only shows its own prompt once, so after that the only way
             // to change the answer is Settings. Say so plainly rather than
             // offering a button that would do nothing.
-            if status != .notDetermined {
+            if RexOutboundLink.isAffiliateProgrammeActive, status != .notDetermined {
                 Button("Change this in iOS Settings") {
                     if let url = URL(string: UIApplication.openSettingsURLString) { openURL(url) }
                 }
