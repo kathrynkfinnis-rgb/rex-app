@@ -297,10 +297,136 @@ enum RexSearch {
     /// once a session rather than on every keystroke.
     private static var customSearchIsDead = false
 
+    /// Oct 20 — "I think we need to improve the product search and buy", and
+    /// then: "need a better API to identify products."
+    ///
+    /// Three sources, in order of how much like a product the answer is.
+    ///
+    /// Programmable Search first, because a page on a shop we chose is the
+    /// best answer there is — but it is locked to nine sites, so anything
+    /// outside them comes back empty and used to fall straight to an
+    /// encyclopaedia. "Olive oil" returning the Wikipedia article on olive
+    /// oil is a reasonable thing for a search engine to do and a useless
+    /// thing for somebody trying to add a bottle they liked.
+    ///
+    /// Open Food Facts fills that gap for food and drink, which is most of
+    /// what Other is used for here — the lists we have are olive oils, wine,
+    /// dressings. It is free, needs no key, has no billing to enable and no
+    /// quota to blow, which three days after a £111 Google bill is not a
+    /// small part of why it was picked. Its products are real ones: a name, a
+    /// brand, a photograph of the actual bottle.
+    ///
+    /// Wikipedia stays last. It knows what Wingspan and Azul are, which no
+    /// shop and no food database does.
+    ///
+    /// The two are fetched together rather than in sequence. Food queries are
+    /// not reliably distinguishable from the rest — "Barr's Irn Bru" and
+    /// "Barr Hill Gin" give nothing away — so asking both and merging beats
+    /// guessing which to ask.
     private static func productLookup(_ q: String) async throws -> [RexSearchHit] {
-        let web = (try? await customSearch(q)) ?? []
-        if !web.isEmpty { return web }
+        async let webResults = (try? await customSearch(q)) ?? []
+        async let groceryResults = openFoodFacts(q)
+        let web = await webResults
+        let grocery = await groceryResults
+        let combined = web + grocery
+        if !combined.isEmpty { return combined }
         return await wikipedia(q)
+    }
+
+    /// Open Food Facts: an open database of groceries, contributed the way
+    /// Wikipedia is. No key, no account, no billing to enable.
+    ///
+    /// Checked against the live API rather than written from the docs, which
+    /// is how two things turned up. The endpoint everyone links to —
+    /// cgi/search.pl — answers 503 with an HTML holding page; they have been
+    /// moving off it and it is not something to depend on. And the country
+    /// filter is only honoured inside the query string in its quoted form,
+    /// `countries_tags:"en:united-kingdom"`; passed as its own parameter it is
+    /// accepted and silently ignored, which took the result count from 10,000
+    /// to 2,855 once it was actually applied. Unfiltered, a search for olive
+    /// oil returns Californian and French bottles to a London phone.
+    ///
+    /// Filtered harder than the other sources, because it is crowd-contributed
+    /// and the long tail is rough: entries with no name, no brand or no
+    /// photograph, and several copies of one product under different barcodes.
+    /// A result worth offering has all three. The barcode is the external id,
+    /// so two people adding the same bottle land on one item.
+    private static func openFoodFacts(_ q: String) async -> [RexSearchHit] {
+        let trimmed = q.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard trimmed.count >= 3 else { return [] }
+        // Sold here first. If that finds nothing, ask again without the
+        // filter — a jar somebody brought back from Italy is still the thing
+        // they want to Rex.
+        let local = await openFoodFactsHits(trimmed, country: localCountryTag)
+        return local.isEmpty ? await openFoodFactsHits(trimmed, country: nil) : local
+    }
+
+    /// The phone's own country as Open Food Facts spells it.
+    private static var localCountryTag: String? {
+        switch (Locale.current.region?.identifier ?? "GB").uppercased() {
+        case "GB": return "en:united-kingdom"
+        case "IE": return "en:ireland"
+        case "US": return "en:united-states"
+        case "FR": return "en:france"
+        case "DE": return "en:germany"
+        case "ES": return "en:spain"
+        case "IT": return "en:italy"
+        default: return nil
+        }
+    }
+
+    private static func openFoodFactsHits(_ terms: String, country: String?) async -> [RexSearchHit] {
+        var components = URLComponents(string: "https://search.openfoodfacts.org/search")!
+        let query = country.map { "\(terms) countries_tags:\"\($0)\"" } ?? terms
+        components.queryItems = [
+            URLQueryItem(name: "q", value: query),
+            URLQueryItem(name: "page_size", value: "12"),
+            // Without this their reply carries every nutrient and ingredient
+            // for every hit — tens of kilobytes per keystroke.
+            URLQueryItem(name: "fields", value: "code,product_name,brands,image_front_small_url"),
+        ]
+        guard let url = components.url else { return [] }
+        var request = URLRequest(url: url)
+        // They ask that apps identify themselves, and are within their rights
+        // to block anything that doesn't.
+        request.setValue("REX/1.0 (iOS; hello@find-rex.com)", forHTTPHeaderField: "User-Agent")
+        request.timeoutInterval = 8
+
+        guard let (data, response) = try? await URLSession.shared.data(for: request),
+              let http = response as? HTTPURLResponse, http.statusCode < 400,
+              let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+              // "hits", not "products" — that is the old endpoint's shape.
+              let hits = json["hits"] as? [[String: Any]]
+        else { return [] }
+
+        var seen = Set<String>()
+        var out: [RexSearchHit] = []
+        for hit in hits {
+            guard let code = hit["code"] as? String, !code.isEmpty,
+                  let name = (hit["product_name"] as? String)?
+                    .trimmingCharacters(in: .whitespacesAndNewlines), !name.isEmpty,
+                  // brands is an array here, not the comma-joined string the
+                  // old endpoint returned.
+                  let brand = (hit["brands"] as? [String])?.first?
+                    .trimmingCharacters(in: .whitespaces), !brand.isEmpty,
+                  let image = hit["image_front_small_url"] as? String, !image.isEmpty
+            else { continue }
+            let key = "\(name.lowercased())|\(brand.lowercased())"
+            guard seen.insert(key).inserted else { continue }
+            out.append(RexSearchHit(
+                externalId: code,
+                externalSource: "open_food_facts",
+                title: name,
+                subtitle: brand,
+                imageURL: image
+                // No productURL on purpose. Their page is a nutrition record,
+                // not a shop, and putting it behind "View product" would make
+                // the same wrong promise the Wikipedia fallback was making.
+                // Buying is the Amazon pill's job.
+            ))
+            if out.count == 6 { break }
+        }
+        return out
     }
 
     /// Everything Wikipedia knows, which for Other is most of what anybody
