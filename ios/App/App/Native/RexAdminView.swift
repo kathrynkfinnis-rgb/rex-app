@@ -2,6 +2,13 @@ import SwiftUI
 
 struct RexAdminRoute: Hashable {}
 
+/// Oct 19 — "we should split out the admin queue to post and the feedback
+/// into two separate links from the Settings page." Two jobs that were one
+/// screen: deciding what REX says, and reading what people tell you. They
+/// are done at different times and in different frames of mind, and the
+/// queue being empty is not a reason to stop looking at the feedback.
+struct RexFeedbackRoute: Hashable {}
+
 /// Oct 18 — "Rex is uploading recipes with no content — please stop uploading
 /// anything at the moment, but is there a way that you can suggest stuff and
 /// we can choose to post or not?" And then: "is that where I'd see the
@@ -20,7 +27,6 @@ struct RexAdminRoute: Hashable {}
 /// is the same thing where you already are.
 struct RexAdminView: View {
     @State private var queue: [FeedRecommendation] = []
-    @State private var feedback: [RexFeedbackEntry] = []
     @State private var isLoading = true
     @State private var errorMessage: String?
     @State private var busyId: String?
@@ -37,12 +43,11 @@ struct RexAdminView: View {
                 }
 
                 queueSection
-                feedbackSection
             }
             .padding(.vertical, RexSpacing.lg)
         }
         .background(RexColor.background.ignoresSafeArea())
-        .navigationTitle("REX admin")
+        .navigationTitle("Waiting to post")
         .navigationBarTitleDisplayMode(.inline)
         .refreshable { await load() }
         .task { await load() }
@@ -130,50 +135,6 @@ struct RexAdminView: View {
         return "Scheduled for " + date.formatted(.dateTime.day().month().hour().minute())
     }
 
-    // MARK: - Feedback
-
-    @ViewBuilder
-    private var feedbackSection: some View {
-        VStack(alignment: .leading, spacing: RexSpacing.sm) {
-            header("From the app's feedback button", count: written.count)
-
-            if written.isEmpty {
-                empty("Nothing sent yet. This is the ! button in the app \u{2014} TestFlight reports live in App Store Connect.")
-            } else {
-                VStack(spacing: 0) {
-                    ForEach(written) { entry in
-                        VStack(alignment: .leading, spacing: 3) {
-                            Text(entry.meta)
-                                .font(RexFont.text(11.5))
-                                .foregroundStyle(RexColor.mutedForeground)
-                            Text(entry.message)
-                                .font(RexFont.text(14))
-                                .foregroundStyle(RexColor.foreground)
-                                .fixedSize(horizontal: false, vertical: true)
-                        }
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                        .padding(.horizontal, RexSpacing.page)
-                        .padding(.vertical, RexSpacing.md)
-                        Divider().overlay(RexColor.divider)
-                            .padding(.leading, RexSpacing.page)
-                    }
-                }
-            }
-
-            if !diagnostics.isEmpty {
-                Text("\(diagnostics.count) push diagnostic\(diagnostics.count == 1 ? "" : "s") hidden \u{2014} the app logs those here too.")
-                    .font(RexFont.text(12))
-                    .foregroundStyle(RexColor.mutedForeground)
-                    .padding(.horizontal, RexSpacing.page)
-                    .padding(.top, RexSpacing.xs)
-            }
-        }
-    }
-
-    /// What a person actually wrote.
-    private var written: [RexFeedbackEntry] { feedback.filter { !$0.isDiagnostic } }
-    private var diagnostics: [RexFeedbackEntry] { feedback.filter(\.isDiagnostic) }
-
     // MARK: - Chrome
 
     private func header(_ title: String, count: Int) -> some View {
@@ -207,10 +168,7 @@ struct RexAdminView: View {
 
     private func load() async {
         errorMessage = nil
-        async let queued = RexAPI.shared.fetchOfficialQueue()
-        async let sent = RexAPI.shared.fetchAppFeedback()
-        queue = await queued
-        feedback = await sent
+        queue = await RexAPI.shared.fetchOfficialQueue()
         isLoading = false
     }
 
@@ -236,16 +194,4 @@ struct RexAdminView: View {
             errorMessage = error.localizedDescription
         }
     }
-}
-
-/// One line someone sent through the app's feedback button.
-struct RexFeedbackEntry: Identifiable {
-    let id: String
-    let message: String
-    let meta: String
-    /// Oct 18 — the table carries automated push-registration diagnostics as
-    /// well as what people type, and there are far more of the former. Mixed
-    /// together they bury the thing worth reading: the first screen of this
-    /// list was eight push failures and one real sentence.
-    let isDiagnostic: Bool
 }

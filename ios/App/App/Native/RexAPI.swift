@@ -2458,6 +2458,60 @@ final class RexAPI {
         return result
     }
 
+    /// Oct 19 — "only Kathryn should have that ability", about clearing a
+    /// piece of feedback once it's been dealt with.
+    ///
+    /// Admin wasn't the right test: Gemma was made an admin on 19 October so
+    /// she could see the queue, and three people ticking things off a shared
+    /// list is how two of them lose track of what's been read. So this is a
+    /// narrower thing than a role — one person, flagged on their profile.
+    ///
+    /// The flag is only what the app uses to decide whether to draw the
+    /// button. What actually stops anyone else is the update policy on
+    /// feedback, which asks the same question of the database directly.
+    private var cachedIsOwner: Bool?
+
+    func isOwner() async -> Bool {
+        if let cachedIsOwner { return cachedIsOwner }
+        guard let token = try? await validToken(), let userId = currentUserId else { return false }
+        var components = URLComponents(url: baseURL.appendingPathComponent("/rest/v1/profiles"), resolvingAgainstBaseURL: false)!
+        components.queryItems = [
+            URLQueryItem(name: "select", value: "is_owner"),
+            URLQueryItem(name: "id", value: "eq.\(userId)"),
+            URLQueryItem(name: "is_owner", value: "is.true"),
+            URLQueryItem(name: "limit", value: "1"),
+        ]
+        var request = URLRequest(url: components.url!)
+        request.setValue(anonKey, forHTTPHeaderField: "apikey")
+        request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+        guard let (data, response) = try? await URLSession.shared.data(for: request),
+              let http = response as? HTTPURLResponse, http.statusCode < 400,
+              let rows = try? JSONSerialization.jsonObject(with: data) as? [[String: Any]]
+        else { return false }
+        let result = !rows.isEmpty
+        cachedIsOwner = result
+        return result
+    }
+
+    /// Marks one piece of feedback as dealt with. `status` has existed on the
+    /// table since 30 July with a default of 'new' and nothing ever wrote to
+    /// it, so this needed no new column — only a policy saying who may.
+    func setFeedbackHandled(id: String, handled: Bool) async throws {
+        let token = try await validToken()
+        var components = URLComponents(url: baseURL.appendingPathComponent("/rest/v1/feedback"), resolvingAgainstBaseURL: false)!
+        components.queryItems = [URLQueryItem(name: "id", value: "eq.\(id)")]
+        var request = URLRequest(url: components.url!)
+        request.httpMethod = "PATCH"
+        request.setValue(anonKey, forHTTPHeaderField: "apikey")
+        request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        request.httpBody = try JSONSerialization.data(withJSONObject: ["status": handled ? "done" : "new"])
+        let (data, response) = try await URLSession.shared.data(for: request)
+        guard let http = response as? HTTPURLResponse, http.statusCode < 400 else {
+            throw RexAPIError.server(friendlyError(data, fallback: "Couldn't update that."))
+        }
+    }
+
     /// The REX account's id, or nil if it hasn't been set up on this project.
     /// Oct 18 — "is there a way that you can suggest stuff and we can choose
     /// to post or not?"
@@ -2551,10 +2605,11 @@ final class RexAPI {
             let is_anonymous: Bool?
             let user_id: String?
             let created_at: String?
+            let status: String?
         }
         var components = URLComponents(url: baseURL.appendingPathComponent("/rest/v1/feedback"), resolvingAgainstBaseURL: false)!
         components.queryItems = [
-            URLQueryItem(name: "select", value: "id,message,page,is_anonymous,user_id,created_at"),
+            URLQueryItem(name: "select", value: "id,message,page,is_anonymous,user_id,created_at,status"),
             URLQueryItem(name: "order", value: "created_at.desc"),
             URLQueryItem(name: "limit", value: "200"),
         ]
@@ -2588,7 +2643,8 @@ final class RexAPI {
                 // The app logs failed push registrations through the same
                 // table. Useful, but not something a person wrote.
                 isDiagnostic: row.page == "push-registration"
-                    || message.hasPrefix("[push diagnostic")
+                    || message.hasPrefix("[push diagnostic"),
+                isHandled: row.status == "done"
             )
         }
     }

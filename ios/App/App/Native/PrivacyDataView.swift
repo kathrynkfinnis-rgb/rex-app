@@ -37,9 +37,16 @@ struct SettingsView: View {
                 }
             }
             if isAdmin {
+                // Oct 19 — "split out the admin queue to post and the
+                // feedback into two separate links". Two jobs, done at
+                // different times: an empty queue was hiding the feedback
+                // underneath it behind a scroll.
                 Section("REX") {
                     NavigationLink(value: RexAdminRoute()) {
-                        row("tray.full", "Waiting to post", "Review what REX wants to say, and the feedback people send")
+                        row("tray.full", "Waiting to post", "Review what REX wants to say before it says it")
+                    }
+                    NavigationLink(value: RexFeedbackRoute()) {
+                        row("exclamationmark.bubble", "Feedback", "What people have sent from the ! button")
                     }
                 }
             }
