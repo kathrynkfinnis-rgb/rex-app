@@ -94,7 +94,25 @@ enum RexMapSnapshot {
     /// The bounding box of every stop, with room around the edges so no pin
     /// sits half off the tile, and a floor so a trip whose stops are all on one
     /// street doesn't zoom to the pavement.
-    private static func region(fitting coordinates: [CLLocationCoordinate2D]) -> MKCoordinateRegion? {
+    private static func region(fitting input: [CLLocationCoordinate2D]) -> MKCoordinateRegion? {
+        // Oct 15 — "Random crash when scrolling through trips" (Gemma). The
+        // log is an NSException out of -[MKMapSnapshotOptions setRegion:],
+        // which is MapKit refusing a region and taking the app with it: the
+        // setter raises rather than returning, so one bad trip tile aborts
+        // the process while you scroll past it.
+        //
+        // Two ways to hand it one. A coordinate can be NaN, and NaN
+        // propagates through min, max and the midpoint until the centre
+        // itself is NaN. Or the box can be wider than the world: two pins far
+        // enough apart, times the 1.4 headroom below, overflows 180 degrees
+        // of latitude or 360 of longitude, which is not a region that exists.
+        //
+        // Both are reachable from real data. A trip can hold a stop at (0, 0)
+        // from a geocode that found nothing — the Rome-restaurant-in-Lebanon
+        // family of bug — and (0, 0) with anywhere in Europe is half a world
+        // across. So the coordinates are filtered to ones that are actually
+        // on Earth before any arithmetic, and the span is clamped after it.
+        let coordinates = input.filter(isOnEarth)
         guard let first = coordinates.first else { return nil }
         if coordinates.count == 1 {
             return MKCoordinateRegion(
@@ -119,12 +137,23 @@ enum RexMapSnapshot {
         )
         // 40% of headroom: a pin is drawn above its coordinate, so a stop at
         // the very top of the box would otherwise lose its head.
-        let latitudeDelta = max((maxLat - minLat) * 1.4, 0.012)
-        let longitudeDelta = max((maxLng - minLng) * 1.4, 0.012)
+        let latitudeDelta = min(max((maxLat - minLat) * 1.4, 0.012), 180)
+        let longitudeDelta = min(max((maxLng - minLng) * 1.4, 0.012), 360)
         return MKCoordinateRegion(
             center: centre,
             span: MKCoordinateSpan(latitudeDelta: latitudeDelta, longitudeDelta: longitudeDelta)
         )
+    }
+
+    /// Finite, and within the range a coordinate can hold. CLLocation's own
+    /// validity check accepts (0, 0) — which is a real point in the Atlantic
+    /// and a perfectly ordinary way for a failed geocode to look — so this
+    /// rejects that too rather than letting one failed lookup stretch a tile
+    /// across an ocean.
+    private static func isOnEarth(_ coordinate: CLLocationCoordinate2D) -> Bool {
+        guard coordinate.latitude.isFinite, coordinate.longitude.isFinite else { return false }
+        guard abs(coordinate.latitude) <= 90, abs(coordinate.longitude) <= 180 else { return false }
+        return !(coordinate.latitude == 0 && coordinate.longitude == 0)
     }
 
     private static func render(
