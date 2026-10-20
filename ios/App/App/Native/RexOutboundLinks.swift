@@ -80,8 +80,18 @@ enum RexOutboundLink {
     /// nothing and is indistinguishable from a working one, so the only safe
     /// default is to add no parameter at all and leave the link exactly as
     /// the person wrote it.
+    /// Oct 20 — findrex-21, the UK store. The suffix is the store: -21 is
+    /// amazon.co.uk, -20 is amazon.com.
+    ///
+    /// The others stay empty deliberately rather than being filled with the
+    /// same string. Every Amazon store is a separate Associates account with
+    /// its own tag, and the EU locales share the -21 suffix without sharing
+    /// the tag — findrex-21 on amazon.de is simply an unrecognised tag, which
+    /// earns nothing and looks exactly like one that works. An empty entry
+    /// leaves the link untouched, which is the honest version of the same
+    /// outcome and the one that cannot be mistaken for working.
     private static let amazonTags: [String: String] = [
-        "amazon.co.uk": "",
+        "amazon.co.uk": "findrex-21",
         "amazon.com": "",
         "amazon.de": "",
         "amazon.fr": "",
@@ -90,14 +100,45 @@ enum RexOutboundLink {
         "amazon.ie": "",
     ]
 
-    /// Whether any store has a tag configured. Drives the disclosure.
+    /// Oct 20 — "can we have affiliate revenue up and running in the
+    /// TestFlight version (99) but not the live App Store version".
+    ///
+    /// The same binary goes to both, so this cannot be a build setting. What
+    /// distinguishes them at runtime is the receipt: TestFlight installs get
+    /// one named sandboxReceipt, App Store installs get one named receipt.
+    /// That is the standard way to tell, and it is what gates the tag below.
+    ///
+    /// It happened to be true already — every line of the Amazon work landed
+    /// after build 98 was cut, so the build in review has none of it — but
+    /// "happened to be true" is not a property you can rely on twice. This
+    /// makes it a fact about the code instead of a fact about the order
+    /// things were committed in.
+    ///
+    /// To go live for everyone: delete this property and the two references
+    /// to it. Before doing that, read the note on isAffiliateProgrammeActive
+    /// about the privacy label — it does not apply to Amazon, which shares
+    /// nothing, but it is the thing to check rather than assume.
+    static var isTestFlightBuild: Bool {
+        #if DEBUG
+        // Simulator and local installs have no receipt at all; a debug build
+        // is a build we are testing, which is the thing being asked.
+        return true
+        #else
+        return Bundle.main.appStoreReceiptURL?.lastPathComponent == "sandboxReceipt"
+        #endif
+    }
+
+    /// Whether any store has a tag configured, and whether this build is one
+    /// that may use it. Drives the disclosure as well as the tagging, so the
+    /// App Store build neither tags links nor claims to.
     static var isAmazonAssociateActive: Bool {
-        amazonTags.values.contains { !$0.isEmpty }
+        isTestFlightBuild && amazonTags.values.contains { !$0.isEmpty }
     }
 
     /// The tag for whichever Amazon store this URL points at, matching on the
     /// registrable domain so www., smile. and m. all resolve the same way.
     private static func amazonTag(for host: String) -> String? {
+        guard isAmazonAssociateActive else { return nil }
         let lower = host.lowercased()
         for (domain, tag) in amazonTags where !tag.isEmpty {
             if lower == domain || lower.hasSuffix(".\(domain)") { return tag }
