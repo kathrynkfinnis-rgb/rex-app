@@ -839,6 +839,35 @@ struct ItemDetailView: View {
                     .buttonStyle(.plain)
                 }
 
+                // Oct 20 — the Amazon pill, for the two categories where REX
+                // knows what the thing is and has no link to it. A book from
+                // Google Books carries no product URL, and a film's watch
+                // providers are TMDB's subscription list, which is a display
+                // of where it streams rather than somewhere to buy it.
+                //
+                // Last in the row deliberately. Booking a restaurant, opening
+                // the map, or the link somebody actually chose to attach are
+                // all things the person came here to do; this is the one that
+                // earns us money, and it does not get to go first.
+                //
+                // Labelled for what it does. "Rent or buy" on a film, because
+                // sending someone to Amazon for something already included
+                // with a subscription they have would be a worse answer to
+                // "where can I watch this" than the provider row above.
+                if let amazonURL = amazonSearchURL(for: item, category: category) {
+                    RexOutboundLinkButton(url: amazonURL) {
+                        HStack(spacing: 4) {
+                            Image(systemName: "cart").font(.system(size: 12))
+                            Text(category == .book ? "Buy on Amazon" : "Rent or buy on Amazon")
+                                .font(RexFont.text(12, weight: .semibold))
+                        }
+                        .foregroundStyle(RexColor.primary)
+                        .padding(.horizontal, RexSpacing.sm)
+                        .padding(.vertical, 6)
+                        .overlay(Capsule().stroke(RexColor.primary, lineWidth: 1))
+                    }
+                }
+
                 if let link = item.link_url, let url = URL(string: link), url.scheme?.hasPrefix("http") == true {
                     // Opens in Safari. Labelled with the site's own name so
                     // it's clear where you're going. Sept 21 — goes through
@@ -865,6 +894,27 @@ struct ItemDetailView: View {
             }
         }
         .padding(16)
+    }
+
+    /// Title and author for a book, title alone for a film — a search for
+    /// "Digger Alejandro González Iñárritu · 2026" finds nothing, because a
+    /// film's subtitle is its director and year rather than anything written
+    /// on the cover, and Amazon matches it against product titles.
+    ///
+    /// Nil for every other category, and nil in the App Store build — see
+    /// RexOutboundLink.isTestFlightBuild.
+    private func amazonSearchURL(for item: RexItem, category: RexCategory) -> URL? {
+        switch category {
+        case .book:
+            let author = (item.subtitle ?? "").split(separator: "·").first.map(String.init) ?? ""
+            return RexOutboundLink.amazonSearch(
+                for: "\(item.title) \(author.trimmingCharacters(in: .whitespaces))"
+            )
+        case .movie, .tv:
+            return RexOutboundLink.amazonSearch(for: item.title, department: "instant-video")
+        default:
+            return nil
+        }
     }
 
     /// Google's details for this place, whichever way they arrived: the

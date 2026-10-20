@@ -146,6 +146,34 @@ enum RexOutboundLink {
         return nil
     }
 
+    /// Oct 20 — "say I recommend a book and Phoebe buys it — do we need a
+    /// link to 'buy on amazon'". Yes, and it has to be built rather than
+    /// pasted: book search comes from Google Books and sets no product link
+    /// at all, so a book added the normal way has nothing to tap.
+    ///
+    /// A search link rather than a product page, because a product page needs
+    /// the ASIN, which needs Amazon's Product Advertising API, which they
+    /// only grant after three qualifying sales — the same three sales this is
+    /// meant to produce. Search links are permitted and track identically.
+    ///
+    /// `department` narrows the results: film and TV go to Prime Video, where
+    /// renting or buying is the thing that actually earns, rather than to a
+    /// shelf of DVDs.
+    static func amazonSearch(for query: String, department: String? = nil) -> URL? {
+        guard isAmazonAssociateActive,
+              let tag = amazonTags["amazon.co.uk"], !tag.isEmpty,
+              var components = URLComponents(string: "https://www.amazon.co.uk/s")
+        else { return nil }
+        let cleaned = query
+            .replacingOccurrences(of: "·", with: " ")
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !cleaned.isEmpty else { return nil }
+        components.queryItems = [URLQueryItem(name: "k", value: cleaned)]
+            + (department.map { [URLQueryItem(name: "i", value: $0)] } ?? [])
+            + [URLQueryItem(name: "tag", value: tag)]
+        return components.url
+    }
+
     /// Adds the Associates tag, or returns nil if this isn't an Amazon link
     /// we have a tag for. An existing `tag` is left alone: it is somebody
     /// else's, and overwriting another creator's attribution to take their
