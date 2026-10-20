@@ -889,7 +889,7 @@ struct ItemDetailView: View {
                 RexOutboundLinkButton(url: amazonURL) {
                     HStack(spacing: 4) {
                         Image(systemName: "cart").font(.system(size: 12))
-                        Text(category == .book ? "Buy on Amazon" : "Rent or buy on Amazon")
+                        Text(amazonPillLabel(for: category))
                             .font(RexFont.text(12, weight: .semibold))
                     }
                     .foregroundStyle(RexColor.primary)
@@ -901,6 +901,18 @@ struct ItemDetailView: View {
             }
         }
         .padding(16)
+    }
+
+    /// Honest about what the link does. "Find" rather than "Buy" on a
+    /// product, because a product in Other might be a board game Amazon
+    /// stocks or a particular small-producer olive oil it has never heard of,
+    /// and a search that returns nothing is a worse promise than a search.
+    private func amazonPillLabel(for category: RexCategory) -> String {
+        switch category {
+        case .book: return "Buy on Amazon"
+        case .movie, .tv: return "Rent or buy on Amazon"
+        default: return "Find on Amazon"
+        }
     }
 
     /// Title and author for a book, title alone for a film — a search for
@@ -919,6 +931,17 @@ struct ItemDetailView: View {
             )
         case .movie, .tv:
             return RexOutboundLink.amazonSearch(for: item.title, department: "instant-video")
+        case .other:
+            // Oct 20 — "I think we need to improve the product search and
+            // buy." Other is the shopping category, and it was the one with
+            // no reliable way to buy anything: its catalogue falls back to
+            // Wikipedia when Programmable Search returns nothing, so the
+            // "View product" link can be an encyclopaedia article. That is
+            // not somewhere you can buy a thing.
+            //
+            // This does not fix the catalogue. It does mean every product has
+            // one honest route to buying it, whatever the catalogue gave us.
+            return RexOutboundLink.amazonSearch(for: item.title)
         default:
             return nil
         }
