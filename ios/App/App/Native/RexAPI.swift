@@ -143,12 +143,17 @@ final class RexAPI {
         // written moments earlier. Single-flighting the refresh means there
         // is only ever one request in flight, and everyone else just awaits
         // its result.
-        if let refreshTask {
-            return try await refreshTask.value
+        // The check and the set have to be one step. Two callers arriving
+        // together both saw nil here and both started a refresh — which is
+        // the "already used" stampede described above, reintroduced by the
+        // gap between reading the field and writing it. Taking the existing
+        // task, or claiming the slot, now happens under the lock.
+        if let existing = cacheLock.withLock({ refreshTask }) {
+            return try await existing.value
         }
 
         let task = Task<String, Error> {
-            defer { refreshTask = nil }
+            defer { cacheLock.withLock { refreshTask = nil } }
             guard let refreshToken = refreshTokenValue else {
                 signOut()
                 throw RexAPIError.notSignedIn
@@ -175,8 +180,15 @@ final class RexAPI {
             refreshTokenValue = decoded.refresh_token
             return decoded.access_token
         }
-        refreshTask = task
-        return try await task.value
+        // If somebody else claimed the slot while this one was being built,
+        // theirs is the request in flight — await that and drop this.
+        let winner: Task<String, Error> = cacheLock.withLock {
+            if let existing = refreshTask { return existing }
+            refreshTask = task
+            return task
+        }
+        if winner != task { task.cancel() }
+        return try await winner.value
     }
 
     func signIn(email: String, password: String) async throws {
@@ -208,10 +220,47 @@ final class RexAPI {
     /// whole query, so selecting this blind would take the entire feed down
     /// until the SQL is run — which is exactly what the Google rating columns
     /// did. Probe once, then remember.
-    private var anonymousColumn: Bool?
+    /// Oct 19 — the crash on build 96, which is where this came from:
+    ///
+    ///   swift_isUniquelyReferenced_nonNull_native
+    ///   Dictionary.subscript.setter
+    ///   RexAPI.hasColumn(_:on:)            RexAPI.swift:267
+    ///   closure #1 in ExploreView.load()
+    ///
+    /// EXC_BAD_ACCESS four seconds after launch, on thread 3, with the feed
+    /// and Explore both loading. RexAPI is a final class, not an actor, and
+    /// every one of these caches was written after an `await` — so the write
+    /// lands on whatever thread the continuation resumes on, and two callers
+    /// mutating the same Swift Dictionary at once leave the copy-on-write
+    /// uniqueness check reading a half-written buffer. Then the process dies
+    /// — or it doesn't, and the answer is quietly wrong instead.
+    ///
+    /// Thirteen separate fields carried that exposure and all asked the same
+    /// question: has this migration reached this object yet. So they are one
+    /// store behind one lock rather than thirteen races. `hiddenUsers` in
+    /// this file has worked this way since September; this is that idiom
+    /// applied to the rest.
+    ///
+    /// The lock is never held across an await. Two callers can therefore
+    /// still both run a probe before either records it, which costs one
+    /// redundant request and settles on the same answer — concurrent
+    /// mutation is the thing worth preventing, not duplicate work.
+    private let cacheLock = NSLock()
+    private var probeCache: [String: Bool] = [:]
+
+    private func probed(_ key: String) -> Bool? {
+        cacheLock.withLock { probeCache[key] }
+    }
+
+    @discardableResult
+    private func record(_ key: String, _ value: Bool) -> Bool {
+        cacheLock.withLock { probeCache[key] = value }
+        return value
+    }
+
 
     private func anonymousField() async -> String {
-        if let anonymousColumn { return anonymousColumn ? ",is_anonymous" : "" }
+        if let known = probed("recommendations:is_anonymous") { return known ? ",is_anonymous" : "" }
         guard let token = try? await validToken() else { return "" }
         var components = URLComponents(url: baseURL.appendingPathComponent("/rest/v1/recommendations"), resolvingAgainstBaseURL: false)!
         components.queryItems = [
@@ -224,7 +273,7 @@ final class RexAPI {
         let ok = (try? await URLSession.shared.data(for: request))
             .flatMap { ($0.1 as? HTTPURLResponse)?.statusCode }
             .map { $0 < 400 } ?? false
-        anonymousColumn = ok
+        record("recommendations:is_anonymous", ok)
         return ok ? ",is_anonymous" : ""
     }
 
@@ -240,7 +289,6 @@ final class RexAPI {
     /// A probe is only worth anything if it asks the object the query will
     /// ask. Keyed by resource path now, because the feed has two of them and
     /// a migration reaches one at a time.
-    private var branchCopyColumn: [String: Bool] = [:]
 
     private func hasBranchCopyColumn(on resourcePath: String) async -> Bool {
         await hasColumn("is_branch_copy", on: resourcePath)
@@ -251,7 +299,7 @@ final class RexAPI {
     /// at a time, so "the table has it" never implies "the view has it".
     private func hasColumn(_ column: String, on resourcePath: String) async -> Bool {
         let key = "\(resourcePath):\(column)"
-        if let known = branchCopyColumn[key] { return known }
+        if let known = probed(key) { return known }
         guard let token = try? await validToken() else { return false }
         var components = URLComponents(url: baseURL.appendingPathComponent(resourcePath), resolvingAgainstBaseURL: false)!
         components.queryItems = [
@@ -264,8 +312,7 @@ final class RexAPI {
         let ok = (try? await URLSession.shared.data(for: request))
             .flatMap { ($0.1 as? HTTPURLResponse)?.statusCode }
             .map { $0 < 400 } ?? false
-        branchCopyColumn[key] = ok
-        return ok
+        return record(key, ok)
     }
 
     /// Oct 14 — "users should be able to show Lists as full titles if it's
@@ -774,10 +821,9 @@ final class RexAPI {
     /// back to querying the base table (with the un-masked embed, i.e.
     /// today's pre-#181 behaviour) rather than the entire main feed going
     /// blank until this migration's been run.
-    private var recommendationsDisplayView: Bool?
 
     private func useRecommendationsDisplayView() async -> Bool {
-        if let recommendationsDisplayView { return recommendationsDisplayView }
+        if let known = probed("resource:recommendations_display") { return known }
         guard let token = try? await validToken() else { return false }
         var components = URLComponents(url: baseURL.appendingPathComponent("/rest/v1/recommendations_display"), resolvingAgainstBaseURL: false)!
         components.queryItems = [URLQueryItem(name: "select", value: "id"), URLQueryItem(name: "limit", value: "1")]
@@ -787,7 +833,7 @@ final class RexAPI {
         let ok = (try? await URLSession.shared.data(for: request))
             .flatMap { ($0.1 as? HTTPURLResponse)?.statusCode }
             .map { $0 < 400 } ?? false
-        recommendationsDisplayView = ok
+        record("resource:recommendations_display", ok)
         return ok
     }
 
@@ -2433,11 +2479,10 @@ final class RexAPI {
     /// and what's the official account's id? Both are asked once per launch
     /// and cached — the answer doesn't change while the app is open, and the
     /// add screen would otherwise ask on every appearance.
-    private var cachedIsAdmin: Bool?
     private var cachedOfficialId: String??
 
     func isAdmin() async -> Bool {
-        if let cachedIsAdmin { return cachedIsAdmin }
+        if let known = probed("role:admin") { return known }
         guard let token = try? await validToken(), let userId = currentUserId else { return false }
         var components = URLComponents(url: baseURL.appendingPathComponent("/rest/v1/user_roles"), resolvingAgainstBaseURL: false)!
         components.queryItems = [
@@ -2454,7 +2499,7 @@ final class RexAPI {
               let rows = try? JSONSerialization.jsonObject(with: data) as? [[String: Any]]
         else { return false }
         let result = !rows.isEmpty
-        cachedIsAdmin = result
+        record("role:admin", result)
         return result
     }
 
@@ -2469,10 +2514,9 @@ final class RexAPI {
     /// The flag is only what the app uses to decide whether to draw the
     /// button. What actually stops anyone else is the update policy on
     /// feedback, which asks the same question of the database directly.
-    private var cachedIsOwner: Bool?
 
     func isOwner() async -> Bool {
-        if let cachedIsOwner { return cachedIsOwner }
+        if let known = probed("role:owner") { return known }
         guard let token = try? await validToken(), let userId = currentUserId else { return false }
         var components = URLComponents(url: baseURL.appendingPathComponent("/rest/v1/profiles"), resolvingAgainstBaseURL: false)!
         components.queryItems = [
@@ -2489,7 +2533,7 @@ final class RexAPI {
               let rows = try? JSONSerialization.jsonObject(with: data) as? [[String: Any]]
         else { return false }
         let result = !rows.isEmpty
-        cachedIsOwner = result
+        record("role:owner", result)
         return result
     }
 
@@ -2650,7 +2694,7 @@ final class RexAPI {
     }
 
     func officialAccountId() async -> String? {
-        if let cachedOfficialId { return cachedOfficialId }
+        if let known = cacheLock.withLock({ cachedOfficialId }) { return known }
         guard let token = try? await validToken() else { return nil }
         var request = URLRequest(url: baseURL.appendingPathComponent("/rest/v1/rpc/official_account_id"))
         request.httpMethod = "POST"
@@ -2667,7 +2711,7 @@ final class RexAPI {
               let http = response as? HTTPURLResponse, http.statusCode < 400
         else { return nil }
         let id = try? JSONDecoder().decode(String?.self, from: data)
-        cachedOfficialId = .some(id ?? nil)
+        cacheLock.withLock { cachedOfficialId = .some(id ?? nil) }
         return id ?? nil
     }
 
@@ -4117,10 +4161,9 @@ final class RexAPI {
     /// recommendations_display view, which fixes its columns when it's
     /// created and wouldn't know about this one. Probed like the other
     /// late-arriving columns, so nothing breaks before the migration runs.
-    private var longNoteColumn: Bool?
 
     func longNoteAvailable() async -> Bool {
-        if let longNoteColumn { return longNoteColumn }
+        if let known = probed("recommendations:long_note") { return known }
         guard let token = try? await validToken() else { return false }
         var components = URLComponents(url: baseURL.appendingPathComponent("/rest/v1/recommendations"), resolvingAgainstBaseURL: false)!
         components.queryItems = [
@@ -4133,7 +4176,7 @@ final class RexAPI {
         let ok = (try? await URLSession.shared.data(for: request))
             .flatMap { ($0.1 as? HTTPURLResponse)?.statusCode }
             .map { $0 < 400 } ?? false
-        longNoteColumn = ok
+        record("recommendations:long_note", ok)
         return ok
     }
 
@@ -5119,9 +5162,8 @@ final class RexAPI {
     /// parent_id doesn't exist until migration 20260907160000 has been run,
     /// and selecting a missing column fails the whole query — same probe
     /// pattern as anonymousField() above.
-    private var blastReplyColumn: Bool?
     private func blastReplyField() async -> String {
-        if let blastReplyColumn { return blastReplyColumn ? ",parent_id" : "" }
+        if let known = probed("blast_comments:parent_id") { return known ? ",parent_id" : "" }
         guard let token = try? await validToken() else { return "" }
         var components = URLComponents(url: baseURL.appendingPathComponent("/rest/v1/request_comments"), resolvingAgainstBaseURL: false)!
         components.queryItems = [
@@ -5134,7 +5176,7 @@ final class RexAPI {
         let ok = (try? await URLSession.shared.data(for: request))
             .flatMap { ($0.1 as? HTTPURLResponse)?.statusCode }
             .map { $0 < 400 } ?? false
-        blastReplyColumn = ok
+        record("blast_comments:parent_id", ok)
         return ok ? ",parent_id" : ""
     }
 
@@ -6236,10 +6278,9 @@ final class RexAPI {
     }
 
     /// Same guard as wantNoteColumn, for wants.source (9 Sept migration).
-    private var wantSourceColumn: Bool?
 
     private func wantSourceField() async -> Bool {
-        if let wantSourceColumn { return wantSourceColumn }
+        if let known = probed("wants:source") { return known }
         guard let token = try? await validToken() else { return false }
         var components = URLComponents(url: baseURL.appendingPathComponent("/rest/v1/wants"), resolvingAgainstBaseURL: false)!
         components.queryItems = [
@@ -6252,16 +6293,15 @@ final class RexAPI {
         let ok = (try? await URLSession.shared.data(for: request))
             .flatMap { ($0.1 as? HTTPURLResponse)?.statusCode }
             .map { $0 < 400 } ?? false
-        wantSourceColumn = ok
+        record("wants:source", ok)
         return ok
     }
 
     /// Same guard as the anonymous column — the note only exists once that
     /// migration has been run, and selecting it blind would fail the query.
-    private var wantNoteColumn: Bool?
 
     private func wantNoteField() async -> String {
-        if let wantNoteColumn { return wantNoteColumn ? ",note" : "" }
+        if let known = probed("wants:note") { return known ? ",note" : "" }
         guard let token = try? await validToken() else { return "" }
         var components = URLComponents(url: baseURL.appendingPathComponent("/rest/v1/wants"), resolvingAgainstBaseURL: false)!
         components.queryItems = [
@@ -6274,15 +6314,14 @@ final class RexAPI {
         let ok = (try? await URLSession.shared.data(for: request))
             .flatMap { ($0.1 as? HTTPURLResponse)?.statusCode }
             .map { $0 < 400 } ?? false
-        wantNoteColumn = ok
+        record("wants:note", ok)
         return ok ? ",note" : ""
     }
 
     /// Same guard again, for wants.show_in_feed (5 Oct migration).
-    private var wantShowInFeedColumn: Bool?
 
     private func wantShowInFeedField() async -> Bool {
-        if let wantShowInFeedColumn { return wantShowInFeedColumn }
+        if let known = probed("wants:show_in_feed") { return known }
         guard let token = try? await validToken() else { return false }
         var components = URLComponents(url: baseURL.appendingPathComponent("/rest/v1/wants"), resolvingAgainstBaseURL: false)!
         components.queryItems = [
@@ -6295,16 +6334,15 @@ final class RexAPI {
         let ok = (try? await URLSession.shared.data(for: request))
             .flatMap { ($0.1 as? HTTPURLResponse)?.statusCode }
             .map { $0 < 400 } ?? false
-        wantShowInFeedColumn = ok
+        record("wants:show_in_feed", ok)
         return ok
     }
 
     /// Same guard again, for wants.photo_urls (3 Oct migration) — so a client
     /// that gets ahead of the database still loads the feed.
-    private var wantPhotosColumn: Bool?
 
     private func wantPhotosField() async -> String {
-        if let wantPhotosColumn { return wantPhotosColumn ? ",photo_urls" : "" }
+        if let known = probed("wants:photo_urls") { return known ? ",photo_urls" : "" }
         guard let token = try? await validToken() else { return "" }
         var components = URLComponents(url: baseURL.appendingPathComponent("/rest/v1/wants"), resolvingAgainstBaseURL: false)!
         components.queryItems = [
@@ -6317,7 +6355,7 @@ final class RexAPI {
         let ok = (try? await URLSession.shared.data(for: request))
             .flatMap { ($0.1 as? HTTPURLResponse)?.statusCode }
             .map { $0 < 400 } ?? false
-        wantPhotosColumn = ok
+        record("wants:photo_urls", ok)
         return ok ? ",photo_urls" : ""
     }
 
