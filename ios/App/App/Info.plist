@@ -30,10 +30,23 @@
 	<string>AIzaSyBDmBb_UWyo2uDBo5cQxj16__6G_wK3Syo</string>
 	<key>GMSApiKey</key>
 	<string>AIzaSyDl2PCHjjKbAje0C-NjJNkb-AKn5LwAtGU</string>
+	<!-- Oct 21 — emptied, not removed. The key was deleted at Google, and
+	     the Custom Search JSON API it served is closed to new customers and
+	     shuts down on 1 January 2027, so there is nothing to point these at.
+
+	     Emptied rather than deleted because both readers already guard on
+	     the value being non-empty and return nothing when it is. Leaving a
+	     dead key in place instead meant every item card fired an HTTPS
+	     request to Google that could only 403: customSearch() latches after
+	     the first failure of a session, but articles() has no such latch and
+	     was asking again on every card.
+
+	     Two features went with it, both already dead from the same 403:
+	     web results in product search, and the press links on an item. -->
 	<key>GoogleCSEApiKey</key>
-	<string>AIzaSyD7CA_SOpUqX3lU3YonDvHEHA2rfMBrA2o</string>
+	<string></string>
 	<key>GoogleCSEEngineId</key>
-	<string>e7ee7b5e87ca1417e</string>
+	<string></string>
 	<key>ITSAppUsesNonExemptEncryption</key>
 	<false/>
 	<key>LSRequiresIPhoneOS</key>
