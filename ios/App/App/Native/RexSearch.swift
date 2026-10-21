@@ -206,6 +206,23 @@ enum RexSearch {
     ) async -> [RexSearchHit] {
         let q = query.trimmingCharacters(in: .whitespacesAndNewlines)
         guard q.count >= 2 else { return [] }
+        // Oct 21 — "can we make it more easy to just copy and paste the link
+        // into the search bar or something and then prepopulate the card",
+        // and: "shouldn't just be for amazon."
+        //
+        // Pasting the page is the one way of identifying a thing that does
+        // not depend on anybody's catalogue — which matters now that Custom
+        // Search is shutting down on 1 January 2027 and takes the only
+        // general-goods source with it. A balance bike has no API anywhere;
+        // its John Lewis page has a name, a photograph and a price on it, and
+        // the person adding it is already looking at that page.
+        //
+        // Ahead of every catalogue rather than alongside them. Somebody who
+        // pasted a URL has told us exactly what they mean, and searching the
+        // web for the text of a URL finds nothing anyway.
+        if let url = pastedURL(q) {
+            return await linkHit(url, category: category)
+        }
         do {
             switch category {
             case .book:            return try await books(q)
@@ -219,6 +236,41 @@ enum RexSearch {
         } catch {
             return []
         }
+    }
+
+    /// A pasted web address, or nil. Deliberately strict: a bare "amazon.co.uk"
+    /// typed as a search term is a search, not a link, so a scheme is
+    /// required. Anything that is a URL but not a web page — a mailto, a
+    /// deep link into another app — is not something we can read a product
+    /// out of.
+    private static func pastedURL(_ q: String) -> URL? {
+        guard q.contains("://"), let url = URL(string: q),
+              let scheme = url.scheme?.lowercased(),
+              scheme == "http" || scheme == "https",
+              let host = url.host, host.contains(".")
+        else { return nil }
+        return url
+    }
+
+    /// One result, built from the page itself. The link is kept as the
+    /// product URL so the card has somewhere to send people — the shop they
+    /// came from, which for an Amazon link means our tag gets added on the
+    /// way out, and for John Lewis means John Lewis.
+    private static func linkHit(_ url: URL, category: RexCategory) async -> [RexSearchHit] {
+        let preview = await linkPreview(for: url)
+        // A page we cannot read a name out of gives us nothing to show. Say
+        // nothing rather than offer a row titled after a URL.
+        guard let title = preview.title?.trimmingCharacters(in: .whitespacesAndNewlines),
+              !title.isEmpty
+        else { return [] }
+        return [RexSearchHit(
+            externalId: url.absoluteString,
+            externalSource: "link",
+            title: title,
+            subtitle: preview.siteName,
+            imageURL: preview.imageURL,
+            productURL: url.absoluteString
+        )]
     }
 
     /// Oct 16 — ask ourselves before we ask Google.
@@ -2028,7 +2080,7 @@ enum RexSearch {
     /// reads those, the same way a messaging app builds a link preview.
     /// Best-effort — a site that blocks it, or has none, just leaves the
     /// thumbnail for you to add.
-    static func linkPreview(for url: URL) async -> (title: String?, imageURL: String?) {
+    static func linkPreview(for url: URL) async -> (title: String?, imageURL: String?, siteName: String?) {
         var request = URLRequest(url: url, timeoutInterval: 8)
         // Some shops serve an empty shell to anything that doesn't look like
         // a browser; Safari's own agent gets the real page.
@@ -2036,7 +2088,7 @@ enum RexSearch {
                          forHTTPHeaderField: "User-Agent")
         request.setValue("text/html", forHTTPHeaderField: "Accept")
         guard let (data, response) = try? await URLSession.shared.data(for: request),
-              let http = response as? HTTPURLResponse, http.statusCode < 400 else { return (nil, nil) }
+              let http = response as? HTTPURLResponse, http.statusCode < 400 else { return (nil, nil, nil) }
         // The meta tags live in <head>; no need to decode a whole product page.
         let head = String(decoding: data.prefix(600_000), as: UTF8.self)
 
@@ -2071,7 +2123,15 @@ enum RexSearch {
         }
         if image?.hasPrefix("http://") == true { image = image?.replacingOccurrences(of: "http://", with: "https://") }
         let title = meta(["og:title", "twitter:title"])
-        return (title, image)
+        // Oct 21 — the shop's own name, for the subtitle of a pasted link.
+        // Falls back to the host with the www. and the TLD taken off, which
+        // for johnlewis.com reads "johnlewis" — not beautiful, and better
+        // than a product with no idea where it came from.
+        let site = meta(["og:site_name", "twitter:site", "application-name"])
+            ?? url.host?
+                .replacingOccurrences(of: "www.", with: "")
+                .components(separatedBy: ".").first
+        return (title, image, site)
     }
 
     // MARK: - Helpers
