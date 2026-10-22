@@ -870,7 +870,17 @@ struct AddRexView: View {
                       // Phoebe, 17 Sept: "Shouldn't be 'tvs' should be 'tv'".
                       // Appending an s to the singular label was wrong for
                       // exactly the categories that don't take one.
-                      ? "Search \(category.pluralLabel.lowercased())…"
+                      //
+                      // Oct 22 — "can we replace the text in the search box
+                      // from 'search other' to 'paste a link or search'."
+                      // Pasting the page has worked here since yesterday and
+                      // nothing said so, which for the one category whose
+                      // catalogue is weakest is the difference between the
+                      // feature existing and nobody finding it. Said on every
+                      // category, because it works on every category — and
+                      // the category still named, because "search books" tells
+                      // you what the box searches and "search" does not.
+                      ? "Paste a link or search \(category.pluralLabel.lowercased())…"
                       : "e.g. \(placeholderTitle(for: category))")
                 .onChange(of: title) { _, _ in scheduleSearch(for: category) }
 
