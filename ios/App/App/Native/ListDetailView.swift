@@ -737,6 +737,16 @@ struct ListNotesEditor: View {
     @State private var text = ""
     @State private var isSaving = false
     @State private var errorMessage: String?
+    /// Oct 22 — "how can we build links into lists like this? tap to
+    /// hyperlink (like in comments)?"
+    ///
+    /// Links already worked: RexNotesText has run every bullet and paragraph
+    /// through linkified() since the notes section was built, so a pasted
+    /// address has always been tappable and [words](address) has always come
+    /// out as a hyperlink on the words. Nobody knew, because this editor was
+    /// a bare box that said nothing, and writing the bracket form by hand on
+    /// a phone is miserable even when you do know.
+    ///
 
     var body: some View {
         NavigationStack {
@@ -751,6 +761,11 @@ struct ListNotesEditor: View {
                         RoundedRectangle(cornerRadius: RexRadius.input, style: .continuous)
                             .stroke(RexColor.border, lineWidth: 1)
                     )
+                Text("Paste a web address and it becomes a link. For a link on words instead, write it as [words](address) \u{2014} the button below starts you off.")
+                    .font(RexFont.text(12))
+                    .foregroundStyle(RexColor.mutedForeground)
+                    .fixedSize(horizontal: false, vertical: true)
+
                 if let errorMessage {
                     Text(errorMessage)
                         .font(RexFont.text(13))
@@ -765,6 +780,16 @@ struct ListNotesEditor: View {
                 ToolbarItem(placement: .topBarLeading) {
                     Button("Cancel") { dismiss() }
                 }
+                // Keyboard rather than the navigation bar: it belongs next to
+                // the writing, and the nav bar already has Cancel and Save.
+                ToolbarItem(placement: .keyboard) {
+                    Button {
+                        appendLinkTemplate()
+                    } label: {
+                        Label("Add a link", systemImage: "link")
+                            .font(RexFont.text(14, weight: .semibold))
+                    }
+                }
                 ToolbarItem(placement: .topBarTrailing) {
                     Button {
                         Task { await save() }
@@ -777,6 +802,23 @@ struct ListNotesEditor: View {
         }
         .tint(RexColor.primary)
         .onAppear { if text.isEmpty { text = initialText } }
+    }
+
+    /// Inserts the bracket form at the end, ready to be filled in.
+    ///
+    /// It wrapped the highlighted words at first, which is the version worth
+    /// having — but TextEditor reports its selection in AttributedString
+    /// indices while the text behind it is a String, and converting between
+    /// them is both fiddly and liable to shift under an SDK update. A
+    /// convenience button is not worth a crash in somebody's notes, so this
+    /// does the dull reliable thing instead.
+    ///
+    /// Deliberately not a dialog asking for the address. It is nearly always
+    /// on the clipboard already — copied from the shop a moment ago — so the
+    /// useful thing is a gap to paste into, not another box to fill in.
+    private func appendLinkTemplate() {
+        let needsSpace = !text.isEmpty && !text.hasSuffix("\n") && !text.hasSuffix(" ")
+        text += (needsSpace ? " " : "") + "[words](address)"
     }
 
     private func save() async {
