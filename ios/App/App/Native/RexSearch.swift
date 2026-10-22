@@ -258,11 +258,26 @@ enum RexSearch {
     /// way out, and for John Lewis means John Lewis.
     private static func linkHit(_ url: URL, category: RexCategory) async -> [RexSearchHit] {
         let preview = await linkPreview(for: url)
-        // A page we cannot read a name out of gives us nothing to show. Say
-        // nothing rather than offer a row titled after a URL.
-        guard let title = preview.title?.trimmingCharacters(in: .whitespacesAndNewlines),
-              !title.isEmpty
-        else { return [] }
+        // Oct 22 — "I just tried to add an amazon link to a new 'other' rex"
+        // — "and it didn't find the produce."
+        //
+        // Amazon answers a fetch with a 3.8KB bot-check page titled
+        // "Amazon.co.uk" and no og: tags at all, so there was no name to read
+        // and this returned nothing. AddRexView has said "Amazon and
+        // Waterstones serve a bot page" since September; I wired this up
+        // without reading it. Pasting an Amazon link is the single most
+        // likely thing anybody would paste.
+        //
+        // The name is in the URL though. Shops put the product in the path —
+        // /Micro-Scooters-Micro-Lite-Balance-Bike/pink/p115159159,
+        // /Jon-Ronson-The-Castle/dp/0241988349 — so when the page will not
+        // talk, the address still says what it points at. Generic rather than
+        // Amazon-specific: Waterstones does this, and so does most of the web.
+        let fromPage = preview.title?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+        let title = fromPage.isEmpty ? (titleFromPath(of: url) ?? "") : fromPage
+        // Still nothing means a bare /dp/B00AQL8VU4 with no words anywhere.
+        // Say nothing rather than offer a row named after a URL.
+        guard !title.isEmpty else { return [] }
         return [RexSearchHit(
             externalId: url.absoluteString,
             externalSource: "link",
@@ -271,6 +286,43 @@ enum RexSearch {
             imageURL: preview.imageURL,
             productURL: url.absoluteString
         )]
+    }
+
+    /// The product name as the address spells it, for pages that will not
+    /// serve their own metadata.
+    ///
+    /// Takes the longest hyphenated path segment, which is reliably the
+    /// human-readable one — the others are routing ("dp", "gp", "product",
+    /// "ref") or identifiers ("p115159159", "B00AQL8VU4"). Requires two words
+    /// and some letters, so an id with a hyphen in it cannot win.
+    private static func titleFromPath(of url: URL) -> String? {
+        let junk: Set<String> = ["dp", "gp", "product", "ref", "p", "s", "d", "browse", "shop", "products"]
+        let candidates = url.path.split(separator: "/").map(String.init).filter { segment in
+            let lower = segment.lowercased()
+            guard !junk.contains(lower) else { return false }
+            let words = segment.split(separator: "-")
+            guard words.count >= 2 else { return false }
+            // At least half the words have to be words, which rules out
+            // "B07-X9-2K" and the hyphenated id formats.
+            let wordy = words.filter { $0.contains(where: { $0.isLetter }) && !$0.contains(where: { $0.isNumber }) }
+            return wordy.count * 2 >= words.count
+        }
+        guard let best = candidates.max(by: { $0.count < $1.count }) else { return nil }
+        // Some shops glue the id on with an underscore —
+        // "le-creuset-signature-cast-iron_123456" — so the separator has to
+        // go and the number with it, or the title ends in a product code.
+        var words = best
+            .replacingOccurrences(of: "-", with: " ")
+            .replacingOccurrences(of: "_", with: " ")
+            .split(separator: " ")
+            .map(String.init)
+        while let last = words.last, last.allSatisfy(\.isNumber) { words.removeLast() }
+        let spaced = words.joined(separator: " ")
+        guard let first = spaced.first else { return nil }
+        // Slugs arrive both ways — "Micro-Scooters-Balance-Bike" and
+        // "micro-scooters-balance-bike". Only the first letter is ours to
+        // fix; title-casing the rest would mangle "of" and "the".
+        return first.uppercased() + spaced.dropFirst()
     }
 
     /// Oct 16 — ask ourselves before we ask Google.
