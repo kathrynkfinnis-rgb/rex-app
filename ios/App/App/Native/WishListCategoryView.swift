@@ -38,6 +38,10 @@ struct WishListCategoryView: View {
         }
     }
     @State private var activeSheet: ActiveSheet?
+    /// The context-menu buy goes through RexOutboundLink.open, which needs the
+    /// environment's opener — the row button uses RexOutboundLinkButton, which
+    /// has its own.
+    @Environment(\.openURL) private var openURL
     /// Sept 7 — "need to be able to edit from want to try to rating once the
     /// book has been read". This screen had no edit path at all: you could
     /// remove a want or open the item, and that was it — so there was
@@ -143,6 +147,39 @@ struct WishListCategoryView: View {
                                     // address, delete it — so the label
                                     // says Edit rather than only naming the
                                     // one thing it used to be for.
+                                    // Oct 22 — "can we then find a way to
+                                    // build a 'buy my want to reads'."
+                                    //
+                                    // A want-to-read list is a list of things
+                                    // you have decided you want and not yet
+                                    // got, which is a shopping list wearing
+                                    // another name. Buying one meant opening
+                                    // it, finding the pill, coming back, and
+                                    // doing it again — so a list of twelve was
+                                    // thirty-six taps and nobody would.
+                                    //
+                                    // A cart rather than the words, because
+                                    // Edit already has the room in this row
+                                    // and two bordered capsules side by side
+                                    // start to look like a toolbar. The full
+                                    // label is in the long-press menu below,
+                                    // where there is space to say which of
+                                    // Buy, Rent or Find this actually is.
+                                    if let amazonURL = RexOutboundLink.amazonSearch(
+                                        forTitle: item.title,
+                                        subtitle: item.subtitle,
+                                        category: route.category
+                                    ) {
+                                        RexOutboundLinkButton(url: amazonURL) {
+                                            Image(systemName: "cart")
+                                                .font(.system(size: 13, weight: .semibold))
+                                                .foregroundStyle(RexColor.primary)
+                                                .frame(width: 32, height: 32)
+                                                .overlay(Circle().stroke(RexColor.primary, lineWidth: 1))
+                                        }
+                                        .accessibilityLabel(RexOutboundLink.amazonLabel(for: route.category))
+                                    }
+
                                     Button {
                                         activeSheet = .edit(asRecommendation(want))
                                     } label: {
@@ -173,6 +210,17 @@ struct WishListCategoryView: View {
                                 }
                             }
                             .contextMenu {
+                                if let amazonURL = RexOutboundLink.amazonSearch(
+                                    forTitle: item.title,
+                                    subtitle: item.subtitle,
+                                    category: route.category
+                                ) {
+                                    Button {
+                                        Task { await RexOutboundLink.open(amazonURL, using: openURL) }
+                                    } label: {
+                                        Label(RexOutboundLink.amazonLabel(for: route.category), systemImage: "cart")
+                                    }
+                                }
                                 Button {
                                     activeSheet = .edit(asRecommendation(want))
                                 } label: {

@@ -174,6 +174,49 @@ enum RexOutboundLink {
         return components.url
     }
 
+    /// Oct 22 — hoisted out of ItemDetailView, which had it privately, so the
+    /// wish list could offer the same thing without a second copy of the
+    /// rules. Two screens quietly disagreeing about which categories are
+    /// buyable, or about whether a film says Buy or Rent, is the kind of
+    /// drift nobody notices until a tester does.
+    ///
+    /// Nil for a place, a trip, a recipe or a podcast: Amazon has nothing to
+    /// sell for the first three, and a podcast is free.
+    static func amazonSearch(forTitle title: String, subtitle: String?, category: RexCategory) -> URL? {
+        switch category {
+        case .book:
+            // Title and author. A book's subtitle is the author, sometimes
+            // followed by "· year" — Amazon matches against product titles,
+            // and the year only narrows it wrongly.
+            let author = (subtitle ?? "").split(separator: "·").first.map(String.init) ?? ""
+            return amazonSearch(for: "\(title) \(author.trimmingCharacters(in: .whitespaces))")
+        case .movie, .tv:
+            // Title alone — a film's subtitle is its director and year, which
+            // is not printed on anything Amazon sells. instant-video is where
+            // renting and buying happens; the alternative is a shelf of DVDs.
+            return amazonSearch(for: title, department: "instant-video")
+        case .other:
+            return amazonSearch(for: title)
+        default:
+            return nil
+        }
+    }
+
+    /// Honest about what the link does. "Find" rather than "Buy" on a product,
+    /// because a product in Other might be a board game Amazon stocks or a
+    /// particular small-producer olive oil it has never heard of, and a search
+    /// that returns nothing is a smaller broken promise than a Buy button that
+    /// does. "Rent or buy" on a film, because sending somebody to pay for
+    /// something already included with their subscription is a worse answer
+    /// than the provider row they could have read instead.
+    static func amazonLabel(for category: RexCategory) -> String {
+        switch category {
+        case .book: return "Buy on Amazon"
+        case .movie, .tv: return "Rent or buy on Amazon"
+        default: return "Find on Amazon"
+        }
+    }
+
     /// Adds the Associates tag, or returns nil if this isn't an Amazon link
     /// we have a tag for. An existing `tag` is left alone: it is somebody
     /// else's, and overwriting another creator's attribution to take their

@@ -885,11 +885,11 @@ struct ItemDetailView: View {
             // sending somebody to Amazon to pay for something already included
             // with a subscription they have would be a worse answer than the
             // provider row above it.
-            if let amazonURL = amazonSearchURL(for: item, category: category) {
+            if let amazonURL = RexOutboundLink.amazonSearch(forTitle: item.title, subtitle: item.subtitle, category: category) {
                 RexOutboundLinkButton(url: amazonURL) {
                     HStack(spacing: 4) {
                         Image(systemName: "cart").font(.system(size: 12))
-                        Text(amazonPillLabel(for: category))
+                        Text(RexOutboundLink.amazonLabel(for: category))
                             .font(RexFont.text(12, weight: .semibold))
                     }
                     .foregroundStyle(RexColor.primary)
@@ -901,50 +901,6 @@ struct ItemDetailView: View {
             }
         }
         .padding(16)
-    }
-
-    /// Honest about what the link does. "Find" rather than "Buy" on a
-    /// product, because a product in Other might be a board game Amazon
-    /// stocks or a particular small-producer olive oil it has never heard of,
-    /// and a search that returns nothing is a worse promise than a search.
-    private func amazonPillLabel(for category: RexCategory) -> String {
-        switch category {
-        case .book: return "Buy on Amazon"
-        case .movie, .tv: return "Rent or buy on Amazon"
-        default: return "Find on Amazon"
-        }
-    }
-
-    /// Title and author for a book, title alone for a film — a search for
-    /// "Digger Alejandro González Iñárritu · 2026" finds nothing, because a
-    /// film's subtitle is its director and year rather than anything written
-    /// on the cover, and Amazon matches it against product titles.
-    ///
-    /// Nil for every other category, and nil in the App Store build — see
-    /// RexOutboundLink.isTestFlightBuild.
-    private func amazonSearchURL(for item: RexItem, category: RexCategory) -> URL? {
-        switch category {
-        case .book:
-            let author = (item.subtitle ?? "").split(separator: "·").first.map(String.init) ?? ""
-            return RexOutboundLink.amazonSearch(
-                for: "\(item.title) \(author.trimmingCharacters(in: .whitespaces))"
-            )
-        case .movie, .tv:
-            return RexOutboundLink.amazonSearch(for: item.title, department: "instant-video")
-        case .other:
-            // Oct 20 — "I think we need to improve the product search and
-            // buy." Other is the shopping category, and it was the one with
-            // no reliable way to buy anything: its catalogue falls back to
-            // Wikipedia when Programmable Search returns nothing, so the
-            // "View product" link can be an encyclopaedia article. That is
-            // not somewhere you can buy a thing.
-            //
-            // This does not fix the catalogue. It does mean every product has
-            // one honest route to buying it, whatever the catalogue gave us.
-            return RexOutboundLink.amazonSearch(for: item.title)
-        default:
-            return nil
-        }
     }
 
     /// Google's details for this place, whichever way they arrived: the
