@@ -279,6 +279,13 @@ struct ItemDetailView: View {
                     // formed a view, so it belongs at the end of it.
                     rankRow
                         .padding(.horizontal, 16)
+
+                    // The foot of the page, below everything a reader came
+                    // for. Only on the categories that carry an Amazon link —
+                    // a place card has nothing to declare.
+                    if RexOutboundLink.amazonLabelApplies(to: RexCategory(rawType: item.type)) {
+                        AmazonDisclosure()
+                    }
                 }
             }
         }

@@ -202,6 +202,16 @@ enum RexOutboundLink {
         }
     }
 
+    /// Whether this category gets an Amazon link at all — the same question
+    /// amazonSearch answers, asked without needing a title to hand. Used to
+    /// decide whether a screen has anything to disclose.
+    static func amazonLabelApplies(to category: RexCategory) -> Bool {
+        switch category {
+        case .book, .movie, .tv, .other: return true
+        default: return false
+        }
+    }
+
     /// Honest about what the link does. "Find" rather than "Buy" on a product,
     /// because a product in Other might be a board game Amazon stocks or a
     /// particular small-producer olive oil it has never heard of, and a search
@@ -297,6 +307,38 @@ struct RexOutboundLinkButton<Label: View>: View {
         }
         .buttonStyle(.plain)
         .accessibilityHint(url.host ?? "")
+    }
+}
+
+/// Oct 22 — "do we need to declare anything if we are earning affiliate
+/// revenue?" Yes: Amazon's Operating Agreement requires the relationship
+/// stated clearly and conspicuously, and under the CAP Code an affiliate link
+/// is a marketing communication that has to be obviously identifiable as one.
+///
+/// Build 100 had the words, but only in Settings → Your data & privacy, two
+/// taps deep on a screen nobody opens — while the links themselves sit on item
+/// cards and wish lists. A disclosure the reader never reaches is not a
+/// disclosure.
+///
+/// At the foot of the screen rather than against the button, Kathryn's call:
+/// it is on the same page as the link, which is what is being asked for,
+/// without putting a commercial note next to a friend's recommendation.
+///
+/// Renders nothing when no tag is configured, which includes every App Store
+/// build — claiming a commission we are not earning would be its own small
+/// untruth.
+struct AmazonDisclosure: View {
+    var body: some View {
+        if RexOutboundLink.isAmazonAssociateActive {
+            Text("Some links here go to Amazon. REX may earn a commission on what you buy, at no cost to you \u{2014} it never changes what your friends recommend or the order you see it in.")
+                .font(RexFont.text(11.5))
+                .foregroundStyle(RexColor.mutedForeground)
+                .fixedSize(horizontal: false, vertical: true)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .padding(.horizontal, RexSpacing.page)
+                .padding(.top, RexSpacing.lg)
+                .padding(.bottom, RexSpacing.md)
+        }
     }
 }
 

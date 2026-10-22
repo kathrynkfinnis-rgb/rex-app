@@ -249,6 +249,12 @@ struct WishListCategoryView: View {
                         }
                     }
                 }
+
+                // Only where the carts above actually appear — a wish list of
+                // places has no Amazon links and nothing to declare.
+                if RexOutboundLink.amazonLabelApplies(to: route.category) {
+                    AmazonDisclosure()
+                }
             }
             .padding(.horizontal, RexSpacing.page)
             .padding(.vertical, RexSpacing.lg)
