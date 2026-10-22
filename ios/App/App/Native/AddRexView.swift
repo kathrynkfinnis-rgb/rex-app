@@ -872,15 +872,21 @@ struct AddRexView: View {
                       // exactly the categories that don't take one.
                       //
                       // Oct 22 — "can we replace the text in the search box
-                      // from 'search other' to 'paste a link or search'."
-                      // Pasting the page has worked here since yesterday and
-                      // nothing said so, which for the one category whose
-                      // catalogue is weakest is the difference between the
-                      // feature existing and nobody finding it. Said on every
-                      // category, because it works on every category — and
-                      // the category still named, because "search books" tells
-                      // you what the box searches and "search" does not.
-                      ? "Paste a link or search \(category.pluralLabel.lowercased())…"
+                      // from 'search other' to 'paste a link or search'", then
+                      // "unlikely you'd paste a link for podcasts", then
+                      // "perhaps 'search or paste a link' for everything other
+                      // than 'other'."
+                      //
+                      // Which is the right shape: both are offered everywhere,
+                      // and the order says which one to reach for. A podcast,
+                      // a book, a film or a place is found by typing its name,
+                      // so search leads and the paste is a quieter second
+                      // option. Other is the category whose catalogue is
+                      // weakest — it is losing Custom Search entirely — so
+                      // there the paste leads.
+                      ? (category == .other
+                         ? "Paste a link or search…"
+                         : "Search \(category.pluralLabel.lowercased()) or paste a link…")
                       : "e.g. \(placeholderTitle(for: category))")
                 .onChange(of: title) { _, _ in scheduleSearch(for: category) }
 
