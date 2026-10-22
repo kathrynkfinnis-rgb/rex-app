@@ -41,6 +41,15 @@ struct RexFeedbackInboxView: View {
                     ProgressView()
                         .frame(maxWidth: .infinity)
                         .padding(.top, 80)
+                } else if showingHandled && handled.isEmpty {
+                    // Oct 22 — found by actually pressing the button rather
+                    // than trusting it. Put the last dealt-with item back
+                    // while looking at this list and the list empties, which
+                    // is correct, but the way out of it used to disappear at
+                    // the same moment: the toggle below was drawn only when
+                    // something was in here. A blank screen with no way back
+                    // to the thing you were reading.
+                    empty("Nothing in here. Anything you clear will show up here rather than disappearing.")
                 } else if outstanding.isEmpty && !showingHandled {
                     empty(handled.isEmpty
                           ? "Nothing sent yet. This is the ! button in the app \u{2014} TestFlight reports live in App Store Connect."
@@ -49,7 +58,9 @@ struct RexFeedbackInboxView: View {
                     list(showingHandled ? handled : outstanding)
                 }
 
-                if !handled.isEmpty {
+                // Shown while looking at the cleared list even when it has
+                // emptied, because that is exactly when a way back is needed.
+                if !handled.isEmpty || showingHandled {
                     Button {
                         showingHandled.toggle()
                     } label: {
