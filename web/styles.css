@@ -142,3 +142,34 @@ li.ranked .thumb { width: 46px; height: 46px; border-radius: 9px; object-fit: co
 li.ranked .meta { min-width: 0; }
 li.ranked .name { margin: 0; font-weight: 600; }
 li.ranked .meta .muted { margin: .1rem 0 0; font-size: .85rem; }
+
+/* Oct 22 — the shared wish list, find-rex.com/l/<user>/<category>.
+   The ranking page's row with a buy button on the end instead of a number:
+   there is no order to a wish list, and the thing a reader does here is not
+   read it but act on one line of it. The button is bordered rather than
+   filled so a list of ten does not arrive as a wall of green, and because
+   the person's choices are the content — the buying is the afterthought. */
+ul.wishlist { list-style: none; margin: 1rem 0 0; padding: 0; display: flex; flex-direction: column; gap: .7rem; }
+li.wanted { display: flex; align-items: center; gap: .75rem; }
+li.wanted .thumb { width: 46px; height: 46px; border-radius: 9px; object-fit: cover; flex: 0 0 auto; }
+li.wanted .meta { min-width: 0; flex: 1 1 auto; }
+li.wanted .name { margin: 0; font-weight: 600; }
+li.wanted .meta .muted { margin: .1rem 0 0; font-size: .85rem; }
+li.wanted .buy {
+  flex: 0 0 auto;
+  text-decoration: none;
+  color: var(--forest);
+  border: 1.5px solid var(--forest);
+  border-radius: 999px;
+  padding: .45rem .85rem;
+  font-weight: 600;
+  font-size: .82rem;
+  white-space: nowrap;
+}
+/* On a phone the row runs out of width before a long title and a button can
+   share it, so the button drops under the text rather than squeezing it. */
+@media (max-width: 520px) {
+  li.wanted { flex-wrap: wrap; }
+  li.wanted .buy { margin-left: calc(46px + .75rem); }
+}
+.disclosure { margin: 1.4rem 0 0; font-size: .8rem; }

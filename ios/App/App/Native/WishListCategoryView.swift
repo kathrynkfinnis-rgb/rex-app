@@ -262,6 +262,21 @@ struct WishListCategoryView: View {
         .background(RexColor.background.ignoresSafeArea())
         .navigationTitle(title)
         .navigationBarTitleDisplayMode(.inline)
+        // Oct 22 — "let's make the shareable wish list." Only on a list
+        // somebody could buy from, and only when there is something on it:
+        // sharing an empty page is sending a 404.
+        .toolbar {
+            if RexOutboundLink.amazonLabelApplies(to: route.category),
+               !wants.isEmpty,
+               let me = RexAPI.shared.currentUserId,
+               let link = RexShareLink.wishListURL(userId: me, category: route.category.rawValue) {
+                ToolbarItem(placement: .topBarTrailing) {
+                    ShareLink(item: link, message: Text(shareMessage)) {
+                        Image(systemName: "square.and.arrow.up")
+                    }
+                }
+            }
+        }
         .navigationDestination(item: $pushedItemId) { ItemDetailView(itemId: $0) }
         .sheet(item: $activeSheet) { sheet in
             switch sheet {
@@ -367,6 +382,17 @@ struct WishListCategoryView: View {
         guard let itemId = want.items?.id else { return }
         wants.removeAll { $0.id == want.id }
         try? await RexAPI.shared.removeWant(itemId: itemId)
+    }
+
+    /// Words only. ShareLink appends the URL itself, so a message carrying it
+    /// too sends the link twice — the same mistake RexInvite's note warns
+    /// about.
+    private var shareMessage: String {
+        switch route.category {
+        case .book: return "Here's what I'm hoping to read \u{2014} if you're ever stuck for a present."
+        case .movie, .tv: return "Here's what I'm hoping to watch."
+        default: return "Here's what I'm after at the moment."
+        }
     }
 
     private func load() async {
