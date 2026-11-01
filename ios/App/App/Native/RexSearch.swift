@@ -273,18 +273,24 @@ enum RexSearch {
         // /Jon-Ronson-The-Castle/dp/0241988349 — so when the page will not
         // talk, the address still says what it points at. Generic rather than
         // Amazon-specific: Waterstones does this, and so does most of the web.
+        // Where it landed, not where it was sent — see linkPreview. A short
+        // link has nothing to read and nothing to tag; the page it resolves to
+        // has both, and is also the better thing to store as the product URL.
+        let landed = preview.resolvedURL ?? url
         let fromPage = preview.title?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
-        let title = fromPage.isEmpty ? (titleFromPath(of: url) ?? "") : fromPage
+        let title = fromPage.isEmpty
+            ? (titleFromPath(of: landed) ?? titleFromPath(of: url) ?? "")
+            : fromPage
         // Still nothing means a bare /dp/B00AQL8VU4 with no words anywhere.
         // Say nothing rather than offer a row named after a URL.
         guard !title.isEmpty else { return [] }
         return [RexSearchHit(
-            externalId: url.absoluteString,
+            externalId: landed.absoluteString,
             externalSource: "link",
             title: title,
             subtitle: preview.siteName,
             imageURL: preview.imageURL,
-            productURL: url.absoluteString
+            productURL: landed.absoluteString
         )]
     }
 
@@ -776,6 +782,20 @@ enum RexSearch {
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
         request.setValue(googleKey, forHTTPHeaderField: "X-Goog-Api-Key")
         request.setValue(bundleId, forHTTPHeaderField: "X-Ios-Bundle-Identifier")
+        // Nov 1 — this one stays Enterprise, and the reason is worth writing
+        // down so nobody "fixes" it later and breaks chain matching.
+        //
+        // websiteUri is itself an Enterprise field, and it is load-bearing:
+        // chainKey() compares websites to decide whether two places trading
+        // under one name are the same chain. Matching on the name alone is
+        // the failure this whole feature is built to avoid — offering The
+        // Crown in Doncaster because somebody liked a different pub called
+        // The Crown in Bristol.
+        //
+        // Acceptable because it is gated: loadChain only calls this for a
+        // place that already carries a chain_key, so an ordinary restaurant
+        // never reaches it. Rating and count ride along for free once the
+        // request is Enterprise anyway, and the branch rows display them.
         request.setValue(
             "places.id,places.displayName,places.formattedAddress,places.location," +
             "places.primaryTypeDisplayName,places.photos,places.rating,places.userRatingCount," +
@@ -1416,7 +1436,7 @@ enum RexSearch {
         request.setValue(bundleId, forHTTPHeaderField: "X-Ios-Bundle-Identifier")
         request.setValue(
             "photos,primaryTypeDisplayName,editorialSummary," +
-            "regularOpeningHours.weekdayDescriptions,rating,userRatingCount,websiteUri," +
+            "regularOpeningHours.weekdayDescriptions,rating,userRatingCount," +
             // Oct 12 — "include the website for restaurants and booking links
             // as well, as per Google." Google holds both: the place's own site
             // and, separately, whatever reservation service it uses — OpenTable,
@@ -1491,9 +1511,22 @@ enum RexSearch {
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
         request.setValue(googleKey, forHTTPHeaderField: "X-Goog-Api-Key")
         request.setValue(bundleId, forHTTPHeaderField: "X-Ios-Bundle-Identifier")
+        // Nov 1 — Pro tier, not Enterprise.
+        //
+        // October's bill: 6,993 Text Search Enterprise calls against 585 Pro.
+        // Only places() got the field-mask fix on 16 October; this path kept
+        // asking for rating and userRatingCount, which are Enterprise fields,
+        // and Enterprise gives 1,000 free calls a month where Pro gives 5,000.
+        // So this burned the free allowance five times faster for no gain.
+        //
+        // No gain because the rating was redundant: the Place Details call
+        // below fetches rating and userRatingCount anyway, and that is what
+        // the card displays. Dropping them here costs nothing and nobody sees
+        // a difference — the item simply gets its rating when the card is
+        // opened rather than when the pin is dropped.
         request.setValue(
             "places.id,places.displayName,places.formattedAddress,places.location," +
-            "places.primaryTypeDisplayName,places.photos,places.rating,places.userRatingCount",
+            "places.primaryTypeDisplayName,places.photos",
             forHTTPHeaderField: "X-Goog-FieldMask"
         )
         request.httpBody = try? JSONSerialization.data(withJSONObject: [
@@ -2132,7 +2165,7 @@ enum RexSearch {
     /// reads those, the same way a messaging app builds a link preview.
     /// Best-effort — a site that blocks it, or has none, just leaves the
     /// thumbnail for you to add.
-    static func linkPreview(for url: URL) async -> (title: String?, imageURL: String?, siteName: String?) {
+    static func linkPreview(for url: URL) async -> (title: String?, imageURL: String?, siteName: String?, resolvedURL: URL?) {
         var request = URLRequest(url: url, timeoutInterval: 8)
         // Some shops serve an empty shell to anything that doesn't look like
         // a browser; Safari's own agent gets the real page.
@@ -2140,7 +2173,13 @@ enum RexSearch {
                          forHTTPHeaderField: "User-Agent")
         request.setValue("text/html", forHTTPHeaderField: "Accept")
         guard let (data, response) = try? await URLSession.shared.data(for: request),
-              let http = response as? HTTPURLResponse, http.statusCode < 400 else { return (nil, nil, nil) }
+              let http = response as? HTTPURLResponse, http.statusCode < 400 else { return (nil, nil, nil, nil) }
+        // Oct 22 — where it ended up, which is not always where it was sent.
+        // Amazon's own share button hands out amzn.eu/d/02Xq9dK: no words in
+        // the path to read a name from, and a host nothing recognises as
+        // Amazon, so the tag would not apply either. The redirect lands on the
+        // full amazon.co.uk address, which has both.
+        let resolved = http.url ?? url
         // The meta tags live in <head>; no need to decode a whole product page.
         let head = String(decoding: data.prefix(600_000), as: UTF8.self)
 
@@ -2180,10 +2219,10 @@ enum RexSearch {
         // for johnlewis.com reads "johnlewis" — not beautiful, and better
         // than a product with no idea where it came from.
         let site = meta(["og:site_name", "twitter:site", "application-name"])
-            ?? url.host?
+            ?? resolved.host?
                 .replacingOccurrences(of: "www.", with: "")
                 .components(separatedBy: ".").first
-        return (title, image, site)
+        return (title, image, site, resolved)
     }
 
     // MARK: - Helpers
