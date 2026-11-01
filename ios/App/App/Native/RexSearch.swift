@@ -1378,10 +1378,20 @@ enum RexSearch {
 
         let (data, response) = try await URLSession.shared.data(for: request)
         guard let http = response as? HTTPURLResponse, http.statusCode < 400 else {
-            // 429 is the daily quota gone — the control that protects the
-            // bill, doing its job. Worth telling the person searching, because
-            // otherwise it is indistinguishable from "no such place".
-            if (response as? HTTPURLResponse)?.statusCode == 429 {
+            // 429 is the daily quota gone. 403 is the other way the same thing
+            // happens, and it was missed until Kathryn put spend caps on the
+            // billing account on 1 November: a cap does not throttle requests,
+            // it disables the API, and a disabled API answers PERMISSION_DENIED
+            // with a 403. So the control that protects the bill would have
+            // produced an empty search with no explanation — precisely the
+            // failure this enum was written to prevent, arriving through a
+            // door it wasn't watching.
+            //
+            // 400 is excluded deliberately: that is a malformed request, which
+            // is our fault, and saying "Google is not answering" would send
+            // somebody to the billing console over our own bug.
+            let status = (response as? HTTPURLResponse)?.statusCode ?? 0
+            if status == 429 || status == 403 {
                 GoogleAvailability.noteRefusal()
             }
             return []
