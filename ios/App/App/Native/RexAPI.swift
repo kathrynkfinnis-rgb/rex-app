@@ -2255,6 +2255,29 @@ final class RexAPI {
             return existingId
         }
 
+        // Nov 1 — "still double rexing if you have had it as a want to try and
+        // then go there."
+        //
+        // The data said what the code could not: a want on an item called
+        // "WAR" and a Rex on an item called "War". Two rows for one film,
+        // differing by capitalisation, so clearWantOnReview looked for a want
+        // against the Rex's item id and found none.
+        //
+        // The three checks above cannot catch that. The external-id one needs
+        // both sides to have come from the same catalogue entry, and the other
+        // two are gated to places and events. A book or a film typed by hand,
+        // or picked from two different search results, matches none of them.
+        //
+        // Title and subtitle together, case-insensitively, is the safe test
+        // for the rest. Title alone would merge the 2007 film War with the
+        // 2019 one; a film's subtitle is its director and year and a book's is
+        // its author, so requiring both means "the same title by the same
+        // person" rather than "the same word".
+        if type != "place", type != "event",
+           let existingId = await findItemByTitle(type: type, title: title, subtitle: subtitle) {
+            return existingId
+        }
+
         var request = URLRequest(url: baseURL.appendingPathComponent("/rest/v1/items"))
         request.httpMethod = "POST"
         request.setValue(anonKey, forHTTPHeaderField: "apikey")
@@ -2406,6 +2429,39 @@ final class RexAPI {
 
     /// The same name at the same address. Used only when neither an external
     /// id nor coordinates were available to match on — see createItem.
+    /// An item of the same kind with the same title and the same subtitle,
+    /// ignoring case. Returns nil when either side has no subtitle, because
+    /// then there is nothing distinguishing two things that share a name and
+    /// merging them would be worse than the duplicate.
+    private func findItemByTitle(type: String, title: String, subtitle: String?) async -> String? {
+        let wanted = title.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard wanted.count >= 2, let token = try? await validToken() else { return nil }
+        var components = URLComponents(url: baseURL.appendingPathComponent("/rest/v1/items"), resolvingAgainstBaseURL: false)!
+        components.queryItems = [
+            URLQueryItem(name: "select", value: "id,title,subtitle"),
+            URLQueryItem(name: "type", value: "eq.\(type)"),
+            // PostgREST's ilike with no wildcards is an exact, case-blind
+            // match, which is the whole fix: WAR finds War.
+            URLQueryItem(name: "title", value: "ilike.\(wanted)"),
+            URLQueryItem(name: "limit", value: "25"),
+        ]
+        guard let url = components.url else { return nil }
+        var request = URLRequest(url: url)
+        request.setValue(anonKey, forHTTPHeaderField: "apikey")
+        request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+        struct Row: Codable { let id: String; let title: String; let subtitle: String? }
+        guard let (data, response) = try? await URLSession.shared.data(for: request),
+              let http = response as? HTTPURLResponse, http.statusCode < 400,
+              let rows = try? JSONDecoder().decode([Row].self, from: data)
+        else { return nil }
+
+        let mine = (subtitle ?? "").trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+        guard !mine.isEmpty else { return nil }
+        return rows.first { row in
+            (row.subtitle ?? "").trimmingCharacters(in: .whitespacesAndNewlines).lowercased() == mine
+        }?.id
+    }
+
     private func findItemByAddress(type: String, title: String, address: String) async -> String? {
         guard let token = try? await validToken() else { return nil }
         // Postgres ilike on the first line of the address: enough to find the

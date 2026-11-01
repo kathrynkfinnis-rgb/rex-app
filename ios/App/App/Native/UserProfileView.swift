@@ -602,8 +602,34 @@ struct UserProfileView: View {
                 }
                 .buttonStyle(.plain)
             } else {
-                PressAndHoldButton(label: "Hold to save") {
-                    Task { await toggleFollow(list) }
+                // Nov 1 — "be able to review collections before adding to your
+                // shelf."
+                //
+                // You already could: the thumbnail above is a NavigationLink
+                // and the collection's own page has a Save button in its
+                // toolbar. But this was the only labelled thing on the tile,
+                // so it read as the only thing you could do, and people held
+                // it because that is what it told them to do. Nobody
+                // discovers a tap target that never says it is one.
+                //
+                // Both now, with the opening first: "Look" is what you want to
+                // do before saving, and saving blind is the thing being
+                // complained about. The hold stays for anybody who already
+                // knows the list and just wants it.
+                VStack(alignment: .leading, spacing: 3) {
+                    NavigationLink(value: CollectionRoute(listId: list.id, name: list.name, isMine: false)) {
+                        HStack(spacing: 3) {
+                            Text("Look inside")
+                            Image(systemName: "chevron.right").font(.system(size: 8, weight: .semibold))
+                        }
+                        .font(RexFont.text(11, weight: .semibold))
+                        .foregroundStyle(RexColor.primary)
+                    }
+                    .buttonStyle(.plain)
+
+                    PressAndHoldButton(label: "Hold to save") {
+                        Task { await toggleFollow(list) }
+                    }
                 }
             }
         }
