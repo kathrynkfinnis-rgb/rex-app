@@ -244,11 +244,25 @@ Deno.serve(async (req) => {
   }
   if (!result.ok) {
     console.log(`[amazon-lookup] ${result.status}: ${result.detail}`);
-    // A 429 here is the one-per-second limit, which a retry a moment later
-    // fixes; anything else is ours to look at. Either way the app falls back
-    // to a search link, so the person is not stuck.
+    // Nov 1 — AssociateNotEligible is the expected answer, not a fault.
+    //
+    // Access to PA-API through the Creators API needs ten qualifying sales in
+    // the past thirty days — a rolling requirement, not a one-off hurdle, and
+    // a good deal higher than the three sales that merely keep the Associates
+    // account alive. So this will be the reply until REX is putting links in
+    // front of enough people, and it will be the reply again any month that
+    // falls short.
+    //
+    // Named separately so it reads as "not yet" in the logs rather than as a
+    // broken integration somebody then goes looking for.
+    const notEligible = result.detail.includes("AssociateNotEligible");
+    const reason = notEligible
+      ? "not_eligible"
+      : result.status === 429
+      ? "rate_limited"
+      : "amazon_error";
     return new Response(
-      JSON.stringify({ error: result.status === 429 ? "rate_limited" : "amazon_error", items: [] }),
+      JSON.stringify({ error: reason, items: [] }),
       { status: 200, headers: CORS },
     );
   }
