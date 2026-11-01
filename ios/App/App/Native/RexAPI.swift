@@ -924,6 +924,24 @@ final class RexAPI {
                 URLQueryItem(name: "limit", value: "\(limit)"),
                 URLQueryItem(name: "offset", value: "\(offset)"),
             ]
+            // Nov 1 — "remove rex from feed."
+            //
+            // The feed is people you know. REX is not one of them, and a
+            // curated list sitting between two friends' recommendations
+            // borrows the weight of being in that company without having
+            // earned it — which is the opposite of what the app is for.
+            //
+            // Not deleted, moved: Explore already has an editorial surface and
+            // that is where something written by the house belongs. Somebody
+            // who wants it goes looking for it; nobody is handed it while
+            // reading their friends.
+            //
+            // Filtered here rather than after the rows arrive, so a page of
+            // thirty is thirty friends' posts. Filtering client-side would
+            // have let REX eat the page and left the feed looking empty.
+            if let official = await officialAccountId() {
+                queryItems.append(URLQueryItem(name: "user_id", value: "neq.\(official)"))
+            }
             // Sept 2 — "individual Rex should still be searchable in the
             // feed though". trip_id.is.null used to be unconditional here,
             // which correctly keeps a trip's stops out of the browse feed
