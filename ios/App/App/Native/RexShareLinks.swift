@@ -35,6 +35,18 @@ enum RexShareLink {
         URL(string: "\(site)/k/\(userId)/\(category)")
     }
 
+    /// Oct 22 — "let's make the shareable wish list."
+    ///
+    /// The other half of the carts added to the wish list rows: those let you
+    /// buy from your own list, this hands the list to somebody else. Keyed by
+    /// whose and which for the same reason the ranking is — a wish list is
+    /// everything you have said you want in a category, not a row with an id.
+    ///
+    /// /l/ rather than /w/, because /w/<id> is already one want's own page.
+    static func wishListURL(userId: String, category: String) -> URL? {
+        URL(string: "\(site)/l/\(userId)/\(category)")
+    }
+
     /// Oct 5 — "and can we truncate the link?" The short form of every link
     /// above: find-rex.com/s/k3n9pqd rather than sixty characters of UUID.
     /// The page it leads to is the same one, via a redirect — see

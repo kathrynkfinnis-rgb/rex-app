@@ -143,7 +143,56 @@ enum RexOutboundLink {
         for (domain, tag) in amazonTags where !tag.isEmpty {
             if lower == domain || lower.hasSuffix(".\(domain)") { return tag }
         }
+        // Oct 22 — Amazon's own share button hands out amzn.eu/d/02Xq9dK and
+        // amzn.to/…, which are Amazon and were matching none of the above. A
+        // link somebody shared from the Amazon app was the one link we did not
+        // tag. They redirect to a regional store, so the UK tag is the right
+        // one to use on a short link reached from a UK phone.
+        if lower == "amzn.eu" || lower == "amzn.to"
+            || lower.hasSuffix(".amzn.eu") || lower.hasSuffix(".amzn.to") {
+            return amazonTags["amazon.co.uk"].flatMap { $0.isEmpty ? nil : $0 }
+        }
         return nil
+    }
+
+    /// Oct 22 — "I want to be able to take a share link from amazon and then
+    /// that fill in the details and then the pill is automatically our revenue
+    /// generating link."
+    ///
+    /// The last part needs the ASIN, which is the one thing an Amazon URL
+    /// always carries however it is shaped: /dp/B0XXXX, /gp/product/B0XXXX,
+    /// /gp/aw/d/B0XXXX, or a short link once it has resolved. From it we can
+    /// build the canonical product address with our tag on it, which is a
+    /// better thing to store than whatever tracking the share button attached.
+    static func amazonASIN(in url: URL) -> String? {
+        guard let host = url.host?.lowercased(),
+              host.contains("amazon.") || host.contains("amzn.")
+        else { return nil }
+        let segments = url.path.split(separator: "/").map(String.init)
+        for (index, segment) in segments.enumerated() {
+            guard ["dp", "d", "product", "gp"].contains(segment.lowercased()) else { continue }
+            // The id is the next segment that looks like one: ten characters
+            // of digits and capitals. "gp/product/B0XXXX" has one in between.
+            for candidate in segments.dropFirst(index + 1).prefix(2) where isASIN(candidate) {
+                return candidate.uppercased()
+            }
+        }
+        // Some paths carry it with no marker at all.
+        return segments.first(where: isASIN)?.uppercased()
+    }
+
+    private static func isASIN(_ candidate: String) -> Bool {
+        candidate.count == 10
+            && candidate.allSatisfy { $0.isNumber || ($0.isLetter && $0.isUppercase) }
+    }
+
+    /// The clean product address for an ASIN, tagged. Replaces a share link's
+    /// tracking parameters rather than adding to them.
+    static func amazonProductURL(asin: String) -> URL? {
+        guard isAmazonAssociateActive,
+              let tag = amazonTags["amazon.co.uk"], !tag.isEmpty
+        else { return URL(string: "https://www.amazon.co.uk/dp/\(asin)") }
+        return URL(string: "https://www.amazon.co.uk/dp/\(asin)?tag=\(tag)")
     }
 
     /// Oct 20 — "say I recommend a book and Phoebe buys it — do we need a
