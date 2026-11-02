@@ -145,4 +145,148 @@ object Rex {
             .decodeList<RexProfile>()
             .firstOrNull()
     }
+
+    // ──────────────────────────────────────────────────────── writing
+
+    /**
+     * Nov 2 — adding a Rex, and the deduplication that has to come with it.
+     *
+     * Written by hand rather than fanned out to an agent alongside the
+     * screens, because the rules below are the ones iOS spent a fortnight
+     * getting wrong in public. Reimplementing them from the screen's point of
+     * view would reproduce every one of those bugs on a second platform, and
+     * they are invisible until somebody's list has two of something.
+     */
+
+    /** An item already in the catalogue from the same source. */
+    private suspend fun findByExternalId(source: String, externalId: String): String? =
+        client.from("items")
+            .select(Columns.raw("id")) {
+                filter {
+                    eq("external_source", source)
+                    eq("external_id", externalId)
+                }
+                limit(1)
+            }
+            .decodeList<ItemId>()
+            .firstOrNull()?.id
+
+    /**
+     * Nov 1 on iOS — "still double rexing if you have had it as a want to try
+     * and then go there". The cause was two rows: a want against an item
+     * called "WAR" and a Rex against one called "War".
+     *
+     * Title and subtitle together, case-blind. Title alone would merge the
+     * 2007 film War with the 2019 one; a film's subtitle is its director and
+     * year and a book's is its author, so requiring both asks "same title by
+     * the same person". Where either side has no subtitle it declines — a
+     * duplicate is better than two different things merged.
+     */
+    private suspend fun findByTitle(type: String, title: String, subtitle: String?): String? {
+        val mine = subtitle?.trim()?.lowercase().orEmpty()
+        if (mine.isEmpty() || title.trim().length < 2) return null
+        return client.from("items")
+            .select(Columns.raw("id,title,subtitle")) {
+                filter {
+                    eq("type", type)
+                    // ilike with no wildcards is an exact, case-blind match.
+                    ilike("title", title.trim())
+                }
+                limit(25)
+            }
+            .decodeList<ItemMatch>()
+            .firstOrNull { it.subtitle?.trim()?.lowercase() == mine }
+            ?.id
+    }
+
+    /**
+     * The item row, reused if we already hold it.
+     *
+     * Not yet carried over from iOS: the two geographic checks — same
+     * coordinates, and same name at the same address — which catch two people
+     * adding one restaurant by different routes. They need the map work this
+     * build does not have, and a place added here still dedupes on its Google
+     * place id, which is how most of them arrive.
+     */
+    suspend fun findOrCreateItem(
+        type: String,
+        title: String,
+        subtitle: String? = null,
+        imageUrl: String? = null,
+        genre: String? = null,
+        address: String? = null,
+        linkUrl: String? = null,
+        externalId: String? = null,
+        externalSource: String? = null,
+    ): String {
+        if (externalId != null && externalSource != null) {
+            findByExternalId(externalSource, externalId)?.let { return it }
+        }
+        if (type != "place" && type != "event") {
+            findByTitle(type, title, subtitle)?.let { return it }
+        }
+        return client.from("items")
+            .insert(
+                NewItem(
+                    type = type,
+                    title = title.trim(),
+                    subtitle = subtitle,
+                    imageUrl = imageUrl,
+                    genre = genre,
+                    address = address,
+                    linkUrl = linkUrl,
+                    externalId = externalId,
+                    externalSource = externalSource,
+                )
+            ) { select(Columns.raw("id")) }
+            .decodeList<ItemId>()
+            .first().id
+    }
+
+    /**
+     * Your take on something. Posting one clears any want you had for it —
+     * "the Rex should convert to a proper Rex, so it shouldn't come up with
+     * two ratings for the thing" (14 October).
+     */
+    suspend fun createRecommendation(itemId: String, rating: Double, note: String?) {
+        val userId = RexAuth.currentUserId ?: error("Not signed in.")
+        client.from("recommendations").insert(
+            NewRecommendation(
+                userId = userId,
+                itemId = itemId,
+                rating = rating,
+                note = note?.trim()?.ifEmpty { null },
+            )
+        )
+        clearWantOnReview(itemId)
+    }
+
+    /** Somewhere you mean to go. */
+    suspend fun createWant(itemId: String) {
+        val userId = RexAuth.currentUserId ?: error("Not signed in.")
+        client.from("wants").insert(NewWant(userId = userId, itemId = itemId))
+    }
+
+    suspend fun removeWant(itemId: String) {
+        val userId = RexAuth.currentUserId ?: return
+        client.from("wants").delete {
+            filter {
+                eq("user_id", userId)
+                eq("item_id", itemId)
+            }
+        }
+    }
+
+    /**
+     * Best-effort on purpose: the review is the thing that mattered and it is
+     * already saved. Failing to tidy the want afterwards should not turn a
+     * successful post into an error on screen.
+     *
+     * iOS also moves the want's collection placement onto the new Rex, so a
+     * want filed in a list stays in that list. Not here yet — this build has
+     * no collection editing, so there is no placement to carry.
+     */
+    private suspend fun clearWantOnReview(itemId: String) {
+        runCatching { removeWant(itemId) }
+    }
 }

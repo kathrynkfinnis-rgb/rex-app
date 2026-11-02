@@ -126,3 +126,40 @@ data class Friendship(
     val status: String,
     @SerialName("created_at") val createdAt: String? = null,
 )
+
+// Insert and projection shapes. Separate from the read models because a row
+// going in is not the row coming back: the database fills id, created_at and
+// the defaults, and sending nulls for them would overwrite what it chose.
+
+@Serializable
+internal data class ItemId(val id: String)
+
+@Serializable
+internal data class ItemMatch(val id: String, val title: String, val subtitle: String? = null)
+
+@Serializable
+internal data class NewItem(
+    val type: String,
+    val title: String,
+    val subtitle: String? = null,
+    @SerialName("image_url") val imageUrl: String? = null,
+    val genre: String? = null,
+    val address: String? = null,
+    @SerialName("link_url") val linkUrl: String? = null,
+    @SerialName("external_id") val externalId: String? = null,
+    @SerialName("external_source") val externalSource: String? = null,
+)
+
+@Serializable
+internal data class NewRecommendation(
+    @SerialName("user_id") val userId: String,
+    @SerialName("item_id") val itemId: String,
+    val rating: Double,
+    val note: String? = null,
+)
+
+@Serializable
+internal data class NewWant(
+    @SerialName("user_id") val userId: String,
+    @SerialName("item_id") val itemId: String,
+)
