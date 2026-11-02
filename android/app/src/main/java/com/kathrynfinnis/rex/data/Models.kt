@@ -57,3 +57,72 @@ data class FeedRecommendation(
             else -> "Obsessed"
         }
 }
+
+/**
+ * Nov 2 — the rest of what the core loop reads. Added in one go rather than
+ * screen by screen, because every one of these is a shape the database
+ * already returns and discovering them separately is how two screens end up
+ * decoding the same row into two different classes.
+ *
+ * Column names match the Swift models exactly. The database is the contract:
+ * anything added to one needs adding to the other.
+ */
+
+/**
+ * Somewhere you mean to go, as distinct from somewhere you have been. Its own
+ * table rather than a recommendation with no rating — a want has no opinion
+ * in it yet, and the feed, the profile and the collections all treat the two
+ * differently.
+ */
+@Serializable
+data class WantRow(
+    val id: String,
+    @SerialName("created_at") val createdAt: String,
+    @SerialName("item_id") val itemId: String,
+    @SerialName("user_id") val userId: String? = null,
+    @SerialName("list_id") val listId: String? = null,
+    @SerialName("show_in_feed") val showInFeed: Boolean? = null,
+    val note: String? = null,
+    val items: RexItem? = null,
+)
+
+/** A collection: a named group somebody has put things into. */
+@Serializable
+data class RexList(
+    val id: String,
+    val name: String,
+    @SerialName("user_id") val userId: String,
+    val emoji: String? = null,
+    val topic: String? = null,
+    @SerialName("created_at") val createdAt: String? = null,
+)
+
+/**
+ * One row inside a collection. A saved post points at somebody's Rex; a want
+ * filed in a collection sits in the wants table instead, which is why a
+ * collection reads from two places and merges them.
+ */
+@Serializable
+data class SavedPost(
+    val id: String,
+    @SerialName("list_id") val listId: String,
+    @SerialName("recommendation_id") val recommendationId: String? = null,
+    val note: String? = null,
+    val section: String? = null,
+    @SerialName("sort_order") val sortOrder: Int? = null,
+    val recommendations: FeedRecommendation? = null,
+)
+
+/**
+ * Who you are to each other. status is 'pending' or 'accepted'; which of the
+ * two columns holds you decides whether a pending row is a request you sent
+ * or one you have been sent.
+ */
+@Serializable
+data class Friendship(
+    val id: String,
+    @SerialName("requester_id") val requesterId: String,
+    @SerialName("addressee_id") val addresseeId: String,
+    val status: String,
+    @SerialName("created_at") val createdAt: String? = null,
+)
