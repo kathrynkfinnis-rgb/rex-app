@@ -7,14 +7,17 @@ plugins {
 
 android {
     namespace = "com.kathrynfinnis.rex"
-    compileSdk = 35
+    compileSdk = 36
 
     defaultConfig {
         applicationId = "com.kathrynfinnis.rex"
         // 26 rather than 24: it is where adaptive icons and the modern
         // notification APIs start, and it already covers ~97% of devices.
         minSdk = 26
-        targetSdk = 35
+        // Nov 4 — 36, not 35. Google Play's deadline for new apps and updates
+        // to target Android 16 passed on 31 August 2026, so an upload built
+        // against 35 is rejected at the door.
+        targetSdk = 36
         versionCode = 1
         versionName = "1.0"
     }
