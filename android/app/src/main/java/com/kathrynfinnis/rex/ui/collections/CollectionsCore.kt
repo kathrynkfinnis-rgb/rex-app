@@ -54,6 +54,7 @@ import com.kathrynfinnis.rex.data.Rex
 import com.kathrynfinnis.rex.data.RexAuth
 import com.kathrynfinnis.rex.data.RexList
 import com.kathrynfinnis.rex.data.SavedPost
+import com.kathrynfinnis.rex.ui.readableFailure
 import com.kathrynfinnis.rex.ui.theme.RexColor
 
 /**
@@ -95,7 +96,7 @@ fun CollectionsList(onOpenCollection: (String, String) -> Unit) {
         state = try {
             CollectionsState.Loaded(Rex.myCollections())
         } catch (e: Exception) {
-            CollectionsState.Failed(e.message)
+            CollectionsState.Failed(readableFailure(e))
         }
     }
 
@@ -229,7 +230,7 @@ fun CollectionDetail(
         state = try {
             DetailState.Loaded(groupRows(Rex.collectionItems(listId)))
         } catch (e: Exception) {
-            DetailState.Failed(e.message)
+            DetailState.Failed(readableFailure(e))
         }
     }
 

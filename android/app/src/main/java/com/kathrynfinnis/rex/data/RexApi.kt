@@ -116,10 +116,31 @@ object Rex {
             }
             .decodeList()
 
-    /** Collections you own. */
+    /**
+     * Collections you own.
+     *
+     * The table is `hitlist_lists`, not `lists` — a leftover name from before
+     * collections were called collections, and the one thing about this
+     * schema nobody would guess. Nov 4: this read asked for `lists` and
+     * PostgREST 404'd the tab for anyone who opened it.
+     *
+     * Filtered by user_id as well as RLS, matching fetchLists on iOS: RLS lets
+     * you see collections shared with you, and this list is specifically the
+     * ones that are yours.
+     *
+     * Ordering mirrors iOS exactly, nullslast included — without it a
+     * collection you have never dragged sorts above every one you have.
+     */
     suspend fun myCollections(): List<RexList> =
-        client.from("lists")
-            .select { order("created_at", Order.DESCENDING) }
+        client.from("hitlist_lists")
+            // Exactly the fields RexList declares, no more: user_id is not
+            // optional on the model, and sort_order can be ordered by without
+            // being selected.
+            .select(Columns.raw("id,name,user_id,emoji,topic,created_at")) {
+                filter { eq("user_id", RexAuth.currentUserId ?: error("Not signed in.")) }
+                order("sort_order", Order.ASCENDING, nullsFirst = false)
+                order("created_at", Order.DESCENDING)
+            }
             .decodeList()
 
     /** What is inside one collection. */

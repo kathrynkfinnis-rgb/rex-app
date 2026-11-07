@@ -50,6 +50,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.kathrynfinnis.rex.data.Rex
 import com.kathrynfinnis.rex.data.RexAuth
+import com.kathrynfinnis.rex.ui.readableFailure
 import com.kathrynfinnis.rex.ui.theme.RexColor
 import kotlinx.coroutines.launch
 
@@ -406,18 +407,17 @@ private fun AddRexForm(onSaved: () -> Unit, onCancel: () -> Unit) {
                         null
                     } catch (e: Exception) {
                         // Two distinguishable failures, because the useful
-                        // next step is different for each. Everything else
-                        // carries the underlying message: it is usually the
-                        // network or a PostgREST complaint, and hiding it
-                        // behind "something went wrong" leaves nobody —
-                        // including us, reading a screenshot — any wiser.
+                        // next step is different for each. The rest goes
+                        // through readableFailure: it still says what kind of
+                        // failure it was, which was the point of printing the
+                        // raw message, without printing the bearer token that
+                        // supabase-kt appends to it.
                         if (e.message?.contains("Not signed in", true) == true) {
                             "Your session ran out before this saved. Sign in " +
                                 "again and your Rex will post."
                         } else {
                             "That didn't save, so nothing has been posted. " +
-                                "Check your connection and try again. " +
-                                "(${e.message ?: e::class.simpleName})"
+                                readableFailure(e)
                         }
                     }
 

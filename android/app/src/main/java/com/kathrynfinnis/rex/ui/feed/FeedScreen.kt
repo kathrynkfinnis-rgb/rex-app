@@ -33,6 +33,7 @@ import androidx.compose.ui.unit.dp
 import coil.compose.AsyncImage
 import com.kathrynfinnis.rex.data.FeedRecommendation
 import com.kathrynfinnis.rex.data.Rex
+import com.kathrynfinnis.rex.ui.readableFailure
 import com.kathrynfinnis.rex.ui.theme.RexColor
 
 /**
@@ -53,7 +54,7 @@ fun FeedScreen() {
         state = try {
             FeedState.Loaded(Rex.feed())
         } catch (e: Exception) {
-            FeedState.Failed(e.message ?: "Couldn't load the feed.")
+            FeedState.Failed(readableFailure(e))
         }
     }
 

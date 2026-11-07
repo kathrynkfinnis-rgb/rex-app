@@ -56,6 +56,7 @@ import com.kathrynfinnis.rex.data.FeedRecommendation
 import com.kathrynfinnis.rex.data.Rex
 import com.kathrynfinnis.rex.data.RexAuth
 import com.kathrynfinnis.rex.data.RexItem
+import com.kathrynfinnis.rex.ui.readableFailure
 import com.kathrynfinnis.rex.ui.theme.RexColor
 import kotlinx.coroutines.async
 import kotlinx.coroutines.coroutineScope
@@ -113,7 +114,7 @@ fun ItemDetailScreen(itemId: String, onBack: () -> Unit) {
                 ItemState.Loaded(header.getOrNull(), said)
             }
         } catch (e: Exception) {
-            ItemState.Failed(e.message)
+            ItemState.Failed(readableFailure(e))
         }
 
         // Separately, and deliberately not inside the block above: whether

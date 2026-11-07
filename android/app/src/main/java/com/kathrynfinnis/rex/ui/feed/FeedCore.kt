@@ -47,6 +47,7 @@ import coil.compose.AsyncImage
 import com.kathrynfinnis.rex.data.FeedRecommendation
 import com.kathrynfinnis.rex.data.Rex
 import com.kathrynfinnis.rex.data.RexAuth
+import com.kathrynfinnis.rex.ui.readableFailure
 import com.kathrynfinnis.rex.ui.theme.RexColor
 import java.time.Instant
 import java.time.LocalDateTime
@@ -88,7 +89,7 @@ fun FeedList(onOpenItem: (String) -> Unit) {
         load = try {
             FeedLoad.Loaded(Rex.feed())
         } catch (e: Exception) {
-            FeedLoad.Failed(e.message)
+            FeedLoad.Failed(readableFailure(e))
         }
     }
 

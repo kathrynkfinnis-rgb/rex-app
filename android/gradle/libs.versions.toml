@@ -1,6 +1,6 @@
 # One place for every version, so a bump is one line rather than a search.
 [versions]
-agp = "8.7.3"
+agp = "8.10.1"
 kotlin = "2.0.21"
 coreKtx = "1.15.0"
 lifecycle = "2.8.7"
