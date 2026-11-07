@@ -11,6 +11,13 @@ struct BlastRoute: Hashable, Identifiable {
     var id: String { requestId }
 }
 
+/// Nov 7 — see openAttached. A distinct type rather than a bare String so it
+/// cannot collide with the `String` destination an ancestor may already have.
+struct AttachedItemRoute: Hashable, Identifiable {
+    let itemId: String
+    var id: String { itemId }
+}
+
 struct BlastDetailView: View {
     let route: BlastRoute
 
@@ -32,6 +39,22 @@ struct BlastDetailView: View {
     @State private var attachedRex: RexItem?
     @State private var choosingRex = false
     @State private var isSending = false
+
+    /// Nov 7 — the attached Rex's destination, owned by this screen.
+    ///
+    /// The chip was a `NavigationLink(value: item.id)`, which relies on some
+    /// ancestor having registered `String`. The feed's stack has; the
+    /// notifications stack registers nothing at all, so a blast opened from a
+    /// notification — which is how most people reach one — drew a chip with a
+    /// chevron on it that did nothing when tapped. Its own typed destination
+    /// cannot be claimed or forgotten by whatever pushed this screen.
+    @State private var openAttached: AttachedItemRoute?
+
+    /// Nov 7 — "you also can't delete or edit comments."
+    @State private var editingId: String?
+    @State private var editDraft = ""
+    @State private var pendingDelete: RequestComment?
+    @FocusState private var editFocused: Bool
 
     var body: some View {
         VStack(spacing: 0) {
@@ -75,6 +98,33 @@ struct BlastDetailView: View {
 
             Divider().overlay(RexColor.border)
             composer
+                .navigationDestination(item: $openAttached) { route in
+                    ItemDetailView(itemId: route.itemId)
+                }
+                .alert(
+                    pendingDelete?.parent_id == nil ? "Delete this suggestion?" : "Delete this reply?",
+                    isPresented: Binding(
+                        get: { pendingDelete != nil },
+                        set: { if !$0 { pendingDelete = nil } }
+                    )
+                ) {
+                    Button("Delete", role: .destructive) {
+                        if let comment = pendingDelete {
+                            pendingDelete = nil
+                            Task { await deleteResponse(comment) }
+                        }
+                    }
+                    Button("Cancel", role: .cancel) { pendingDelete = nil }
+                } message: {
+                    // parent_id cascades, so deleting a suggestion takes the
+                    // conversation under it. Say so rather than surprising
+                    // somebody who only wanted to fix their own wording.
+                    Text(
+                        replyCount(of: pendingDelete) > 0
+                        ? "The replies to it go too. This can't be undone."
+                        : "This can't be undone."
+                    )
+                }
                 .alert("Link \u{201C}\(linkWords)\u{201D}", isPresented: Binding(
                     get: { linkRange != nil },
                     set: { if !$0 { linkRange = nil } }
@@ -147,47 +197,25 @@ struct BlastDetailView: View {
                     Text(response.profiles?.display_name ?? response.profiles?.username ?? "Someone")
                         .font(RexFont.text(13, weight: .semibold))
                         .foregroundStyle(RexColor.foreground)
-                    MentionedText(text: response.body, font: RexFont.text(15)) { name in
-                        Task { await openMention(name) }
+                    if editingId == response.id {
+                        inlineEditor(for: response)
+                    } else {
+                        MentionedText(text: response.body, font: RexFont.text(15)) { name in
+                            Task { await openMention(name) }
+                        }
+                            .font(RexFont.text(14))
+                            .foregroundStyle(RexColor.foreground.opacity(0.9))
                     }
-                        .font(RexFont.text(14))
-                        .foregroundStyle(RexColor.foreground.opacity(0.9))
 
                     if let item = response.items {
-                        NavigationLink(value: item.id) {
-                            HStack(spacing: RexSpacing.sm) {
-                                Image(systemName: RexCategory(rawType: item.type).symbol)
-                                    .font(.system(size: 11))
-                                VStack(alignment: .leading, spacing: 1) {
-                                    Text(item.title)
-                                        .font(RexFont.text(13, weight: .semibold))
-                                        .lineLimit(1)
-                                    if let sub = item.address ?? item.subtitle, !sub.isEmpty {
-                                        Text(sub)
-                                            .font(RexFont.text(11))
-                                            .foregroundStyle(RexColor.mutedForeground)
-                                            .lineLimit(1)
-                                    }
-                                }
-                                Spacer(minLength: 0)
-                                Image(systemName: "chevron.right")
-                                    .font(.system(size: 10, weight: .semibold))
-                                    .foregroundStyle(RexColor.mutedForeground)
-                            }
-                            .foregroundStyle(RexColor.foreground)
-                            .padding(RexSpacing.sm + 2)
-                            .background(RexColor.card)
-                            .clipShape(RoundedRectangle(cornerRadius: RexRadius.input, style: .continuous))
-                            .overlay(
-                                RoundedRectangle(cornerRadius: RexRadius.input, style: .continuous)
-                                    .stroke(RexColor.border, lineWidth: 1)
-                            )
-                        }
-                        .buttonStyle(.plain)
-                        .padding(.top, 4)
+                        attachedChip(item)
                     }
                 }
                 Spacer(minLength: RexSpacing.sm)
+
+                if response.user_id == RexAPI.shared.currentUserId {
+                    ownerMenu(response)
+                }
             }
 
             HStack(spacing: RexSpacing.lg) {
@@ -241,13 +269,26 @@ struct BlastDetailView: View {
                         Text(reply.profiles?.display_name ?? reply.profiles?.username ?? "Someone")
                             .font(RexFont.text(12, weight: .semibold))
                             .foregroundStyle(RexColor.foreground)
-                        MentionedText(text: reply.body, font: RexFont.text(14)) { name in
-                            Task { await openMention(name) }
+                        if editingId == reply.id {
+                            inlineEditor(for: reply)
+                        } else {
+                            MentionedText(text: reply.body, font: RexFont.text(14)) { name in
+                                Task { await openMention(name) }
+                            }
+                                .font(RexFont.text(13))
+                                .foregroundStyle(RexColor.foreground.opacity(0.9))
                         }
-                            .font(RexFont.text(13))
-                            .foregroundStyle(RexColor.foreground.opacity(0.9))
+
+                        // Nov 7 — the half that was missing. See attachedChip.
+                        if let item = reply.items {
+                            attachedChip(item)
+                        }
                     }
                     Spacer(minLength: RexSpacing.sm)
+
+                    if reply.user_id == RexAPI.shared.currentUserId {
+                        ownerMenu(reply)
+                    }
                 }
                 .padding(.leading, 38)
             }
@@ -262,9 +303,141 @@ struct BlastDetailView: View {
         )
     }
 
+    /// Nov 7 — "Phoebe attached a list and it hasn't come up."
+    ///
+    /// It had come up, in the sense that it was saved: suggested_item_id was
+    /// set and fetchRequestComments has always read it back. What it had not
+    /// done is appear, because this chip was written inline in the top-level
+    /// branch of responseRow and the reply branch below drew an avatar, a
+    /// name and the body text — nothing else. Attach something to a reply
+    /// rather than to a suggestion of its own and it went in and was never
+    /// drawn again, which is indistinguishable from it not having worked.
+    ///
+    /// A list reaches this the same way anything else does: a list is an item
+    /// with type "list", and searchMyRexItems filters by nothing, so it was
+    /// always attachable. Same chip, same destination.
+    private func attachedChip(_ item: RexItem) -> some View {
+        Button {
+            openAttached = AttachedItemRoute(itemId: item.id)
+        } label: {
+            HStack(spacing: RexSpacing.sm) {
+                Image(systemName: RexCategory(rawType: item.type).symbol)
+                    .font(.system(size: 11))
+                VStack(alignment: .leading, spacing: 1) {
+                    Text(item.title)
+                        .font(RexFont.text(13, weight: .semibold))
+                        .lineLimit(1)
+                    if let sub = item.address ?? item.subtitle, !sub.isEmpty {
+                        Text(sub)
+                            .font(RexFont.text(11))
+                            .foregroundStyle(RexColor.mutedForeground)
+                            .lineLimit(1)
+                    }
+                }
+                Spacer(minLength: 0)
+                Image(systemName: "chevron.right")
+                    .font(.system(size: 10, weight: .semibold))
+                    .foregroundStyle(RexColor.mutedForeground)
+            }
+            .foregroundStyle(RexColor.foreground)
+            .padding(RexSpacing.sm + 2)
+            .background(RexColor.card)
+            .clipShape(RoundedRectangle(cornerRadius: RexRadius.input, style: .continuous))
+            .overlay(
+                RoundedRectangle(cornerRadius: RexRadius.input, style: .continuous)
+                    .stroke(RexColor.border, lineWidth: 1)
+            )
+        }
+        .buttonStyle(.plain)
+        .padding(.top, 4)
+    }
+
+    /// Nov 7 — edit and delete, on your own. The same "…" LikesCommentsView
+    /// has had since 17 September, which is where this was asked for first.
+    private func ownerMenu(_ comment: RequestComment) -> some View {
+        Menu {
+            Button {
+                editDraft = comment.body
+                editingId = comment.id
+                editFocused = true
+            } label: {
+                Label("Edit", systemImage: "pencil")
+            }
+            Button(role: .destructive) {
+                pendingDelete = comment
+            } label: {
+                Label("Delete", systemImage: "trash")
+            }
+        } label: {
+            Image(systemName: "ellipsis")
+                .font(.system(size: 12, weight: .bold))
+                .foregroundStyle(RexColor.mutedForeground)
+                .padding(8)
+                .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel("More")
+    }
+
+    /// An edit happens where the comment already is, matching how a Rex's
+    /// comments do it rather than opening a sheet over the conversation.
+    private func inlineEditor(for comment: RequestComment) -> some View {
+        VStack(alignment: .leading, spacing: RexSpacing.sm) {
+            TextField("Your suggestion", text: $editDraft, axis: .vertical)
+                .font(RexFont.text(14))
+                .focused($editFocused)
+                .padding(RexSpacing.sm)
+                .background(RexColor.card)
+                .clipShape(RoundedRectangle(cornerRadius: RexRadius.input, style: .continuous))
+                .overlay(
+                    RoundedRectangle(cornerRadius: RexRadius.input, style: .continuous)
+                        .stroke(RexColor.border, lineWidth: 1)
+                )
+            HStack(spacing: RexSpacing.md) {
+                Spacer(minLength: 0)
+                Button("Cancel") { editingId = nil; editDraft = "" }
+                    .font(RexFont.text(13))
+                    .foregroundStyle(RexColor.mutedForeground)
+                Button("Save") { Task { await saveEdit(comment) } }
+                    .font(RexFont.text(13, weight: .semibold))
+                    .foregroundStyle(RexColor.primary)
+                    .disabled(editDraft.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+            }
+        }
+    }
+
+    private func saveEdit(_ comment: RequestComment) async {
+        let trimmed = editDraft.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { return }
+        do {
+            try await RexAPI.shared.updateRequestComment(id: comment.id, body: trimmed)
+            editingId = nil
+            editDraft = ""
+            await load()
+        } catch {
+            errorMessage = error.localizedDescription
+        }
+    }
+
+    private func deleteResponse(_ comment: RequestComment) async {
+        do {
+            try await RexAPI.shared.deleteRequestComment(id: comment.id)
+            await load()
+        } catch {
+            errorMessage = error.localizedDescription
+        }
+    }
+
     /// Top-level suggestions only — replies are drawn under their parent.
     private var topLevelResponses: [RequestComment] {
         responses.filter { $0.parent_id == nil }
+    }
+
+    /// How much the delete confirmation has to warn about — nothing for a
+    /// reply, and for a suggestion whatever cascades with it.
+    private func replyCount(of comment: RequestComment?) -> Int {
+        guard let comment, comment.parent_id == nil else { return 0 }
+        return replies(to: comment).count
     }
 
     private func replies(to response: RequestComment) -> [RequestComment] {

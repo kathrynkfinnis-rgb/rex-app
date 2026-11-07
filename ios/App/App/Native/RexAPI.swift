@@ -5430,6 +5430,53 @@ final class RexAPI {
                                failure: "Couldn't delete that comment.")
     }
 
+    /// Nov 7 — "you also can't delete or edit comments."
+    ///
+    /// Said of a blast, and true only of a blast: editing and deleting landed
+    /// on 17 September for a Rex's comments and never travelled to
+    /// request_comments, which is the third time something has been fixed in
+    /// LikesCommentsView and not here (the Reply tap target on 18 October, the
+    /// attached Rex below). The policies have been on the table since 29 July
+    /// — "Users update own request comments", "Users delete own request
+    /// comments" — so this is only the client finally using them.
+    ///
+    /// Separate from writeComment rather than a third branch of its `isWant`
+    /// flag: that flag is already doing duty as a two-table switch, and a
+    /// Bool cannot name a third table.
+    func updateRequestComment(id: String, body text: String) async throws {
+        try await writeRequestComment(id: id, method: "PATCH", body: ["body": text],
+                                      failure: "Couldn't save that change.")
+    }
+
+    /// A parent takes its replies with it: parent_id is declared `on delete
+    /// cascade`, so deleting a suggestion deletes the conversation under it.
+    /// That is the right behaviour and worth saying out loud, because the
+    /// confirmation has to warn about it.
+    func deleteRequestComment(id: String) async throws {
+        try await writeRequestComment(id: id, method: "DELETE", body: nil,
+                                      failure: "Couldn't delete that.")
+    }
+
+    private func writeRequestComment(id: String, method: String,
+                                     body: [String: Any]?, failure: String) async throws {
+        let token = try await validToken()
+        var components = URLComponents(url: baseURL.appendingPathComponent("/rest/v1/request_comments"), resolvingAgainstBaseURL: false)!
+        components.queryItems = [URLQueryItem(name: "id", value: "eq.\(id)")]
+        var request = URLRequest(url: components.url!)
+        request.httpMethod = method
+        request.setValue(anonKey, forHTTPHeaderField: "apikey")
+        request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+        if let body {
+            request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+            request.httpBody = try JSONSerialization.data(withJSONObject: body)
+        }
+
+        let (data, response) = try await URLSession.shared.data(for: request)
+        guard let http = response as? HTTPURLResponse, http.statusCode < 400 else {
+            throw RexAPIError.server(friendlyError(data, fallback: failure))
+        }
+    }
+
     private func writeComment(id: String, isWant: Bool, method: String,
                               body: [String: Any]?, failure: String) async throws {
         let token = try await validToken()
