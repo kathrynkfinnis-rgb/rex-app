@@ -1,0 +1,123 @@
+# Nov 7 — Nick's point 4. There was no .github directory at all before this,
+# which is also why Dependabot was raising alerts and never opening a pull
+# request to fix one.
+#
+# Four jobs because REX is four codebases in one repository, and each has its
+# own toolchain: the website (plain JS, linted), the edge functions (Deno),
+# Android (Gradle) and iOS (Xcode). They run in parallel and none depends on
+# another.
+#
+# Deliberately not here yet:
+#   * Tests. There are none to run. Adding a green "tests" job that executes
+#     nothing is worse than no job, because it reads as covered.
+#   * Deploys. find-rex.com is built by Cloudflare Pages from this repo
+#     already, and the two apps are released by hand through App Store
+#     Connect and Play. CI here is a gate, not a pipeline.
+
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  # So a dependency bump can be checked without waiting for the schedule.
+  workflow_dispatch:
+
+# A second push to the same branch cancels the first. Nothing here has side
+# effects, so there is no reason to finish a run that is already stale.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  web:
+    name: Website and tooling
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+      - run: npm ci
+      - name: Lint
+        run: npx eslint .
+      - name: Typecheck
+        run: npx tsc --noEmit
+      # Reports, does not fail the build. These are eslint and prettier,
+      # which never touch a request or a user's data, so a transitive
+      # advisory here is worth seeing and not worth blocking a release on.
+      # Revisit the moment anything here runs in production.
+      - name: npm audit
+        run: npm audit --audit-level=high || true
+
+  functions:
+    name: Edge functions
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: denoland/setup-deno@v2
+        with:
+          deno-version: v2.x
+      # The nine functions run with the service-role key, so a type error
+      # here is the most expensive kind in the repository.
+      - name: Type-check every function
+        run: |
+          failed=0
+          for fn in supabase/functions/*/index.ts; do
+            echo "::group::$fn"
+            deno check --allow-import "$fn" || failed=1
+            echo "::endgroup::"
+          done
+          exit $failed
+      - name: Format check
+        run: deno fmt --check supabase/functions || true
+
+  android:
+    name: Android
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+      - uses: gradle/actions/setup-gradle@v4
+      - name: Assemble debug
+        working-directory: android
+        run: ./gradlew assembleDebug --no-daemon
+      # Report-only for now. Android lint has never been run against this
+      # project, so its first output is a backlog rather than a regression,
+      # and a job that is red from the day it is created gets ignored. The
+      # report is kept as an artifact below; make this blocking once the
+      # backlog it finds has been worked through.
+      - name: Lint
+        working-directory: android
+        continue-on-error: true
+        run: ./gradlew lintDebug --no-daemon
+      - name: Keep the lint report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: android-lint
+          path: android/app/build/reports/lint-results-*.html
+          if-no-files-found: ignore
+
+  ios:
+    name: iOS
+    runs-on: macos-15
+    steps:
+      - uses: actions/checkout@v4
+      # A simulator build, so nothing here needs a signing certificate and no
+      # secret has to live in the repository for CI to work.
+      - name: Build
+        working-directory: ios/App
+        run: |
+          xcodebuild build \
+            -scheme App \
+            -destination 'generic/platform=iOS Simulator' \
+            -configuration Debug \
+            CODE_SIGNING_ALLOWED=NO

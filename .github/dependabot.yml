@@ -1,0 +1,57 @@
+# Nov 7 — Nick's point 9, and the half the dashboard could not do on its own.
+#
+# Dependabot *alerts* were already on and are a repository setting; this file
+# is what turns an alert into a pull request. Without it you are told about a
+# vulnerable package and then update it by hand, which is the step that does
+# not happen.
+#
+# Gradle is the one that matters most here, because Android was invisible to
+# the dependency graph entirely until this: GitHub reads npm from
+# package-lock.json and Swift from Package.resolved without being asked, but
+# a Gradle project needs either a committed lockfile or "Automatic dependency
+# submission" turned on in Settings → Advanced Security. Listing it here does
+# not substitute for that switch — see the README note in the same commit.
+
+version: 2
+updates:
+  # The repo's own CI. Actions are the easiest supply-chain foothold in any
+  # repository and the easiest thing to leave pinned to a stale major.
+  - package-ecosystem: github-actions
+    directory: "/"
+    schedule:
+      interval: weekly
+      day: monday
+    commit-message:
+      prefix: "ci"
+
+  # eslint and prettier, which is all that is left of npm here now that the
+  # Lovable web app has gone. Security updates still matter; version churn
+  # does not, so these are grouped into one PR rather than one each.
+  - package-ecosystem: npm
+    directory: "/"
+    schedule:
+      interval: weekly
+      day: monday
+    open-pull-requests-limit: 3
+    groups:
+      dev-tooling:
+        patterns: ["*"]
+
+  - package-ecosystem: gradle
+    directory: "/android"
+    schedule:
+      interval: weekly
+      day: monday
+    open-pull-requests-limit: 5
+    groups:
+      androidx:
+        patterns: ["androidx.*"]
+      kotlin:
+        patterns: ["org.jetbrains.kotlin*", "com.google.devtools.ksp"]
+
+  - package-ecosystem: swift
+    directory: "/ios/App"
+    schedule:
+      interval: weekly
+      day: monday
+    open-pull-requests-limit: 3

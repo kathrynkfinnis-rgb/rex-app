@@ -40,8 +40,9 @@ const CATEGORY = {
 };
 
 const esc = (value) =>
-  String(value ?? "").replace(/[&<>"']/g, (c) =>
-    ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c])
+  String(value ?? "").replace(
+    /[&<>"']/g,
+    (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c],
   );
 
 const isSafeImage = (url) => typeof url === "string" && /^https:\/\//.test(url);
@@ -163,7 +164,10 @@ export async function onRequestGet({ params, request }) {
   for (const row of items) {
     const heading = (row.section || "").trim();
     let group = sections.find((s) => s.heading === heading);
-    if (!group) { group = { heading, rows: [] }; sections.push(group); }
+    if (!group) {
+      group = { heading, rows: [] };
+      sections.push(group);
+    }
     group.rows.push(row);
   }
 
@@ -184,10 +188,14 @@ export async function onRequestGet({ params, request }) {
   <h1>${esc(list.emoji ? list.emoji + " " : "")}${esc(list.name)}</h1>
   <p class="lede">${count} ${count === 1 ? "thing" : "things"} · put together by ${esc(who)}${list.owner_username ? ` <span class="muted">@${esc(list.owner_username)}</span>` : ""}</p>
 </div>
-${sections.map((s) => `<div class="card">
+${sections
+  .map(
+    (s) => `<div class="card">
   ${s.heading ? `<h2>${esc(s.heading)}</h2>` : ""}
   <ul class="entries">${s.rows.map(entry).join("")}</ul>
-</div>`).join("")}`;
+</div>`,
+  )
+  .join("")}`;
 
   return page({ title, description, image, url: canonical, body });
 }

@@ -36,8 +36,9 @@ const BUYABLE = {
 };
 
 const esc = (value) =>
-  String(value ?? "").replace(/[&<>"']/g, (c) =>
-    ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c])
+  String(value ?? "").replace(
+    /[&<>"']/g,
+    (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c],
   );
 
 const isSafeImage = (url) => typeof url === "string" && /^https:\/\//.test(url);
@@ -169,9 +170,7 @@ export async function onRequestGet({ params, request }) {
       const thumb = isSafeImage(row.item_image_url)
         ? `<img class="thumb" src="${esc(row.item_image_url)}" alt="">`
         : "";
-      const sub = row.item_subtitle
-        ? `<p class="muted">${esc(row.item_subtitle)}</p>`
-        : "";
+      const sub = row.item_subtitle ? `<p class="muted">${esc(row.item_subtitle)}</p>` : "";
       const buy = amazonURL(row, params.category);
       // rel="sponsored nofollow" because it is a paid link and search engines
       // are entitled to know that. "noopener" because every outbound link

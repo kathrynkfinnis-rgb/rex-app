@@ -6,7 +6,26 @@ import reactRefresh from "eslint-plugin-react-refresh";
 import tseslint from "typescript-eslint";
 
 export default tseslint.config(
-  { ignores: ["dist", ".output", ".vinxi"] },
+  // Nov 7 — this listed three build directories and nothing else, so
+  // `eslint .` walked the whole repository: android/app/build (tens of
+  // thousands of generated files), the iOS tree, and supabase/functions,
+  // which is Deno and fails these rules by design. A lint that takes over
+  // five minutes and reports on generated code is one nobody runs, and it
+  // could not have gone in CI as it stood.
+  //
+  // This config is the web app's. The other three have their own tools —
+  // Gradle's lint, Xcode's warnings, and `deno check`.
+  {
+    ignores: [
+      "dist",
+      ".output",
+      ".vinxi",
+      "android/**",
+      "ios/**",
+      "supabase/**",
+      "**/routeTree.gen.ts",
+    ],
+  },
   {
     extends: [js.configs.recommended, ...tseslint.configs.recommended],
     files: ["**/*.{ts,tsx}"],

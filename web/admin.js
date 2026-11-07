@@ -7,11 +7,16 @@
 // own contents is a courtesy, not the security — a non-admin who read the
 // source and called the functions themselves would still be refused.
 const SUPABASE_URL = "https://uhpzkbkwxcgqfxmlyktj.supabase.co";
-const ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVocHprYmt3eGNncWZ4bWx5a3RqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODU4Mzk2NDMsImV4cCI6MjEwMTQxNTY0M30.IvQ8byDwHErLhuJI1Pg3bRcb4AKK4sb9Bm6cr_6sHbI";
+const ANON_KEY =
+  "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVocHprYmt3eGNncWZ4bWx5a3RqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODU4Mzk2NDMsImV4cCI6MjEwMTQxNTY0M30.IvQ8byDwHErLhuJI1Pg3bRcb4AKK4sb9Bm6cr_6sHbI";
 const STORE = "rex.admin.session";
 
 const root = document.getElementById("root");
-const esc = (v) => String(v ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+const esc = (v) =>
+  String(v ?? "").replace(
+    /[&<>"']/g,
+    (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c],
+  );
 const num = (v) => (v === null || v === undefined ? "—" : Number(v).toLocaleString("en-GB"));
 const pct = (a, b) => (!b ? "—" : Math.round((a / b) * 100) + "%");
 
@@ -20,7 +25,9 @@ function session(next) {
     if (next === undefined) return JSON.parse(localStorage.getItem(STORE) || "null");
     if (next === null) localStorage.removeItem(STORE);
     else localStorage.setItem(STORE, JSON.stringify(next));
-  } catch { return null; }
+  } catch {
+    return null;
+  }
 }
 
 async function signIn(email, password) {
@@ -37,13 +44,18 @@ async function signIn(email, password) {
 async function rpc(name, token) {
   const response = await fetch(`${SUPABASE_URL}/rest/v1/rpc/${name}`, {
     method: "POST",
-    headers: { apikey: ANON_KEY, Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+    headers: {
+      apikey: ANON_KEY,
+      Authorization: `Bearer ${token}`,
+      "Content-Type": "application/json",
+    },
     body: "{}",
   });
   if (response.status === 401) throw new Error("expired");
   const data = await response.json();
   // The functions raise 'forbidden' for anyone without the admin role.
-  if (!response.ok) throw new Error(data.message === "forbidden" ? "forbidden" : (data.message || "Couldn't load"));
+  if (!response.ok)
+    throw new Error(data.message === "forbidden" ? "forbidden" : data.message || "Couldn't load");
   return data;
 }
 
@@ -71,7 +83,9 @@ function feedbackRow(row) {
   const when = row.created_at
     ? new Date(row.created_at).toLocaleString("en-GB", { dateStyle: "medium", timeStyle: "short" })
     : "";
-  const who = row.is_anonymous ? "anonymous" : (row.who?.display_name || row.who?.username || "someone");
+  const who = row.is_anonymous
+    ? "anonymous"
+    : row.who?.display_name || row.who?.username || "someone";
   const where = row.page ? ` · ${esc(row.page)}` : "";
   return `<div class="fb">
     <p class="fb-meta">${esc(when)} · ${esc(who)}${where}</p>
@@ -96,7 +110,10 @@ function bars(points) {
   if (!points || !points.length) return "";
   const max = Math.max(...points.map((p) => p.count), 1);
   return `<div class="bars">${points
-    .map((p) => `<div style="height:${Math.max(2, (p.count / max) * 100)}%" title="${esc(p.week)}: ${p.count}"></div>`)
+    .map(
+      (p) =>
+        `<div style="height:${Math.max(2, (p.count / max) * 100)}%" title="${esc(p.week)}: ${p.count}"></div>`,
+    )
     .join("")}</div>`;
 }
 
@@ -174,8 +191,12 @@ function render(users, content, engagement, email, feedback) {
 
     <h2>Who's posting</h2>
     <table class="lean"><tbody>
-      ${(engagement.top_contributors || []).map((row) =>
-        `<tr><td>${esc(row.display_name || row.username)}</td><td>${num(row.count)}</td></tr>`).join("")}
+      ${(engagement.top_contributors || [])
+        .map(
+          (row) =>
+            `<tr><td>${esc(row.display_name || row.username)}</td><td>${num(row.count)}</td></tr>`,
+        )
+        .join("")}
     </tbody></table>
 
     <h2>The rest</h2>
@@ -189,9 +210,11 @@ function render(users, content, engagement, email, feedback) {
     </div>
 
     <h2>Feedback from inside the app</h2>
-    ${feedback.length
-      ? `<div class="fb-list">${feedback.map(feedbackRow).join("")}</div>`
-      : `<p class="muted">Nothing yet. This is the ! button in the app header, not TestFlight \u2014 those live in App Store Connect.</p>`}
+    ${
+      feedback.length
+        ? `<div class="fb-list">${feedback.map(feedbackRow).join("")}</div>`
+        : `<p class="muted">Nothing yet. This is the ! button in the app header, not TestFlight \u2014 those live in App Store Connect.</p>`
+    }
 
     <p class="muted" style="margin-top:2rem;font-size:.85rem">
       DAU, WAU and MAU mean “posted a Rex”, not “opened the app” — nobody posts daily, so read them as
@@ -219,15 +242,20 @@ async function load() {
       // and read as "nobody has sent anything".
       table(
         "feedback?select=created_at,message,page,is_anonymous,user_id" +
-        "&order=created_at.desc&limit=200",
-        current.token
+          "&order=created_at.desc&limit=200",
+        current.token,
       ),
     ]);
     // Names in a second pass. profiles.id is the same uuid as auth.users.id,
     // so the ids line up even though no foreign key joins them.
-    const ids = [...new Set(feedback.filter((f) => !f.is_anonymous && f.user_id).map((f) => f.user_id))];
+    const ids = [
+      ...new Set(feedback.filter((f) => !f.is_anonymous && f.user_id).map((f) => f.user_id)),
+    ];
     const people = ids.length
-      ? await table(`profiles?select=id,username,display_name&id=in.(${ids.join(",")})`, current.token)
+      ? await table(
+          `profiles?select=id,username,display_name&id=in.(${ids.join(",")})`,
+          current.token,
+        )
       : [];
     const byId = Object.fromEntries(people.map((p) => [p.id, p]));
     for (const row of feedback) row.who = byId[row.user_id];
@@ -239,7 +267,9 @@ async function load() {
         <p class="muted">That account isn't an admin. Ask Kathryn if you think it should be.</p>`;
       return;
     }
-    renderSignIn(error.message === "expired" ? "That session has expired — sign in again." : error.message);
+    renderSignIn(
+      error.message === "expired" ? "That session has expired — sign in again." : error.message,
+    );
   }
 }
 

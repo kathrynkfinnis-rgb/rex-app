@@ -36,3 +36,19 @@ dist-ssr
 .env.*
 !.env.example
 supabase/.temp/
+
+# Nov 7 — Android build output. 921 generated files were tracked, which is
+# why `git status` was unreadable and every build produced a diff. Gradle
+# regenerates all of it; none of it belongs to anyone.
+android/.gradle/
+android/build/
+android/app/build/
+android/local.properties
+android/.kotlin/
+.DS_Store
+
+# Upload keys and keystores — a signed release must never be reproducible
+# by anyone who clones this. The repository is public.
+*.jks
+*.keystore
+android/keystore.properties

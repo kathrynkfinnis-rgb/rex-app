@@ -33,8 +33,9 @@ const CATEGORY_PLURAL = {
 };
 
 const esc = (value) =>
-  String(value ?? "").replace(/[&<>"']/g, (c) =>
-    ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c])
+  String(value ?? "").replace(
+    /[&<>"']/g,
+    (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c],
   );
 
 const isSafeImage = (url) => typeof url === "string" && /^https:\/\//.test(url);
@@ -139,8 +140,7 @@ export async function onRequestGet({ params, request }) {
   const image = rows.map((r) => r.item_image_url).find(isSafeImage) || null;
 
   const title = `${who}'s ${plural}, in order`;
-  const description =
-    `${rows.length} ${plural} ranked by ${who} on REX — recommendations from people you actually trust.`;
+  const description = `${rows.length} ${plural} ranked by ${who} on REX — recommendations from people you actually trust.`;
 
   const items = rows
     .map((row, index) => {
@@ -150,9 +150,7 @@ export async function onRequestGet({ params, request }) {
       const thumb = isSafeImage(row.item_image_url)
         ? `<img class="thumb" src="${esc(row.item_image_url)}" alt="">`
         : "";
-      const sub = row.item_subtitle
-        ? `<p class="muted">${esc(row.item_subtitle)}</p>`
-        : "";
+      const sub = row.item_subtitle ? `<p class="muted">${esc(row.item_subtitle)}</p>` : "";
       return `<li class="ranked">
   <span class="rank">${rank}</span>
   ${thumb}

@@ -1,9 +1,0 @@
-<?xml version="1.0" encoding="utf-8"?>
-<resources>
-    <color name="ic_launcher_background">#F7F4ED</color>
-    <string name="app_name">REX</string>
-    <style name="Theme.Rex" parent="android:Theme.Material.Light.NoActionBar">
-        <item name="android:statusBarColor">#F8F8F5</item>
-        <item name="android:windowLightStatusBar">true</item>
-    </style>
-</resources>
