@@ -1624,14 +1624,30 @@ final class RexAPI {
     /// going null. It stops being in the feed the moment it does, because the
     /// feed only reads published rows.
     ///
-    /// Admin-only, because posting as REX is: offering to unpost to anyone
-    /// would be offering a button whose point is a thing they cannot do. The
-    /// database decides the real question when the repost is attempted — this
-    /// is only whether to show the door.
+    /// Nov 6 — "make it so you can return a posted trip to drafts (and list
+    /// as well)". No longer admin-only: the gate that decides who is offered
+    /// this lives in the card and the trip and list screens, and is now
+    /// "yours, and a kind the Drafts screen can hand back".
+    ///
+    /// The stops come with it, which is the part that was wrong. A trip is
+    /// one row plus a row per stop pointing at it through trip_id, and only
+    /// the trip's own row was being unpublished. The feed hid the orphaned
+    /// stops because it reads trip_id is.null — but an item page, search and
+    /// the map all read published rows without caring about trip_id, so a
+    /// friend could still read all fifteen stops of a trip sitting in your
+    /// drafts. publishQueuedPost has always done both halves; this is the
+    /// same two filters in the other direction.
     func moveToDrafts(recommendationId: String) async throws {
+        // The trip itself first, so it leaves the feed on the first round
+        // trip rather than after both.
+        try await unpublishRows(matching: URLQueryItem(name: "id", value: "eq.\(recommendationId)"))
+        try await unpublishRows(matching: URLQueryItem(name: "trip_id", value: "eq.\(recommendationId)"))
+    }
+
+    private func unpublishRows(matching filter: URLQueryItem) async throws {
         let token = try await validToken()
         var components = URLComponents(url: baseURL.appendingPathComponent("/rest/v1/recommendations"), resolvingAgainstBaseURL: false)!
-        components.queryItems = [URLQueryItem(name: "id", value: "eq.\(recommendationId)")]
+        components.queryItems = [filter]
         var request = URLRequest(url: components.url!)
         request.httpMethod = "PATCH"
         request.setValue(anonKey, forHTTPHeaderField: "apikey")
@@ -1658,7 +1674,13 @@ final class RexAPI {
             URLQueryItem(name: "user_id", value: "eq.\(userId)"),
             URLQueryItem(name: "trip_id", value: "is.null"),
             URLQueryItem(name: "published_at", value: "is.null"),
-            URLQueryItem(name: "items.type", value: "eq.trip"),
+            // Nov 6 — this said eq.trip, which is not what the comment above
+            // it claimed and not what DraftsView expects: that screen has
+            // drawn a list icon and routed to ListDetailView since September.
+            // A list's items.type is "list", so every list ever saved as a
+            // draft was filed correctly and then shown by nothing. Saving one
+            // looked like losing it.
+            URLQueryItem(name: "items.type", value: "in.(trip,list)"),
             URLQueryItem(name: "order", value: "created_at.desc"),
         ]
         var request = URLRequest(url: components.url!)

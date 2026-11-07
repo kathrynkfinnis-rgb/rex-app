@@ -1922,9 +1922,36 @@ struct EditableIfMine: ViewModifier {
     /// Oct 14 — "can admins get the ability to remove a post they made, and
     /// save it to drafts so they can repost as Rex." Only on your own posts,
     /// and only if you are one of the people who could repost as REX.
-    @State private var canUnpost = false
+    @State private var isAdminUser = false
+    @State private var confirmingUnpost = false
 
     private var editable: Bool { isMine || canEditAsRex }
+
+    /// Nov 6 — "make it so you can return a posted trip to drafts (and list
+    /// as well?)". Unposting was admin-only for three weeks because the only
+    /// reason to want it was reposting as REX. Changing your mind about a
+    /// trip you have published is a better one, and the mechanism is the same
+    /// one column either way.
+    ///
+    /// Trips and lists, deliberately, and not a single Rex. What makes this
+    /// safe to offer is the way back: fetchDrafts reads rows whose items.type
+    /// is trip or list, DraftsView lists them, and TripDetailView and
+    /// ListDetailView both carry the Publish button that sends them back out.
+    /// A single Rex has none of that — unposting one would file it where no
+    /// screen looks and no button can reach, which is indistinguishable from
+    /// losing it. "Hide from the feed", just below this in the menu, is the
+    /// reversible, visible thing that already covers a single Rex.
+    ///
+    /// Admins keep the wider version on their own posts, type regardless,
+    /// because that is what the October request was for.
+    private var isDraftableKind: Bool {
+        switch RexCategory(rawType: rec.items?.type) {
+        case .trip, .list: return true
+        default: return false
+        }
+    }
+
+    private var canUnpost: Bool { isMine && (isDraftableKind || isAdminUser) }
 
     func body(content: Content) -> some View {
         if editable {
@@ -1944,11 +1971,13 @@ struct EditableIfMine: ViewModifier {
                         // keeps all of it and puts the row back where an
                         // unposted one lives, ready to go out as REX.
                         if canUnpost {
+                            // Nov 6 — asks first. Everything else in this
+                            // menu is either reversible in a tap or opens a
+                            // form; this one takes something off your
+                            // friends' feeds, and "Move to drafts" sitting
+                            // under "Edit" is easy to hit by accident.
                             Button {
-                                Task {
-                                    try? await RexAPI.shared.moveToDrafts(recommendationId: rec.id)
-                                    onChanged?()
-                                }
+                                confirmingUnpost = true
                             } label: {
                                 Label("Move to drafts", systemImage: "tray.and.arrow.down")
                             }
@@ -1997,6 +2026,25 @@ struct EditableIfMine: ViewModifier {
                 // post, because until now there was nothing to work out about
                 // your own. Unposting is a question about yours.
                 .task { await checkRexPost() }
+                .confirmationDialog(
+                    "Move this back to drafts?",
+                    isPresented: $confirmingUnpost,
+                    titleVisibility: .visible
+                ) {
+                    Button("Move to drafts") {
+                        Task {
+                            try? await RexAPI.shared.moveToDrafts(recommendationId: rec.id)
+                            onChanged?()
+                        }
+                    }
+                    Button("Cancel", role: .cancel) {}
+                } message: {
+                    Text(
+                        "It comes off the feed and only you will see it. "
+                        + "The note, the photos, the rating, the tags and every stop are kept — "
+                        + "publish it again whenever you like, from Drafts on your profile."
+                    )
+                }
         } else {
             content
                 .task { await checkRexPost() }
@@ -2009,7 +2057,7 @@ struct EditableIfMine: ViewModifier {
         // Your own post: the only question is whether you could repost it as
         // REX, which is what makes unposting worth offering.
         if isMine {
-            if !canUnpost, await RexAPI.shared.isAdmin() { canUnpost = true }
+            if !isAdminUser, await RexAPI.shared.isAdmin() { isAdminUser = true }
             return
         }
         guard !canEditAsRex else { return }

@@ -40,6 +40,9 @@ struct TripDetailView: View {
     @State private var isDraft = false
     @State private var isPublishing = false
     @State private var publishError: String?
+    /// Nov 6 — the other direction. See the toolbar menu.
+    @State private var confirmingUnpost = false
+    @State private var isUnposting = false
 
     @State private var isOwner = false
     /// The trip's own Rex row, kept so "Edit" can open the same
@@ -313,11 +316,41 @@ struct TripDetailView: View {
                             Label("Fix stop locations", systemImage: "mappin.and.ellipse")
                         }
                         .disabled(isRegeocoding)
+
+                        // Nov 6 — "return a posted trip to drafts". The feed
+                        // card's "…" can do this too, but a trip you have
+                        // changed your mind about is one you are usually
+                        // looking at, and the feed card means finding it
+                        // again by scrolling. Hidden once it is a draft:
+                        // there is a Publish banner at the bottom of this
+                        // screen for that direction.
+                        if !isDraft {
+                            Button {
+                                confirmingUnpost = true
+                            } label: {
+                                Label("Move to drafts", systemImage: "tray.and.arrow.down")
+                            }
+                            .disabled(isUnposting || tripRec == nil)
+                        }
                     } label: {
                         Image(systemName: "ellipsis.circle")
                     }
                 }
             }
+        }
+        .confirmationDialog(
+            "Move this trip back to drafts?",
+            isPresented: $confirmingUnpost,
+            titleVisibility: .visible
+        ) {
+            Button("Move to drafts") { Task { await moveToDrafts() } }
+            Button("Cancel", role: .cancel) {}
+        } message: {
+            Text(
+                "It comes off the feed and only you will see it. "
+                + "Every stop, note, photo and rating is kept — "
+                + "publish the trip again from here whenever you're ready."
+            )
         }
         .fullScreenCover(isPresented: $showingTripEditor) {
             if let tripRec {
@@ -639,6 +672,23 @@ struct TripDetailView: View {
             publishError = error.localizedDescription
         }
         isPublishing = false
+    }
+
+    /// Nov 6 — the reverse of publish(), and reported through the same
+    /// `publishError`: it is the same banner, about the same one thing, and a
+    /// second error slot under it would only ever show one at a time.
+    private func moveToDrafts() async {
+        isUnposting = true
+        publishError = nil
+        do {
+            try await RexAPI.shared.moveToDrafts(recommendationId: route.recommendationId)
+            // Flips the banner at the foot of the screen to "Publish trip",
+            // so the way back is on screen the moment it goes.
+            isDraft = true
+        } catch {
+            publishError = error.localizedDescription
+        }
+        isUnposting = false
     }
 
     private func load() async {

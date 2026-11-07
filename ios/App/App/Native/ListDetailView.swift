@@ -58,6 +58,9 @@ struct ListDetailView: View {
     /// else, until you publish it from the banner below.
     @State private var isDraft = false
     @State private var isPublishing = false
+    /// Nov 6 — the other direction. See the toolbar menu.
+    @State private var confirmingUnpost = false
+    @State private var isUnposting = false
     @State private var publishError: String?
     @State private var isEditing = false
     /// Sept 14 — the list's own row, for opening it in the input form.
@@ -295,6 +298,19 @@ struct ListDetailView: View {
                             )
                         }
                         .disabled(isSettingTitles)
+
+                        // Nov 6 — "(and list as well?)". Same place and same
+                        // wording as the trip screen's, and hidden once the
+                        // list is a draft: the Publish banner at the foot of
+                        // the screen covers that direction.
+                        if !isDraft {
+                            Button {
+                                confirmingUnpost = true
+                            } label: {
+                                Label("Move to drafts", systemImage: "tray.and.arrow.down")
+                            }
+                            .disabled(isUnposting || listRec == nil)
+                        }
                     } label: {
                         Image(systemName: "ellipsis.circle")
                     }
@@ -302,6 +318,20 @@ struct ListDetailView: View {
             }
         }
         .task { await load() }
+        .confirmationDialog(
+            "Move this list back to drafts?",
+            isPresented: $confirmingUnpost,
+            titleVisibility: .visible
+        ) {
+            Button("Move to drafts") { Task { await moveToDrafts() } }
+            Button("Cancel", role: .cancel) {}
+        } message: {
+            Text(
+                "It comes off the feed and only you will see it. "
+                + "Every item, note and heading is kept — "
+                + "publish the list again from here whenever you're ready."
+            )
+        }
         .fullScreenCover(isPresented: $showingListEditor) {
             if let listRec {
                 ListEditorLoader(list: listRec) {
@@ -457,6 +487,22 @@ struct ListDetailView: View {
             publishError = error.localizedDescription
         }
         isPublishing = false
+    }
+
+    /// Nov 6 — the reverse of publish(), reported through the same
+    /// `publishError` banner, matching what TripDetailView does. A list has
+    /// no stops to carry, so this is the one row, but it goes through the
+    /// same call for the same reason: one description of what unposting means.
+    private func moveToDrafts() async {
+        isUnposting = true
+        publishError = nil
+        do {
+            try await RexAPI.shared.moveToDrafts(recommendationId: route.recommendationId)
+            isDraft = true
+        } catch {
+            publishError = error.localizedDescription
+        }
+        isUnposting = false
     }
 
     /// The list's Notes, under everything else — the same place the Notes
