@@ -1302,9 +1302,26 @@ final class RexAPI {
 
     /// Publishes a draft trip or list, and everything journaled onto it, in
     /// one go — the whole point of drafting is adding entries over time and
-    /// then sharing the finished thing all at once, not one at a time. A
-    /// list's items hang off it by trip_id exactly as a trip's stops do, so
-    /// the same query covers both.
+    /// then sharing the finished thing all at once, not one at a time.
+    ///
+    /// Nov 7, from Phoebe: "I tagged Alex in the list and then only this came
+    /// up, i.e. not the actual list" — a list page with a title, a cover and
+    /// a comment on it, and no items at all.
+    ///
+    /// The comment that used to sit here said a list's items hang off it by
+    /// trip_id exactly as a trip's stops do, so one query covered both. That
+    /// was wrong, and fetchListItems two hundred lines down says so: it
+    /// filters on list_id. So publishing a draft list published the list row
+    /// and left every item in it unpublished — and an unpublished row is
+    /// visible to its author and to nobody else. Phoebe saw her list; Alex
+    /// opened it and found the shell.
+    ///
+    /// The one filter now names all three. See moveToDrafts for the same
+    /// three in the other direction.
+    private static func selfAndChildren(of id: String) -> String {
+        "(id.eq.\(id),trip_id.eq.\(id),list_id.eq.\(id))"
+    }
+
     func publishDraft(recommendationId: String) async throws {
         try await publishTrip(tripRecommendationId: recommendationId)
     }
@@ -1313,7 +1330,7 @@ final class RexAPI {
         let token = try await validToken()
         var components = URLComponents(url: baseURL.appendingPathComponent("/rest/v1/recommendations"), resolvingAgainstBaseURL: false)!
         components.queryItems = [
-            URLQueryItem(name: "or", value: "(id.eq.\(tripRecommendationId),trip_id.eq.\(tripRecommendationId))"),
+            URLQueryItem(name: "or", value: Self.selfAndChildren(of: tripRecommendationId)),
         ]
         var request = URLRequest(url: components.url!)
         request.httpMethod = "PATCH"
@@ -1629,19 +1646,26 @@ final class RexAPI {
     /// this lives in the card and the trip and list screens, and is now
     /// "yours, and a kind the Drafts screen can hand back".
     ///
-    /// The stops come with it, which is the part that was wrong. A trip is
-    /// one row plus a row per stop pointing at it through trip_id, and only
-    /// the trip's own row was being unpublished. The feed hid the orphaned
-    /// stops because it reads trip_id is.null — but an item page, search and
-    /// the map all read published rows without caring about trip_id, so a
-    /// friend could still read all fifteen stops of a trip sitting in your
-    /// drafts. publishQueuedPost has always done both halves; this is the
-    /// same two filters in the other direction.
+    /// The contents come with it, which is the part that was wrong. A trip is
+    /// one row plus a row per stop pointing at it through trip_id, a list is
+    /// one row plus a row per item pointing at it through list_id, and only
+    /// the parent's own row was being unpublished. The feed hid the orphans
+    /// because it reads trip_id is.null — but an item page, search and the
+    /// map all read published rows without caring, so a friend could still
+    /// read all fifteen stops of a trip sitting in your drafts.
+    ///
+    /// Nov 7: list_id added here as well as in publishTrip. Both directions
+    /// had the same blind spot, from the same wrong belief that a list's
+    /// items hang off trip_id — see the note up there, and Phoebe's list
+    /// that arrived at Alex with nothing in it.
     func moveToDrafts(recommendationId: String) async throws {
-        // The trip itself first, so it leaves the feed on the first round
-        // trip rather than after both.
+        // The parent first, so it leaves the feed on the first round trip
+        // rather than after both.
         try await unpublishRows(matching: URLQueryItem(name: "id", value: "eq.\(recommendationId)"))
-        try await unpublishRows(matching: URLQueryItem(name: "trip_id", value: "eq.\(recommendationId)"))
+        try await unpublishRows(matching: URLQueryItem(
+            name: "or",
+            value: "(trip_id.eq.\(recommendationId),list_id.eq.\(recommendationId))"
+        ))
     }
 
     private func unpublishRows(matching filter: URLQueryItem) async throws {
@@ -2699,11 +2723,19 @@ final class RexAPI {
     /// published by hand is not left looking like it is still waiting.
     func publishQueuedPost(id: String) async throws {
         let stamp = ISO8601DateFormatter().string(from: Date())
-        // The trip itself first. If this is a trip, its stops follow on the
-        // same stamp — a published itinerary whose stops are still queued
-        // opens as an empty trip, which is worse than not posting it.
+        // The post itself first. If it is a trip or a list, its contents
+        // follow on the same stamp — a published itinerary whose stops are
+        // still queued opens as an empty trip, which is worse than not
+        // posting it.
+        //
+        // Nov 7: list_id, for the third time in this file. The sentence above
+        // was describing the exact bug Phoebe hit, in the one shape it had
+        // not been applied to.
         try await publishRows(matching: URLQueryItem(name: "id", value: "eq.\(id)"), at: stamp)
-        try await publishRows(matching: URLQueryItem(name: "trip_id", value: "eq.\(id)"), at: stamp)
+        try await publishRows(
+            matching: URLQueryItem(name: "or", value: "(trip_id.eq.\(id),list_id.eq.\(id))"),
+            at: stamp
+        )
     }
 
     private func publishRows(matching filter: URLQueryItem, at stamp: String) async throws {
