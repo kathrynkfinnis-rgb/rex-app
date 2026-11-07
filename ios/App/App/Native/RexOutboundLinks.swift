@@ -118,21 +118,36 @@ enum RexOutboundLink {
     /// to it. Before doing that, read the note on isAffiliateProgrammeActive
     /// about the privacy label — it does not apply to Amazon, which shares
     /// nothing, but it is the thing to check rather than assume.
-    static var isTestFlightBuild: Bool {
-        #if DEBUG
-        // Simulator and local installs have no receipt at all; a debug build
-        // is a build we are testing, which is the thing being asked.
-        return true
-        #else
-        return Bundle.main.appStoreReceiptURL?.lastPathComponent == "sandboxReceipt"
-        #endif
-    }
-
-    /// Whether any store has a tag configured, and whether this build is one
-    /// that may use it. Drives the disclosure as well as the tagging, so the
-    /// App Store build neither tags links nor claims to.
+    /// Nov 6 — "I would like to turn on affiliate revenue." The TestFlight
+    /// gate that used to be here is gone, which is what that means: the tag
+    /// now goes on for everybody, App Store builds included.
+    ///
+    /// Why it was safe to remove, in the order the note above asked for it to
+    /// be checked:
+    ///
+    ///   * The privacy label does not change. That warning belongs to
+    ///     Skimlinks, which bounces people through go.skimresources.com and
+    ///     is tracking under ATT. An Associates tag is a query parameter on a
+    ///     link to Amazon the person was already opening — no redirect, no
+    ///     third party, no identifier, nothing about them sent anywhere. So
+    ///     no NSUserTrackingUsageDescription and no ATT prompt, and the label
+    ///     still truthfully says REX does no tracking.
+    ///   * The disclosure Amazon's Operating Agreement requires is already
+    ///     where the links are: AmazonDisclosure at the foot of every item
+    ///     page that carries one, plus AffiliateLinksSection in Privacy and
+    ///     data. Both key off this property, so they appear in the same
+    ///     builds that tag.
+    ///
+    /// And why now rather than later: approval needs three qualifying sales
+    /// inside 180 days of applying or the account is closed, and a gate that
+    /// hid the links from everyone except TestFlight was guaranteeing zero of
+    /// them. The links have to reach real people for the account to survive.
+    ///
+    /// Still the one honest condition — that a tag actually exists. An
+    /// unapproved or misspelled tag earns nothing and looks exactly like a
+    /// working one, so a store with no tag leaves its links untouched.
     static var isAmazonAssociateActive: Bool {
-        isTestFlightBuild && amazonTags.values.contains { !$0.isEmpty }
+        amazonTags.values.contains { !$0.isEmpty }
     }
 
     /// The tag for whichever Amazon store this URL points at, matching on the
