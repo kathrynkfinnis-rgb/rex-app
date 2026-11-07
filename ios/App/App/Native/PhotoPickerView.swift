@@ -37,6 +37,22 @@ struct PhotoPickerView: View {
     @State private var selection: [PhotosPickerItem] = []
     @State private var isUploading = false
     @State private var errorMessage: String?
+    /// Nov 7 — "want to be able to take a pic in the app as well as just
+    /// picking from library."
+    ///
+    /// The tile has drawn a camera glyph since the day it was written and has
+    /// always opened the library, which is the whole of the complaint: it
+    /// promised a camera and delivered a picker, so taking a photo of your
+    /// dinner meant leaving REX, taking it, coming back and finding it in the
+    /// grid. RexCameraPicker has existed since 13 October for exactly this
+    /// and was wired into the recipe scanner only.
+    ///
+    /// Here rather than in AddRexView because this one view is every photo
+    /// slot REX has — a Rex, a trip, a trip's stops, a list's cover — so the
+    /// camera arrives in all of them at once, and none of them drift.
+    @State private var choosingSource = false
+    @State private var showCamera = false
+    @State private var showLibrary = false
     /// Which photo is being dragged, for the reorder.
     @State private var dragging: String?
     /// Oct 3 — the photo currently open in the cropper.
@@ -126,32 +142,23 @@ struct PhotoPickerView: View {
                     }
 
                     if photoURLs.count < maxPhotos {
-                        PhotosPicker(
-                            selection: $selection,
-                            maxSelectionCount: maxPhotos - photoURLs.count,
-                            matching: .images
-                        ) {
-                            VStack(spacing: RexSpacing.xs) {
-                                if isUploading {
-                                    ProgressView().controlSize(.small)
-                                } else {
-                                    Image(systemName: "camera")
-                                        .font(.system(size: 18))
-                                        .foregroundStyle(RexColor.mutedForeground)
-                                    Text("Add photo")
-                                        .font(RexFont.text(11))
-                                        .foregroundStyle(RexColor.mutedForeground)
-                                }
-                            }
-                            .frame(width: 78, height: 78)
-                            .background(RexColor.card)
-                            .clipShape(RoundedRectangle(cornerRadius: RexRadius.input, style: .continuous))
-                            .overlay(
-                                RoundedRectangle(cornerRadius: RexRadius.input, style: .continuous)
-                                    .strokeBorder(RexColor.border, style: StrokeStyle(lineWidth: 1, dash: [4, 3]))
-                            )
+                        // One tile either way. With a camera it asks which;
+                        // without one — the Simulator, or a device where
+                        // Screen Time has restricted the camera — it goes
+                        // straight to the library as it always did, rather
+                        // than offering a choice with one real answer.
+                        if RexCameraPicker.isAvailable {
+                            Button { choosingSource = true } label: { addTile }
+                                .buttonStyle(.plain)
+                                .disabled(isUploading)
+                        } else {
+                            PhotosPicker(
+                                selection: $selection,
+                                maxSelectionCount: maxPhotos - photoURLs.count,
+                                matching: .images
+                            ) { addTile }
+                                .disabled(isUploading)
                         }
-                        .disabled(isUploading)
                     }
                 }
                 .padding(.horizontal, 1)
@@ -181,6 +188,68 @@ struct PhotoPickerView: View {
             PhotoCropView(image: photo.image) { cropped in
                 Task { await replace(photo.url, with: cropped) }
             }
+        }
+        .confirmationDialog("Add a photo", isPresented: $choosingSource, titleVisibility: .visible) {
+            Button("Take a photo") { showCamera = true }
+            Button("Choose from library") { showLibrary = true }
+            Button("Cancel", role: .cancel) {}
+        }
+        // Presented from the dialog rather than by its own PhotosPicker
+        // button, which is why this is the isPresented form.
+        .photosPicker(
+            isPresented: $showLibrary,
+            selection: $selection,
+            maxSelectionCount: max(1, maxPhotos - photoURLs.count),
+            matching: .images
+        )
+        .fullScreenCover(isPresented: $showCamera) {
+            RexCameraPicker { image in
+                Task { await add(image) }
+            }
+            .ignoresSafeArea()
+        }
+    }
+
+    /// The tile itself, shared by both branches above so the camera and the
+    /// no-camera case cannot start looking different from each other.
+    private var addTile: some View {
+        VStack(spacing: RexSpacing.xs) {
+            if isUploading {
+                ProgressView().controlSize(.small)
+            } else {
+                Image(systemName: "camera")
+                    .font(.system(size: 18))
+                    .foregroundStyle(RexColor.mutedForeground)
+                Text("Add photo")
+                    .font(RexFont.text(11))
+                    .foregroundStyle(RexColor.mutedForeground)
+            }
+        }
+        .frame(width: 78, height: 78)
+        .background(RexColor.card)
+        .clipShape(RoundedRectangle(cornerRadius: RexRadius.input, style: .continuous))
+        .overlay(
+            RoundedRectangle(cornerRadius: RexRadius.input, style: .continuous)
+                .strokeBorder(RexColor.border, style: StrokeStyle(lineWidth: 1, dash: [4, 3]))
+        )
+    }
+
+    /// A photo straight from the camera. It arrives as a UIImage rather than a
+    /// PhotosPickerItem, so it skips loadTransferable and downscaledJPEG and
+    /// is encoded here at the same quality `replace` uses for a crop.
+    private func add(_ image: UIImage) async {
+        guard photoURLs.count < maxPhotos else { return }
+        isUploading = true
+        errorMessage = nil
+        defer { isUploading = false }
+        guard let jpeg = image.jpegData(compressionQuality: 0.82) else {
+            errorMessage = "Couldn't save that photo."
+            return
+        }
+        do {
+            photoURLs.append(try await RexAPI.shared.uploadPhoto(data: jpeg, fileExtension: "jpg"))
+        } catch {
+            errorMessage = error.localizedDescription
         }
     }
 

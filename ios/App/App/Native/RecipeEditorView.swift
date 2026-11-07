@@ -250,7 +250,9 @@ struct RecipeEditorView: View {
             Task { await importFromPhoto(item) }
         }
         .fullScreenCover(isPresented: $showCamera) {
-            RexCameraPicker { image in
+            // The crop box, kept for this caller: a cookbook page is what it
+            // is for. See the note on allowsEditing.
+            RexCameraPicker(allowsEditing: true) { image in
                 Task { await importFromCapture(image) }
             }
             .ignoresSafeArea()

@@ -18,6 +18,15 @@ import UIKit
 /// there presents an empty black sheet, so the caller checks first and falls
 /// back to the library.
 struct RexCameraPicker: UIViewControllerRepresentable {
+    /// Nov 7 — was hardcoded true, for the one caller that wanted it. A
+    /// recipe is a flat page and the crop box is how you cut the facing page
+    /// and your own thumb out before anything is read. An ordinary photo of
+    /// your dinner is not that: forcing a crop box in front of every shot
+    /// makes taking one a two-step job, and PhotoPickerView already puts a
+    /// crop button on each photo afterwards, where it is optional.
+    /// Declared before onCapture so the trailing closure still reads as one:
+    /// RexCameraPicker(allowsEditing: true) { image in … }
+    var allowsEditing = false
     var onCapture: (UIImage) -> Void
 
     @Environment(\.dismiss) private var dismiss
@@ -30,10 +39,7 @@ struct RexCameraPicker: UIViewControllerRepresentable {
         let picker = UIImagePickerController()
         picker.sourceType = .camera
         picker.delegate = context.coordinator
-        // A recipe is a flat page, so the editing crop box is genuinely useful
-        // here in a way it usually isn't — it is how you cut the facing page
-        // and your own thumb out before anything is read.
-        picker.allowsEditing = true
+        picker.allowsEditing = allowsEditing
         return picker
     }
 
