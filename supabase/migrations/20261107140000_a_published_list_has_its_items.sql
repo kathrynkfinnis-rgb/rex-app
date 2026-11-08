@@ -1,3 +1,26 @@
+-- Nov 8, after the fact: THIS WAS NOT PHOEBE'S BUG, and this migration
+-- updated nothing when it was run. Keeping it, because the hole it closes is
+-- real and the record of being wrong is worth more than a tidy file.
+--
+-- Her list's twenty items all had a published_at, set at the same moment as
+-- the list itself in August. What actually happened is in NotificationsView:
+-- a notification about a list routed by item id into ItemDetailView, which
+-- draws a title, a cover, "Rex'd by" and "What friends say" and knows nothing
+-- about contents. The screenshot was never the list page. It was the generic
+-- item page, which is why there was not even an empty state on it — and
+-- "Nothing on this list yet." would have told us that in one glance.
+--
+-- The lesson is the cheap check I skipped: "What friends say" appears in
+-- exactly one file, and it is not ListDetailView. Grepping the words in the
+-- screenshot would have found that before any of the SQL below was written.
+--
+-- What is below still stands on its own. The publish path genuinely did not
+-- know about list_id, so a list drafted and then published would have left
+-- every item unpublished. It had not bitten yet because a list built in one
+-- sitting is created already published. The original note follows.
+--
+-- ─────────────────────────────────────────────────────────────────────
+--
 -- Nov 7, from Phoebe: "I tagged Alex in the list and then only this came up,
 -- i.e. not the actual list." A list page with its title, its cover and her
 -- comment on it, and not one item.

@@ -20,6 +20,10 @@ struct NotificationsView: View {
     /// id, not an item id, and PostgREST can't embed it directly since it's
     /// polymorphic (could be a recommendation, a friendship, or a request).
     @State private var recItemIds: [String: String] = [:]
+    /// Nov 8 — and what kind of thing each one is, because a trip and a list
+    /// each have a screen of their own and the generic item page cannot show
+    /// what is inside either. See fetchItemTypes.
+    @State private var recItemTypes: [String: String] = [:]
     /// Oct 5 — the same, for wants, which live in their own table.
     @State private var wantItemIds: [String: String] = [:]
     /// Friend request currently mid-Accept/Decline, so its buttons can show a
@@ -153,6 +157,35 @@ struct NotificationsView: View {
             friendRequestRow(n)
         } else if n.isTrip, let recId = n.entity_id {
             NavigationLink(value: TripRoute(recommendationId: recId, title: n.linkedTitle ?? "Trip")) {
+                rowContent(n)
+            }
+            .buttonStyle(.plain)
+        // Nov 8 — "I tagged Alex in the list and then only this came up, i.e.
+        // not the actual list."
+        //
+        // A list and a trip are both pages whose whole point is what is
+        // inside them, and both are addressed by their recommendation id.
+        // Everything else here routed by item id into ItemDetailView, which
+        // draws a title, a cover, "Rex'd by" and "What friends say" and knows
+        // nothing about contents — so a list notification opened something
+        // that looks like the list with the list missing.
+        //
+        // Models.swift has said this since 14 October, about the same fault
+        // one layer up: "when I click on a list it should take me to the list
+        // with the component Rexes. Same fault the trip above had on 3
+        // October, and only the trip was fixed." Fixed there, for feed cards.
+        // The notification row is the third place and was still wrong.
+        //
+        // Keyed off the item's own type rather than the notification's
+        // data["category"], which n.isTrip above uses: the payload only
+        // carries it on newer rows, while the type is true of every one.
+        } else if let recId = n.linkedRecommendationId, recItemTypes[recId] == "trip" {
+            NavigationLink(value: TripRoute(recommendationId: recId, title: n.linkedTitle ?? "Trip")) {
+                rowContent(n)
+            }
+            .buttonStyle(.plain)
+        } else if let recId = n.linkedRecommendationId, recItemTypes[recId] == "list" {
+            NavigationLink(value: ListRoute(recommendationId: recId, title: n.linkedTitle ?? "List")) {
                 rowContent(n)
             }
             .buttonStyle(.plain)
@@ -379,6 +412,7 @@ struct NotificationsView: View {
             // non-tappable rather than the whole screen erroring out.
             let recIds = Array(Set(notifications.compactMap(\.linkedRecommendationId)))
             recItemIds = (try? await RexAPI.shared.fetchItemIds(forRecommendations: recIds)) ?? [:]
+            recItemTypes = await RexAPI.shared.fetchItemTypes(forRecommendations: recIds)
             let wantIds = Array(Set(notifications.compactMap(\.linkedWantId)))
             wantItemIds = await RexAPI.shared.fetchItemIds(forWants: wantIds)
             // Sept 15 — "These notifications should change now that they have

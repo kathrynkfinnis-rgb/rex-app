@@ -6728,6 +6728,53 @@ final class RexAPI {
         return found
     }
 
+    /// Nov 8 — what *kind* of thing each of those recommendations is, so a
+    /// notification can open the right screen for it.
+    ///
+    /// Phoebe tagged Alex in a list; the notification opened ItemDetailView,
+    /// which shows a title, a cover, "Rex'd by" and "What friends say" and
+    /// has no idea a list has contents. From the outside that is a list page
+    /// with the list missing, which is exactly how it was reported.
+    ///
+    /// Deliberately read here rather than from the notification's own `data`
+    /// payload. RexNotification.isTrip keys off data["category"], which only
+    /// exists on notifications written after whichever trigger started
+    /// setting it — so every older one would keep opening the wrong screen.
+    /// The item's type is a fact about the row and is true for all of them.
+    ///
+    /// Separate from fetchItemIds rather than widening it, because that one
+    /// has three callers and a want has no type to ask for.
+    func fetchItemTypes(forRecommendations recommendationIds: [String]) async -> [String: String] {
+        guard !recommendationIds.isEmpty, let token = try? await validToken() else { return [:] }
+        struct Row: Codable {
+            struct Item: Codable { let type: String }
+            let id: String
+            let items: Item?
+        }
+
+        var found: [String: String] = [:]
+        for chunk in stride(from: 0, to: recommendationIds.count, by: 25).map({
+            Array(recommendationIds[$0..<min($0 + 25, recommendationIds.count)])
+        }) {
+            var components = URLComponents(url: baseURL.appendingPathComponent("/rest/v1/recommendations"), resolvingAgainstBaseURL: false)!
+            components.queryItems = [
+                URLQueryItem(name: "select", value: "id,items(type)"),
+                URLQueryItem(name: "id", value: "in.(\(chunk.joined(separator: ",")))"),
+            ]
+            guard let url = components.url else { continue }
+            var request = URLRequest(url: url)
+            request.setValue(anonKey, forHTTPHeaderField: "apikey")
+            request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+
+            guard let (data, response) = try? await URLSession.shared.data(for: request),
+                  let http = response as? HTTPURLResponse, http.statusCode < 400,
+                  let rows = try? JSONDecoder().decode([Row].self, from: data)
+            else { continue }
+            for row in rows { found[row.id] = row.items?.type }
+        }
+        return found
+    }
+
     /// Oct 5 — the item behind each of these wants, so a notification about
     /// one can open the thing it is about. Same shape as the recommendation
     /// lookup above, against the table wants actually live in.
