@@ -300,6 +300,22 @@ struct AddRexView: View {
     @State private var alreadyRexdTitles: Set<String> = []
     @State private var searchTask: Task<Void, Never>?
     @State private var photoURLs: [String] = []
+    /// Nov 8 — "tagging also not working when I'm in a rex myself. It should
+    /// be suggesting names to you like it does in WhatsApp."
+    ///
+    /// Blast replies and a Rex's comments have both offered the @ picker for
+    /// weeks. Composing the Rex itself never has — so the one screen where
+    /// you are most likely to name who you went with was the one that
+    /// wouldn't help you spell it, and a typed "@phoebe" stayed plain text
+    /// that notified nobody.
+    ///
+    /// Picking a name does two things, and the second is the point: the
+    /// username goes into the note, and the friend goes into taggedFriendIds
+    /// — the same set the "Tag friends" picker below writes, saved through
+    /// the same setTaggedFriends, which is what already notifies them and
+    /// draws their faces on the card. An @ that only coloured some text
+    /// would have been a second, worse mechanism beside one that works.
+    @State private var friends: [RexProfileDetail] = []
     @State private var taggedFriendIds: Set<String> = []
     /// Oct 18 — "editing a trip untags Danny."
     ///
@@ -656,6 +672,8 @@ struct AddRexView: View {
             // see the section and never learn the REX account exists.
             isAdmin = await RexAPI.shared.isAdmin()
             if isAdmin { officialAccountId = await RexAPI.shared.officialAccountId() }
+            // Nov 8 — for the @ picker over the note. See mentionableFriends.
+            friends = (try? await RexAPI.shared.fetchAcceptedFriendProfiles()) ?? []
         }
         .onAppear {
             // Only offered when this is a fresh compose — an edit of a
@@ -1117,6 +1135,7 @@ struct AddRexView: View {
                     .background(RexColor.card)
                     .clipShape(RoundedRectangle(cornerRadius: 14))
                     .overlay(RoundedRectangle(cornerRadius: 14).stroke(RexColor.border, lineWidth: 1))
+                noteMentionPicker
 
                 // Sept 10 — "a free text 'Notes' box at the bottom of lists
                 // so if the app can't work out what is in the list as it is
@@ -1167,9 +1186,28 @@ struct AddRexView: View {
                     .background(RexColor.card)
                     .clipShape(RoundedRectangle(cornerRadius: 14))
                     .overlay(RoundedRectangle(cornerRadius: 14).stroke(RexColor.border, lineWidth: 1))
+                noteMentionPicker
                 Text("This goes in your friends' feed so they can chime in.")
                     .font(RexFont.text(12))
                     .foregroundStyle(RexColor.mutedForeground)
+
+                // Nov 8 — the tag list, which a want did not have.
+                //
+                // Oct 15 said it should: "also need to be able to tag someone
+                // in a want to try", and argued the want is the more useful
+                // half — "went here with Phoebe" is a fact you record
+                // afterwards, "shall we go, Phoebe?" is why you wrote the
+                // want down at all. The picker was never actually moved, so
+                // it stayed inside the rated branch.
+                //
+                // It has to be here now rather than later, because the @
+                // picker above writes into the same set. Without this, an @
+                // on a want would tag somebody with nothing on screen saying
+                // so and no way to take it back.
+                Text("Tag friends (optional)")
+                    .font(.system(size: 14, weight: .semibold))
+                    .foregroundStyle(RexColor.foreground)
+                FriendTagPickerView(selectedIds: $taggedFriendIds)
 
                 // Oct 3 — "Can't add a photo to a want-to-try." A want is the
                 // kind of Rex most likely to start life as a screenshot — a
@@ -1196,6 +1234,7 @@ struct AddRexView: View {
                     .background(RexColor.card)
                     .clipShape(RoundedRectangle(cornerRadius: 14))
                     .overlay(RoundedRectangle(cornerRadius: 14).stroke(RexColor.border, lineWidth: 1))
+                noteMentionPicker
 
                 // A trip already set its single cover photo up top, and its
                 // carousel is built from its stops' photos — so no second,
@@ -2066,6 +2105,22 @@ struct AddRexView: View {
         (category == .trip || category == .list)
             && editingTripRecId == nil && editingListRecId == nil
             && !title.trimmingCharacters(in: .whitespaces).isEmpty
+    }
+
+    /// The picker, shown under whichever note box is on screen while an @ is
+    /// part-typed. One builder rather than three copies: the form has three
+    /// note fields — a list's "what's this list for", a want's, and a rated
+    /// Rex's — and they all bind to `note`, so they all need the same thing
+    /// underneath and must not drift apart.
+    @ViewBuilder
+    private var noteMentionPicker: some View {
+        if let query = MentionDraft.inProgress(in: note), !friends.isEmpty {
+            MentionPicker(query: query, friends: friends) { friend in
+                note = MentionDraft.complete(note, with: friend.username)
+                // The half that makes this a tag rather than decoration.
+                taggedFriendIds.insert(friend.id)
+            }
+        }
     }
 
     private var closeNoun: String {
