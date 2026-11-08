@@ -323,13 +323,23 @@ struct AppleMapView: UIViewRepresentable {
         /// genuinely on top of each other stop merging and print over one
         /// another, which is the problem clustering exists to solve.
         ///
-        /// The balloon's own width is about 40. 26 on 8 October, 18 now: what
-        /// stopped it going further then was that the frame is also the tap
-        /// target, and RexPlaceAnnotationView has since separated those, so a
-        /// finger still gets its 44 whatever this says. Two pins now split
-        /// roughly half a zoom step sooner than at 26, and about a step and a
-        /// half sooner than an untouched balloon.
-        static let pinCollisionSize: CGFloat = 18
+        /// The balloon's own width is about 40. 26 on 8 October, 18 on the
+        /// 12th, 12 now — "they bunch too early", 7 November, which is the
+        /// third time this has been the answer to "the map is too zoomed in".
+        ///
+        /// What never stopped it going lower is the tap target: the frame
+        /// used to be both, and RexPlaceAnnotationView separated them, so a
+        /// finger gets its 44pt whatever this says. What does stop it is
+        /// honesty — at some point two balloons genuinely on top of each
+        /// other stop merging and print over one another, which is the thing
+        /// clustering exists to prevent.
+        ///
+        /// 12 is a little under a third of the balloon, so two pins split
+        /// about a full zoom step sooner than at 18 and nearly three sooner
+        /// than an untouched marker. Below this the overlap starts to look
+        /// like a bug rather than a dense map; inseparableMetres is what
+        /// catches the genuinely-same-point case underneath it.
+        static let pinCollisionSize: CGFloat = 12
 
         static func ghostImage(tint: UIColor) -> UIImage {
             if let cached = ghostCache[tint] { return cached }
@@ -614,8 +624,9 @@ final class RexPlaceAnnotationView: MKMarkerAnnotationView {
 final class RexClusterAnnotationView: MKAnnotationView {
     /// How much room the bubble claims when MapKit works out what overlaps.
     /// Kept just above the pins' own box so a cluster never outlives the pins
-    /// inside it.
-    static let collisionSize: CGFloat = 19
+    /// inside it — so this moves whenever pinCollisionSize does. 13 against
+    /// a pin's 12, as of 7 November.
+    static let collisionSize: CGFloat = 13
     /// What the bubble actually looks like. Deliberately bigger than the
     /// collision box — see `bubble`.
     private static let artworkSize: CGFloat = 36

@@ -1002,6 +1002,43 @@ private let markdownLink = try? NSRegularExpression(
     pattern: #"\[([^\]\n]{1,120})\]\((https?://[^\s)]{1,500})\)"#
 )
 
+/// Nov 7 — both kinds in one expression, because they have to be found in one
+/// pass. linkified() rewrites the text as it goes, and a range measured in the
+/// original string means nothing in the rewritten one, so markdown cannot be
+/// resolved first and addresses second the way it used to be.
+///
+/// The markdown alternative comes first so that the address inside a
+/// [words](url) is consumed as part of it, rather than being matched again by
+/// the bare alternative and printed beside the words it was meant to hide
+/// behind.
+/// `\u{...}` is not an escape inside a Swift raw string, so writing the curly
+/// quotes that way handed ICU a literal backslash-u and the whole pattern
+/// silently failed to compile — try? returned nil and nothing was linked at
+/// all. Plain quotes only; a smart quote against a URL is rare enough to live
+/// with, and a pattern that compiles beats one that covers more and doesn't.
+private let linkPattern = try? NSRegularExpression(
+    pattern: #"\[([^\]\n]{1,120})\]\((https?://[^\s)]{1,500})\)"#
+        + #"|https?://[^\s<>"']{1,2000}"#
+)
+
+/// Trailing punctuation a URL at the end of a sentence picks up but does not
+/// own. NSDataDetector used to do this for us; the single pass has to do it
+/// by hand. Brackets are included because "(see https://x.com/y)" is common
+/// and the closing one is not part of the address.
+private func trimmingTrailingPunctuation(_ candidate: String) -> String {
+    var trimmed = Substring(candidate)
+    while let last = trimmed.last, ".,;:!?\u{201D}\")]}>".contains(last) {
+        // (This string is not a regex, so \u{...} is a real escape here.)
+        // A closing bracket is only punctuation if nothing opened it inside
+        // the address — Wikipedia's URLs genuinely end in one.
+        if last == ")", trimmed.filter({ $0 == "(" }).count >= trimmed.filter({ $0 == ")" }).count {
+            break
+        }
+        trimmed = trimmed.dropLast()
+    }
+    return String(trimmed)
+}
+
 /// Oct 14 — the same markdown, flattened to its words, for the places that
 /// show a snippet of somebody's text as plain characters. A notification read
 /// `kathryn replied to your blast: "[Greenpan](https://greenpan.com)"`, which
@@ -1018,46 +1055,59 @@ func plainLinkText(_ text: String) -> String {
 }
 
 func linkified(_ text: String) -> AttributedString {
-    // Markdown first: rewrite [words](url) down to `words`, remembering where
-    // each landed so the link can be applied to the shortened string.
-    var plain = ""
-    var linkRanges: [(Range<String.Index>, URL)] = []
-    if let markdownLink {
-        let ns = text as NSString
-        var cursor = 0
-        for match in markdownLink.matches(in: text, range: NSRange(location: 0, length: ns.length)) {
-            guard match.numberOfRanges == 3,
-                  let url = URL(string: ns.substring(with: match.range(at: 2)))
-            else { continue }
-            plain += ns.substring(with: NSRange(location: cursor, length: match.range.location - cursor))
-            let start = plain.endIndex
-            plain += ns.substring(with: match.range(at: 1))
-            linkRanges.append((start..<plain.endIndex, url))
-            cursor = match.range.location + match.range.length
-        }
-        plain += ns.substring(from: cursor)
-    }
-    // No markdown found means nothing was rewritten, so the original stands.
-    let text = linkRanges.isEmpty ? text : plain
-
-    var attributed = AttributedString(text)
-    for (range, url) in linkRanges {
-        guard let attrRange = Range(range, in: attributed) else { continue }
-        attributed[attrRange].link = url
-        attributed[attrRange].foregroundColor = RexColor.primary
-        attributed[attrRange].underlineStyle = .single
-    }
-
-    guard let detector = try? NSDataDetector(types: NSTextCheckingResult.CheckingType.link.rawValue) else {
-        return attributed
-    }
+    // One pass over the text, rewriting both kinds of link as it goes and
+    // remembering where each landed. Two passes cannot work: a range belongs
+    // to the string it was measured in, so rewriting anything invalidates
+    // every range found before it.
+    var display = ""
+    var links: [(Range<String.Index>, URL)] = []
     let ns = text as NSString
-    let matches = detector.matches(in: text, range: NSRange(location: 0, length: ns.length))
-    for match in matches {
-        guard let url = match.url,
-              let range = Range(match.range, in: text),
-              let attrRange = Range(range, in: attributed),
-              attributed[attrRange].link == nil else { continue }
+    var cursor = 0
+
+    if let linkPattern {
+        for match in linkPattern.matches(in: text, range: NSRange(location: 0, length: ns.length)) {
+            // Everything between the last match and this one, unchanged.
+            display += ns.substring(with: NSRange(location: cursor, length: match.range.location - cursor))
+            cursor = match.range.location + match.range.length
+
+            let whole = ns.substring(with: match.range)
+            let markdownWords = match.range(at: 1)
+            let markdownURL = match.range(at: 2)
+
+            let label: String
+            let target: URL?
+            if markdownWords.location != NSNotFound, markdownURL.location != NSNotFound {
+                // [words](url) — show the words.
+                label = ns.substring(with: markdownWords)
+                target = URL(string: ns.substring(with: markdownURL))
+            } else {
+                // A pasted address. Long ones become their host and an arrow;
+                // short ones are already readable and stay as they are.
+                let address = trimmingTrailingPunctuation(whole)
+                // Whatever the trim gave back is punctuation, not address, so
+                // it is put back into the text after the link.
+                let tail = String(whole.dropFirst(address.count))
+                target = URL(string: address)
+                let shown = address.count > bareLinkMaxCharacters
+                    ? "\(prettyHost(of: target) ?? "link") \u{2197}"
+                    : address
+                let start = display.endIndex
+                display += shown
+                if let target { links.append((start..<display.endIndex, target)) }
+                display += tail
+                continue
+            }
+
+            let start = display.endIndex
+            display += label
+            if let target { links.append((start..<display.endIndex, target)) }
+        }
+    }
+    display += ns.substring(from: cursor)
+
+    var attributed = AttributedString(display)
+    for (range, url) in links {
+        guard let attrRange = Range(range, in: attributed) else { continue }
         attributed[attrRange].link = url
         // Oct 12 — "embed the links as hyperlinks that you can then click on."
         // They were already tappable; underlined body text doesn't read as a
@@ -1067,6 +1117,30 @@ func linkified(_ text: String) -> AttributedString {
         attributed[attrRange].underlineStyle = .single
     }
     return attributed
+}
+
+/// Beyond this many characters a pasted address is noise rather than
+/// information, and is shown as its host instead.
+///
+/// Nov 7 — "have we fixed the product linking so it becomes one neat arrow
+/// when you upload a link in a comment or a blast or anywhere really?"
+///
+/// Gemma pasted two Amazon product links into a blast. Amazon's share URLs
+/// carry ref, crid, dib, dib_tag, keywords, qid, sprefix and sr, so each was
+/// about three hundred characters and rendered as fifteen lines of underlined
+/// text. The two of them filled the screen and pushed the blast itself out of
+/// sight.
+///
+/// Words somebody deliberately linked have collapsed to their words since 14
+/// October. A pasted address had nothing doing the same job for it. 48 is
+/// comfortably more than a tidy link — find-rex.com/s/ab12 is 19 — and well
+/// under anything with tracking parameters on it.
+private let bareLinkMaxCharacters = 48
+
+/// The host, without the www., for the label on a shortened link.
+private func prettyHost(of url: URL?) -> String? {
+    guard let host = url?.host() else { return nil }
+    return host.hasPrefix("www.") ? String(host.dropFirst(4)) : host
 }
 
 extension Text {
