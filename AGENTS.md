@@ -38,9 +38,28 @@ cd web && npx wrangler pages deploy . --project-name=rex-web --branch main
 ```
 
 Look for `Compiled Worker successfully` and `Uploading Functions bundle`. Without
-both lines the share pages did not go up — which is what happens if you run it
-from the repo root, where wrangler picks up `.output/server/wrangler.json` and
-silently skips `functions/`.
+both lines the share pages did not go up.
+
+Nov 8 — the deploy on that date printed:
+
+```
+Using redirected Wrangler configuration.
+ - Configuration being used: "../.output/server/wrangler.json"
+```
+
+and still uploaded the Functions bundle, so it worked. But the note this
+replaces said that redirect only happened from the repo root, and it does not:
+`.wrangler/deploy/config.json` holds `{"configPath":"../../.output/server/wrangler.json"}`,
+so it is read from inside `web/` too. Both are untracked, gitignored leftovers
+of the TanStack app that was removed on the 7th, and `.output` can no longer be
+regenerated because the thing that built it is gone. Clearing them removes the
+redirect for good:
+
+```
+rm -rf .output .wrangler/deploy
+```
+
+Check the two lines above are still printed after doing it.
 
 An edge function:
 
