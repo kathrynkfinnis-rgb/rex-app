@@ -5,10 +5,29 @@ The iOS app, the website at find-rex.com, and the Supabase schema behind both.
 | Where | What |
 | --- | --- |
 | `ios/App` | The native SwiftUI app. `App/Native` is the app; the Capacitor shell around it is a leftover from the Lovable era and shrinking. |
-| `web/` | find-rex.com — a static Cloudflare Pages site plus the Pages Functions that render every share link. **This is what is deployed**, not the TanStack app in `src/`. |
-| `src/` | The older React app. Not served at find-rex.com. |
+| `android/` | The native Jetpack Compose app. Same database, same RLS. |
+| `web/` | find-rex.com — a static Cloudflare Pages site plus the Pages Functions that render every share link. **This is what is deployed.** |
 | `supabase/migrations` | Every schema change, in order. Run by hand in the SQL editor. |
 | `supabase/functions` | Edge functions. These do **not** ride along with an app build — deploy them separately. |
+| `.github/workflows` | CI: the website, the edge functions, Android and iOS, each built on its own. |
+
+`src/` held the older TanStack app and was removed on 7 November. It had not
+been served at find-rex.com since September, and its vite config still pointed
+at the old Lovable Cloud project rather than REX's database.
+
+## The brand mark
+
+The dino-with-crown exists as eleven files and nothing keeps them in step, so
+changing the logo means changing all of them in one commit:
+
+| Where | Files |
+| --- | --- |
+| iOS | `ios/App/App/Assets.xcassets/AppIcon.appiconset/AppIcon-512@2x.png` (1024×1024 — this is also the App Store listing icon, so it needs a new build and a review) |
+| Android | `android/app/src/main/res/mipmap-xxhdpi/ic_launcher_foreground.png`, plus the two `mipmap-anydpi-v26/ic_launcher*.xml` wrappers |
+| Website | `web/og-default.png` (1200×1200 — the image on every shared link with no photo of its own), `icon-512.png`, `icon-192.png`, `icon-180.png`, `apple-touch-icon.png`, `favicon.png`, `wordmark.png`, `dinologo.png` |
+
+Miss `og-default.png` and every link shared from the app keeps the old logo in
+its WhatsApp preview, long after both app icons have changed.
 
 ## Deploying
 
