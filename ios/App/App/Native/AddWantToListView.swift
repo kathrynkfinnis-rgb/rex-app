@@ -184,9 +184,12 @@ struct AddWantToListView: View {
         creating = true
         errorMessage = nil
         do {
+            // Same as AddToCollectionView: a quick-made collection gets its
+            // type's emoji rather than nothing, so it isn't one more
+            // identical notebook in the list.
+            let type = itemType ?? "other"
             let id = try await RexAPI.shared.createCollection(
-                name: name, emoji: nil,
-                itemType: itemType ?? "other"
+                name: name, emoji: RexCategory(rawType: type).emoji, itemType: type
             )
             try await RexAPI.shared.setWantList(wantId: wantId, listId: id)
             selectedListId = id

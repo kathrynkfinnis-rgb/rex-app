@@ -41,35 +41,56 @@ struct AddToCollectionView: View {
                         }
 
                         ForEach(lists) { list in
+                            let isIn = inLists.contains(list.id)
+                            let category = RexCategory(rawType: list.item_type)
                             Button {
                                 Task { await toggle(list) }
                             } label: {
                                 HStack(spacing: RexSpacing.md) {
                                     ZStack {
                                         RoundedRectangle(cornerRadius: RexRadius.input, style: .continuous)
-                                            .fill(RexColor.badgeBackground)
-                                        Text(list.emoji ?? "\u{1F4D2}").font(.system(size: 18))
+                                            .fill(category.tintColor.opacity(0.14))
+                                        // A collection made from the quick box
+                                        // below has no emoji of its own, so
+                                        // this falls back to what it holds
+                                        // rather than to one shared notebook.
+                                        Text(list.emoji ?? category.emoji).font(.system(size: 18))
                                     }
                                     .frame(width: 40, height: 40)
 
-                                    Text(list.name)
-                                        .font(RexFont.text(15, weight: .medium))
-                                        .foregroundStyle(RexColor.foreground)
+                                    VStack(alignment: .leading, spacing: 1) {
+                                        Text(list.name)
+                                            .font(RexFont.text(15, weight: .medium))
+                                            .foregroundStyle(RexColor.foreground)
+                                            .lineLimit(2)
+                                            .multilineTextAlignment(.leading)
+                                        Text(category.pluralLabel)
+                                            .font(RexFont.text(12))
+                                            .foregroundStyle(RexColor.mutedForeground)
+                                    }
 
                                     Spacer()
 
                                     if busyIds.contains(list.id) {
                                         ProgressView().controlSize(.small)
                                     } else {
-                                        Image(systemName: inLists.contains(list.id) ? "checkmark.circle.fill" : "circle")
+                                        Image(systemName: isIn ? "checkmark.circle.fill" : "circle")
                                             .font(.system(size: 20))
-                                            .foregroundStyle(inLists.contains(list.id) ? RexColor.primary : RexColor.border)
+                                            .foregroundStyle(isIn ? RexColor.primary : RexColor.border)
                                     }
                                 }
                                 .padding(RexSpacing.md)
                                 .rexCard()
+                                // A filled circle alone was the only thing
+                                // separating in from out, at the far edge of
+                                // the row from the name it belongs to.
+                                .overlay(
+                                    RoundedRectangle(cornerRadius: RexRadius.card, style: .continuous)
+                                        .stroke(isIn ? RexColor.primary : .clear, lineWidth: 1.5)
+                                )
                             }
                             .buttonStyle(.plain)
+                            .animation(.snappy(duration: 0.2), value: isIn)
                         }
 
                         VStack(alignment: .leading, spacing: RexSpacing.sm) {
@@ -161,10 +182,12 @@ struct AddToCollectionView: View {
         creating = true
         errorMessage = nil
         do {
+            // Type the collection by whatever's going into it first, and
+            // give it that type's emoji rather than nothing. Passing nil
+            // here is what made every row in this sheet identical.
+            let type = rec.items?.type ?? "other"
             let id = try await RexAPI.shared.createCollection(
-                name: name, emoji: nil,
-                // Type the collection by whatever's going into it first.
-                itemType: rec.items?.type ?? "other"
+                name: name, emoji: RexCategory(rawType: type).emoji, itemType: type
             )
             try await RexAPI.shared.addToCollection(recommendationId: rec.id, listId: id)
             newName = ""

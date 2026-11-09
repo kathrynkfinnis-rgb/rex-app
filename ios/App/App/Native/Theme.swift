@@ -314,6 +314,30 @@ enum RexCategory: String, Codable, CaseIterable {
         }
     }
 
+    /// Nov 9 — "can we make this look a bit nicer?", about a sheet of six
+    /// collections all wearing the same notebook.
+    ///
+    /// They were identical because a collection made from the quick "New
+    /// collection" box has no emoji — only NewCollectionView's picker ever
+    /// set one — so every row fell back to the same default. The sheet was
+    /// fine; it had nothing to draw. A collection's type is already known,
+    /// so this is what it falls back to instead, and six notebooks become a
+    /// plate, a book, a pin and so on without anybody picking anything.
+    var emoji: String {
+        switch self {
+        case .place: return "\u{1F4CD}"    // round pushpin
+        case .trip: return "\u{2708}\u{FE0F}"
+        case .book: return "\u{1F4DA}"
+        case .movie: return "\u{1F3AC}"
+        case .tv: return "\u{1F4FA}"
+        case .podcast: return "\u{1F3A7}"
+        case .recipe: return "\u{1F373}"
+        case .event: return "\u{1F3AB}"
+        case .other: return "\u{2728}"
+        case .list: return "\u{1F4D2}"
+        }
+    }
+
     /// One colour per category — Add-a-Rex's category picker (a left
     /// accent bar per card, icon+label tinted to match) and, more subtly,
     /// the feed itself. Distinct enough to tell apart across a 2-column
