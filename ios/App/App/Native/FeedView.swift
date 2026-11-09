@@ -45,13 +45,19 @@ struct FeedView: View {
     /// would mean picking a cuisine silently let go of the shape above it.
     @State private var cuisineFilter: String?
     @State private var blastsOnly = false
-    /// Nov 9 — "I'd also like to be able to filter the feed by 'most rexed'."
+    /// Nov 9 — sorting the feed by hotness.
     ///
-    /// Not the same as most liked, which counts hearts on one post. This
-    /// counts how many people Rex'd the *thing* — the number already on every
-    /// card next to the dino — so the restaurant four friends swear by rises
-    /// above the one that got four hearts from the same crowd.
-    private enum SortMode { case recent, mostLiked, mostRexed }
+    /// Not the same as most liked, which counts hearts on one post. Hot
+    /// counts how many people Rex'd the *thing* — the number next to the dino
+    /// on every card — so the restaurant four friends swear by rises above
+    /// the one that got four hearts from the same crowd.
+    ///
+    /// "Hot means 3+ friends", which is the threshold RecommendationCardView
+    /// has always used for its flame badge. So this sorts on exactly what
+    /// that badge counts and the word means one thing on the screen. A
+    /// time-decayed version was considered and turned down: it would have
+    /// ranked a card above another that visibly says it is hotter.
+    private enum SortMode { case recent, mostLiked, hot }
     @State private var sortMode: SortMode = .recent
     @State private var likeCounts: [String: Int] = [:]
     @State private var query = ""
@@ -459,7 +465,7 @@ struct FeedView: View {
                 if la != lb { return la > lb }
                 return a.created_at > b.created_at // tie-break: newest first
             }
-        case .mostRexed:
+        case .hot:
             // Keyed on item_id, not id: the count belongs to the thing, so
             // two friends' Rexes of the same restaurant carry the same number
             // and sit together rather than one of them floating off.
@@ -1081,10 +1087,16 @@ struct FeedView: View {
                     // No counterpart to loadLikeCountsIfNeeded: rex counts
                     // ride along with the feed itself for the dino on every
                     // card, so they are already here.
+                    //
+                    // Nov 9 — "Hot means 3+ friends." Named to match the badge
+                    // a card already wears (RecommendationCardView: flame and
+                    // "Hot — 4 friends Rex'd this" at three or more), so the
+                    // word means one thing on this screen. Sorting by the same
+                    // count puts every card carrying that badge at the top.
                     Button {
-                        sortMode = .mostRexed
+                        sortMode = .hot
                     } label: {
-                        Label("Most Rex'd", systemImage: sortMode == .mostRexed ? "checkmark" : "")
+                        Label("Hot", systemImage: sortMode == .hot ? "checkmark" : "")
                     }
                 } label: {
                     Image(systemName: "arrow.up.arrow.down")

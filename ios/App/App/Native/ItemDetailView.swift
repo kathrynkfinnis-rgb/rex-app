@@ -987,8 +987,20 @@ struct ItemDetailView: View {
     /// Oct 14 — the photograph across the band: one somebody who went there
     /// uploaded. Nil when nobody has, which is when the category's texture
     /// takes the band instead.
+    /// Nov 9 — "Phoebe's photo has been attached to my Rex — bit weird?"
+    ///
+    /// It was `communityPhotoURLs.first`: the photos of everyone who Rex'd
+    /// this, in whatever order the fetch returned them. On a place two people
+    /// have been to, that put a friend's photograph across the top of a page
+    /// where you had uploaded one of your own, with nothing to say whose it
+    /// was — so it read as your Rex wearing somebody else's picture.
+    ///
+    /// Yours leads when you have one. Everyone's is still in "Photos from
+    /// friends" below, which is labelled and so was never the confusing part.
     private var heroPhoto: String? {
-        communityPhotoURLs.first
+        let mine = recs.first { $0.user_id == RexAPI.shared.currentUserId }
+            .flatMap { $0.photo_urls?.first ?? $0.photo_url }
+        return mine ?? communityPhotoURLs.first
     }
 
     /// The card resting on it: Google's picture of the place, falling back to

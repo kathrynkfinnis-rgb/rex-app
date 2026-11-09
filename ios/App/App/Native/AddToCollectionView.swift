@@ -9,6 +9,15 @@ struct AddToCollectionView: View {
     @Environment(\.dismiss) private var dismiss
 
     @State private var lists: [RexList] = []
+    /// Nov 9 — "can we use the little images from the collections page for
+    /// the 'add to collection' page? so it's a bit more engaging?"
+    ///
+    /// The same 2x2 of what is actually inside each one that CollectionsView
+    /// draws on its shelf tiles, via the same ThumbnailGridView. Loaded after
+    /// the rows are already on screen — it is one request per collection, and
+    /// nothing here should wait on them: a row shows its emoji and swaps to
+    /// the real thing when it arrives.
+    @State private var contents: [String: [SavedPost]] = [:]
     @State private var inLists: Set<String> = []
     @State private var isLoading = true
     @State private var newName = ""
@@ -46,17 +55,25 @@ struct AddToCollectionView: View {
                             Button {
                                 Task { await toggle(list) }
                             } label: {
+                                let thumbs = (contents[list.id] ?? [])
+                                    .compactMap { $0.recommendations?.items?.image_url }
                                 HStack(spacing: RexSpacing.md) {
-                                    ZStack {
-                                        RoundedRectangle(cornerRadius: RexRadius.input, style: .continuous)
-                                            .fill(category.tintColor.opacity(0.14))
-                                        // A collection made from the quick box
-                                        // below has no emoji of its own, so
-                                        // this falls back to what it holds
-                                        // rather than to one shared notebook.
-                                        Text(list.emoji ?? category.emoji).font(.system(size: 18))
+                                    Group {
+                                        if thumbs.isEmpty {
+                                            ZStack {
+                                                RoundedRectangle(cornerRadius: RexRadius.input, style: .continuous)
+                                                    .fill(category.tintColor.opacity(0.14))
+                                                // Still the fallback, for a
+                                                // collection that is empty or
+                                                // whose items have no artwork.
+                                                Text(list.emoji ?? category.emoji).font(.system(size: 20))
+                                            }
+                                        } else {
+                                            ThumbnailGridView(urls: thumbs)
+                                        }
                                     }
-                                    .frame(width: 40, height: 40)
+                                    .frame(width: 52, height: 52)
+                                    .clipShape(RoundedRectangle(cornerRadius: RexRadius.input, style: .continuous))
 
                                     VStack(alignment: .leading, spacing: 1) {
                                         Text(list.name)
@@ -64,7 +81,12 @@ struct AddToCollectionView: View {
                                             .foregroundStyle(RexColor.foreground)
                                             .lineLimit(2)
                                             .multilineTextAlignment(.leading)
-                                        Text(category.pluralLabel)
+                                        // The count beats the category name:
+                                        // it is what CollectionsView shows,
+                                        // and "20 items" tells you which
+                                        // collection this is in a way that
+                                        // "Movies" does not.
+                                        Text(itemCountLabel(for: list, category: category))
                                             .font(RexFont.text(12))
                                             .foregroundStyle(RexColor.mutedForeground)
                                     }
@@ -151,11 +173,32 @@ struct AddToCollectionView: View {
         .task { await load() }
     }
 
+    /// "20 items" where we know, the category where we don't yet — the counts
+    /// arrive after the rows, and a row that flashes "0 items" before
+    /// correcting itself is worse than one that says what kind it is.
+    private func itemCountLabel(for list: RexList, category: RexCategory) -> String {
+        guard let rows = contents[list.id] else { return category.pluralLabel }
+        return rows.count == 1 ? "1 item" : "\(rows.count) items"
+    }
+
     private func load() async {
         isLoading = true
         lists = (try? await RexAPI.shared.fetchLists()) ?? []
         inLists = (try? await RexAPI.shared.collectionsContaining(recommendationId: rec.id)) ?? []
         isLoading = false
+        // After the rows are drawn: one request per collection, and the sheet
+        // is usable without any of them. Same shape as CollectionsView.
+        let all = lists
+        contents = await withTaskGroup(of: (String, [SavedPost]).self) { group in
+            for list in all {
+                group.addTask {
+                    (list.id, (try? await RexAPI.shared.fetchCollectionItems(listId: list.id)) ?? [])
+                }
+            }
+            var result: [String: [SavedPost]] = [:]
+            for await (id, rows) in group { result[id] = rows }
+            return result
+        }
     }
 
     private func toggle(_ list: RexList) async {
