@@ -2,11 +2,11 @@
 [versions]
 agp = "8.10.1"
 kotlin = "2.0.21"
-coreKtx = "1.15.0"
+coreKtx = "1.19.1"
 lifecycle = "2.8.7"
 activityCompose = "1.9.3"
-composeBom = "2024.11.00"
-navigation = "2.8.4"
+composeBom = "2026.09.00"
+navigation = "2.10.2"
 # Supabase's own Kotlin SDK: auth, PostgREST and storage against the same
 # project the iOS app uses. Replaces about 6,700 lines of hand-rolled
 # URLSession calls in RexAPI.swift.
