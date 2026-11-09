@@ -11,7 +11,7 @@ navigation = "2.8.4"
 # project the iOS app uses. Replaces about 6,700 lines of hand-rolled
 # URLSession calls in RexAPI.swift.
 supabase = "3.0.3"
-ktor = "3.0.1"
+ktor = "3.6.1"
 serialization = "1.7.3"
 coil = "2.7.0"
 maps = "6.2.1"
