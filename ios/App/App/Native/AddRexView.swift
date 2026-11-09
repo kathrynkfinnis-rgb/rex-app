@@ -317,6 +317,12 @@ struct AddRexView: View {
     /// would have been a second, worse mechanism beside one that works.
     @State private var friends: [RexProfileDetail] = []
     @State private var taggedFriendIds: Set<String> = []
+    /// When tickets for this event drop, if anybody knows yet. Optional
+    /// because most events either have no ticket to wait for or no announced
+    /// time, and an unanswerable question on a form is worse than no question.
+    @State private var ticketsOnSaleAt: Date?
+    @State private var editingTicketsOnSale = false
+    @State private var draftTicketsOnSale = Date()
     /// Oct 18 — "editing a trip untags Danny."
     ///
     /// Both editors opened with an empty tag picker, because neither init
@@ -1121,6 +1127,20 @@ struct AddRexView: View {
                         Task { await lookUpLinkedImage(link) }
                     }
                     .textInputAutocapitalization(.never)
+            }
+
+            // Nov 9 — "No option to add an alert for tickets here."
+            //
+            // Ticket reminders have been built end to end since 12 October —
+            // the column, the cron job, the push copy, a "Remind me" button —
+            // and had been used exactly zero times. Not because nobody wanted
+            // them: because the only place to enter an on-sale time was a
+            // quiet text button on the event's own page, which you reach by
+            // posting the event and then going back into it. The intent is
+            // here, at the moment somebody is typing in an event they are
+            // excited about, so the field is here too.
+            if category == .event {
+                ticketsOnSaleField
             }
 
             // A list is always just "posted" — there's no done-vs-want-to-try
@@ -2123,6 +2143,77 @@ struct AddRexView: View {
         }
     }
 
+    /// The on-sale row for an event. A line of text until it's filled in,
+    /// rather than a date picker sitting open on today's date — an unset
+    /// optional and "today" have to look different, or every event gets an
+    /// on-sale time of whenever it happened to be added.
+    @ViewBuilder
+    private var ticketsOnSaleField: some View {
+        VStack(alignment: .leading, spacing: RexSpacing.xs) {
+            Text("Tickets on sale (optional)")
+                .font(.system(size: 14, weight: .semibold))
+                .foregroundStyle(RexColor.foreground)
+            Button {
+                draftTicketsOnSale = ticketsOnSaleAt ?? Date()
+                editingTicketsOnSale = true
+            } label: {
+                HStack(spacing: RexSpacing.sm) {
+                    Image(systemName: ticketsOnSaleAt == nil ? "bell.badge" : "bell.fill")
+                    Text(ticketsOnSaleAt.map { $0.formatted(date: .abbreviated, time: .shortened) }
+                         ?? "Know when they drop? Add it")
+                        .font(RexFont.text(14, weight: .medium))
+                    Spacer()
+                    if ticketsOnSaleAt != nil {
+                        Button("Clear") { ticketsOnSaleAt = nil }
+                            .font(RexFont.text(12))
+                            .foregroundStyle(RexColor.mutedForeground)
+                            .buttonStyle(.plain)
+                    }
+                }
+                .foregroundStyle(RexColor.primary)
+                .padding(12)
+                .background(RexColor.card)
+                .clipShape(RoundedRectangle(cornerRadius: 14))
+                .overlay(RoundedRectangle(cornerRadius: 14).stroke(RexColor.border, lineWidth: 1))
+            }
+            .buttonStyle(.plain)
+            Text("We'll remind you and anyone else waiting, half an hour before.")
+                .font(RexFont.text(12))
+                .foregroundStyle(RexColor.mutedForeground)
+        }
+        .sheet(isPresented: $editingTicketsOnSale) {
+            NavigationStack {
+                VStack(alignment: .leading, spacing: RexSpacing.md) {
+                    DatePicker(
+                        "On sale",
+                        selection: $draftTicketsOnSale,
+                        displayedComponents: [.date, .hourAndMinute]
+                    )
+                    .datePickerStyle(.graphical)
+                    .tint(RexColor.primary)
+                    Spacer()
+                }
+                .padding(RexSpacing.page)
+                .background(RexColor.background.ignoresSafeArea())
+                .navigationTitle("When do tickets drop?")
+                .navigationBarTitleDisplayMode(.inline)
+                .toolbar {
+                    ToolbarItem(placement: .topBarLeading) {
+                        Button("Cancel") { editingTicketsOnSale = false }
+                    }
+                    ToolbarItem(placement: .topBarTrailing) {
+                        Button("Save") {
+                            ticketsOnSaleAt = draftTicketsOnSale
+                            editingTicketsOnSale = false
+                        }
+                        .font(RexFont.text(15, weight: .semibold))
+                    }
+                }
+            }
+            .tint(RexColor.primary)
+        }
+    }
+
     private var closeNoun: String {
         switch category {
         case .trip: return "trip"
@@ -2542,6 +2633,13 @@ struct AddRexView: View {
                 }
                 didWant = true
                 lastWantItemId = itemId
+            }
+            // After both branches, because an on-sale time belongs to the
+            // event itself and holds whether you've been or are only hoping
+            // to. Best-effort: the Rex is posted either way, and the time can
+            // still be set from the event's own page.
+            if category == .event, let onSale = ticketsOnSaleAt {
+                try? await RexAPI.shared.setTicketsOnSale(itemId: itemId, at: onSale)
             }
             RexSubcategoryUsage.record(category, Array(subcategories))
             // Phoebe, 21 Sept: the "pick up where you left off?" prompt kept
