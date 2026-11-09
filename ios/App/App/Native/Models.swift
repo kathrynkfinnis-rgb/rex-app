@@ -275,6 +275,13 @@ enum JSONValue: Codable {
         if case .bool(let v) = self { return v }
         return nil
     }
+    /// Nov 9 — `.number` has been decodable since this type existed and had
+    /// no way to read it back out, so every notification carrying a count or
+    /// a lead time had to be described without it.
+    var numberValue: Double? {
+        if case .number(let v) = self { return v }
+        return nil
+    }
 }
 
 struct RexNotification: Codable, Identifiable {
@@ -327,6 +334,23 @@ struct RexNotification: Codable, Identifiable {
                 : "\(who) wants to try \(title) with you"
         case "mention": return "\(who) tagged you: \"\(preview)\""
         case "friend_new_rec": return "\(who) Rexed \(title.isEmpty ? "something new" : title)"
+        // Nov 9 — ticket_reminder has written rows since 12 October with no
+        // line here, so the one notification whose whole job is naming a
+        // time has been reading "New activity" in the bell.
+        case "ticket_reminder":
+            let what = title.isEmpty ? "Tickets" : "Tickets for \(title)"
+            let lead = Int(data?["lead_minutes"]?.numberValue ?? 0)
+            if lead >= 1440 { return "\(what) go on sale tomorrow" }
+            if lead >= 60 { return "\(what) go on sale in \(lead / 60) hours" }
+            if lead > 0 { return "\(what) go on sale in \(lead) minutes" }
+            return "\(what) are on sale now"
+        // Nov 9 — the batched nudge. `who` is deliberately unused: the row
+        // has no actor, because a pile of requests has no single author.
+        case "friend_requests_waiting":
+            let n = Int(data?["count"]?.numberValue ?? 0)
+            return n == 1
+                ? "You have a friend request waiting"
+                : "You have \(n) friend requests waiting"
         default: return "New activity"
         }
     }
@@ -465,7 +489,7 @@ struct RexCreator: Codable {
 
 struct FeedRecommendation: Codable, Identifiable {
     let id: String
-    /// Oct 18 — when a queued REX post is meant to go out, so the admin
+    /// Oct 18 — when a queued Rex post is meant to go out, so the admin
     /// screen can say. Null on every ordinary row and absent from most
     /// selects, hence the default.
     var scheduled_at: String? = nil
@@ -554,7 +578,7 @@ struct RequestComment: Codable, Identifiable {
     /// Sept 7 — set when this is a reply to another suggestion rather than
     /// a suggestion of its own. One level only; see the migration.
     var parent_id: String?
-    /// Oct 3 — "when you reply to a blast, you should be able to tag REX to
+    /// Oct 3 — "when you reply to a blast, you should be able to tag Rex to
     /// the response." A reply that names somewhere is useful; a reply that
     /// attaches the actual Rex is the thing the blast was asking for.
     var suggested_item_id: String?
@@ -636,7 +660,7 @@ struct TrendingItem: Codable, Identifiable {
     var id: String { item_id }
 }
 
-/// Explore tab. A shelf curated by the named REX team members — either
+/// Explore tab. A shelf curated by the named Rex team members — either
 /// their own pick or something credited elsewhere via source_label.
 struct EditorialCollection: Codable, Identifiable {
     let id: String

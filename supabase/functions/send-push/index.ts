@@ -59,8 +59,8 @@ const PREF_COLUMN: Record<string, string> = {
   blast_comment: "blast_comment",
   friend_new_rec: "friend_new_rec",
   // Oct 19 — these five had no entry, which did two things. They fell
-  // through notifCopy to "New activity on REX" ("this gave me the
-  // notification 'new activity on REX' but it should say 'someone has also
+  // through notifCopy to "New activity on Rex" ("this gave me the
+  // notification 'new activity on Rex' but it should say 'someone has also
   // replied to a blast'", and before that Rachel's reply) — and, worse, an
   // unmapped type skipped the preference block entirely, so it never checked
   // push_enabled either. A type nobody had taught this map about pushed to
@@ -69,6 +69,11 @@ const PREF_COLUMN: Record<string, string> = {
   want_tagged: "rec_tagged",
   mention: "mention",
   rec_saved: "rec_saved",
+  // Nov 9 — the waiting-requests nudge rides the friend_request toggle
+  // rather than adding one of its own. Someone who turned friend requests
+  // off does not want a weekly count of them either, and a second switch
+  // for the same subject is a switch nobody finds.
+  friend_requests_waiting: "friend_request",
 };
 
 function notifCopy(type: string, actorName: string, data: Record<string, unknown>): string {
@@ -98,7 +103,28 @@ function notifCopy(type: string, actorName: string, data: Record<string, unknown
     case "mention": return `${actorName} tagged you in a comment`;
     case "rec_saved": return `${actorName} saved your Rex`;
     case "friend_new_rec": return `${actorName} Rex'd ${data?.title || "something new"}`;
-    default: return "New activity on REX";
+    // Nov 9 — ticket_reminder has been inserting rows since 12 October with
+    // no case here, so every ticket alert that reached a phone said "New
+    // activity on Rex". The one notification whose entire value is naming a
+    // time was the one that didn't name it.
+    case "ticket_reminder": {
+      const what = data?.title ? `Tickets for ${data.title}` : "Tickets";
+      const lead = Number(data?.lead_minutes ?? 0);
+      if (lead >= 1440) return `${what} go on sale tomorrow`;
+      if (lead >= 60) return `${what} go on sale in ${Math.round(lead / 60)} hours`;
+      if (lead > 0) return `${what} go on sale in ${lead} minutes`;
+      return `${what} are on sale now`;
+    }
+    // Nov 9 — "we are noticing lots of people have friend requests waiting."
+    // One nudge for the pile, never one per request: see the migration
+    // 20261109_friend_requests_waiting.sql for why it is batched and capped.
+    case "friend_requests_waiting": {
+      const n = Number(data?.count ?? 0);
+      return n === 1
+        ? "You have a friend request waiting"
+        : `You have ${n} friend requests waiting`;
+    }
+    default: return "New activity on Rex";
   }
 }
 
