@@ -1345,6 +1345,35 @@ final class RexAPI {
         guard let http = response as? HTTPURLResponse, http.statusCode < 400 else {
             throw RexAPIError.server(friendlyError(data, fallback: "Couldn't publish this."))
         }
+
+        // Nov 9 — "if you remove a trip from the feed into drafts and then
+        // repost it, it should come to the top of the feed."
+        //
+        // published_at is already stamped above and has been since drafts
+        // existed; the feed has simply never read it, sorting on created_at
+        // everywhere instead. Rather than change what every feed query orders
+        // by, the parent's created_at moves with it, which is also the date
+        // the card shows — a trip reposted today reading "27 Oct" was the
+        // other half of what looked wrong.
+        //
+        // The parent alone, deliberately. The PATCH above covers the trip's
+        // stops as well, and stops are ordered by sort_order then created_at:
+        // restamping them all to one instant would tie every stop that has no
+        // explicit sort_order and scramble the itinerary.
+        var bump = URLComponents(url: baseURL.appendingPathComponent("/rest/v1/recommendations"), resolvingAgainstBaseURL: false)!
+        bump.queryItems = [URLQueryItem(name: "id", value: "eq.\(tripRecommendationId)")]
+        var bumpRequest = URLRequest(url: bump.url!)
+        bumpRequest.httpMethod = "PATCH"
+        bumpRequest.setValue(anonKey, forHTTPHeaderField: "apikey")
+        bumpRequest.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+        bumpRequest.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        bumpRequest.httpBody = try JSONSerialization.data(withJSONObject: [
+            "created_at": ISO8601DateFormatter().string(from: Date()),
+        ])
+        // Best-effort: the thing is published either way, and a trip that is
+        // back on the feed in the wrong position beats one that failed to
+        // publish because its timestamp wouldn't move.
+        _ = try? await URLSession.shared.data(for: bumpRequest)
     }
 
     /// Your own trips (draft or published) to add a new stop to — task #104's
