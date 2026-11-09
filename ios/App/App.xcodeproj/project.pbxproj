@@ -837,7 +837,7 @@
 			repositoryURL = "https://github.com/googlemaps/ios-maps-sdk";
 			requirement = {
 				kind = upToNextMajorVersion;
-				minimumVersion = 9.0.0;
+				minimumVersion = 11.3.0;
 			};
 		};
 /* End XCRemoteSwiftPackageReference section */
