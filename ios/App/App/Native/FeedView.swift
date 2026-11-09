@@ -337,12 +337,24 @@ struct FeedView: View {
         }
     }
 
-    /// #165 — the same item Rex'd by more than one person (or once
-    /// standalone and again as a trip stop) showed as a separate feed card
-    /// per row, back to back, saying the same thing twice. One card per
-    /// item now: your own take if you have one, else whichever is most
-    /// recent — everyone else still surfaces via the "Also Rex'd by"
-    /// footer (rexCounts), so nothing's actually lost, just not repeated.
+    /// Nov 9 — "please can we remove the rule that if two people rex the
+    /// same thing, it removes the original rex from the feed."
+    ///
+    /// #165 folded every Rex of an item down to a single card. Two different
+    /// things were wrapped up in that, and only one of them was ever a
+    /// duplicate. The same person's item showing twice — once standalone and
+    /// again as a trip stop — is one fact posted twice, and still collapses
+    /// below. Two *people* Rex'ing the same book is two facts, and is the
+    /// premise of the whole app: what Phoebe wrote about it and what Gemma
+    /// wrote about it are the content, not noise to be folded away. The
+    /// "Also Rex'd by" footer counts heads; it never carried what anybody
+    /// said, so it was never the substitute #165 assumed it was.
+    ///
+    /// The cost of being wrong here is asymmetric and that is the argument:
+    /// a repeated card is a scroll, a swallowed one is a Rex your friend
+    /// wrote that you never see.
+    ///
+    /// So the collapse key is (item, person) now rather than (item).
     /// Blasts are left alone — a question isn't a duplicate of anything.
     ///
     /// Wants used to be left alone too, on the reasoning that "wants to
@@ -358,23 +370,30 @@ struct FeedView: View {
     /// want signal for your own card.
     private func collapseDuplicateItems(_ rows: [FeedRecommendation]) -> [FeedRecommendation] {
         let myId = RexAPI.shared.currentUserId
-        var primaryIdByItem: [String: String] = [:]
+        func collapseKey(_ rec: FeedRecommendation) -> String {
+            "\(rec.item_id)|\(rec.user_id)"
+        }
+        var primaryIdByItemPerson: [String: String] = [:]
         for rec in rows where !rec.isWant && !rec.isBlast {
-            guard let existingId = primaryIdByItem[rec.item_id],
+            guard let existingId = primaryIdByItemPerson[collapseKey(rec)],
                   let existing = rows.first(where: { $0.id == existingId })
             else {
-                primaryIdByItem[rec.item_id] = rec.id
+                primaryIdByItemPerson[collapseKey(rec)] = rec.id
                 continue
             }
-            let recIsMine = rec.user_id == myId
-            let existingIsMine = existing.user_id == myId
-            if recIsMine && !existingIsMine {
-                primaryIdByItem[rec.item_id] = rec.id
-            } else if recIsMine == existingIsMine, rec.created_at > existing.created_at {
-                primaryIdByItem[rec.item_id] = rec.id
+            // Within one person there is no "mine vs theirs" to prefer, so
+            // the most recent telling wins and that is the whole rule.
+            if rec.created_at > existing.created_at {
+                primaryIdByItemPerson[collapseKey(rec)] = rec.id
             }
         }
-        let itemsWithARealRex = Set(primaryIdByItem.keys)
+        // Deliberately still item-level, and no longer derivable from the
+        // keys above now that those carry a user id: a want folds away when
+        // *anybody* has really Rex'd the item, which Sept 1 asked for and
+        // this change does not touch.
+        let itemsWithARealRex = Set(
+            rows.filter { !$0.isWant && !$0.isBlast }.map(\.item_id)
+        )
 
         // Oct 18 — "these are the same thing, the cards should be combined."
         //
@@ -410,7 +429,7 @@ struct FeedView: View {
                 guard !itemsWithARealRex.contains(rec.item_id) else { return false }
                 return primaryWantByItem[rec.item_id] == rec.id
             }
-            return primaryIdByItem[rec.item_id] == rec.id
+            return primaryIdByItemPerson[collapseKey(rec)] == rec.id
         }
     }
 
@@ -902,7 +921,7 @@ struct FeedView: View {
     /// used without distortion per the brand guidelines. Wrapped in a
     /// disabled plain Button rather than a bare Image: iOS 26's toolbar
     /// otherwise auto-wraps a bare leading-item Image in its own circular
-    /// "Liquid Glass" badge, which is exactly the "REX in a circle" Kathryn
+    /// "Liquid Glass" badge, which is exactly the "Rex in a circle" Kathryn
     /// asked to remove — the plain button style plus hiding the shared
     /// background opts out of that chrome. Pulled into its own property
     /// (rather than inline in .toolbar) because the compiler choked trying
@@ -931,7 +950,7 @@ struct FeedView: View {
                 // with it. A logo is not body copy with a different size: it
                 // is a fixed drawing of a name, and it does not change because
                 // the typography around it did.
-                Text("REX")
+                Text("Rex")
                     .font(.system(size: 24, weight: .bold, design: .serif))
                     .foregroundStyle(RexColor.primary)
                     .fixedSize()
@@ -939,7 +958,7 @@ struct FeedView: View {
         }
         .buttonStyle(.plain)
         .disabled(true)
-        .accessibilityLabel("REX")
+        .accessibilityLabel("Rex")
     }
 
     /// Pulled out of body for the same reason as wordmarkToolbarItem above —
@@ -1909,19 +1928,19 @@ struct EditableIfMine: ViewModifier {
 
     /// Oct 7 — "you can't edit posts by Rex."
     ///
-    /// Admins have been able to post as the REX account since 5 October, and
+    /// Admins have been able to post as the Rex account since 5 October, and
     /// then couldn't touch what they'd posted: the "…" is gated on the Rex
-    /// being yours, and a Rex posted as REX belongs to the official account
+    /// being yours, and a Rex posted as Rex belongs to the official account
     /// rather than to you. So the one kind of post that is nobody's personal
     /// opinion was the one kind nobody could correct.
     ///
-    /// Deliberately narrow. An admin gets the menu on REX's own posts, and on
+    /// Deliberately narrow. An admin gets the menu on Rex's own posts, and on
     /// nothing else — being on the team is not a licence to edit what your
     /// friends wrote about a restaurant.
     @State private var canEditAsRex = false
     /// Oct 14 — "can admins get the ability to remove a post they made, and
     /// save it to drafts so they can repost as Rex." Only on your own posts,
-    /// and only if you are one of the people who could repost as REX.
+    /// and only if you are one of the people who could repost as Rex.
     @State private var isAdminUser = false
     @State private var confirmingUnpost = false
 
@@ -1929,7 +1948,7 @@ struct EditableIfMine: ViewModifier {
 
     /// Nov 6 — "make it so you can return a posted trip to drafts (and list
     /// as well?)". Unposting was admin-only for three weeks because the only
-    /// reason to want it was reposting as REX. Changing your mind about a
+    /// reason to want it was reposting as Rex. Changing your mind about a
     /// trip you have published is a better one, and the mechanism is the same
     /// one column either way.
     ///
@@ -1966,10 +1985,10 @@ struct EditableIfMine: ViewModifier {
                             Label("Edit", systemImage: "pencil")
                         }
                         // Oct 14 — written under your own name when it was
-                        // meant to come from REX. Deleting and retyping loses
+                        // meant to come from Rex. Deleting and retyping loses
                         // the note, the photos, the rating and the tags; this
                         // keeps all of it and puts the row back where an
-                        // unposted one lives, ready to go out as REX.
+                        // unposted one lives, ready to go out as Rex.
                         if canUnpost {
                             // Nov 6 — asks first. Everything else in this
                             // menu is either reversible in a tap or opens a
@@ -2055,7 +2074,7 @@ struct EditableIfMine: ViewModifier {
     /// one round trip per session rather than one per card.
     private func checkRexPost() async {
         // Your own post: the only question is whether you could repost it as
-        // REX, which is what makes unposting worth offering.
+        // Rex, which is what makes unposting worth offering.
         if isMine {
             if !isAdminUser, await RexAPI.shared.isAdmin() { isAdminUser = true }
             return
