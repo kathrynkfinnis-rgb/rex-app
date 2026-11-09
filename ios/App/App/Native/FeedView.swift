@@ -45,7 +45,13 @@ struct FeedView: View {
     /// would mean picking a cuisine silently let go of the shape above it.
     @State private var cuisineFilter: String?
     @State private var blastsOnly = false
-    private enum SortMode { case recent, mostLiked }
+    /// Nov 9 — "I'd also like to be able to filter the feed by 'most rexed'."
+    ///
+    /// Not the same as most liked, which counts hearts on one post. This
+    /// counts how many people Rex'd the *thing* — the number already on every
+    /// card next to the dino — so the restaurant four friends swear by rises
+    /// above the one that got four hearts from the same crowd.
+    private enum SortMode { case recent, mostLiked, mostRexed }
     @State private var sortMode: SortMode = .recent
     @State private var likeCounts: [String: Int] = [:]
     @State private var query = ""
@@ -446,13 +452,28 @@ struct FeedView: View {
     /// "Most liked" needs an actual re-sort here.
     private var sorted: [FeedRecommendation] {
         let base: [FeedRecommendation]
-        if sortMode == .mostLiked {
+        switch sortMode {
+        case .mostLiked:
             base = matching.sorted { a, b in
                 let la = likeCounts[a.id] ?? 0, lb = likeCounts[b.id] ?? 0
                 if la != lb { return la > lb }
                 return a.created_at > b.created_at // tie-break: newest first
             }
-        } else {
+        case .mostRexed:
+            // Keyed on item_id, not id: the count belongs to the thing, so
+            // two friends' Rexes of the same restaurant carry the same number
+            // and sit together rather than one of them floating off.
+            //
+            // rexCounts is already loaded for the dino on every card — fetched
+            // for the whole page in loadFeed and topped up as more arrives —
+            // so this costs no request of its own. A count that has not landed
+            // yet reads as 0 and sorts low until it does, same as Most liked.
+            base = matching.sorted { a, b in
+                let ra = rexCounts[a.item_id] ?? 0, rb = rexCounts[b.item_id] ?? 0
+                if ra != rb { return ra > rb }
+                return a.created_at > b.created_at
+            }
+        case .recent:
             base = matching
         }
         // Same reasoning as visible()'s own guard: once a filter/search has
@@ -1056,6 +1077,14 @@ struct FeedView: View {
                         Task { await loadLikeCountsIfNeeded() }
                     } label: {
                         Label("Most liked", systemImage: sortMode == .mostLiked ? "checkmark" : "")
+                    }
+                    // No counterpart to loadLikeCountsIfNeeded: rex counts
+                    // ride along with the feed itself for the dino on every
+                    // card, so they are already here.
+                    Button {
+                        sortMode = .mostRexed
+                    } label: {
+                        Label("Most Rex'd", systemImage: sortMode == .mostRexed ? "checkmark" : "")
                     }
                 } label: {
                     Image(systemName: "arrow.up.arrow.down")
