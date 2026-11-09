@@ -3,7 +3,7 @@ import AppTrackingTransparency
 // Oct 16, security review — `import AdSupport` was here with no
 // ASIdentifierManager use anywhere in the app. Apple's scanner reads the
 // import and expects an IDFA declaration, which would have contradicted the
-// privacy label's "no tracking". REX never reads the advertising identifier:
+// privacy label's "no tracking". Rex never reads the advertising identifier:
 // the ATT prompt exists because of what a Skimlinks redirect does, not
 // because we want an ID. See the note on isAffiliateProgrammeActive.
 
@@ -16,7 +16,7 @@ import AppTrackingTransparency
 /// label is the one telling the truth. Put the key back in the same breath
 /// as flipping isAffiliateProgrammeActive, or the submission bounces.
 ///
-/// When someone taps through to a shop from REX, we can earn a commission on
+/// When someone taps through to a shop from Rex, we can earn a commission on
 /// what they buy. Skimlinks does the work: hand it any outbound link and it
 /// turns the ones from merchants it covers into affiliate links, leaving
 /// everything else alone.
@@ -25,7 +25,7 @@ import AppTrackingTransparency
 ///
 /// 1. **Apple requires permission first.** A Skimlinks redirect is tracking
 ///    under App Tracking Transparency — it lets a third party follow someone
-///    from REX to a purchase. So the system prompt has to be shown and
+///    from Rex to a purchase. So the system prompt has to be shown and
 ///    allowed *before* the first link is ever rewritten. Shipping without it
 ///    is one of the most reliable ways to be rejected, and Apple tests for it.
 ///
@@ -34,7 +34,7 @@ import AppTrackingTransparency
 ///    paid. Nothing is withheld, nothing nags, and nothing is degraded.
 ///
 /// We never read the advertising identifier ourselves. Permission is asked
-/// because of what the redirect does, not because REX wants an ID.
+/// because of what the redirect does, not because Rex wants an ID.
 enum RexOutboundLink {
     /// Sept 22 — Skimlinks turned find-rex.com down: no original content and
     /// no traffic, which is exactly what their published criteria say they
@@ -45,7 +45,7 @@ enum RexOutboundLink {
     /// Everything below is kept, working, behind this one flag. Flip it back
     /// on the day an application is accepted — and update the privacy policy
     /// and the App Store privacy label in the same breath, because both
-    /// currently say, truthfully, that REX does no tracking at all.
+    /// currently say, truthfully, that Rex does no tracking at all.
     static let isAffiliateProgrammeActive = false
 
     /// From the Skimlinks dashboard: publisher 309502, site X1797857.
@@ -59,7 +59,7 @@ enum RexOutboundLink {
     /// keeping separate rather than folding into the flag above.
     ///
     /// Skimlinks bounces the person through go.skimresources.com, which lets
-    /// a third party watch them travel from REX to a purchase. That is
+    /// a third party watch them travel from Rex to a purchase. That is
     /// tracking under App Tracking Transparency, which is why everything
     /// above waits on a system prompt. An Associates tag is a query
     /// parameter on a link to Amazon that the person was already opening:
@@ -131,7 +131,7 @@ enum RexOutboundLink {
     ///     link to Amazon the person was already opening — no redirect, no
     ///     third party, no identifier, nothing about them sent anywhere. So
     ///     no NSUserTrackingUsageDescription and no ATT prompt, and the label
-    ///     still truthfully says REX does no tracking.
+    ///     still truthfully says Rex does no tracking.
     ///   * The disclosure Amazon's Operating Agreement requires is already
     ///     where the links are: AmazonDisclosure at the foot of every item
     ///     page that carries one, plus AffiliateLinksSection in Privacy and
@@ -294,7 +294,7 @@ enum RexOutboundLink {
     /// Adds the Associates tag, or returns nil if this isn't an Amazon link
     /// we have a tag for. An existing `tag` is left alone: it is somebody
     /// else's, and overwriting another creator's attribution to take their
-    /// commission is not a thing REX should do quietly.
+    /// commission is not a thing Rex should do quietly.
     static func amazonTagged(_ url: URL) -> URL? {
         guard let host = url.host, let tag = amazonTag(for: host),
               var components = URLComponents(url: url, resolvingAgainstBaseURL: false)
@@ -353,7 +353,7 @@ enum RexOutboundLink {
     }
 }
 
-/// A link to somewhere outside REX, opened through the affiliate layer.
+/// A link to somewhere outside Rex, opened through the affiliate layer.
 ///
 /// Drop-in for SwiftUI's `Link`: same call shape, but it asks for tracking
 /// permission the first time and decorates the URL when allowed.
@@ -394,7 +394,7 @@ struct RexOutboundLinkButton<Label: View>: View {
 struct AmazonDisclosure: View {
     var body: some View {
         if RexOutboundLink.isAmazonAssociateActive {
-            Text("Some links here go to Amazon. REX may earn a commission on what you buy, at no cost to you \u{2014} it never changes what your friends recommend or the order you see it in.")
+            Text("Some links here go to Amazon. Rex may earn a commission on what you buy, at no cost to you \u{2014} it never changes what your friends recommend or the order you see it in.")
                 .font(RexFont.text(11.5))
                 .foregroundStyle(RexColor.mutedForeground)
                 .fixedSize(horizontal: false, vertical: true)
@@ -418,15 +418,15 @@ struct AffiliateLinksSection: View {
         // was asked and nothing is being tracked — so the ATT wording below
         // would be describing a prompt that never appears.
         if !RexOutboundLink.isAffiliateProgrammeActive {
-            return "Some shop links earn REX a small commission. It never costs you anything, it never changes what your friends recommend or the order you see it in, and nothing about you is shared with anyone."
+            return "Some shop links earn Rex a small commission. It never costs you anything, it never changes what your friends recommend or the order you see it in, and nothing about you is shared with anyone."
         }
         switch status {
         case .authorized:
-            return "Shop links you tap may earn REX a small commission. It never costs you anything, and it never changes what your friends recommend or the order you see it in."
+            return "Shop links you tap may earn Rex a small commission. It never costs you anything, and it never changes what your friends recommend or the order you see it in."
         case .denied, .restricted:
-            return "Shop links open directly, and REX earns nothing from them. Nothing about the app is any different."
+            return "Shop links open directly, and Rex earns nothing from them. Nothing about the app is any different."
         default:
-            return "The first time you tap through to a shop, we'll ask. Saying no changes nothing about how REX works."
+            return "The first time you tap through to a shop, we'll ask. Saying no changes nothing about how Rex works."
         }
     }
 
@@ -449,7 +449,7 @@ struct AffiliateLinksSection: View {
             // The wording Amazon require, near enough verbatim — this is one
             // of the few places where the phrasing is not ours to improve.
             if RexOutboundLink.isAmazonAssociateActive {
-                Text("As an Amazon Associate, REX earns from qualifying purchases.")
+                Text("As an Amazon Associate, Rex earns from qualifying purchases.")
                     .font(RexFont.text(12))
                     .foregroundStyle(RexColor.mutedForeground)
                     .fixedSize(horizontal: false, vertical: true)

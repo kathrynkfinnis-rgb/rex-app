@@ -1,7 +1,7 @@
 # find-rex.com
 
 The public website: a landing page, support, the legal pages, and the share
-pages behind every link the app produces. Built in September 2026 to take REX
+pages behind every link the app produces. Built in September 2026 to take Rex
 off Lovable — plain HTML and CSS, no framework and no build step.
 
 ## What's here

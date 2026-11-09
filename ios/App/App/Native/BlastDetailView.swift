@@ -465,7 +465,7 @@ struct BlastDetailView: View {
     private var composer: some View {
         VStack(spacing: RexSpacing.sm) {
             // Oct 3 — "when you reply to a blast, you should be able to tag
-            // REX to the response." A reply that names somewhere is useful; a
+            // Rex to the response." A reply that names somewhere is useful; a
             // reply that attaches the actual Rex is what the blast was asking
             // for, and it carries the rating, the note and the way through to
             // the place.

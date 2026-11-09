@@ -129,7 +129,7 @@ fun CollectionsList(onOpenCollection: (String, String) -> Unit) {
                         // Honest about where the feature lives: this build has
                         // no way to make a collection, because RexApi has no
                         // write for it.
-                        "Collections you make in REX on iPhone will appear here."
+                        "Collections you make in Rex on iPhone will appear here."
                     } else {
                         "Sign in and the collections you've made will be here."
                     },

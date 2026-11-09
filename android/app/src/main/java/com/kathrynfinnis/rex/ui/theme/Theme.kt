@@ -61,7 +61,7 @@ private val RexScheme = lightColorScheme(
 /**
  * The iOS app pins itself to light (RootView's preferredColorScheme, and
  * SceneDelegate's overrideUserInterfaceStyle behind it). Matching that here
- * rather than inheriting the system is deliberate: a dark REX has never been
+ * rather than inheriting the system is deliberate: a dark Rex has never been
  * designed, and half-doing it would look worse than not having it.
  */
 val RexTypography = Typography(

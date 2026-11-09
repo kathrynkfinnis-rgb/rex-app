@@ -11,7 +11,7 @@ import SwiftUI
 ///
 /// The prompts that matter name a person — "what are Phoebe's favourite
 /// places" — and they're built from your real friends. Every other app's
-/// version of this screen has to ask about taste in the abstract; REX can ask
+/// version of this screen has to ask about taste in the abstract; Rex can ask
 /// about people, because it knows who your friends are and what they've Rex'd.
 ///
 /// The one rule the design has to hold: a friend's Rex and a web find never
@@ -185,7 +185,7 @@ struct TalkToRexView: View {
     }
 
     /// Built from real friends where there are any. The person-shaped prompts
-    /// go first: they're the ones only REX can offer, and they're the ones
+    /// go first: they're the ones only Rex can offer, and they're the ones
     /// that best explain what this screen is for.
     private var prompts: [Prompt] {
         var list: [Prompt] = []
@@ -399,7 +399,7 @@ struct AskRexAnswerBlock: View {
 
     /// Deliberately unlike a feed card in every way that carries meaning: no
     /// rail, no avatar, no rating, a dashed edge and a tint that appears
-    /// nowhere else in REX. Nobody you know has vouched for this.
+    /// nowhere else in Rex. Nobody you know has vouched for this.
     private func webCardView(_ result: AskRexWebResult) -> some View {
         VStack(alignment: .leading, spacing: RexSpacing.sm) {
             HStack(spacing: 6) {

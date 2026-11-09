@@ -412,7 +412,7 @@ struct AppleMapView: UIViewRepresentable {
             // collision changes, so the map looks the same and simply gives up
             // hiding things earlier. See pinCollisionSize for where it sits.
             view?.frame.size = CGSize(width: Self.pinCollisionSize, height: Self.pinCollisionSize)
-            // The callout is REX's own sheet, not MapKit's bubble — selecting
+            // The callout is Rex's own sheet, not MapKit's bubble — selecting
             // is what opens it, so the built-in callout would be a second,
             // worse version of the same thing.
             view?.canShowCallout = false
@@ -615,7 +615,7 @@ final class RexPlaceAnnotationView: MKMarkerAnnotationView {
     }
 }
 
-/// What a group of colliding pins looks like: REX green, the count, and the
+/// What a group of colliding pins looks like: Rex green, the count, and the
 /// same shape language as a single pin so the map reads as one system.
 ///
 /// Oct 2 — introduced because MapKit hides annotations that collide, which is

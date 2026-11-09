@@ -3,7 +3,7 @@
 
     <uses-permission android:name="android.permission.INTERNET" />
     <!-- The map centres on where you are, the same as iOS. Coarse is enough:
-         REX never needs to know which side of the street you are on. -->
+         Rex never needs to know which side of the street you are on. -->
     <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
 

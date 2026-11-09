@@ -14,7 +14,7 @@ struct PersonRoute: Hashable {
 /// whole list of what they have been in, cross-referenced against our own
 /// items so anything your friends have Rex'd says so. A credit nobody here
 /// has touched is still worth showing — it is how you find the next thing —
-/// but the count underneath is what makes this REX's screen rather than a
+/// but the count underneath is what makes this Rex's screen rather than a
 /// catalogue's.
 struct PersonCreditsView: View {
     let route: PersonRoute
@@ -106,7 +106,7 @@ struct PersonCreditsView: View {
                     .foregroundStyle(RexColor.mutedForeground)
                     .lineLimit(1)
             }
-            // The whole point of this screen being in REX rather than a
+            // The whole point of this screen being in Rex rather than a
             // catalogue: somebody you know has seen it.
             if count > 0 {
                 Text("\(count) Rex")

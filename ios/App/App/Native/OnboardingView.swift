@@ -3,13 +3,13 @@ import SwiftUI
 /// #102 (Phoebe + Gemma) — after signup, ask a couple of quick questions
 /// instead of dropping straight into an empty feed, and explain what the
 /// app actually is while general awareness is still low. Three steps: what
-/// REX is, what you're into, then find some friends (REX is only as good as
+/// Rex is, what you're into, then find some friends (Rex is only as good as
 /// the people in it, and a feed with nobody followed is the worst possible
 /// first impression).
 ///
 /// The explainer used to live behind a logo tap in the feed's toolbar, but
 /// that slot went to the new Explore tab instead — this is its new, better
-/// home: the moment someone's least sure what REX is, is the moment they've
+/// home: the moment someone's least sure what Rex is, is the moment they've
 /// just signed up.
 ///
 /// Shown once per account — RootView gates this on a per-user-id UserDefaults
@@ -63,7 +63,7 @@ struct OnboardingView: View {
                 .resizable()
                 .scaledToFit()
                 .frame(height: 28)
-                .accessibilityLabel("REX")
+                .accessibilityLabel("Rex")
                 .padding(.top, RexSpacing.lg)
 
             Text("Recommendations from people you actually trust.")
@@ -182,7 +182,7 @@ struct OnboardingView: View {
                 // work yet: searching needs a username, and nobody has
                 // anybody's on their first morning. Checking contacts does
                 // work, so that's what it points at.
-                Text("REX is only as good as the people in it. Check your contacts to see who's already here \u{2014} or send a friend the link.")
+                Text("Rex is only as good as the people in it. Check your contacts to see who's already here \u{2014} or send a friend the link.")
                     .font(RexFont.text(15))
                     .foregroundStyle(RexColor.mutedForeground)
                     .fixedSize(horizontal: false, vertical: true)

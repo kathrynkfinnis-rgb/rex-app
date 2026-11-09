@@ -590,7 +590,7 @@ final class RexAPI {
         return row.accepted_terms_version != RexLegal.version
     }
 
-    /// Everything REX holds about you, as one JSON document — the "download
+    /// Everything Rex holds about you, as one JSON document — the "download
     /// my data" right. Read with your own session, so it's exactly what the
     /// database's access rules say is yours. A section that fails is
     /// recorded as such in the file rather than failing the whole export.
@@ -615,7 +615,7 @@ final class RexAPI {
         let mine = "eq.\(userId)"
 
         var export: [String: Any] = [
-            "about": "Your REX data, exported \(ISO8601DateFormatter().string(from: Date())). Photos are linked by URL rather than included.",
+            "about": "Your Rex data, exported \(ISO8601DateFormatter().string(from: Date())). Photos are linked by URL rather than included.",
             "account": await get("/auth/v1/user", [:]),
         ]
         export["profile"] = await get("/rest/v1/profiles", ["id": mine, "select": "*"])
@@ -926,7 +926,7 @@ final class RexAPI {
             ]
             // Nov 1 — "remove rex from feed."
             //
-            // The feed is people you know. REX is not one of them, and a
+            // The feed is people you know. Rex is not one of them, and a
             // curated list sitting between two friends' recommendations
             // borrows the weight of being in that company without having
             // earned it — which is the opposite of what the app is for.
@@ -938,7 +938,7 @@ final class RexAPI {
             //
             // Filtered here rather than after the rows arrive, so a page of
             // thirty is thirty friends' posts. Filtering client-side would
-            // have let REX eat the page and left the feed looking empty.
+            // have let Rex eat the page and left the feed looking empty.
             if let official = await officialAccountId() {
                 queryItems.append(URLQueryItem(name: "user_id", value: "neq.\(official)"))
             }
@@ -1243,7 +1243,7 @@ final class RexAPI {
         // Oct 16 — and the chain key, for the same reason and from the same
         // field. This used to be set only at creation, from the search hit,
         // which is why the search had to ask Google for websiteUri on every
-        // query — an Enterprise-tier field that moved every search REX makes
+        // query — an Enterprise-tier field that moved every search Rex makes
         // onto a tier with a fifth of the free allowance. Details already
         // fetches the website, once per place per ninety days, so taking the
         // chain key from here instead costs one tier on a call we were
@@ -1470,12 +1470,12 @@ final class RexAPI {
 
     /// Oct 16 — the catalogue we already have, asked before Google is.
     ///
-    /// REX knows about three thousand places, and until now typing the name
+    /// Rex knows about three thousand places, and until now typing the name
     /// of one still went to Google: the local lookup beside it was only ever
     /// read for the "Already Rex'd" badge, never used as an answer. That is
     /// backwards for an app whose whole claim is that your friends know
     /// better than a listing, and it is why the Google bill rises in a
-    /// straight line with the number of people using REX.
+    /// straight line with the number of people using Rex.
     ///
     /// This is everyone's items, not just yours — a place Phoebe added is a
     /// perfectly good answer when you search for it.
@@ -1632,7 +1632,7 @@ final class RexAPI {
     /// save it to drafts so they can repost as Rex."
     ///
     /// The case is an admin writing something under their own name that was
-    /// meant to come from REX. Deleting and retyping it loses the note, the
+    /// meant to come from Rex. Deleting and retyping it loses the note, the
     /// photos, the rating and the tags; this keeps all of it and puts the row
     /// back where an unposted one lives.
     ///
@@ -1963,12 +1963,12 @@ final class RexAPI {
     /// explicitly instead (trip_id/list_id both null) and PATCHes it if
     /// found, so re-rating something you've already Rex'd on its own still
     /// updates in place rather than erroring or duplicating.
-    /// Oct 5 — branches of these chains that are in REX but that nobody has
+    /// Oct 5 — branches of these chains that are in Rex but that nobody has
     /// Rex'd, for the map's hollow pins.
     ///
     /// One query against items, never Google: the map loads often and asking
     /// Google per chain on every load would be both slow and billed. A branch
-    /// nobody has put into REX at all simply isn't shown here — the place page
+    /// nobody has put into Rex at all simply isn't shown here — the place page
     /// is where those are offered, one chain at a time.
     func unvisitedChainBranches(chainKeys: [String], excludingItemIds: Set<String>) async -> [MapPlace] {
         let keys = Array(Set(chainKeys.filter { !$0.isEmpty })).prefix(40)
@@ -2008,10 +2008,10 @@ final class RexAPI {
             }
     }
 
-    /// Oct 5 — the other branches of this place already in REX.
+    /// Oct 5 — the other branches of this place already in Rex.
     ///
     /// Only reads what's here; it never asks Google. A branch nobody has put
-    /// in REX yet is found separately (RexSearch.chainBranches), because that
+    /// in Rex yet is found separately (RexSearch.chainBranches), because that
     /// one does cost a call.
     func chainSiblings(chainKey: String, excludingItemId: String) async -> [RexItem] {
         guard let token = try? await validToken() else { return [] }
@@ -2595,7 +2595,7 @@ final class RexAPI {
         return r * c
     }
 
-    /// Sept 18 — the REX account: is this person one of the three admins,
+    /// Sept 18 — the Rex account: is this person one of the three admins,
     /// and what's the official account's id? Both are asked once per launch
     /// and cached — the answer doesn't change while the app is open, and the
     /// add screen would otherwise ask on every appearance.
@@ -2676,11 +2676,11 @@ final class RexAPI {
         }
     }
 
-    /// The REX account's id, or nil if it hasn't been set up on this project.
+    /// The Rex account's id, or nil if it hasn't been set up on this project.
     /// Oct 18 — "is there a way that you can suggest stuff and we can choose
     /// to post or not?"
     ///
-    /// There already was: a REX post with no published_at is a suggestion,
+    /// There already was: a Rex post with no published_at is a suggestion,
     /// and has been since 18 September. It was simply drained by a timer
     /// every fifteen minutes with nobody looking first. This is what the
     /// looking reads.
@@ -2828,7 +2828,7 @@ final class RexAPI {
         request.httpMethod = "POST"
         request.setValue(anonKey, forHTTPHeaderField: "apikey")
         // Oct 1 — the same missing backslash as isAdmin() had, and the reason
-        // build 58 didn't fix "Post as REX": the toggle needs BOTH an admin
+        // build 58 didn't fix "Post as Rex": the toggle needs BOTH an admin
         // and an official account, this call 401'd and returned nil, so the
         // section stayed hidden even once the admin check was right. Two
         // separate one-character faults guarding the same feature.
@@ -2859,11 +2859,11 @@ final class RexAPI {
         anonymous: Bool = false,
         returningId: Bool = false,
         asDraft: Bool = false,
-        /// Post as someone else — only ever the REX account, and only ever
+        /// Post as someone else — only ever the Rex account, and only ever
         /// by an admin. The database enforces both (see migration
         /// 20260918100000); this just says who to write down as the author.
         postAs: String? = nil,
-        /// When a queued REX post should go out. A row with this set and no
+        /// When a queued Rex post should go out. A row with this set and no
         /// published_at is picked up by publish_due_official_posts().
         scheduledAt: Date? = nil,
         /// Oct 13 — "the 'others in the chain' shouldn't appear on the feed
@@ -3014,7 +3014,7 @@ final class RexAPI {
         components.queryItems = [
             URLQueryItem(name: "select", value: select),
             URLQueryItem(name: "user_id", value: "eq.\(userId)"),
-            // "I just added this REX to a trip and now it has duplicated in
+            // "I just added this Rex to a trip and now it has duplicated in
             // my feed" — reported on the profile page specifically. Adding
             // an existing standalone Rex to a trip (addPlaceToTrip) creates
             // a brand-new recommendation row for the same item — trip_id
@@ -5233,7 +5233,7 @@ final class RexAPI {
 
     func fetchRequestComments(requestId: String) async throws -> [RequestComment] {
         let token = try await validToken()
-        // Oct 3 — "when you reply to a blast, you should be able to tag REX to
+        // Oct 3 — "when you reply to a blast, you should be able to tag Rex to
         // the response." The column has been on the table since the start and
         // was never read or written; this is both halves.
         let select = "id,request_id,user_id,body,created_at,suggested_item_id," +
@@ -5766,7 +5766,7 @@ final class RexAPI {
         return (try? JSONDecoder().decode([TrendingItem].self, from: data)) ?? []
     }
 
-    /// Explore tab's REX-curated shelves ("REX Team" picks and anything
+    /// Explore tab's Rex-curated shelves ("Rex Team" picks and anything
     /// credited to an outside source, both written by the three named
     /// curators — see is_rex_curator() in the migration).
     // MARK: - Curating editorial shelves
@@ -5789,7 +5789,7 @@ final class RexAPI {
         request.setValue("return=representation", forHTTPHeaderField: "Prefer")
         var body: [String: Any] = [
             "title": title,
-            "source_label": sourceLabel.isEmpty ? "REX Team" : sourceLabel,
+            "source_label": sourceLabel.isEmpty ? "Rex Team" : sourceLabel,
             "sort_order": sortOrder,
         ]
         body["category"] = category.map { $0 as Any } ?? (NSNull() as Any)
@@ -5820,7 +5820,7 @@ final class RexAPI {
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
         var body: [String: Any] = [
             "title": title,
-            "source_label": sourceLabel.isEmpty ? "REX Team" : sourceLabel,
+            "source_label": sourceLabel.isEmpty ? "Rex Team" : sourceLabel,
             "sort_order": sortOrder,
         ]
         body["category"] = category.map { $0 as Any } ?? (NSNull() as Any)
@@ -5887,7 +5887,7 @@ final class RexAPI {
         }
     }
 
-    /// Search REX's own catalogue, so building a shelf is picking things that
+    /// Search Rex's own catalogue, so building a shelf is picking things that
     /// already exist rather than retyping their names and hunting for a photo.
     func searchCatalogue(_ query: String, limit: Int = 20) async throws -> [RexItem] {
         let trimmed = query.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -6829,7 +6829,7 @@ final class RexAPI {
     ///
     /// Because a shared Rex is fetched like any other, and RLS shows you your
     /// own and your friends'. Somebody sends a link to a friend-of-a-friend,
-    /// or to a person not on REX yet who then signs up — the row is invisible,
+    /// or to a person not on Rex yet who then signs up — the row is invisible,
     /// the deep link gives up, and Notifications is where it lands.
     ///
     /// get_shared_recommendation has existed since July for exactly this: a
@@ -7331,7 +7331,7 @@ final class RexAPI {
     /// Three things keep it honest now:
     ///
     ///   * a budget — at most `perLaunch` places are even considered, so the
-    ///     work is bounded by a constant rather than by how much REX knows;
+    ///     work is bounded by a constant rather than by how much Rex knows;
     ///   * serial, not concurrent — one at a time, so a mistake costs one
     ///     call and not fifteen hundred before anyone can react;
     ///   * a dedup set that survives relaunching, so a place we have already

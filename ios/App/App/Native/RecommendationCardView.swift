@@ -489,7 +489,7 @@ struct RecommendationCardView: View {
     }
 
     /// Social proof and your own state with this item, both of which are the
-    /// point of REX and were previously buried.
+    /// point of Rex and were previously buried.
     /// Oct 7 — "the 'want to try' and 'on your list' is still duplicative.
     /// Only need one."
     ///

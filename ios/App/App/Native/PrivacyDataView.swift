@@ -1,7 +1,7 @@
 import SwiftUI
 
 /// Sept 15 — Profile → "Your data & privacy": the policies, a copy of
-/// everything REX holds about you, and deleting your account. The last two
+/// everything Rex holds about you, and deleting your account. The last two
 /// are GDPR rights (access/portability and erasure), and Apple requires the
 /// deletion one for any app you can create an account in.
 struct PrivacyRoute: Hashable {}
@@ -16,7 +16,7 @@ struct SettingsView: View {
 
     @Environment(\.dismiss) private var dismiss
     @State private var confirmingLogOut = false
-    /// Oct 18 — the way into the REX admin screen. Settings rather than a
+    /// Oct 18 — the way into the Rex admin screen. Settings rather than a
     /// fourth toolbar icon on the profile: three is already a row, and this
     /// is something two people ever tap.
     @State private var isAdmin = false
@@ -41,9 +41,9 @@ struct SettingsView: View {
                 // feedback into two separate links". Two jobs, done at
                 // different times: an empty queue was hiding the feedback
                 // underneath it behind a scroll.
-                Section("REX") {
+                Section("Rex") {
                     NavigationLink(value: RexAdminRoute()) {
-                        row("tray.full", "Waiting to post", "Review what REX wants to say before it says it")
+                        row("tray.full", "Waiting to post", "Review what Rex wants to say before it says it")
                     }
                     NavigationLink(value: RexFeedbackRoute()) {
                         row("exclamationmark.bubble", "Feedback", "What people have sent from the ! button")

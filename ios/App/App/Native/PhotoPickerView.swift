@@ -43,12 +43,12 @@ struct PhotoPickerView: View {
     /// The tile has drawn a camera glyph since the day it was written and has
     /// always opened the library, which is the whole of the complaint: it
     /// promised a camera and delivered a picker, so taking a photo of your
-    /// dinner meant leaving REX, taking it, coming back and finding it in the
+    /// dinner meant leaving Rex, taking it, coming back and finding it in the
     /// grid. RexCameraPicker has existed since 13 October for exactly this
     /// and was wired into the recipe scanner only.
     ///
     /// Here rather than in AddRexView because this one view is every photo
-    /// slot REX has — a Rex, a trip, a trip's stops, a list's cover — so the
+    /// slot Rex has — a Rex, a trip, a trip's stops, a list's cover — so the
     /// camera arrives in all of them at once, and none of them drift.
     @State private var choosingSource = false
     @State private var showCamera = false

@@ -53,7 +53,7 @@ struct CuratorShelvesView: View {
                         Text("No shelves yet")
                             .font(RexFont.display(18, weight: .semibold))
                             .foregroundStyle(RexColor.foreground)
-                        Text("A shelf is a handful of picks under a heading — “A long weekend in Lisbon”, “Best Sunday roasts”. Build one from places already in REX.")
+                        Text("A shelf is a handful of picks under a heading — “A long weekend in Lisbon”, “Best Sunday roasts”. Build one from places already in Rex.")
                             .font(RexFont.text(14))
                             .foregroundStyle(RexColor.mutedForeground)
                             .fixedSize(horizontal: false, vertical: true)
@@ -159,7 +159,7 @@ private struct EditShelfView: View {
     @Environment(\.dismiss) private var dismiss
 
     @State private var title = ""
-    @State private var sourceLabel = "REX Team"
+    @State private var sourceLabel = "Rex Team"
     @State private var category: RexCategory?
     @State private var items: [EditorialCollectionItem] = []
     @State private var shelfId: String?
@@ -176,7 +176,7 @@ private struct EditShelfView: View {
             ScrollView {
                 VStack(alignment: .leading, spacing: RexSpacing.lg) {
                     field("Heading", text: $title, placeholder: "A long weekend in Lisbon")
-                    field("Credit", text: $sourceLabel, placeholder: "REX Team")
+                    field("Credit", text: $sourceLabel, placeholder: "Rex Team")
 
                     VStack(alignment: .leading, spacing: RexSpacing.sm) {
                         Text("Category")
@@ -451,7 +451,7 @@ private struct EditShelfView: View {
     }
 }
 
-/// Pick something already in REX. Choosing from the catalogue rather than
+/// Pick something already in Rex. Choosing from the catalogue rather than
 /// typing a name means the card gets its real photo and subtitle for free,
 /// and points at an item people can open.
 private struct AddShelfItemView: View {
@@ -467,7 +467,7 @@ private struct AddShelfItemView: View {
     @State private var searchTask: Task<Void, Never>?
     @State private var errorMessage: String?
     /// Oct 3 — "ensure that you can upload stuff that hasn't been Rex'd
-    /// before." A shelf could only hold things already in REX's own
+    /// before." A shelf could only hold things already in Rex's own
     /// catalogue, which means a Rexpert can only recommend what somebody has
     /// already recommended — the exact opposite of what a curated shelf is
     /// for. These are the external catalogue's answers, which get created as
@@ -527,7 +527,7 @@ private struct AddShelfItemView: View {
                     }
 
                     if !results.isEmpty {
-                        Text("Already on REX")
+                        Text("Already on Rex")
                             .font(RexFont.text(11, weight: .semibold))
                             .tracking(0.3)
                             .foregroundStyle(RexColor.mutedForeground)
@@ -563,7 +563,7 @@ private struct AddShelfItemView: View {
                     }
 
                     if !webResults.isEmpty {
-                        Text("Not on REX yet")
+                        Text("Not on Rex yet")
                             .font(RexFont.text(11, weight: .semibold))
                             .tracking(0.3)
                             .foregroundStyle(RexColor.mutedForeground)
@@ -627,14 +627,14 @@ private struct AddShelfItemView: View {
             try? await Task.sleep(nanoseconds: 400_000_000)
             guard !Task.isCancelled else { return }
             isSearching = true
-            // REX's own catalogue and the outside one together, so a shelf
+            // Rex's own catalogue and the outside one together, so a shelf
             // isn't limited to what somebody has already Rex'd.
             async let mine = (try? await RexAPI.shared.searchCatalogue(term)) ?? []
             async let web = RexSearch.search(category: category, query: term)
             let (found, hits) = await (mine, web)
             guard !Task.isCancelled else { return }
             results = found
-            // Anything already in REX is offered once, from the first list.
+            // Anything already in Rex is offered once, from the first list.
             let known = Set(found.map { $0.title.lowercased() })
             webResults = hits.filter { !known.contains($0.title.lowercased()) }.prefix(8).map { $0 }
             isSearching = false

@@ -186,7 +186,7 @@ struct NotificationPreferencesView: View {
             let granted = await RexPushNotifications.requestPermission()
             isRequestingPermission = false
             guard granted else {
-                errorMessage = "Push needs to be allowed in iOS Settings > REX > Notifications first."
+                errorMessage = "Push needs to be allowed in iOS Settings > Rex > Notifications first."
                 return
             }
         }

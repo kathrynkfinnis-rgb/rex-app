@@ -44,23 +44,23 @@ fun readableFailure(e: Throwable): String = when {
     // No network, or it died mid-request. The one failure the person can
     // actually do something about.
     e is HttpRequestException || e is IOException ->
-        "Couldn't reach REX. Check your connection and try again."
+        "Couldn't reach Rex. Check your connection and try again."
 
     e is RestException -> when (e.statusCode) {
         401, 403 -> "Your session has run out. Sign in again."
 
-        // 404 from PostgREST means the table or column REX asked for isn't
+        // 404 from PostgREST means the table or column Rex asked for isn't
         // there — a mistake in the app, not something the person can fix by
         // retrying. Saying so is more honest than "check your connection",
         // and it is what sent us looking for hitlist_lists.
-        404 -> "REX asked for something that isn't there. That's a bug at our " +
+        404 -> "Rex asked for something that isn't there. That's a bug at our " +
             "end — it won't help to try again."
 
-        in 500..599 -> "REX's database is having a moment. Try again shortly."
+        in 500..599 -> "Rex's database is having a moment. Try again shortly."
 
-        else -> "REX couldn't load that. Try again in a moment."
+        else -> "Rex couldn't load that. Try again in a moment."
     }
 
-    else -> "Something went wrong between here and REX. " +
+    else -> "Something went wrong between here and Rex. " +
         "Check your connection and try again."
 }

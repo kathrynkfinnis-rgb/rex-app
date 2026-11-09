@@ -2,7 +2,7 @@ import SwiftUI
 
 /// Deliveroo-homepage-style discovery surface: category pills up top,
 /// horizontally-swipeable shelves stacked underneath. Three sources mixed
-/// together — friends' collections you haven't followed yet, REX-team
+/// together — friends' collections you haven't followed yet, Rex-team
 /// curated picks (and anything credited to an outside source, both typed
 /// in by the same three people), and what's trending across the app this
 /// week. Reached from the Explore tab, not the logo — see FeedView/
@@ -374,7 +374,7 @@ struct ExploreView: View {
         }
     }
 
-    /// Curated by the REX team, plus what the whole app is Rexing this week.
+    /// Curated by the Rex team, plus what the whole app is Rexing this week.
     /// Only the three named curators see this, and only on the Rexperts tab —
     /// it's the page the shelves appear on, so it's where editing them
     /// belongs. is_rex_curator() is the real gate; this is just the door.
@@ -436,7 +436,7 @@ struct ExploreView: View {
             Text("Nothing from the Rexperts yet")
                 .font(RexFont.display(20, weight: .semibold))
                 .foregroundStyle(RexColor.foreground)
-            Text("This is where REX's own picks will live. In the meantime, Rex from friends is the good stuff.")
+            Text("This is where Rex's own picks will live. In the meantime, Rex from friends is the good stuff.")
                 .font(RexFont.text(14))
                 .foregroundStyle(RexColor.mutedForeground)
                 .multilineTextAlignment(.center)
@@ -571,7 +571,7 @@ struct ExploreView: View {
     /// Oct 15 — "can we please have a hot section on the Explore?"
     ///
     /// Trending already existed, but split one shelf per category and filed
-    /// under the Rexperts tab, which is where REX's own picks live — so what
+    /// under the Rexperts tab, which is where Rex's own picks live — so what
     /// everybody is actually Rexing this week was three taps from the top and
     /// read as editorial. Hot is a different claim from a curated shelf: it
     /// is nobody's opinion, just what is moving.
@@ -698,7 +698,7 @@ struct ExploreView: View {
                     // shape of thing as a trip: a page whose point is what is
                     // inside it. On 3 October the trip got its own route here
                     // and the list did not, so a curated list opened its bare
-                    // item page — the title, the REX account, a review, and
+                    // item page — the title, the Rex account, a review, and
                     // none of the podcasts it was recommending.
                     if item.isTrip {
                         Task { await openTrip(itemId: itemId, title: item.title) }

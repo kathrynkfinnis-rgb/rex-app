@@ -7,7 +7,7 @@ import SwiftUI
 ///
 /// This is the feedback half, lifted out of RexAdminView. The two were one
 /// screen because they arrived in the same conversation on 18 October, not
-/// because they belong together: one is deciding what REX says, the other is
+/// because they belong together: one is deciding what Rex says, the other is
 /// reading what people say to you. An empty queue is no reason to stop
 /// reading the second.
 ///

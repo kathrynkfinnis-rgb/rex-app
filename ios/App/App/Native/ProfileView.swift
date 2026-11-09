@@ -410,7 +410,7 @@ struct ProfileView: View {
             // "What you Rex" bars the web profile also had below it, which
             // Kathryn asked to drop in favour of going straight to the feed.
             HStack(spacing: RexSpacing.sm) {
-                statCard(value: "\(rexTotal)", label: "REX")
+                statCard(value: "\(rexTotal)", label: "Rex")
                 statCard(value: averageRatingText, label: "AVG RATING")
                 statCard(value: "\(friendCount)", label: "FRIENDS") {
                     // Pushed onto the same stack now that Friends isn't a

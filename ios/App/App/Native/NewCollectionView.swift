@@ -79,9 +79,9 @@ struct NewCollectionView: View {
                         VStack(spacing: 0) {
                             visibilityRow("draft", "Only me", "Keep it private while you build it up.", "lock")
                             Divider().overlay(RexColor.border)
-                            visibilityRow("friends", "Friends", "Anyone you're friends with on REX.", "person.2")
+                            visibilityRow("friends", "Friends", "Anyone you're friends with on Rex.", "person.2")
                             Divider().overlay(RexColor.border)
-                            visibilityRow("public", "Anyone on REX", "Friends can share it on.", "globe")
+                            visibilityRow("public", "Anyone on Rex", "Friends can share it on.", "globe")
                         }
                         .background(RexColor.card)
                         .clipShape(RoundedRectangle(cornerRadius: RexRadius.card, style: .continuous))

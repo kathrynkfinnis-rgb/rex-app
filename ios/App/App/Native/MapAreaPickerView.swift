@@ -3,7 +3,7 @@ import MapKit
 
 /// Oct 16 — "I want to be able to press the location in the top left and
 /// select a place to find Rex", and before that "can we make it so that you
-/// can change this place if you're looking for REX in a specific town /
+/// can change this place if you're looking for Rex in a specific town /
 /// village / part of London?"
 ///
 /// The map has always centred on where you are, which is right for "what's

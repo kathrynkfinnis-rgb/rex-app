@@ -508,7 +508,7 @@ struct CollectionDetailView: View {
                         Menu("Who can see it") {
                             visibilityButton("draft", "Only me", "lock")
                             visibilityButton("friends", "Friends", "person.2")
-                            visibilityButton("public", "Anyone on REX", "globe")
+                            visibilityButton("public", "Anyone on Rex", "globe")
                         }
 
                         // Oct 12 — "being able to order and title your
@@ -694,13 +694,13 @@ struct CollectionDetailView: View {
 
     private var shareText: String {
         let count = rows.count
-        let lead = "\(emoji) \(name) \u{2014} \(count) \(count == 1 ? "thing" : "things") on REX"
+        let lead = "\(emoji) \(name) \u{2014} \(count) \(count == 1 ? "thing" : "things") on Rex"
         return RexShareLink.message(lead, url: shareURL)
     }
 
     private var visibilityLabel: String {
         switch visibility {
-        case "public": return "Anyone on REX"
+        case "public": return "Anyone on Rex"
         case "friends": return "Friends"
         default: return "Only me"
         }

@@ -1,4 +1,4 @@
-# REX — Security Review
+# Rex — Security Review
 
 **Date:** 16 October 2026
 **Scope:** `ios/App/App/Native` (SwiftUI app), `supabase/migrations` (124 files), `supabase/functions` (7 edge functions), `web/` (Cloudflare Pages + Functions), `src/` (unserved React app), git history.
@@ -8,11 +8,11 @@
 
 ## 1. Executive summary
 
-REX is in better security shape than most pre-launch consumer apps, and that is not a courtesy. Row Level Security is enabled on **every** table with no exceptions. There are no analytics or crash-reporting SDKs, one `print()` in 46,000 lines of Swift, and no plaintext HTTP anywhere. Account deletion genuinely deletes. Contact matching hashes on the device and never stores a number. The share pages escape output centrally, so the usual cross-site-scripting hole structurally cannot be opened. Several past reviews are visible in the code, and they were done properly.
+Rex is in better security shape than most pre-launch consumer apps, and that is not a courtesy. Row Level Security is enabled on **every** table with no exceptions. There are no analytics or crash-reporting SDKs, one `print()` in 46,000 lines of Swift, and no plaintext HTTP anywhere. Account deletion genuinely deletes. Contact matching hashes on the device and never stores a number. The share pages escape output centrally, so the usual cross-site-scripting hole structurally cannot be opened. Several past reviews are visible in the code, and they were done properly.
 
 The problems are concentrated in two places, and both have a single shape.
 
-**The first is authorisation.** REX has no server of its own — the app talks straight to the database — so RLS *is* the security. Most policies are right. A handful check *"is this row mine?"* but forget *"am I allowed to see the thing it hangs off?"*, and several `UPDATE` policies were written without their own `WITH CHECK`, which in Postgres silently reuses the read condition for the write. Six findings are that same mistake. The fix for each is to copy the stricter sibling policy that already exists a few files away.
+**The first is authorisation.** Rex has no server of its own — the app talks straight to the database — so RLS *is* the security. Most policies are right. A handful check *"is this row mine?"* but forget *"am I allowed to see the thing it hangs off?"*, and several `UPDATE` policies were written without their own `WITH CHECK`, which in Postgres silently reuses the read condition for the write. Six findings are that same mistake. The fix for each is to copy the stricter sibling policy that already exists a few files away.
 
 **The second is paperwork that hasn't kept up with the code.** The privacy policy doesn't mention the AI features, still contains a literal `[TO CONFIRM — Kathryn to add the registered company address]` placeholder, and promises a way to delete your phone hash that no screen offers. The contacts permission prompt still says "email addresses" though the app now reads phone numbers too. None of this is exotic; all of it is read by App Review.
 
@@ -128,7 +128,7 @@ The precondition is guaranteed for everyone: `befriend_official_account` (`20260
 
 `are_friends()` tests only the pair and the status, and it gates recommendations, wants, blasts, rankings, ticket reminders, comments, likes and the photo storage buckets. One `PATCH` opens a stranger's entire account.
 
-**Attack:** sign up → find your auto-created REX friendship row → `PATCH /rest/v1/friendships?id=eq.<row>` with `{"requester_id":"<victim>","status":"accepted"}` → read their content. The victim gets a "friend accepted" notification for a request they never sent.
+**Attack:** sign up → find your auto-created Rex friendship row → `PATCH /rest/v1/friendships?id=eq.<row>` with `{"requester_id":"<victim>","status":"accepted"}` → read their content. The victim gets a "friend accepted" notification for a request they never sent.
 
 **Fix:** revoke the table-wide UPDATE and grant only the column that may change:
 

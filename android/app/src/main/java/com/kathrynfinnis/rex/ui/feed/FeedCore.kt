@@ -99,7 +99,7 @@ fun FeedList(onOpenItem: (String) -> Unit) {
         is FeedLoad.Failed -> FeedMessage(
             headline = "The feed didn't load",
             body = buildString {
-                append("Something went wrong between here and REX. ")
+                append("Something went wrong between here and Rex. ")
                 append("Check your connection and try again.")
                 state.detail?.takeIf { it.isNotBlank() }?.let { append("\n\n").append(it) }
             },
@@ -125,7 +125,7 @@ fun FeedList(onOpenItem: (String) -> Unit) {
             // app rather than a fact about them.
             !signedIn && !resolving -> FeedMessage(
                 headline = "Sign in to see your feed",
-                body = "REX shows you what the people you follow have been to, " +
+                body = "Rex shows you what the people you follow have been to, " +
                     "watched and read. Signing in is what fills it.",
             )
 
@@ -236,7 +236,7 @@ private fun RecommendationCard(rec: FeedRecommendation, onOpenItem: (String) -> 
                 Text(
                     // Username, not display name: a feed is people you know
                     // and @names are what people recognise each other by in
-                    // REX. Display name is the fallback, and "Someone" only
+                    // Rex. Display name is the fallback, and "Someone" only
                     // when the profile join came back empty — which happens
                     // for a deleted account, and saying "Someone" is better
                     // than dropping the line and leaving an orphan note.
@@ -319,7 +319,7 @@ private fun TierBadge(tier: String) {
 
 /**
  * Filled badges rather than the numeric score. The five tiers are the scale
- * REX actually talks in — "Obsessed" is the word people use — and a 9.4 beside
+ * Rex actually talks in — "Obsessed" is the word people use — and a 9.4 beside
  * an 8.8 invites a comparison the scale was designed to avoid. The number is
  * still on the item screen for anyone who wants it.
  *

@@ -1,4 +1,4 @@
-# REX — codebase brief for an external reviewer
+# Rex — codebase brief for an external reviewer
 
 Written 17 October 2026. Read-only orientation; nothing here changes code.
 
@@ -15,7 +15,7 @@ Where I am inferring rather than reading, I say so.
 
 ## 1. What it is
 
-REX is a recommendations app: you log places, trips, books, films and so on,
+Rex is a recommendations app: you log places, trips, books, films and so on,
 rate them, and see what your friends thought of the same things. The product
 claim is that a friend's opinion beats a stranger's star rating, which is why
 the social graph — not the catalogue — is the core of it.

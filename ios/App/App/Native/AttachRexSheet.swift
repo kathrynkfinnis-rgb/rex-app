@@ -1,6 +1,6 @@
 import SwiftUI
 
-/// Oct 3 — "when you reply to a blast, you should be able to tag REX to the
+/// Oct 3 — "when you reply to a blast, you should be able to tag Rex to the
 /// response."
 ///
 /// Picks one of your own Rex to attach to a reply. Deliberately only your own,

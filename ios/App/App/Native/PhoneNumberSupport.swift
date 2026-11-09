@@ -46,7 +46,7 @@ enum RexPhone {
         return callingCodes[region] ?? "44"
     }
 
-    /// Enough of the world to cover anyone REX is likely to reach soon. An
+    /// Enough of the world to cover anyone Rex is likely to reach soon. An
     /// unknown region falls back to +44 rather than refusing, since a wrong
     /// guess simply fails to match rather than doing damage.
     private static let callingCodes: [String: String] = [
@@ -99,7 +99,7 @@ struct PhoneNumberPromptView: View {
             Text("""
                  Your friends have your number in their phone — they almost certainly \
                  don't have the email address you signed up with. Adding it is what lets \
-                 REX tell them you're here.
+                 Rex tell them you're here.
                  """)
                 .font(RexFont.text(15))
                 .foregroundStyle(RexColor.mutedForeground)
@@ -120,7 +120,7 @@ struct PhoneNumberPromptView: View {
                 )
 
             Text("""
-                 REX never stores your number and never shows it to anyone. It's scrambled \
+                 Rex never stores your number and never shows it to anyone. It's scrambled \
                  on this phone first, and only the scrambled version is sent — the same way \
                  contact matching already works.
                  """)

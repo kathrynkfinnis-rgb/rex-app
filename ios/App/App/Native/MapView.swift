@@ -70,7 +70,7 @@ struct RexMapView: View {
     @State private var areaName: String?
     /// Oct 16 — "I want to be able to press the location in the top left and
     /// select a place to find Rex", and 15 Oct, "can we make it so that you
-    /// can change this place if you're looking for REX in a specific town /
+    /// can change this place if you're looking for Rex in a specific town /
     /// village / part of London?"
     ///
     /// Somewhere chosen by hand, which outranks where the phone says you are
@@ -1053,7 +1053,7 @@ struct RexMapView: View {
     /// Oct 4 — "on the map, if you're looking at a particular country, a bubble
     /// comes up with any trips inputted for that country?"
     ///
-    /// Region rather than country: a country is a shape REX doesn't hold, and
+    /// Region rather than country: a country is a shape Rex doesn't hold, and
     /// "the trips with stops in what I'm looking at" is both easier to compute
     /// and closer to what someone means — pan to the south of France and the
     /// French trips are what you want, not everything filed under France.

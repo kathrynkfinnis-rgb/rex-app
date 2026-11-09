@@ -5,7 +5,7 @@ import UIKit
 /// camera rather than having to take photo first."
 ///
 /// The camera, in the app. Until now "Import from photo" opened the library,
-/// so photographing a cookbook page meant leaving REX, taking the picture,
+/// so photographing a cookbook page meant leaving Rex, taking the picture,
 /// coming back and finding it again — four steps for what is one intention.
 ///
 /// UIImagePickerController rather than anything newer because this needs the

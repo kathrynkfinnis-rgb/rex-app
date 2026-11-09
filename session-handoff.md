@@ -1,4 +1,4 @@
-# Session handoff — REX native app
+# Session handoff — Rex native app
 
 Written mid-session because the user asked to compact chat history. Everything
 below is what a fresh session needs to pick this up cleanly.
@@ -189,9 +189,9 @@ new ones above once logged.
 
 ## Parked at Kathryn's request (11 Sept) — designs agreed, not started
 
-- **Official REX profile.** "Post as REX" switch for admins, not a shared
-  login. REX is a normal profile; an admins table + RLS lets only listed
-  admins write rows whose user_id is the REX profile. Admins: Kathryn,
+- **Official Rex profile.** "Post as Rex" switch for admins, not a shared
+  login. Rex is a normal profile; an admins table + RLS lets only listed
+  admins write rows whose user_id is the Rex profile. Admins: Kathryn,
   Gemma, Phoebe. Needs Kathryn to create the auth user (Supabase →
   Authentication → Add user, username "rex") — don't create it ourselves.
 - **Find friends via contacts.** Phase 1: match contacts' emails against

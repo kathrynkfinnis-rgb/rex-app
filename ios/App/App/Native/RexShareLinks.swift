@@ -18,7 +18,7 @@ enum RexShareLink {
     }
 
     /// Oct 5 — a collection's own public page. Only resolves for one the owner
-    /// has set to "Anyone on REX"; the RPC behind it refuses anything else, so
+    /// has set to "Anyone on Rex"; the RPC behind it refuses anything else, so
     /// a link to a private collection 404s rather than confirming it exists.
     static func collectionURL(listId: String) -> URL? {
         URL(string: "\(site)/c/\(listId)")
@@ -71,7 +71,7 @@ enum RexShareLink {
     /// links for one share. Everything a reader needs is the one link
     /// ShareLink adds: it opens a public page that offers the App Store from
     /// there, so the invitation doesn't need an address of its own.
-    static let joinLine = "To see more, join REX."
+    static let joinLine = "To see more, join Rex."
 
     /// What it is, then the invitation. No URLs: see above.
     static func message(_ lead: String, url: URL? = nil) -> String {

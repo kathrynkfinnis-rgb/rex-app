@@ -4,7 +4,7 @@ struct RexAdminRoute: Hashable {}
 
 /// Oct 19 — "we should split out the admin queue to post and the feedback
 /// into two separate links from the Settings page." Two jobs that were one
-/// screen: deciding what REX says, and reading what people tell you. They
+/// screen: deciding what Rex says, and reading what people tell you. They
 /// are done at different times and in different frames of mind, and the
 /// queue being empty is not a reason to stop looking at the feedback.
 struct RexFeedbackRoute: Hashable {}
@@ -16,7 +16,7 @@ struct RexFeedbackRoute: Hashable {}
 ///
 /// Both, in one place, on the phone.
 ///
-/// The queue needed no new machinery. A post by the REX account with no
+/// The queue needed no new machinery. A post by the Rex account with no
 /// `published_at` is already exactly a suggestion — that state has existed
 /// since 18 September, it was simply drained by a timer every fifteen minutes
 /// with nobody looking at it first. This is the looking.
@@ -77,7 +77,7 @@ struct RexAdminView: View {
             if isLoading && queue.isEmpty {
                 ProgressView().padding(.horizontal, RexSpacing.page)
             } else if queue.isEmpty {
-                empty("Nothing queued. Anything REX writes lands here first, and goes out only when you say so.")
+                empty("Nothing queued. Anything Rex writes lands here first, and goes out only when you say so.")
             } else {
                 ForEach(queue) { rec in
                     VStack(alignment: .leading, spacing: RexSpacing.sm) {

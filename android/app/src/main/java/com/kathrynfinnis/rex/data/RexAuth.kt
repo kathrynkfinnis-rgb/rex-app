@@ -19,7 +19,7 @@ import kotlinx.coroutines.flow.map
  * Deliberately thin. supabase-kt already persists the session, refreshes the
  * token and exposes the status as a flow; wrapping that in a repository of
  * our own would be inventing a second source of truth for something the SDK
- * is already the truth about. What this adds is REX's vocabulary — signed in
+ * is already the truth about. What this adds is Rex's vocabulary — signed in
  * or not, and who — so screens never import the Supabase types directly and
  * swapping the client later touches one file.
  *

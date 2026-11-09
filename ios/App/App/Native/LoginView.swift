@@ -1,6 +1,6 @@
 import SwiftUI
 
-/// Sign-in, in three screens: what REX is, then either welcome back or get
+/// Sign-in, in three screens: what Rex is, then either welcome back or get
 /// started. Editorial restraint per the brand guidelines — large fields of
 /// Oxford Stone, the supplied wordmark, a serif headline, one dominant action.
 struct LoginView: View {
@@ -41,7 +41,7 @@ struct LoginView: View {
                     .resizable()
                     .scaledToFit()
                     .frame(height: 40)
-                    .accessibilityLabel("REX")
+                    .accessibilityLabel("Rex")
                     .padding(.bottom, RexSpacing.xl)
 
                 Text("Recommendations from people you actually trust.")
@@ -67,7 +67,7 @@ struct LoginView: View {
                     // Oct 1 — App Store 5.1.1(v): the Rexperts shelves aren't
                     // account-based and shouldn't need an account to read.
                     // Also simply a better first impression than a wall: you
-                    // can see what REX is before being asked to join it.
+                    // can see what Rex is before being asked to join it.
                     Button("Have a look around first") { path = [.browse] }
                         .font(RexFont.text(15, weight: .semibold))
                         .foregroundStyle(RexColor.mutedForeground)
@@ -203,7 +203,7 @@ private struct SignUpScreen: View {
                     .padding(.vertical, RexSpacing.xxl)
             } else {
                 stepRow(1, "Make an account", "Email and a password, or use Apple.")
-                stepRow(2, "Find your friends", "REX is only as good as the people in it.")
+                stepRow(2, "Find your friends", "Rex is only as good as the people in it.")
 
                 VStack(spacing: RexSpacing.md) {
                     authField("Email", text: $email, isSecure: false, field: .email,

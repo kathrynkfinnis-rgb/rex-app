@@ -15,7 +15,7 @@ struct ItemDetailView: View {
     /// Oct 2 — "could we have a button here to see more from this author, and
     /// then a list of other works and who has rex'd if any".
     @State private var moreByAuthor: [RexSearchHit] = []
-    /// Lowercased title -> the item in REX, for whichever of the author's
+    /// Lowercased title -> the item in Rex, for whichever of the author's
     /// books someone here has actually Rex'd.
     @State private var authorBookItems: [String: RexItem] = [:]
     @State private var authorBookRexCounts: [String: Int] = [:]
@@ -26,7 +26,7 @@ struct ItemDetailView: View {
     /// populated it; every later visit reads the cached columns off the item.
     @State private var placeDetails: RexPlaceDetails?
     @State private var hoursExpanded = false
-    /// Oct 5 — other branches of this chain: those already in REX, and those
+    /// Oct 5 — other branches of this chain: those already in Rex, and those
     /// Google knows about that nobody has Rex'd.
     @State private var chainBranchesHere: [RexItem] = []
     @State private var chainBranchesElsewhere: [RexSearchHit] = []
@@ -871,7 +871,7 @@ struct ItemDetailView: View {
             .fixedSize(horizontal: true, vertical: false)
             }
 
-            // Oct 20 — the Amazon pill, for the two categories where REX knows
+            // Oct 20 — the Amazon pill, for the two categories where Rex knows
             // what the thing is and has no link to it. A book from Google
             // Books carries no product URL, and a film's watch providers are
             // TMDB's subscription list: a display of where it streams, not
@@ -1342,7 +1342,7 @@ struct ItemDetailView: View {
     /// newest-first from fetchRecommendations(forItem:), and the person who
     /// found a place before anyone else is the one worth leading with.
     /// Oct 12 — "How is Phoebe recommending this place twice and appearing in
-    /// the REX list twice?"
+    /// the Rex list twice?"
     ///
     /// Because on 4 October we deliberately allowed a second Rex of the same
     /// place — going back two years later and feeling differently is worth
@@ -1370,7 +1370,7 @@ struct ItemDetailView: View {
     /// (cast etc should be below reviews)."
     ///
     /// The cast sat inside the details block in the header, which put a row of
-    /// actors above what your friends thought of the film. On REX the friends
+    /// actors above what your friends thought of the film. On Rex the friends
     /// are the point and everything else is context, so the context goes
     /// under them.
     @ViewBuilder
@@ -1503,7 +1503,7 @@ struct ItemDetailView: View {
         .rexCard()
     }
 
-    /// Branches already in REX, and branches Google knows about that nobody
+    /// Branches already in Rex, and branches Google knows about that nobody
     /// has Rex'd. Fetched only for a place that belongs to a chain, so an
     /// ordinary restaurant costs nothing.
     private func loadChain(_ item: RexItem) async {
@@ -2032,7 +2032,7 @@ struct ItemDetailView: View {
     /// along rather than a list to read.
     ///
     /// The whole bibliography comes from OpenLibrary, so it includes books
-    /// nobody here has touched; what makes it REX's rather than a catalogue is
+    /// nobody here has touched; what makes it Rex's rather than a catalogue is
     /// the count underneath. "2 Rex" means someone you know has read it and
     /// the cover is a door; no count means it's just a book that exists, and
     /// tapping offers to add it rather than opening a page that isn't there.

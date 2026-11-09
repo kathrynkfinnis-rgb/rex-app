@@ -5,7 +5,7 @@ import MapKit
 ///
 /// Every place and trip card in the feed drew its tile from Google's Static
 /// Maps API: one billed request per card, per scroll, at $2 per thousand with
-/// 10,000 free a month. It was the highest-volume Google SKU REX had by a wide
+/// 10,000 free a month. It was the highest-volume Google SKU Rex had by a wide
 /// margin — the first one that would run out, at roughly fifty active users —
 /// and the least necessary, because a small locator tile with one pin on it is
 /// a job Apple does on the device for nothing.

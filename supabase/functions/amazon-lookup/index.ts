@@ -168,7 +168,7 @@ async function callAmazon(target: string, payload: Record<string, unknown>) {
   return { ok: true as const, json: JSON.parse(text) };
 }
 
-/// Amazon's shape, flattened to the four things a REX card needs. Their reply
+/// Amazon's shape, flattened to the four things a Rex card needs. Their reply
 /// nests every field behind a DisplayValue, and half of them are absent on any
 /// given product, so this is defensive throughout rather than trusting it.
 // deno-lint-ignore no-explicit-any
@@ -200,7 +200,7 @@ function normalise(item: any) {
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: CORS });
 
-  // Signed-in REX users only. This spends a rate limit that is not easily
+  // Signed-in Rex users only. This spends a rate limit that is not easily
   // replaced — PA-API grants are tied to sales and withdrawn after 30 days
   // without one — so it is not something to leave open.
   const authorization = req.headers.get("Authorization") ?? "";
@@ -249,7 +249,7 @@ Deno.serve(async (req) => {
     // Access to PA-API through the Creators API needs ten qualifying sales in
     // the past thirty days — a rolling requirement, not a one-off hurdle, and
     // a good deal higher than the three sales that merely keep the Associates
-    // account alive. So this will be the reply until REX is putting links in
+    // account alive. So this will be the reply until Rex is putting links in
     // front of enough people, and it will be the reply again any month that
     // falls short.
     //

@@ -67,8 +67,8 @@ struct RexCardActions: View {
         // Oct 5 — the link and the invitation come from RexShareLink.message
         // so every share in the app reads the same in a chat thread.
         let lead = rec.isWant
-            ? "\(who) wants to try \(title) on REX"
-            : "\(who) Rex'd \(title) on REX"
+            ? "\(who) wants to try \(title) on Rex"
+            : "\(who) Rex'd \(title) on Rex"
         return RexShareLink.message(lead, url: shareURL)
     }
 

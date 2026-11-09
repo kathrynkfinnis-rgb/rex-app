@@ -397,7 +397,7 @@ private enum class Mode {
      * `mode.other.switchInvite` — the offer, not the state you are in.
      */
     val switchInvite: String
-        get() = if (this == SignIn) "I already have an account" else "New to REX? Create an account"
+        get() = if (this == SignIn) "I already have an account" else "New to Rex? Create an account"
 
     val other: Mode
         get() = if (this == SignIn) SignUp else SignIn
@@ -452,14 +452,14 @@ private fun readable(e: Throwable, mode: Mode): String {
     // No network, or it died mid-request. Worth its own sentence because the
     // fix is entirely in the person's hands.
     if (e is HttpRequestException || e is IOException) {
-        return "Couldn't reach REX. Check your connection and try again."
+        return "Couldn't reach Rex. Check your connection and try again."
     }
 
     if (e is AuthRestException) {
         when (e.errorCode) {
             AuthErrorCode.InvalidCredentials, AuthErrorCode.UserNotFound ->
                 return "That email and password don't match an account. Check both, " +
-                    "or create an account if you're new to REX."
+                    "or create an account if you're new to Rex."
 
             AuthErrorCode.EmailNotConfirmed ->
                 return "Check your email to confirm your account, then sign in."
@@ -480,7 +480,7 @@ private fun readable(e: Throwable, mode: Mode): String {
                 return "New accounts aren't open at the moment."
 
             AuthErrorCode.EmailAddressNotAuthorized ->
-                return "REX can't send email to that address. Try another one."
+                return "Rex can't send email to that address. Try another one."
 
             AuthErrorCode.UserBanned ->
                 return "That account has been suspended."
@@ -493,7 +493,7 @@ private fun readable(e: Throwable, mode: Mode): String {
     return when {
         raw.contains("invalid login credentials") ->
             "That email and password don't match an account. Check both, " +
-                "or create an account if you're new to REX."
+                "or create an account if you're new to Rex."
         raw.contains("email not confirmed") ->
             "Check your email to confirm your account, then sign in."
         raw.contains("already registered") || raw.contains("already been registered") ->

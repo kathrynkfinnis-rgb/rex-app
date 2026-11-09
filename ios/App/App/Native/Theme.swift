@@ -18,7 +18,7 @@ extension Color {
 /// mostly neutral. Roughly 85% white and warm neutrals, 10% forest green,
 /// 5% accent. Colour is used sparingly and deliberately.
 ///
-/// Supersedes the earlier "REX Brand Guidelines" khaki/oxblood palette below
+/// Supersedes the earlier "Rex Brand Guidelines" khaki/oxblood palette below
 /// this comment used to describe — full swap, not a tweak, per the spec
 /// (Forest Green primary, warm white surfaces, gold reserved strictly for
 /// premium/award/featured contexts, never as a general accent).
@@ -346,7 +346,7 @@ enum RexCategory: String, Codable, CaseIterable {
         }
     }
 
-    /// The illustrated REX mascot to show wherever an item has no real
+    /// The illustrated Rex mascot to show wherever an item has no real
     /// thumbnail — Kathryn's own drawings, one per category. place/event
     /// got their own (Aug 28) — map-reading and VIP-lanyard Rex — so
     /// they no longer share the generic "other" drawing.
@@ -382,7 +382,7 @@ let rexListKinds: [String] = ["Book", "Place", "Trip", "Film & TV", "Recipe", "M
 /// categories … at the moment they don't make any sense, for example
 /// 'mujeres en china' is the third subcategory when you filter by books."
 ///
-/// These are now taken from the catalogues REX actually reads, rather than
+/// These are now taken from the catalogues Rex actually reads, rather than
 /// guessed: films and TV are TMDB's own genre lists verbatim, podcasts are
 /// Apple's top-level categories, places follow what Google returns as a
 /// primary type, and books follow the shape Goodreads and BISAC share. That

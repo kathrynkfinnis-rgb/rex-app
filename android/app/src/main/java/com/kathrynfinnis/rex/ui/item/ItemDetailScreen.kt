@@ -173,7 +173,7 @@ fun ItemDetailScreen(itemId: String, onBack: () -> Unit) {
                 is ItemState.Failed -> Message(
                     heading = "Couldn't load this",
                     body = s.message
-                        ?: "Something went wrong between here and REX. Check your connection and try again.",
+                        ?: "Something went wrong between here and Rex. Check your connection and try again.",
                     actionLabel = "Try again",
                     onAction = { attempt++ },
                 )

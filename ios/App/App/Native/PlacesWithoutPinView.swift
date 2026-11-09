@@ -190,7 +190,7 @@ struct PlacesWithoutPinView: View {
             Text("Not available")
                 .font(RexFont.display(20, weight: .semibold))
                 .foregroundStyle(RexColor.foreground)
-            Text("This one's for the REX team.")
+            Text("This one's for the Rex team.")
                 .font(RexFont.text(14))
                 .foregroundStyle(RexColor.mutedForeground)
         }

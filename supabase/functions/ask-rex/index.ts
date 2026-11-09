@@ -17,13 +17,13 @@
 //      to read a stranger's recommendations.
 //
 //   3. Retrieval, not stuffing. The model sees perhaps forty candidates, never
-//      the database. That's what keeps the cost flat whether REX holds 200 Rex
+//      the database. That's what keeps the cost flat whether Rex holds 200 Rex
 //      or 200,000 — and what makes the answers good.
 //
 // Where the web comes in: when there aren't enough friend Rex to answer
 // properly, the model may name things it knows of, but it never gets to
 // describe them as facts. It returns a *search hint* per suggestion and the
-// app resolves each one through REX's existing catalogue search (Google
+// app resolves each one through Rex's existing catalogue search (Google
 // Places, OpenLibrary, TMDB). Anything that doesn't resolve is dropped. So a
 // web card is always a real, findable thing rather than a sentence the model
 // wrote — which is the only version of "pull ideas from the internet" that
@@ -151,7 +151,7 @@ Deno.serve(async (req) => {
   // or one retry bug in the app — could run up a Gemini bill overnight with
   // nothing between them and Google. Forty is far above honest use and far
   // below anything that costs real money (about 24p), so this is a runaway
-  // guard nobody using REX normally will ever meet.
+  // guard nobody using Rex normally will ever meet.
   const dayAgo = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
   const { count: asksToday } = await asUser
     .from("rex_asks")
@@ -549,8 +549,8 @@ function buildPrompt(input: {
     "in the app, so paraphrasing it would put words in their mouth.",
     "",
     "Some entries are the person's own Rex, marked as such. Use them — being reminded of somewhere",
-    "you loved two years ago is one of the best things REX can do — but say so: \"you rated this\",",
-    "not a friend's name. Lead with a friend's where both fit, since the point of REX is other",
+    "you loved two years ago is one of the best things Rex can do — but say so: \"you rated this\",",
+    "not a friend's name. Lead with a friend's where both fit, since the point of Rex is other",
     "people; their own are the better answer when nothing else comes close, or when the question",
     "is plainly about their own history (\"where did I go in Lisbon?\").",
     "",
@@ -564,7 +564,7 @@ function buildPrompt(input: {
     "",
     "Address them as \"you\", and the people whose Rex you are quoting as \"your friends\" — they are",
     "the user's friends, never yours. Saying \"my friends haven't Rex'd anything in Edinburgh\" claims",
-    "a social circle you don't have, and makes the one thing REX is for sound like it belongs to a",
+    "a social circle you don't have, and makes the one thing Rex is for sound like it belongs to a",
     "chatbot. Better still, use the person's name: \"Danny's been to…\".",
     "",
     "Reply with JSON only, in this shape:",

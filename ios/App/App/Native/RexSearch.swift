@@ -62,7 +62,7 @@ enum GoogleBudget {
 ///
 /// A quota refusal and "there is genuinely nothing called that" looked
 /// identical: the search swallowed the error and returned an empty list
-/// either way. Nobody would report that as a bug — they would just decide REX
+/// either way. Nobody would report that as a bug — they would just decide Rex
 /// is bad at finding places, which is the worst possible outcome for the one
 /// control we have that protects the bill.
 ///
@@ -333,7 +333,7 @@ enum RexSearch {
 
     /// Oct 16 — ask ourselves before we ask Google.
     ///
-    /// REX holds about three thousand places. Until now, typing the name of
+    /// Rex holds about three thousand places. Until now, typing the name of
     /// one of them still went to Google: the local lookup running alongside
     /// was only ever read for the "Already Rex'd" badge, never used as an
     /// answer. So the Google bill rose in a straight line with the number of
@@ -528,7 +528,7 @@ enum RexSearch {
         var request = URLRequest(url: url)
         // They ask that apps identify themselves, and are within their rights
         // to block anything that doesn't.
-        request.setValue("REX/1.0 (iOS; hello@find-rex.com)", forHTTPHeaderField: "User-Agent")
+        request.setValue("Rex/1.0 (iOS; hello@find-rex.com)", forHTTPHeaderField: "User-Agent")
         request.timeoutInterval = 8
 
         guard let (data, response) = try? await URLSession.shared.data(for: request),
@@ -609,7 +609,7 @@ enum RexSearch {
         var request = URLRequest(url: components.url!)
         // Wikipedia asks that clients identify themselves and rate-limits
         // those that don't.
-        request.setValue("REX/1.0 (https://find-rex.com)", forHTTPHeaderField: "User-Agent")
+        request.setValue("Rex/1.0 (https://find-rex.com)", forHTTPHeaderField: "User-Agent")
 
         guard let (data, response) = try? await URLSession.shared.data(for: request),
               let http = response as? HTTPURLResponse, http.statusCode < 400,
@@ -1328,7 +1328,7 @@ enum RexSearch {
         // Google prices a place search by the most expensive field in the
         // mask. rating, userRatingCount and websiteUri are Enterprise
         // fields; everything else here is Pro. Asking for those three moved
-        // every search REX makes onto a tier with a thousand free calls a
+        // every search Rex makes onto a tier with a thousand free calls a
         // month instead of five thousand, and £25 per thousand after that.
         //
         // Nothing on screen used them. No search row draws a rating — the
@@ -2054,7 +2054,7 @@ enum RexSearch {
 
     /// TMDB files certificates per country under two different shapes
     /// depending on whether it's a film or a programme. GB first because
-    /// that's where REX is being used, then US as the usual fallback.
+    /// that's where Rex is being used, then US as the usual fallback.
     private static func certificate(from json: [String: Any], kind: String) -> String? {
         let preferred = ["GB", "US"]
         if kind == "movie" {

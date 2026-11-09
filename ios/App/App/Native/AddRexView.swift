@@ -238,7 +238,7 @@ struct AddRexView: View {
     @State private var hiddenFromFeed = false
     /// Sept 18 — "a Rex profile, that we can start automatically posting
     /// recommendations to keep the feed interesting". Admins only, and only
-    /// visible once the REX account actually exists on this project.
+    /// visible once the Rex account actually exists on this project.
     @State private var isAdmin = false
     @State private var officialAccountId: String?
     /// Sept 21 — "I just lost a whole trip by accident, because I scrolled
@@ -669,7 +669,7 @@ struct AddRexView: View {
         .task {
             // Both cached in RexAPI, so this costs one request per launch
             // however many times the add screen is opened. Non-admins never
-            // see the section and never learn the REX account exists.
+            // see the section and never learn the Rex account exists.
             isAdmin = await RexAPI.shared.isAdmin()
             if isAdmin { officialAccountId = await RexAPI.shared.officialAccountId() }
             // Nov 8 — for the @ picker over the note. See mentionableFriends.
@@ -1162,7 +1162,7 @@ struct AddRexView: View {
                 // Oct 5 — "enable admins to post all types of content as Rex
                 // (incl lists and trips)." This toggle only ever existed in
                 // the branch below, which trips and lists never reach — so the
-                // two kinds of post the REX account most wants to make, a
+                // two kinds of post the Rex account most wants to make, a
                 // curated list and an itinerary, were the two it couldn't.
                 if isAdmin, officialAccountId != nil {
                     postAsRexSection
@@ -1338,17 +1338,17 @@ struct AddRexView: View {
         .padding(16)
     }
 
-    /// Posting as REX, for the three of us. Deliberately plain and a little
-    /// stark — it should never be possible to post as REX by accident, or to
+    /// Posting as Rex, for the three of us. Deliberately plain and a little
+    /// stark — it should never be possible to post as Rex by accident, or to
     /// not notice that you have.
     private var postAsRexSection: some View {
         VStack(alignment: .leading, spacing: RexSpacing.sm) {
             Toggle(isOn: $postAsRex.animation()) {
                 VStack(alignment: .leading, spacing: 2) {
-                    Text("Post as REX")
+                    Text("Post as Rex")
                         .font(.system(size: 14, weight: .semibold))
                         .foregroundStyle(RexColor.foreground)
-                    Text("Posts from the REX account instead of yours. Everyone sees it.")
+                    Text("Posts from the Rex account instead of yours. Everyone sees it.")
                         .font(RexFont.text(12))
                         .foregroundStyle(RexColor.mutedForeground)
                         .fixedSize(horizontal: false, vertical: true)
@@ -2260,7 +2260,7 @@ struct AddRexView: View {
                     photoURLs: [],
                     returningId: true,
                     asDraft: asDraft,
-                    // Oct 5 — admins can post a trip as REX. Oct 12 — and so
+                    // Oct 5 — admins can post a trip as Rex. Oct 12 — and so
                     // do its stops now. The note here used to argue they could
                     // stay under the admin because they are children of the
                     // trip and never shown alone. They are shown alone: a stop
@@ -2271,7 +2271,7 @@ struct AddRexView: View {
                     //
                     // The timer never left the device. scheduledAt was passed
                     // only by the single-Rex branch, so a trip or a list
-                    // scheduled as REX was created with scheduled_at null and
+                    // scheduled as Rex was created with scheduled_at null and
                     // published_at set — out immediately, timer ignored. The
                     // 7 October fix added the cron that publishes the queue;
                     // nothing was ever reaching the queue from here.
@@ -2311,8 +2311,8 @@ struct AddRexView: View {
                             returningId: true,
                             asDraft: asDraft,
                             // Oct 12 — the same fault the list items had: a
-                            // trip posted as REX kept every stop under the
-                            // admin who posted it, so the trip said REX and
+                            // trip posted as Rex kept every stop under the
+                            // admin who posted it, so the trip said Rex and
                             // each place in it said Phoebe.
                             postAs: postAsRex ? officialAccountId : nil
                         )
@@ -2378,12 +2378,12 @@ struct AddRexView: View {
                     // saved as a draft went straight onto everyone's feed. The
                     // button did the one thing it promised not to.
                     asDraft: asDraft,
-                    // Oct 5 — admins can post a list as REX. Its items stay
+                    // Oct 5 — admins can post a list as Rex. Its items stay
                     // under the admin's own account for the same reason a
                     // trip's stops do: they aren't posts of their own.
                     postAs: postAsRex ? officialAccountId : nil,
                     // The same omission as the trip branch above — see its
-                    // note. A list scheduled as REX went out immediately.
+                    // note. A list scheduled as Rex went out immediately.
                     scheduledAt: postAsRex && scheduleRexPost ? rexPostDate : nil
                 )
                 if !listNotes.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
@@ -2437,8 +2437,8 @@ struct AddRexView: View {
                             // Oct 12 — "ensure the individual Rex don't come
                             // under our own accounts (see Phoebe's Halloween
                             // list)." They did. The list itself was posted as
-                            // REX and every item inside it under whoever was
-                            // signed in, so the collection said REX and all
+                            // Rex and every item inside it under whoever was
+                            // signed in, so the collection said Rex and all
                             // fifteen things in it said Phoebe.
                             //
                             // My note on 5 October said the items "aren't
@@ -2518,7 +2518,7 @@ struct AddRexView: View {
                     try? await RexAPI.shared.setTaggedFriends(recommendationId: newRecId, userIds: Array(taggedFriendIds))
                 }
                 didWant = false
-                // A scheduled REX post hasn't gone anywhere yet, so the
+                // A scheduled Rex post hasn't gone anywhere yet, so the
                 // success screen shouldn't offer to share it.
                 didSaveDraft = asDraft || (postAsRex && scheduleRexPost)
             case .want:

@@ -3,10 +3,10 @@ import SwiftUI
 /// Oct 1 — App Store review, Guideline 5.1.1(v): "the app requires users to
 /// register or log in to access features that are not account based."
 ///
-/// Fair. Almost everything in REX genuinely is account-based — the feed, the
+/// Fair. Almost everything in Rex genuinely is account-based — the feed, the
 /// map, collections and Talk to Rex all show what people you are friends with
 /// have recommended, and none of that can exist without an account. But the
-/// Rexperts material is REX's own curated shelves and what the whole app has
+/// Rexperts material is Rex's own curated shelves and what the whole app has
 /// Rex'd most this week. That is editorial. It doesn't depend on who you are,
 /// and it was sitting behind a sign-up wall for no reason.
 ///
@@ -70,12 +70,12 @@ struct BrowseWithoutAccountView: View {
         .background(RexColor.background.ignoresSafeArea())
         .navigationTitle("Have a look around")
         .navigationBarTitleDisplayMode(.inline)
-        .alert("Join REX to see more", isPresented: $showingJoinPrompt) {
+        .alert("Join Rex to see more", isPresented: $showingJoinPrompt) {
             Button("Not now", role: .cancel) {}
             Button("Create an account") { onSignUp() }
         } message: {
             Text(promptSubject.map {
-                "\($0) is on REX. Sign up to see what your friends think of it, and add your own."
+                "\($0) is on Rex. Sign up to see what your friends think of it, and add your own."
             } ?? "Sign up to see what your friends recommend, and add your own.")
         }
         .task { await load() }
@@ -83,11 +83,11 @@ struct BrowseWithoutAccountView: View {
 
     private var header: some View {
         VStack(alignment: .leading, spacing: RexSpacing.sm) {
-            Text("What REX is Rexing")
+            Text("What Rex is Rexing")
                 .font(RexFont.display(26, weight: .semibold))
                 .foregroundStyle(RexColor.foreground)
             Text("""
-                 A look at what's being recommended across REX right now. The real \
+                 A look at what's being recommended across Rex right now. The real \
                  thing is seeing what the people you actually know think — that bit \
                  needs an account.
                  """)
@@ -101,6 +101,9 @@ struct BrowseWithoutAccountView: View {
 
     private var trendingShelf: some View {
         VStack(alignment: .leading, spacing: RexSpacing.md) {
+            // Uppercase because the eyebrow is set in caps — the shelf beside
+            // it passes source_label.uppercased() into the same slot. This is
+            // typography, not the brand's spelling, which is "Rex".
             shelfHeading("Most Rex'd this week", tag: "ACROSS REX")
             ScrollView(.horizontal, showsIndicators: false) {
                 HStack(alignment: .top, spacing: RexSpacing.md) {
@@ -212,7 +215,7 @@ struct BrowseWithoutAccountView: View {
                 .font(RexFont.display(20, weight: .semibold))
                 .foregroundStyle(RexColor.foreground)
             Text("""
-                 REX is recommendations from people you actually know — where they \
+                 Rex is recommendations from people you actually know — where they \
                  ate, what they read, the trips worth copying. That needs an account, \
                  because it's about your friends and not ours.
                  """)

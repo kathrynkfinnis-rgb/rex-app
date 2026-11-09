@@ -1,4 +1,4 @@
-# What's left before we can submit REX
+# What's left before we can submit Rex
 
 App ID 6799256042 · `com.kathrynfinnis.rexapp` · version 1.0
 Checked against App Store Connect on 18 September 2026. Version 1.0 is in
@@ -22,12 +22,12 @@ one; what's needed from us is a yes or a rewrite.
 | **Description** — blocks | | Up to 4,000 characters. Draft below. |
 | **Keywords** — blocks | | 100 characters, comma separated, never shown. Don't repeat the name or subtitle. |
 | **Support / privacy / marketing URLs** — blocks | | All three exist now: `find-rex.com/support.html`, `find-rex.com/privacy.html`, `find-rex.com`. |
-| **Primary category** — blocks | | Not set. Social Networking fits what REX does; Lifestyle is softer and less competitive. |
+| **Primary category** — blocks | | Not set. Social Networking fits what Rex does; Lifestyle is softer and less competitive. |
 | **Promotional text** | | 170 characters, changeable without review. Skippable for now. |
 
 ### Starting point for the description
 
-> REX is where the recommendations you actually trust live: the restaurant your
+> Rex is where the recommendations you actually trust live: the restaurant your
 > sister raved about, the book your friend couldn't put down, the trip worth
 > copying stop by stop.
 >
@@ -47,8 +47,8 @@ make on our behalf.
 | --- | --- | --- |
 | **Screenshots** — blocks | | The biggest job left. Sizes below. The feed, a trip, the map and a single Rex are the four worth showing. |
 | **Age rating questionnaire** — blocks | | Answered to land on 16+ as agreed. Claude can fill it in, but someone has to agree the answers are true. |
-| **Privacy nutrition label** — blocks | | Declares what REX collects: name, email, photos, rough location, usage. Must match the privacy policy — Apple does check. |
-| **Demo account for the reviewer** — blocks | | REX shows nothing until you have friends, so the reviewer needs an account with a populated feed, or they reject it as empty. |
+| **Privacy nutrition label** — blocks | | Declares what Rex collects: name, email, photos, rough location, usage. Must match the privacy policy — Apple does check. |
+| **Demo account for the reviewer** — blocks | | Rex shows nothing until you have friends, so the reviewer needs an account with a populated feed, or they reject it as empty. |
 | **Content rights declaration** — blocks | | Whether the app shows third-party content. It does — book covers, film posters, Google place data. |
 | **Press Submit** — blocks | | Only an Account Holder or Admin can. |
 
@@ -71,7 +71,7 @@ Claude's to build. Only the first two block submission.
 | **Sign in with Apple token revocation** — blocks | Claude | Apple requires that deleting your account also revokes the Apple token. Deletion works; this half doesn't exist. Needs an Apple key and a server function — about half a day. |
 | **Attach a build to version 1.0** — blocks | Claude | None attached. Trivial once we pick one; 48 is the candidate. |
 | **Leaked-password protection** | Claude | One toggle in Supabase Auth, from the security lint. Not an Apple requirement. |
-| **Non-empty first-run feed** | Claude | The REX account can be queued with posts, which also solves what the reviewer sees. Same job as the demo account, from the other end. |
+| **Non-empty first-run feed** | Claude | The Rex account can be queued with posts, which also solves what the reviewer sees. Same job as the demo account, from the other end. |
 
 ---
 

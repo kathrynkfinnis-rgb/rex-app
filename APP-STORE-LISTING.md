@@ -52,17 +52,53 @@ Need ideas instead? 💡 Ask your friends for recommendations on anything, from 
 Friends, not strangers: Every recommendation comes from someone you chose to follow, with their own rating and their own words.
 ```
 
+## What's new — 1.0.1
+
+4,000 characters maximum. Ordered by what a person will actually notice, not
+by what was hardest to build.
+
+```
+Take a photo without leaving Rex — the camera tile opens the camera now, not just your library.
+
+Type @ while you're writing a Rex and your friends' names come up, the way they do in WhatsApp.
+
+If a friend Rex'd something you've Rex'd too, you'll see both. No more one card standing in for two people.
+
+Blasts: attachments show up on replies, and you can edit or delete your own.
+
+Changed your mind about a trip or a list? Move it back to drafts.
+
+Pasted links are one neat arrow now instead of a wall of text, and map pins stay apart for longer before they group together.
+
+Fixed: a published list keeps its items, and a notification about a list opens the list.
+```
+
+Deliberately not mentioned:
+
+* **The icon.** The November artwork is the same dino with tighter framing and
+  a slightly yellower cream. Nobody will see a difference, and release notes
+  that announce an invisible change teach people not to read them.
+* **Affiliate links.** They were gated to TestFlight and now are not. That is
+  revenue, not a feature, and saying so in the notes invites a conversation
+  nobody is asking for.
+* **The Rex rename.** Internal consistency. The store still reads Find Rex.
+
 ## A note on the name
 
-This copy writes **Rex**; the website and the app's own interface write **REX**
-throughout, and the store listing is **Find Rex**. Three spellings of one name.
-Nothing is broken by it and Apple does not care, but it is worth settling on
-one before the listing copy and the screenshots are written to match each
-other.
+Settled 9 November: the name is **Rex**, swept through the repo in one commit.
+The App Store listing is still **Find Rex**, because only a new version can
+change it — so 1.0.1 is the free opportunity, and after that it costs another
+review.
+
+Checked on 9 November: no app is named exactly "Rex" in the UK or US store, so
+the name is probably free. But **Rex: Book, Movie & TV Tracker** (Late Summer
+Labs LLC, released March 2026, still being updated) is the same word on the
+same kind of product, which means Apple may read "Rex" as confusingly similar
+and refuse it. App Store Connect is the only test that settles it.
 
 ## The website says the opposite
 
-find-rex.com still leads with "Join the beta on TestFlight" and "REX is in beta
+find-rex.com still leads with "Join the beta on TestFlight" and "Rex is in beta
 on iPhone, and needs iOS 18 or later". The app is approved and on sale. That
 copy should become an App Store link — but not until the territory list is
 fixed, because an App Store button that 404s for a UK visitor is worse than a
