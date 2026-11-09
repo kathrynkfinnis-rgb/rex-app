@@ -1553,13 +1553,35 @@ struct AddRexView: View {
         searchTask?.cancel()
         searchTask = nil
         picked = hit
-        title = hit.title
         // Google returns the place name in displayName, so its "subtitle" is
         // the address rather than an author/year.
         if hit.externalSource == "google_places" {
-            subtitle = ""
             address = hit.address ?? ""
+            // Nov 9 — "the play should be the dominant title, not the
+            // theatre."
+            //
+            // For a place, the place is the thing, so the venue's name is the
+            // title and overwriting what was typed is right. For an event it
+            // is the opposite: the venue is where the event is, not what it
+            // is. Picking "Young Vic" off the search was replacing the event
+            // somebody had typed, so the feed card led with the theatre and
+            // pushed "Eurotrash Play" into the grey line underneath.
+            //
+            // The venue goes where the form already asks for it — the field
+            // labelled "Venue, date, or type" for events, which is subtitle —
+            // and only when it is empty, so a typed "Thursday 7pm" survives
+            // being given an address.
+            let typedTitle = title.trimmingCharacters(in: .whitespaces)
+            if category == .event, !typedTitle.isEmpty {
+                if subtitle.trimmingCharacters(in: .whitespaces).isEmpty {
+                    subtitle = hit.title
+                }
+            } else {
+                title = hit.title
+                subtitle = ""
+            }
         } else {
+            title = hit.title
             subtitle = hit.subtitle ?? ""
         }
         // #73 — a picked web result for "Other"/Stuff carries its own page
