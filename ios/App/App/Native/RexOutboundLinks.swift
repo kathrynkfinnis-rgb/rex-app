@@ -374,6 +374,32 @@ struct RexOutboundLinkButton<Label: View>: View {
     }
 }
 
+/// Nov 9 — "can we find a way to easily add an affiliate linked Amazon link?"
+///
+/// There was nothing to add: a link somebody pastes into a blast reply, a
+/// note or a list is already an Amazon link, and `resolved` already knows how
+/// to tag one. What was missing is that none of those taps ever reached it.
+/// `RexOutboundLinkButton` covers the buttons the app draws itself — "Buy on
+/// Amazon" on an item page — and user-written text goes through `linkified`,
+/// which hands the raw URL straight to the system.
+///
+/// So every Amazon link anyone has pasted into a comment has earned nothing.
+///
+/// This is deliberately not applied at the app root, where it would also sit
+/// over every internal `openURL` call. It goes on the views that render text
+/// somebody typed, which is where pasted links live.
+///
+/// `resolved` leaves anything that isn't a shop we have a tag for exactly as
+/// it was, and it will not overwrite a `tag` already on the URL — taking
+/// another creator's commission is not something to do quietly.
+extension View {
+    func rexOutboundLinks() -> some View {
+        environment(\.openURL, OpenURLAction { url in
+            .systemAction(RexOutboundLink.resolved(url))
+        })
+    }
+}
+
 /// Oct 22 — "do we need to declare anything if we are earning affiliate
 /// revenue?" Yes: Amazon's Operating Agreement requires the relationship
 /// stated clearly and conspicuously, and under the CAP Code an affiliate link

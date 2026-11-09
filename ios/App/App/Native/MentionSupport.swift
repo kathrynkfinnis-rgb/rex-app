@@ -177,8 +177,11 @@ struct MentionedText: View {
                 // Ours, or somebody's actual link. A comment can hold both,
                 // and an http link in one must keep opening the way it
                 // always has.
+                // Not rexOutboundLinks(): this handler is already installed
+                // here, and an inner one wins. So the affiliate layer has to
+                // be on this branch rather than wrapped around it.
                 guard url.scheme == Self.scheme, let name = url.host() else {
-                    return .systemAction
+                    return .systemAction(RexOutboundLink.resolved(url))
                 }
                 onMention?(name)
                 return .handled

@@ -201,6 +201,9 @@ struct RexNotesText: View {
             }
         }
         .textSelection(.enabled)
+        // The whole view is somebody's own notes, so every link in it is one
+        // they pasted. See rexOutboundLinks().
+        .rexOutboundLinks()
     }
 
     private func linkified(_ body: String) -> AttributedString {

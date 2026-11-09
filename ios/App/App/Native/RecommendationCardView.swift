@@ -269,6 +269,9 @@ struct RecommendationCardView: View {
                             }
                             .onPreferenceChange(NoteHeightKey.self) { fullNoteHeight = $0 }
                             .onPreferenceChange(NoteShownHeightKey.self) { shownNoteHeight = $0 }
+                            // The note is what the person wrote, links and
+                            // all. See rexOutboundLinks().
+                            .rexOutboundLinks()
                             .contentShape(Rectangle())
                             .onTapGesture {
                                 if noteIsClipped || noteExpanded {
