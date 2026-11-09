@@ -102,6 +102,7 @@
 		FEED07810000000000000000 /* MentionSupport.swift in Sources */ = {isa = PBXBuildFile; fileRef = FEED07800000000000000000 /* MentionSupport.swift */; };
 		FEED07710000000000000000 /* RexKeyboardDismiss.swift in Sources */ = {isa = PBXBuildFile; fileRef = FEED07700000000000000000 /* RexKeyboardDismiss.swift */; };
 		FEED07610000000000000000 /* RexOutboundLinks.swift in Sources */ = {isa = PBXBuildFile; fileRef = FEED07600000000000000000 /* RexOutboundLinks.swift */; };
+		FEED19410000000000000000 /* RexNearby.swift in Sources */ = {isa = PBXBuildFile; fileRef = FEED19400000000000000000 /* RexNearby.swift */; };
 		FEED07510000000000000000 /* RexShareLinks.swift in Sources */ = {isa = PBXBuildFile; fileRef = FEED07500000000000000000 /* RexShareLinks.swift */; };
 		FEED12010000000000000000 /* PlacesWithoutPinView.swift in Sources */ = {isa = PBXBuildFile; fileRef = FEED12000000000000000000 /* PlacesWithoutPinView.swift */; };
 		FEED11010000000000000000 /* RepickItemSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = FEED11000000000000000000 /* RepickItemSheet.swift */; };
@@ -231,6 +232,7 @@
 		FEED07800000000000000000 /* MentionSupport.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MentionSupport.swift; sourceTree = "<group>"; };
 		FEED07700000000000000000 /* RexKeyboardDismiss.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RexKeyboardDismiss.swift; sourceTree = "<group>"; };
 		FEED07600000000000000000 /* RexOutboundLinks.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RexOutboundLinks.swift; sourceTree = "<group>"; };
+		FEED19400000000000000000 /* RexNearby.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RexNearby.swift; sourceTree = "<group>"; };
 		FEED07500000000000000000 /* RexShareLinks.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RexShareLinks.swift; sourceTree = "<group>"; };
 		FEED12000000000000000000 /* PlacesWithoutPinView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlacesWithoutPinView.swift; sourceTree = "<group>"; };
 		FEED11000000000000000000 /* RepickItemSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RepickItemSheet.swift; sourceTree = "<group>"; };
@@ -398,6 +400,7 @@
 				FEED07800000000000000000 /* MentionSupport.swift */,
 				FEED07700000000000000000 /* RexKeyboardDismiss.swift */,
 				FEED07600000000000000000 /* RexOutboundLinks.swift */,
+				FEED19400000000000000000 /* RexNearby.swift */,
 				FEED07500000000000000000 /* RexShareLinks.swift */,
 				FEED12000000000000000000 /* PlacesWithoutPinView.swift */,
 				FEED11000000000000000000 /* RepickItemSheet.swift */,
@@ -598,6 +601,7 @@
 				FEED07810000000000000000 /* MentionSupport.swift in Sources */,
 				FEED07710000000000000000 /* RexKeyboardDismiss.swift in Sources */,
 				FEED07610000000000000000 /* RexOutboundLinks.swift in Sources */,
+				FEED19410000000000000000 /* RexNearby.swift in Sources */,
 				FEED07510000000000000000 /* RexShareLinks.swift in Sources */,
 				FEED12010000000000000000 /* PlacesWithoutPinView.swift in Sources */,
 				FEED11010000000000000000 /* RepickItemSheet.swift in Sources */,

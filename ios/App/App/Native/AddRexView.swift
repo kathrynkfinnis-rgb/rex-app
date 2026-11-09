@@ -317,6 +317,12 @@ struct AddRexView: View {
     /// would have been a second, worse mechanism beside one that works.
     @State private var friends: [RexProfileDetail] = []
     @State private var taggedFriendIds: Set<String> = []
+    /// The town the place search is biased to. See RexNearby for why the form
+    /// asks rather than reading the device's location. Starts at whatever was
+    /// used last, which is usually still right.
+    @State private var searchNear = RexNearby.remembered
+    @State private var nearCoord: (lat: Double, lng: Double)?
+    @State private var nearTask: Task<Void, Never>?
     /// When tickets for this event drop, if anybody knows yet. Optional
     /// because most events either have no ticket to wait for or no announced
     /// time, and an unanswerable question on a form is worse than no question.
@@ -913,6 +919,14 @@ struct AddRexView: View {
                          : "Search \(category.pluralLabel.lowercased()) or paste a link…")
                       : "e.g. \(placeholderTitle(for: category))")
                 .onChange(of: title) { _, _ in scheduleSearch(for: category) }
+
+            // Only where a name can mean somewhere — a book called Lisbon is
+            // the same book wherever you are. Only while searching, so it is
+            // not one more empty box greeting you on a form you have already
+            // filled in by hand.
+            if searchFirst, category == .place || category == .event {
+                nearField(for: category)
+            }
 
             suggestions(for: category)
 
@@ -1645,6 +1659,79 @@ struct AddRexView: View {
         return nil
     }
 
+    /// "Near" — the town the search should lean towards.
+    ///
+    /// Sits under the search box rather than beside it: a name and a place
+    /// side by side on a phone gives both of them half a line, and the name
+    /// is the one people type most of.
+    @ViewBuilder
+    private func nearField(for category: RexCategory) -> some View {
+        VStack(alignment: .leading, spacing: RexSpacing.xs) {
+            HStack(spacing: RexSpacing.sm) {
+                Image(systemName: "mappin.and.ellipse")
+                    .font(.system(size: 13))
+                    .foregroundStyle(RexColor.mutedForeground)
+                TextField("Near (e.g. London)", text: $searchNear)
+                    .font(RexFont.text(14))
+                    .textInputAutocapitalization(.words)
+                    .autocorrectionDisabled()
+                if !searchNear.isEmpty {
+                    Button {
+                        searchNear = ""
+                    } label: {
+                        Image(systemName: "xmark.circle.fill")
+                            .font(.system(size: 14))
+                            .foregroundStyle(RexColor.mutedForeground)
+                    }
+                    .buttonStyle(.plain)
+                }
+            }
+            .padding(.horizontal, 12)
+            .padding(.vertical, 10)
+            .background(RexColor.card)
+            .clipShape(RoundedRectangle(cornerRadius: RexRadius.input, style: .continuous))
+            .overlay(
+                RoundedRectangle(cornerRadius: RexRadius.input, style: .continuous)
+                    .stroke(RexColor.border, lineWidth: 1)
+            )
+        }
+        .onChange(of: searchNear) { _, town in
+            nearTask?.cancel()
+            // Cleared on purpose: back to the Europe rectangle, and don't
+            // offer the old town again next time.
+            if town.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                nearCoord = nil
+                RexNearby.remembered = ""
+                scheduleSearch(for: category)
+                return
+            }
+            nearTask = Task {
+                // Apple's geocoder is rate-limited at about a request a
+                // second, so this waits longer than the search debounce: a
+                // town is typed once and the search behind it can wait for it.
+                try? await Task.sleep(nanoseconds: 700_000_000)
+                if Task.isCancelled { return }
+                let found = await RexNearby.coordinate(for: town)
+                if Task.isCancelled { return }
+                await MainActor.run {
+                    nearCoord = found
+                    // Only somewhere we could actually place is worth
+                    // offering back next time — "Lond" helps nobody.
+                    if found != nil { RexNearby.remembered = town }
+                    // Whatever is already typed, now with somewhere to be.
+                    scheduleSearch(for: category)
+                }
+            }
+        }
+        .task {
+            // The remembered town arrives as text; it needs resolving once
+            // before the first search can use it.
+            if nearCoord == nil, !searchNear.isEmpty {
+                nearCoord = await RexNearby.coordinate(for: searchNear)
+            }
+        }
+    }
+
     /// Debounced so we're not firing a request per keystroke.
     private func scheduleSearch(for category: RexCategory) {
         searchTask?.cancel()
@@ -1662,7 +1749,10 @@ struct AddRexView: View {
             // Your own Rex are looked up alongside the catalogue, on the same
             // debounce, so the badge arrives with the rows rather than
             // flickering in a moment later.
-            async let catalogue = RexSearch.search(category: category, query: term)
+            // nil is "no hint", not a failure: the search still runs and
+            // falls back to the Europe rectangle, exactly as it did before
+            // this box existed.
+            async let catalogue = RexSearch.search(category: category, query: term, near: nearCoord)
             async let mine = (try? await RexAPI.shared.searchMyRexItems(query: term)) ?? []
             let (results, myHits) = await (catalogue, mine)
             if Task.isCancelled { return }
