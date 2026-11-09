@@ -5281,6 +5281,20 @@ final class RexAPI {
         guard let http = response as? HTTPURLResponse, http.statusCode < 400 else {
             throw RexAPIError.server(friendlyError(data, fallback: "Couldn't load responses."))
         }
+        // Nov 9 — "Phoebe added by clicking the + on the blast reply but the
+        // link was then not clickable."
+        //
+        // The select above has asked for suggested_item_id and the embedded
+        // items since 3 October, and this struct has never decoded either,
+        // so every reply arrived with items nil no matter what the server
+        // sent. The attachment saved, the row was there, and the chip could
+        // not draw because the data never reached the view.
+        //
+        // Which is why the 7 November fix did not fix it. That added the chip
+        // to the reply branch of responseRow — a real omission, but the
+        // second one. Rendering cannot help when the field is discarded one
+        // layer down, so attaching anything to any reply has been invisible
+        // for five weeks.
         struct Row: Codable {
             let id: String
             let request_id: String
@@ -5288,6 +5302,8 @@ final class RexAPI {
             let body: String
             let created_at: String
             let parent_id: String?
+            let suggested_item_id: String?
+            let items: RexItem?
         }
         let rows = try JSONDecoder().decode([Row].self, from: data)
         guard !rows.isEmpty else { return [] }
@@ -5310,6 +5326,8 @@ final class RexAPI {
                 body: row.body, created_at: row.created_at,
                 profiles: profilesById[row.user_id],
                 parent_id: row.parent_id,
+                suggested_item_id: row.suggested_item_id,
+                items: row.items,
                 likeCount: like?.count ?? 0,
                 likedByMe: like?.likedByMe ?? false
             )

@@ -564,10 +564,11 @@ struct FeedRecommendation: Codable, Identifiable {
     }
 }
 
-/// #132 — a reply to a blast (public.request_comments). suggested_item_id
-/// exists in the schema for "reply with an actual place/book/etc", but the
-/// native compose UI only sends plain text for now — the column just comes
-/// back nil for every response until that's built.
+/// #132 — a reply to a blast (public.request_comments). suggested_item_id is
+/// "reply with an actual place/book/etc", which the compose UI has sent since
+/// 3 October; fetchRequestComments decodes it and the embedded item since
+/// 9 November, having asked the server for both in between without ever
+/// reading them.
 struct RequestComment: Codable, Identifiable {
     let id: String
     let request_id: String
