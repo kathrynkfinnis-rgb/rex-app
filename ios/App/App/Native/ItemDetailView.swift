@@ -48,6 +48,19 @@ struct ItemDetailView: View {
     @State private var rating: Double = 10
     @State private var note: String = ""
     @FocusState private var noteFocused: Bool
+    /// Nov 9 — "Still can't comment in notes on a REX."
+    ///
+    /// The @ picker shipped in 103 went into the three places a Rex is
+    /// written from scratch and missed this one, which is where a Rex that
+    /// already exists gets edited. Typing @ here did nothing at all.
+    ///
+    /// `originalTaggedFriendIds` is why the tags are read before they are
+    /// written: setTaggedFriends replaces the row set rather than adding to
+    /// it, so saving a set built only from this session would silently drop
+    /// anyone tagged through AddRexView's own picker.
+    @State private var friends: [RexProfileDetail] = []
+    @State private var taggedFriendIds: Set<String> = []
+    @State private var originalTaggedFriendIds: Set<String> = []
     /// Oct 19 — the want row behind "Want to try", so it can be filed into a
     /// collection from here. Only fetched when you actually want this.
     @State private var myWant: WantRow?
@@ -518,6 +531,8 @@ struct ItemDetailView: View {
             if let mine = fetchedRecs.first(where: { $0.user_id == RexAPI.shared.currentUserId }) {
                 rating = mine.rating
                 note = mine.note ?? ""
+                taggedFriendIds = Set((mine.recommendation_tags ?? []).compactMap { $0.profiles?.id })
+                originalTaggedFriendIds = taggedFriendIds
             }
 
             // Oct 16 — "when you open a card, particularly a place card, it
@@ -537,6 +552,9 @@ struct ItemDetailView: View {
             async let wantPostsTask = RexAPI.shared.fetchWants(forItem: itemId)
             Task { await loadDetails(fetchedItem) }
             Task { await loadMyRank() }
+            // Only needed once the note box is open, and nothing on the page
+            // waits for it — an empty list just means no picker yet.
+            Task { friends = (try? await RexAPI.shared.fetchAcceptedFriendProfiles()) ?? [] }
             // Only events have these, so only events pay for the request.
             if RexCategory(rawType: fetchedItem.type) == .event {
                 async let people = RexAPI.shared.ticketReminders(itemId: itemId)
@@ -635,6 +653,14 @@ struct ItemDetailView: View {
             do {
                 try await RexAPI.shared.upsertRecommendation(itemId: itemId, rating: rating, note: note)
                 recs = try await RexAPI.shared.fetchRecommendations(forItem: itemId)
+                // After the refetch, because upsert creates the row on a first
+                // Rex and there is no id to hang tags off until it has.
+                if taggedFriendIds != originalTaggedFriendIds, let mine = myRec {
+                    try await RexAPI.shared.setTaggedFriends(
+                        recommendationId: mine.id, userIds: Array(taggedFriendIds)
+                    )
+                    originalTaggedFriendIds = taggedFriendIds
+                }
                 // Back to reading it, now that it's written.
                 isEditingNote = false
             } catch {
@@ -1995,6 +2021,17 @@ struct ItemDetailView: View {
                     .clipShape(RoundedRectangle(cornerRadius: 14))
                     .overlay(RoundedRectangle(cornerRadius: 14).stroke(RexColor.border, lineWidth: 1))
                     .transition(.opacity.combined(with: .move(edge: .top)))
+
+                if let query = MentionDraft.inProgress(in: note), !friends.isEmpty {
+                    MentionPicker(query: query, friends: friends) { friend in
+                        note = MentionDraft.complete(note, with: friend.username)
+                        // The half that makes this a tag rather than
+                        // decoration: the note's text notifies nobody, because
+                        // trg_notify_rec_mention fires on comments, not on a
+                        // recommendation's own note.
+                        taggedFriendIds.insert(friend.id)
+                    }
+                }
 
                 Button(action: save) {
                     if isSaving {
