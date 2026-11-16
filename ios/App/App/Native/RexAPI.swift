@@ -1733,7 +1733,21 @@ final class RexAPI {
             // A list's items.type is "list", so every list ever saved as a
             // draft was filed correctly and then shown by nothing. Saving one
             // looked like losing it.
-            URLQueryItem(name: "items.type", value: "in.(trip,list)"),
+            //
+            // Nov 16 — "I want to be able to move a Rex back to drafts and
+            // then repost it", so the type filter is gone entirely. It was
+            // never about trips and lists being special: it was that a single
+            // Rex had no way back, and unposting one would have filed it
+            // where no screen looked. DraftsView publishes a single Rex from
+            // its own row now, which is the way back, so the restriction has
+            // nothing left to protect.
+            //
+            // list_id arrives with it, and has to. The type filter was doing
+            // this job by accident: a draft list's own items are rows with
+            // published_at null too, and trip_id is.null does not exclude
+            // them the way it excludes a trip's stops. Without this, drafting
+            // one list would fill the screen with every item inside it.
+            URLQueryItem(name: "list_id", value: "is.null"),
             URLQueryItem(name: "order", value: "created_at.desc"),
         ]
         var request = URLRequest(url: components.url!)

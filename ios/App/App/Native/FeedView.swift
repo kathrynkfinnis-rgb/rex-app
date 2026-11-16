@@ -1979,10 +1979,6 @@ struct EditableIfMine: ViewModifier {
     /// nothing else — being on the team is not a licence to edit what your
     /// friends wrote about a restaurant.
     @State private var canEditAsRex = false
-    /// Oct 14 — "can admins get the ability to remove a post they made, and
-    /// save it to drafts so they can repost as Rex." Only on your own posts,
-    /// and only if you are one of the people who could repost as Rex.
-    @State private var isAdminUser = false
     /// Nov 16 — one dialog driven by this, rather than a second
     /// .confirmationDialog beside the first. Same reasoning as the note on
     /// CollectionDetailView's ActiveSheet: stacking two presentation
@@ -2000,25 +1996,23 @@ struct EditableIfMine: ViewModifier {
     /// trip you have published is a better one, and the mechanism is the same
     /// one column either way.
     ///
-    /// Trips and lists, deliberately, and not a single Rex. What makes this
-    /// safe to offer is the way back: fetchDrafts reads rows whose items.type
-    /// is trip or list, DraftsView lists them, and TripDetailView and
-    /// ListDetailView both carry the Publish button that sends them back out.
-    /// A single Rex has none of that — unposting one would file it where no
-    /// screen looks and no button can reach, which is indistinguishable from
-    /// losing it. "Hide from the feed", just below this in the menu, is the
-    /// reversible, visible thing that already covers a single Rex.
+    /// Nov 16 — "I want to be able to move a Rex back to drafts and then
+    /// repost it."
     ///
-    /// Admins keep the wider version on their own posts, type regardless,
-    /// because that is what the October request was for.
-    private var isDraftableKind: Bool {
-        switch RexCategory(rawType: rec.items?.type) {
-        case .trip, .list: return true
-        default: return false
-        }
-    }
-
-    private var canUnpost: Bool { isMine && (isDraftableKind || isAdminUser) }
+    /// This was trips and lists only, and the reason was never that a single
+    /// Rex is different in kind. It was the way back: fetchDrafts read only
+    /// trip and list types, and only TripDetailView and ListDetailView carry
+    /// a Publish button, so unposting a single Rex would have filed it where
+    /// no screen looked — indistinguishable from losing it.
+    ///
+    /// DraftsView publishes a single Rex from its own row now, so the way
+    /// back exists and the restriction has nothing left to protect. Every
+    /// kind can be unposted.
+    ///
+    /// Still your own only. "Hide from the feed" stays where it is: it is the
+    /// lighter thing, for when you want something off the feed but still in
+    /// your own collections and searches, which drafting is not.
+    private var canUnpost: Bool { isMine }
 
     func body(content: Content) -> some View {
         if editable {
@@ -2174,12 +2168,12 @@ struct EditableIfMine: ViewModifier {
     /// Both lookups are cached on RexAPI after their first call, so this costs
     /// one round trip per session rather than one per card.
     private func checkRexPost() async {
-        // Your own post: the only question is whether you could repost it as
-        // Rex, which is what makes unposting worth offering.
-        if isMine {
-            if !isAdminUser, await RexAPI.shared.isAdmin() { isAdminUser = true }
-            return
-        }
+        // Nov 16 — your own post asks nothing now. This used to find out
+        // whether you were an admin, because admins could unpost any type
+        // while everyone else was held to trips and lists. Everyone can
+        // unpost anything, so there is nothing left to establish, and the
+        // admin lookup is skipped on your own cards entirely.
+        if isMine { return }
         guard !canEditAsRex else { return }
         guard await RexAPI.shared.isAdmin() else { return }
         canEditAsRex = rec.user_id == (await RexAPI.shared.officialAccountId())
