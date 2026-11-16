@@ -58,6 +58,15 @@ struct ItemDetailView: View {
     /// written: setTaggedFriends replaces the row set rather than adding to
     /// it, so saving a set built only from this session would silently drop
     /// anyone tagged through AddRexView's own picker.
+    /// The full-screen photo viewer opened from the header. Identifiable
+    /// rather than a bool pair so the urls and the starting index arrive
+    /// together and cannot disagree.
+    private struct PhotoViewerRoute: Identifiable {
+        let urls: [String]
+        let index: Int
+        var id: String { "\(index)-\(urls.first ?? "")" }
+    }
+    @State private var photoViewer: PhotoViewerRoute?
     @State private var friends: [RexProfileDetail] = []
     @State private var taggedFriendIds: Set<String> = []
     @State private var originalTaggedFriendIds: Set<String> = []
@@ -378,6 +387,9 @@ struct ItemDetailView: View {
                 }
             }
         }
+        .fullScreenCover(item: $photoViewer) {
+            PhotoFullScreenView(urls: $0.urls, initialIndex: $0.index)
+        }
         .task { await load() }
         // Needs the item first, for its author.
         .task(id: item?.id) { await loadMoreByAuthor() }
@@ -693,13 +705,30 @@ struct ItemDetailView: View {
             // being the Google pic." A picture somebody who went there took
             // goes across the band; Google's sits in the card on it. A listing
             // photo supports a personal one and should not outrank it.
+            // Nov 16 — "when you upload a picture with a Rex it becomes a
+            // thumbnail but you can't enlarge it. You should be able to click
+            // into it."
+            //
+            // The picture in question was a screenshot of braid instructions:
+            // seven bullet points rendered at about 90pt wide, which is a
+            // picture of text with the text taken out. PhotoFullScreenView
+            // has existed since the carousel was built — nothing on this
+            // header had ever been wired to it.
+            //
+            // Tapping either the band or the thumbnail opens the same viewer,
+            // because which of the two a given photo lands in depends on
+            // whether anybody has uploaded one, and that is not something a
+            // person should have to reason about to read their own
+            // screenshot.
             if let hero = heroPhoto {
                 ZStack(alignment: .topTrailing) {
                     RexPhotoBand(url: hero)
+                        .onTapGesture { openPhotos(at: hero) }
                     if let card = cardPhoto {
                         RexHeaderThumbnail(url: card, category: category)
                             .padding(.trailing, RexHeaderMetrics.thumbTrailing)
                             .padding(.top, RexHeaderMetrics.photoThumbTop)
+                            .onTapGesture { openPhotos(at: card) }
                     }
                 }
                 .frame(height: RexHeaderMetrics.photoBandHeight, alignment: .top)
@@ -709,6 +738,9 @@ struct ItemDetailView: View {
                     RexHeaderThumbnail(url: item.image_url, category: category)
                         .padding(.trailing, RexHeaderMetrics.thumbTrailing)
                         .padding(.top, RexHeaderMetrics.thumbTop)
+                        .onTapGesture {
+                            if let url = item.image_url { openPhotos(at: url) }
+                        }
                 }
                 // The cover hangs past the band's bottom edge; without this the
                 // stack clips it at the fold.
@@ -997,6 +1029,23 @@ struct ItemDetailView: View {
     ///
     /// Yours leads when you have one. Everyone's is still in "Photos from
     /// friends" below, which is labelled and so was never the confusing part.
+    /// Every picture on this page, in the order the header shows them, so the
+    /// viewer can be swiped rather than opening one photo and dead-ending.
+    /// Deduplicated: cardPhoto already refuses to repeat the band, but an
+    /// item's own image_url can be the same file as a community upload.
+    private var headerPhotos: [String] {
+        var seen = Set<String>()
+        return ([heroPhoto, cardPhoto, item?.image_url].compactMap { $0 }
+                + communityPhotoURLs).filter { seen.insert($0).inserted }
+    }
+
+    private func openPhotos(at url: String) {
+        photoViewer = PhotoViewerRoute(
+            urls: headerPhotos,
+            index: headerPhotos.firstIndex(of: url) ?? 0
+        )
+    }
+
     private var heroPhoto: String? {
         let mine = recs.first { $0.user_id == RexAPI.shared.currentUserId }
             .flatMap { $0.photo_urls?.first ?? $0.photo_url }
