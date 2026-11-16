@@ -83,6 +83,32 @@ Deliberately not mentioned:
   nobody is asking for.
 * **The Rex rename.** Internal consistency. The store still reads Find Rex.
 
+## What's new — 1.0.2
+
+4,000 characters maximum. Ordered by what somebody will notice, not by what
+was hardest.
+
+```
+Changed your mind about something you posted? Move any Rex back to drafts and publish it again whenever you like — it returns to the top of the feed.
+
+Blasts can be deleted now.
+
+Tap a photo on anything you've Rex'd to see it full screen, instead of squinting at a thumbnail.
+
+Typing @ in a note brings up your friends again. The picker was there all along, hidden under the keyboard.
+
+Pasted links are tidier: every one is now just its site and a little arrow.
+
+Fixed: the share button on a collection, a card that claimed a friend had Rex'd something when nobody had, and a Rex hidden from the feed now says so when you find it in search.
+```
+
+Deliberately not mentioned:
+
+* **The Amazon tracking ID.** findrexapp-21 goes live with this build, which
+  is a requirement of the Associates application rather than a feature.
+* **The double ring on a card menu.** Two people reported it and it is worth
+  fixing; nobody wants to read about it.
+
 ## A note on the name
 
 Settled 9 November: the name is **Rex**, swept through the repo in one commit.
