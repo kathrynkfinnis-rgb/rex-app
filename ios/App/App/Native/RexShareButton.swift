@@ -39,15 +39,46 @@ struct RexShareButton<Label: View>: View {
         }
         .buttonStyle(.plain)
         .disabled(minting)
-        .sheet(item: $payload) { ActivitySheet(payload: $0) }
+        .sheet(item: $payload) { RexActivitySheet(payload: $0) }
     }
 
     private func share() async {
         minting = true
-        let short = await RexAPI.shared.shareCode(kind: kind, targetId: targetId)
+        payload = await RexShare.payload(
+            kind: kind, targetId: targetId, fallbackURL: fallbackURL, message: message
+        )
         minting = false
+    }
+}
+
+/// Nov 16 — "the share button on collections doesn't work."
+///
+/// It worked everywhere else, and the difference is where it sits. A
+/// collection's Share is an item inside the "…" Menu, and RexShareButton
+/// attaches its own `.sheet`. Tapping a menu item dismisses the menu, which
+/// takes the button's view out of the hierarchy — and a sheet attached to a
+/// view that is going away never presents. The feed card's paperplane and the
+/// success screen's Share button are plain buttons on a live view, so they
+/// were always fine.
+///
+/// So the minting is separated from the presenting. A caller inside a menu
+/// awaits `RexShare.payload` and holds the result on its own state, then puts
+/// `.rexShareSheet` on a view that outlives the menu.
+enum RexShare {
+    static func payload(
+        kind: String, targetId: String, fallbackURL: URL, message: String
+    ) async -> SharePayload {
+        let short = await RexAPI.shared.shareCode(kind: kind, targetId: targetId)
+        // Same fallback as ever: a long link beats a share that does nothing.
         let url = short.flatMap(RexShareLink.shortURL(code:)) ?? fallbackURL
-        payload = SharePayload(message: message, url: url)
+        return SharePayload(message: message, url: url)
+    }
+}
+
+extension View {
+    /// The share sheet, presented from wherever the caller is still on screen.
+    func rexShareSheet(_ payload: Binding<SharePayload?>) -> some View {
+        sheet(item: payload) { RexActivitySheet(payload: $0) }
     }
 }
 
@@ -61,7 +92,7 @@ struct SharePayload: Identifiable {
 /// and ShareLink can't be handed its item late. Message and URL go in as two
 /// activity items, which is what ShareLink(item:message:) does — WhatsApp
 /// puts the words first and the link under them.
-private struct ActivitySheet: UIViewControllerRepresentable {
+struct RexActivitySheet: UIViewControllerRepresentable {
     let payload: SharePayload
 
     func makeUIViewController(context: Context) -> UIActivityViewController {

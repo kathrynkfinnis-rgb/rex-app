@@ -1260,15 +1260,31 @@ struct AddRexView: View {
                 Text("Note").font(.system(size: 14, weight: .semibold)).foregroundStyle(RexColor.foreground)
                 // See the note box above — a description that outgrew five
                 // lines started scrolling under the caret.
-                TextField("What did you love about it?", text: $note, axis: .vertical)
-                    .lineLimit(3...14)
-                    .id(Self.noteFieldID)
-                    .focused($noteFocused)
-                    .padding(12)
-                    .background(RexColor.card)
-                    .clipShape(RoundedRectangle(cornerRadius: 14))
-                    .overlay(RoundedRectangle(cornerRadius: 14).stroke(RexColor.border, lineWidth: 1))
-                noteMentionPicker
+                // Nov 16 — "you still can't tag people in comments", and
+                // "when I'm typing the box of text is hidden by the keyboard".
+                // One bug, reported twice.
+                //
+                // The id used to be on the TextField alone, and scrollToNote
+                // anchors it .bottom — the field's bottom edge to the bottom
+                // of the visible area. The picker renders immediately below
+                // that edge, so it was scrolled exactly off-screen every
+                // time: present, laid out, drawn, and never once visible.
+                // Typing @ did nothing because nothing appeared to do it.
+                //
+                // Both carry the id now, so what gets anchored is the field
+                // and whatever is under it. With no @ part-typed the group is
+                // just the field again and the behaviour is unchanged.
+                VStack(alignment: .leading, spacing: RexSpacing.xs) {
+                    TextField("What did you love about it?", text: $note, axis: .vertical)
+                        .lineLimit(3...14)
+                        .focused($noteFocused)
+                        .padding(12)
+                        .background(RexColor.card)
+                        .clipShape(RoundedRectangle(cornerRadius: 14))
+                        .overlay(RoundedRectangle(cornerRadius: 14).stroke(RexColor.border, lineWidth: 1))
+                    noteMentionPicker
+                }
+                .id(Self.noteFieldID)
 
                 // A trip already set its single cover photo up top, and its
                 // carousel is built from its stops' photos — so no second,

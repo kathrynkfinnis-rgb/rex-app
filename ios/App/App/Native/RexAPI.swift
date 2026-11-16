@@ -6638,10 +6638,24 @@ final class RexAPI {
         guard !realItemIds.isEmpty else { return [:] }
         let token = try await validToken()
         var components = URLComponents(url: baseURL.appendingPathComponent("/rest/v1/recommendations"), resolvingAgainstBaseURL: false)!
+        // Nov 16 — "this says also Rex'd by 1 friend but no other Rex in the
+        // card?"
+        //
+        // Because the second row was not a Rex. This counted every
+        // recommendations row for the item outside a trip, and a book sitting
+        // in one of your own collections is such a row — so your own list
+        // entry was counted as somebody else's Rex, the dino read 2, and the
+        // badge invented a friend. There was no second card to find.
+        //
+        // upsertRecommendation has always identified a standalone Rex by both
+        // halves, trip_id null AND list_id null. This had only the first.
+        // With both, a person has at most one standalone Rex per item, which
+        // is what makes a row count a people count.
         components.queryItems = [
             URLQueryItem(name: "select", value: "item_id"),
             URLQueryItem(name: "item_id", value: "in.(\(realItemIds.joined(separator: ",")))"),
             URLQueryItem(name: "trip_id", value: "is.null"),
+            URLQueryItem(name: "list_id", value: "is.null"),
         ]
 
         // Oct 2 — the same 1,000-row cap that was quietly eating the map (see
@@ -6683,10 +6697,14 @@ final class RexAPI {
         let (resourcePath, profilesSelect) = await recommendationsReadPath()
         let select = "id,user_id,rating,created_at\(await anonymousField()),\(profilesSelect)"
         var components = URLComponents(url: baseURL.appendingPathComponent(resourcePath), resolvingAgainstBaseURL: false)!
+        // The same pair as fetchRexCounts above, for the same reason: this is
+        // the list of people behind that count, and a collection entry is not
+        // a person who Rex'd it.
         components.queryItems = [
             URLQueryItem(name: "select", value: select),
             URLQueryItem(name: "item_id", value: "eq.\(itemId)"),
             URLQueryItem(name: "trip_id", value: "is.null"),
+            URLQueryItem(name: "list_id", value: "is.null"),
             URLQueryItem(name: "order", value: "created_at.desc"),
         ]
         var request = URLRequest(url: components.url!)

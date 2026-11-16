@@ -51,11 +51,15 @@ struct CollectionDetailView: View {
         case edit(FeedRecommendation)
         case documentImport
         case addRex
+        /// Nov 16 — Share joins this rather than bringing a second `.sheet`,
+        /// for exactly the reason the note above records.
+        case share(SharePayload)
         var id: String {
             switch self {
             case .edit(let rec): return "edit-\(rec.id)"
             case .documentImport: return "documentImport"
             case .addRex: return "addRex"
+            case .share(let payload): return "share-\(payload.id)"
             }
         }
     }
@@ -459,6 +463,8 @@ struct CollectionDetailView: View {
                     startingSortOrder: (rows.compactMap { $0.sort_order }.max() ?? -1) + 1,
                     onAdded: { Task { await load() } }
                 )
+            case .share(let payload):
+                RexActivitySheet(payload: payload)
             }
         }
         .toolbar {
@@ -541,12 +547,18 @@ struct CollectionDetailView: View {
                     }
 
                     if let shareURL {
-                        RexShareButton(
-                            kind: "list",
-                            targetId: route.listId,
-                            fallbackURL: shareURL,
-                            message: shareText
-                        ) {
+                        // Not RexShareButton: this is inside the "…" Menu,
+                        // and a sheet attached to a menu item never presents
+                        // because tapping it dismisses the menu first. See
+                        // RexShare. The sheet goes on the view body instead.
+                        Button {
+                            Task {
+                                activeSheet = .share(await RexShare.payload(
+                                    kind: "list", targetId: route.listId,
+                                    fallbackURL: shareURL, message: shareText
+                                ))
+                            }
+                        } label: {
                             Label("Share", systemImage: "square.and.arrow.up")
                         }
                     } else {

@@ -2068,13 +2068,30 @@ struct EditableIfMine: ViewModifier {
                         // card mock-up: it sits beside the rating in the
                         // corner, and reads as "more" rather than competing
                         // with it as a second glyph.
+                        // Nov 16 — "there is a circle inside a circle on this
+                        // blast."
+                        //
+                        // Both real, drawn by different things. Ours is the
+                        // inner one, a stroke around the padded glyph at
+                        // roughly 29pt; the outer is iOS 26 putting its own
+                        // circular Liquid Glass badge around the menu at the
+                        // full 44pt tap target — the same chrome the toolbar
+                        // wordmark had to opt out of above, except
+                        // .sharedBackgroundVisibility only applies to a
+                        // ToolbarItem and this is a Menu on a card.
+                        //
+                        // So ours goes, on 26 only. The system's ring is
+                        // better placed anyway: it traces the 44pt area that
+                        // is actually tappable rather than the glyph inside
+                        // it. Below 26 nothing draws a ring for us, so the
+                        // stroke stays there.
                         Image(systemName: "ellipsis")
                             .font(.system(size: 13, weight: .bold))
                             .foregroundStyle(RexColor.mutedForeground)
                             .padding(8)
                             .background(RexColor.card)
                             .clipShape(Circle())
-                            .overlay(Circle().stroke(RexColor.border, lineWidth: 1))
+                            .modifier(RexLegacyCircleBorder())
                             .frame(width: 44, height: 44)
                             .contentShape(Rectangle())
                     }
@@ -2123,5 +2140,21 @@ struct EditableIfMine: ViewModifier {
         guard !canEditAsRex else { return }
         guard await RexAPI.shared.isAdmin() else { return }
         canEditAsRex = rec.user_id == (await RexAPI.shared.officialAccountId())
+    }
+}
+
+/// The ring around a card's "…" menu, on the versions that need one.
+///
+/// Nov 16 — see the ellipsis label in RexCardMenu above. iOS 26 draws its own
+/// circular badge around a Menu, so adding ours produced two rings at
+/// different radii; before 26 it draws nothing and the glyph needs an edge to
+/// read as a button. Hence the version check rather than deleting the stroke.
+struct RexLegacyCircleBorder: ViewModifier {
+    func body(content: Content) -> some View {
+        if #available(iOS 26.0, *) {
+            content
+        } else {
+            content.overlay(Circle().stroke(RexColor.border, lineWidth: 1))
+        }
     }
 }
