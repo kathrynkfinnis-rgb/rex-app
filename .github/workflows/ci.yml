@@ -64,12 +64,19 @@ jobs:
           deno-version: v2.x
       # The nine functions run with the service-role key, so a type error
       # here is the most expensive kind in the repository.
+      # Nov 16 — --node-modules-dir=auto. The functions import one thing,
+      # jsr:@supabase/supabase-js@2, and that package's own types reach for
+      # npm:openai and npm:@supabase/realtime-js. Without somewhere to put
+      # them Deno reported "Failed resolving types. Could not find a matching
+      # package ... in the node_modules directory" for every function, so this
+      # job has been red since it was written and told us nothing about our
+      # own code either way.
       - name: Type-check every function
         run: |
           failed=0
           for fn in supabase/functions/*/index.ts; do
             echo "::group::$fn"
-            deno check --allow-import "$fn" || failed=1
+            deno check --allow-import --node-modules-dir=auto "$fn" || failed=1
             echo "::endgroup::"
           done
           exit $failed
@@ -108,9 +115,29 @@ jobs:
 
   ios:
     name: iOS
-    runs-on: macos-15
+    runs-on: macos-latest
     steps:
       - uses: actions/checkout@v4
+      # Nov 16 — the runner's default Xcode was 16.4, which ships the iOS 18
+      # SDK, and the app uses iOS 26 APIs behind #available guards. A guard
+      # decides what runs; the symbol still has to exist to compile. So every
+      # iOS run failed on .sharedBackgroundVisibility and had done since that
+      # line was written, while the same build passed on a laptop running
+      # Xcode 27.
+      #
+      # Picking the newest Xcode present rather than naming a version: the
+      # runner images change under us, and a hard-coded Xcode_26.app is the
+      # same trap one release later. The listing is printed so that if the
+      # newest available is still too old, the log says so outright instead
+      # of failing somewhere in the middle of a compile.
+      - name: Use the newest Xcode on the runner
+        run: |
+          echo "Xcodes available:"
+          ls -d /Applications/Xcode*.app
+          newest=$(ls -d /Applications/Xcode*.app | sort -V | tail -1)
+          sudo xcode-select -s "$newest"
+          xcodebuild -version
+          echo "iOS SDK: $(xcrun --sdk iphoneos --show-sdk-version)"
       # A simulator build, so nothing here needs a signing certificate and no
       # secret has to live in the repository for CI to work.
       - name: Build
