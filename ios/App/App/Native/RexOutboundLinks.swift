@@ -90,8 +90,20 @@ enum RexOutboundLink {
     /// earns nothing and looks exactly like one that works. An empty entry
     /// leaves the link untouched, which is the honest version of the same
     /// outcome and the one that cannot be mistaken for working.
+    /// Nov 16 — findrex-21 was rejected. Amazon reviewed find-rex.com, found
+    /// no tagged links on it (they are on the /l/ share pages, which a
+    /// reviewer landing on the homepage never sees) and could not establish
+    /// where traffic would come from.
+    ///
+    /// So the tag is dead, and a dead tag is worse than none: it earns
+    /// nothing, looks exactly like a working one, and places links under a
+    /// rejected account. Blank until a new one is approved — the app is being
+    /// reapplied for as the traffic source, which is the honest description
+    /// of where these links actually are, and Amazon issues a tracking ID per
+    /// app rather than reviving an old one. Expect a new string here, not
+    /// this one back.
     private static let amazonTags: [String: String] = [
-        "amazon.co.uk": "findrex-21",
+        "amazon.co.uk": "",
         "amazon.com": "",
         "amazon.de": "",
         "amazon.fr": "",
@@ -223,18 +235,26 @@ enum RexOutboundLink {
     /// `department` narrows the results: film and TV go to Prime Video, where
     /// renting or buying is the thing that actually earns, rather than to a
     /// shelf of DVDs.
+    /// Nov 16 — no longer nil when there is no tag.
+    ///
+    /// This used to refuse to build a URL at all without one, so blanking the
+    /// tag would have taken every "Buy on Amazon" button on a book, film, TV
+    /// show or product off the screen with it. Finding the thing you have
+    /// just been recommended is the feature; the tag is only how it earns.
+    /// Losing the first to suspend the second is the wrong trade, and
+    /// amazonProductURL above has always got this right — it falls back to a
+    /// clean address rather than to nothing. Same shape here now.
     static func amazonSearch(for query: String, department: String? = nil) -> URL? {
-        guard isAmazonAssociateActive,
-              let tag = amazonTags["amazon.co.uk"], !tag.isEmpty,
-              var components = URLComponents(string: "https://www.amazon.co.uk/s")
+        guard var components = URLComponents(string: "https://www.amazon.co.uk/s")
         else { return nil }
         let cleaned = query
             .replacingOccurrences(of: "·", with: " ")
             .trimmingCharacters(in: .whitespacesAndNewlines)
         guard !cleaned.isEmpty else { return nil }
+        let tag = amazonTags["amazon.co.uk"] ?? ""
         components.queryItems = [URLQueryItem(name: "k", value: cleaned)]
             + (department.map { [URLQueryItem(name: "i", value: $0)] } ?? [])
-            + [URLQueryItem(name: "tag", value: tag)]
+            + (tag.isEmpty ? [] : [URLQueryItem(name: "tag", value: tag)])
         return components.url
     }
 
