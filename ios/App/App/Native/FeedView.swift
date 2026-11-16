@@ -1983,7 +1983,14 @@ struct EditableIfMine: ViewModifier {
     /// save it to drafts so they can repost as Rex." Only on your own posts,
     /// and only if you are one of the people who could repost as Rex.
     @State private var isAdminUser = false
-    @State private var confirmingUnpost = false
+    /// Nov 16 — one dialog driven by this, rather than a second
+    /// .confirmationDialog beside the first. Same reasoning as the note on
+    /// CollectionDetailView's ActiveSheet: stacking two presentation
+    /// modifiers on one view is how a control ends up silently doing nothing.
+    private enum PendingConfirm {
+        case unpost, deleteBlast
+    }
+    @State private var pendingConfirm: PendingConfirm?
 
     private var editable: Bool { isMine || canEditAsRex }
 
@@ -2037,9 +2044,22 @@ struct EditableIfMine: ViewModifier {
                             // friends' feeds, and "Move to drafts" sitting
                             // under "Edit" is easy to hit by accident.
                             Button {
-                                confirmingUnpost = true
+                                pendingConfirm = .unpost
                             } label: {
                                 Label("Move to drafts", systemImage: "tray.and.arrow.down")
+                            }
+                        }
+                        // Nov 16 — "I can't delete the blast." There was no
+                        // delete on a blast anywhere in the app: this menu
+                        // offered Edit and Hide from the feed, and that was
+                        // all of it. Only your own, and only a blast — a Rex
+                        // is deleted from its editor, and "Hide from the
+                        // feed" is the reversible thing for everything else.
+                        if rec.isBlast, isMine {
+                            Button(role: .destructive) {
+                                pendingConfirm = .deleteBlast
+                            } label: {
+                                Label("Delete blast", systemImage: "trash")
                             }
                         }
                         Button {
@@ -2104,23 +2124,46 @@ struct EditableIfMine: ViewModifier {
                 // your own. Unposting is a question about yours.
                 .task { await checkRexPost() }
                 .confirmationDialog(
-                    "Move this back to drafts?",
-                    isPresented: $confirmingUnpost,
+                    pendingConfirm == .deleteBlast
+                        ? "Delete this blast?" : "Move this back to drafts?",
+                    isPresented: Binding(
+                        get: { pendingConfirm != nil },
+                        set: { if !$0 { pendingConfirm = nil } }
+                    ),
                     titleVisibility: .visible
                 ) {
-                    Button("Move to drafts") {
-                        Task {
-                            try? await RexAPI.shared.moveToDrafts(recommendationId: rec.id)
-                            onChanged?()
+                    if pendingConfirm == .deleteBlast {
+                        Button("Delete", role: .destructive) {
+                            Task {
+                                // rec.id for a blast is "blast-<uuid>" — the
+                                // synthetic id the feed gives it. The row in
+                                // `requests` is what is underneath.
+                                let requestId = String(rec.id.dropFirst("blast-".count))
+                                try? await RexAPI.shared.deleteRequest(id: requestId)
+                                onChanged?()
+                            }
+                        }
+                    } else {
+                        Button("Move to drafts") {
+                            Task {
+                                try? await RexAPI.shared.moveToDrafts(recommendationId: rec.id)
+                                onChanged?()
+                            }
                         }
                     }
                     Button("Cancel", role: .cancel) {}
                 } message: {
-                    Text(
-                        "It comes off the feed and only you will see it. "
-                        + "The note, the photos, the rating, the tags and every stop are kept — "
-                        + "publish it again whenever you like, from Drafts on your profile."
-                    )
+                    if pendingConfirm == .deleteBlast {
+                        // request_comments cascades on delete, so this is not
+                        // only your own writing going.
+                        Text("Every suggestion your friends left on it goes too. This can't be undone.")
+                    } else {
+                        Text(
+                            "It comes off the feed and only you will see it. "
+                            + "The note, the photos, the rating, the tags and every stop are kept — "
+                            + "publish it again whenever you like, from Drafts on your profile."
+                        )
+                    }
                 }
         } else {
             content

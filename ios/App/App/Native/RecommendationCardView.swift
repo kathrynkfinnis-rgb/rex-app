@@ -556,6 +556,31 @@ struct RecommendationCardView: View {
 
                 if !alsoWant.isEmpty { alsoWantedBadge(alsoWant) }
 
+                // Nov 16 — "tried to move this book to drafts and it's not
+                // working. It stays on the feed and doesn't go."
+                //
+                // It had gone. What she did next was search for it to check,
+                // and fetchFeed deliberately drops the show_in_feed filter
+                // when the feed is searched or filtered — hidden means "don't
+                // broadcast this", not "make this unfindable". So the card
+                // came back looking exactly as it had before, and the control
+                // looked broken by doing precisely what it promised.
+                //
+                // Saying so on the card is the missing half. Only you ever
+                // see this: a hidden Rex is already out of everybody else's
+                // feed, so there is nobody else to show it to.
+                if rec.show_in_feed == false {
+                    HStack(spacing: 4) {
+                        Image(systemName: "eye.slash").font(.system(size: 10))
+                        Text("Hidden").font(RexFont.text(12, weight: .semibold))
+                    }
+                    .foregroundStyle(RexColor.mutedForeground)
+                    .padding(.horizontal, RexSpacing.sm)
+                    .padding(.vertical, 4)
+                    .background(RexColor.muted)
+                    .clipShape(Capsule())
+                }
+
                 Spacer(minLength: 0)
             }
             .padding(.top, RexSpacing.xs)

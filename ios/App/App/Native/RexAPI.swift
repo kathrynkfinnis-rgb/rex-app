@@ -5536,6 +5536,37 @@ final class RexAPI {
                                       failure: "Couldn't delete that.")
     }
 
+    /// Nov 16 — "I can't delete the blast."
+    ///
+    /// There was nothing to call. Recommendations have had
+    /// deleteRecommendation since the beginning and a reply has had
+    /// deleteRequestComment above, but the blast itself — the row in
+    /// `requests` — had no delete anywhere in the app. The card menu offered
+    /// Edit and Hide from the feed and that was the whole of it.
+    ///
+    /// The database was ready the day the table was made: "Users delete own
+    /// requests" FOR DELETE USING (auth.uid() = user_id), with the grant to
+    /// match. Only the client half was missing.
+    ///
+    /// request_comments references requests ON DELETE CASCADE, so this takes
+    /// every reply with it. Hence the confirmation that says so — a blast
+    /// with eight suggestions on it is other people's writing, not just
+    /// yours.
+    func deleteRequest(id: String) async throws {
+        let token = try await validToken()
+        var components = URLComponents(url: baseURL.appendingPathComponent("/rest/v1/requests"), resolvingAgainstBaseURL: false)!
+        components.queryItems = [URLQueryItem(name: "id", value: "eq.\(id)")]
+        var request = URLRequest(url: components.url!)
+        request.httpMethod = "DELETE"
+        request.setValue(anonKey, forHTTPHeaderField: "apikey")
+        request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+
+        let (data, response) = try await URLSession.shared.data(for: request)
+        guard let http = response as? HTTPURLResponse, http.statusCode < 400 else {
+            throw RexAPIError.server(friendlyError(data, fallback: "Couldn't delete that blast."))
+        }
+    }
+
     private func writeRequestComment(id: String, method: String,
                                      body: [String: Any]?, failure: String) async throws {
         let token = try await validToken()

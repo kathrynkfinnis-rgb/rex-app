@@ -102,8 +102,17 @@ enum RexOutboundLink {
     /// of where these links actually are, and Amazon issues a tracking ID per
     /// app rather than reviving an old one. Expect a new string here, not
     /// this one back.
+    /// Nov 16, later the same day — findrexapp-21, issued to Three Lines
+    /// Studios Ltd with the iOS app as the declared property rather than
+    /// find-rex.com. The blanking above lasted one build and never shipped.
+    ///
+    /// This has to be live in the app before Amazon verifies the account.
+    /// What sank findrex-21 was a reviewer finding no tagged links on the
+    /// property we had named; the property named this time is the App Store
+    /// listing, so the tagged links have to be in the build people download.
+    /// Until 1.0.2 ships, the account is approved and earning nothing.
     private static let amazonTags: [String: String] = [
-        "amazon.co.uk": "",
+        "amazon.co.uk": "findrexapp-21",
         "amazon.com": "",
         "amazon.de": "",
         "amazon.fr": "",

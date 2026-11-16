@@ -1112,9 +1112,19 @@ func linkified(_ text: String) -> AttributedString {
                 // it is put back into the text after the link.
                 let tail = String(whole.dropFirst(address.count))
                 target = URL(string: address)
-                let shown = address.count > bareLinkMaxCharacters
-                    ? "\(prettyHost(of: target) ?? "link") \u{2197}"
-                    : address
+                // Nov 16 — "should the link not have a little arrow?"
+                //
+                // Phoebe pasted https://amzn.eu/d/0hbGNZKT, which is 26
+                // characters and so fell under the 48 this used to allow
+                // through on the grounds that short addresses are "already
+                // readable". That premise was the mistake: length is not
+                // readability. A share code is opaque at any length, and
+                // that one still wrapped onto two lines in a reply bubble.
+                //
+                // Every pasted address is its host and an arrow now. The full
+                // address is not lost — it is what the link opens — and one
+                // rule is easier to trust than a threshold nobody can see.
+                let shown = "\(prettyHost(of: target) ?? "link") \u{2197}"
                 let start = display.endIndex
                 display += shown
                 if let target { links.append((start..<display.endIndex, target)) }
@@ -1143,9 +1153,6 @@ func linkified(_ text: String) -> AttributedString {
     return attributed
 }
 
-/// Beyond this many characters a pasted address is noise rather than
-/// information, and is shown as its host instead.
-///
 /// Nov 7 — "have we fixed the product linking so it becomes one neat arrow
 /// when you upload a link in a comment or a blast or anywhere really?"
 ///
@@ -1155,12 +1162,11 @@ func linkified(_ text: String) -> AttributedString {
 /// text. The two of them filled the screen and pushed the blast itself out of
 /// sight.
 ///
-/// Words somebody deliberately linked have collapsed to their words since 14
-/// October. A pasted address had nothing doing the same job for it. 48 is
-/// comfortably more than a tidy link — find-rex.com/s/ab12 is 19 — and well
-/// under anything with tracking parameters on it.
-private let bareLinkMaxCharacters = 48
-
+/// That was fixed with a 48-character threshold, which held for nine days and
+/// then met https://amzn.eu/d/0hbGNZKT — 26 characters, entirely opaque, and
+/// still two wrapped lines in a reply. The threshold is gone: see linkified,
+/// where every pasted address now collapses to its host.
+///
 /// The host, without the www., for the label on a shortened link.
 private func prettyHost(of url: URL?) -> String? {
     guard let host = url?.host() else { return nil }
