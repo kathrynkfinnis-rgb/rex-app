@@ -90,11 +90,33 @@ The App Store listing is still **Find Rex**, because only a new version can
 change it — so 1.0.1 is the free opportunity, and after that it costs another
 review.
 
-Checked on 9 November: no app is named exactly "Rex" in the UK or US store, so
-the name is probably free. But **Rex: Book, Movie & TV Tracker** (Late Summer
-Labs LLC, released March 2026, still being updated) is the same word on the
-same kind of product, which means Apple may read "Rex" as confusingly similar
-and refuse it. App Store Connect is the only test that settles it.
+**"Rex" on its own is not available.** Tried on 10 November and App Store
+Connect refused it outright:
+
+```
+ENTITY_ERROR.ATTRIBUTE.INVALID.DUPLICATE.DIFFERENT_ACCOUNT
+The app name you entered is already being used. If you have trademark
+rights to this name and would like it released for your use, submit a claim.
+```
+
+So this is settled, and not by a judgement call about similarity: somebody
+else holds the name. Searching the store was the wrong test — a reservation
+does not have to be a published app, which is why "no app is named exactly
+Rex" looked like a green light and wasn't.
+
+**"Rex - Recommendations" is available** — accepted on the first try, 21 of
+the 30 characters. Set and then reverted the same day: Kathryn chose to keep
+**Find Rex** for 1.0.1 and take the name at the next update, which costs
+nothing beyond waiting, since any new version may change it.
+
+Two things to carry into that update:
+
+* the product page would then read "Rex - Recommendations" above
+  "Recommendations from friends", so the subtitle wants rewriting at the same
+  time — "From the people you trust" (25) or "Places, books, films and more"
+  (29);
+* `CFBundleDisplayName` is **Rex** and always has been, so the icon on a
+  phone is unaffected by any of this.
 
 ## The website says the opposite
 
