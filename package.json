@@ -5,7 +5,8 @@
   "type": "module",
   "scripts": {
     "lint": "eslint .",
-    "format": "prettier --write ."
+    "format": "prettier --write .",
+    "dev": "npx --yes wrangler pages dev web --port 8788"
   },
   "dependencies": {
     "@capacitor/cli": "^8.5.0",

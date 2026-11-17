@@ -17,7 +17,7 @@
 const SUPABASE_URL = "https://uhpzkbkwxcgqfxmlyktj.supabase.co";
 const ANON_KEY =
   "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVocHprYmt3eGNncWZ4bWx5a3RqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODU4Mzk2NDMsImV4cCI6MjEwMTQxNTY0M30.IvQ8byDwHErLhuJI1Pg3bRcb4AKK4sb9Bm6cr_6sHbI";
-const TESTFLIGHT = "https://testflight.apple.com/join/WBkDCpXV";
+const APP_STORE = "https://apps.apple.com/app/id6799256042";
 
 // The app's five-tier scale (RexRatingScale.swift): sub-6 Do not Rex, 6 Meh,
 // 7-8 Rex, 9 Loved, 10 Obsessed. Kept in step with it by hand.
@@ -79,6 +79,7 @@ function page({ title, description, image, url, body, status = 200 }) {
 <html lang="en">
 <head>
 <meta charset="utf-8">
+<meta name="apple-itunes-app" content="app-id=6799256042">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <!-- Oct 14 — "the image is the wrong logo." With no photo on the thing
      being shared there was no og:image at all, so WhatsApp fell back to
@@ -87,7 +88,7 @@ function page({ title, description, image, url, body, status = 200 }) {
      "the same logo as the top left of the feed screen". -->
 <title>${esc(title)}</title>
 <meta name="description" content="${esc(description)}">
-<meta property="og:site_name" content="REX">
+<meta property="og:site_name" content="Rex">
 <meta property="og:type" content="article">
 <meta property="og:title" content="${esc(title)}">
 <meta property="og:description" content="${esc(description)}">
@@ -105,19 +106,19 @@ ${`<meta name="twitter:image" content="${esc(image || "https://find-rex.com/og-d
 </head>
 <body>
 <header class="site"><div class="wrap">
-  <a class="brand" href="/"><img class="mark" src="/dinologo.png" alt=""><img class="word" src="/wordmark.png" alt="REX"></a>
+  <a class="brand" href="/"><img class="mark" src="/dinologo.png" alt=""><img class="word" src="/wordmark.png" alt="Rex"></a>
   <nav class="site"><a href="/support.html">Support</a><a href="/privacy.html">Privacy</a></nav>
 </div></header>
 <main><div class="wrap">
 ${body}
 <div class="card join">
   <h3>Recommendations from people you actually trust</h3>
-  <p class="muted">REX keeps the places, books, films and trips your friends really recommend — in one app, in their own words.</p>
-  <p><a class="btn" href="${TESTFLIGHT}">Get REX on iPhone</a></p>
+  <p class="muted">Rex keeps the places, books, films and trips your friends really recommend — in one app, in their own words.</p>
+  <p><a class="btn" href="${APP_STORE}">Download Rex on the App Store</a></p>
 </div>
 </div></main>
 <footer class="site"><div class="wrap">
-  <p>REX is made by Three Lines Studio Ltd. <a href="mailto:support@find-rex.com">support@find-rex.com</a></p>
+  <p>Rex is made by Three Lines Studios Ltd. <a href="mailto:support@find-rex.com">support@find-rex.com</a></p>
   <p><a href="/privacy.html">Privacy Policy</a> &middot; <a href="/terms.html">Terms of Service</a> &middot; <a href="/support.html">Support</a></p>
 </div></footer>
 </body>
@@ -135,7 +136,7 @@ ${body}
 
 function missing(url, what) {
   return page({
-    title: `This ${what} isn't available — REX`,
+    title: `This ${what} isn't available — Rex`,
     description: `This ${what} may have been deleted, or the link may be wrong.`,
     url,
     status: 404,
@@ -163,7 +164,7 @@ export async function onRequestGet({ params, request }) {
     : `${who} wants to try ${rec.item_title}`;
   const description = rec.note
     ? `“${String(rec.note).replace(/\s+/g, " ").slice(0, 155)}”`
-    : `A ${category.toLowerCase()} on REX — recommendations from people you actually trust.`;
+    : `A ${category.toLowerCase()} on Rex — recommendations from people you actually trust.`;
 
   const body = `<div class="card rex">
   ${image ? `<img class="hero" src="${esc(image)}" alt="">` : ""}

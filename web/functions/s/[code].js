@@ -40,7 +40,7 @@ export async function onRequestGet({ params, request }) {
 
   // An unknown code goes to the front page rather than a 404: the likeliest
   // reason to be holding one is that somebody sent it, and the home page at
-  // least says what REX is.
+  // least says what Rex is.
   if (!path || !row.target_id) return Response.redirect(`${url.origin}/`, 302);
 
   return Response.redirect(`${url.origin}/${path}/${row.target_id}`, 302);
