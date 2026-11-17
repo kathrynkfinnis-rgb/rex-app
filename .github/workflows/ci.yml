@@ -37,7 +37,7 @@ jobs:
     name: Website and tooling
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - uses: actions/setup-node@v4
         with:
           node-version: "22"
@@ -58,7 +58,7 @@ jobs:
     name: Edge functions
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - uses: denoland/setup-deno@v2
         with:
           deno-version: v2.x
@@ -87,7 +87,7 @@ jobs:
     name: Android
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - uses: actions/setup-java@v4
         with:
           distribution: temurin
@@ -117,7 +117,7 @@ jobs:
     name: iOS
     runs-on: macos-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       # Nov 16 — the runner's default Xcode was 16.4, which ships the iOS 18
       # SDK, and the app uses iOS 26 APIs behind #available guards. A guard
       # decides what runs; the symbol still has to exist to compile. So every
