@@ -2,16 +2,21 @@ package com.kathrynfinnis.rex.ui
 
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Add
 import androidx.compose.material.icons.outlined.Bookmark
 import androidx.compose.material.icons.outlined.Home
 import androidx.compose.material.icons.outlined.Map
+import androidx.compose.material.icons.outlined.People
 import androidx.compose.material.icons.outlined.Search
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.NavigationBar
 import androidx.compose.material3.NavigationBarItem
 import androidx.compose.material3.NavigationBarItemDefaults
@@ -22,6 +27,7 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.unit.dp
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
@@ -36,6 +42,7 @@ import com.kathrynfinnis.rex.ui.collections.CollectionDetail
 import com.kathrynfinnis.rex.ui.collections.CollectionsList
 import com.kathrynfinnis.rex.ui.explore.ExploreScreen
 import com.kathrynfinnis.rex.ui.feed.FeedList
+import com.kathrynfinnis.rex.ui.friends.FriendsScreen
 import com.kathrynfinnis.rex.ui.item.ItemDetailScreen
 import com.kathrynfinnis.rex.ui.map.MapScreen
 import com.kathrynfinnis.rex.ui.theme.RexColor
@@ -98,6 +105,27 @@ private fun SignedIn() {
 
     Scaffold(
         containerColor = RexColor.background,
+        // Nov 17 — the app had no top bar at all, which was fine while every
+        // screen was a tab and is not once Friends exists. iOS reaches Friends
+        // from the feed's toolbar; this is the same affordance in the same
+        // place. Profile joins it as the next port, which is why it is a Row
+        // rather than a single button.
+        topBar = {
+            if (!onTab) return@Scaffold
+            Row(
+                Modifier.fillMaxWidth().padding(start = 16.dp, end = 4.dp, top = 8.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Spacer(Modifier.weight(1f))
+                IconButton(onClick = { nav.navigate("friends") }) {
+                    Icon(
+                        Icons.Outlined.People,
+                        contentDescription = "Friends",
+                        tint = RexColor.foreground,
+                    )
+                }
+            }
+        },
         floatingActionButton = {
             if (onTab) {
                 FloatingActionButton(
@@ -184,6 +212,18 @@ private fun SignedIn() {
                     onBack = { nav.popBackStack() },
                     onOpenItem = { nav.navigate("item/$it") },
                 )
+            }
+
+            // Not a tab, for the reason in the Tab comment above: the two apps
+            // should navigate the same way, and on iOS Friends is a push from
+            // the feed's toolbar rather than a fifth tab.
+            //
+            // onOpenProfile is deliberately not passed. UserProfileView has no
+            // Android counterpart yet, and a row that navigates nowhere is
+            // worse than one that does not look tappable — so the screen is
+            // told there is no profile to open and renders accordingly.
+            composable("friends") {
+                FriendsScreen(onBack = { nav.popBackStack() })
             }
 
             composable("add") {

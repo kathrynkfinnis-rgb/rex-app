@@ -127,9 +127,53 @@ data class Friendship(
     @SerialName("created_at") val createdAt: String? = null,
 )
 
+/**
+ * Somebody you might know, from suggested_friends_for_me. Friends-of-friends
+ * ranked by mutual count, plus active accounts with no mutuals at all so a
+ * brand-new sign-up sees somebody rather than an empty screen.
+ *
+ * mutual_count defaults to 0 rather than being required: those no-mutual
+ * suggestions are exactly the rows a new account gets, and a strict decode
+ * would fail the whole list for the people who need it most.
+ */
+@Serializable
+data class SuggestedFriend(
+    val id: String,
+    val username: String,
+    @SerialName("display_name") val displayName: String? = null,
+    @SerialName("avatar_url") val avatarUrl: String? = null,
+    @SerialName("mutual_count") val mutualCount: Int = 0,
+)
+
 // Insert and projection shapes. Separate from the read models because a row
 // going in is not the row coming back: the database fills id, created_at and
 // the defaults, and sending nulls for them would overwrite what it chose.
+
+@Serializable
+internal data class NewFriendship(
+    @SerialName("requester_id") val requesterId: String,
+    @SerialName("addressee_id") val addresseeId: String,
+    val status: String = "pending",
+)
+
+@Serializable
+internal data class FriendshipStatusPatch(val status: String)
+
+// RPC arguments. Named with the leading underscore the functions themselves
+// declare — Postgres resolves named arguments by name, so these are not free
+// to tidy.
+
+@Serializable
+internal data class SearchProfilesArgs(
+    @SerialName("_query") val query: String,
+    @SerialName("_limit") val limit: Int = 15,
+)
+
+@Serializable
+internal data class ProfileBasicsArgs(@SerialName("_ids") val ids: List<String>)
+
+@Serializable
+internal data class SuggestedFriendsArgs(@SerialName("_limit") val limit: Int = 20)
 
 @Serializable
 internal data class ItemId(val id: String)

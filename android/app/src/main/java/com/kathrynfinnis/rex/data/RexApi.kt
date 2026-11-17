@@ -5,8 +5,10 @@ import io.github.jan.supabase.auth.Auth
 import io.github.jan.supabase.createSupabaseClient
 import io.github.jan.supabase.postgrest.Postgrest
 import io.github.jan.supabase.postgrest.from
+import io.github.jan.supabase.postgrest.postgrest
 import io.github.jan.supabase.postgrest.query.Columns
 import io.github.jan.supabase.postgrest.query.Order
+import io.github.jan.supabase.postgrest.rpc
 import io.github.jan.supabase.storage.Storage
 
 /**
@@ -165,6 +167,117 @@ object Rex {
             .select { filter { eq("id", id) }; limit(1) }
             .decodeList<RexProfile>()
             .firstOrNull()
+    }
+
+    // ──────────────────────────────────────────────────────── friends
+
+    /**
+     * Nov 17 — the first thing an Android build needs that it did not have.
+     *
+     * Until now there was no way to follow anybody on Android at all, which
+     * made the feed permanently empty: it reads what the people you follow
+     * have posted, and you could not follow anyone. The empty state even
+     * promised it would fill up.
+     *
+     * Two of these go through RPCs rather than reading the table, and that is
+     * not an optimisation — see searchProfiles and the fallback in profiles().
+     */
+
+    /**
+     * Every friendship you are part of, pending and accepted.
+     *
+     * requester_id and addressee_id reference auth.users(id) rather than
+     * profiles, so there is no PostgREST embed to be had — the profiles come
+     * separately and are merged by the caller, exactly as FriendsView.swift
+     * does it.
+     */
+    suspend fun friendships(): List<Friendship> =
+        client.from("friendships")
+            .select(Columns.raw("id,requester_id,addressee_id,status"))
+            .decodeList()
+
+    /**
+     * Names and avatars for a set of ids.
+     *
+     * The two-step matters. The profiles SELECT policy returns yourself, your
+     * friends, and anyone you already have a friendship row with — so a
+     * stranger comes back *missing* rather than refused: 200 OK, one fewer
+     * row, nothing to notice. iOS hit this on 5 October with a stranger's
+     * profile page showing no name at the exact moment you were deciding
+     * whether to add them. Anyone the table declines to hand over is looked up
+     * through profile_basics, which returns the same four columns.
+     *
+     * The fallback is best-effort: on a project where that function has not
+     * been created the caller still gets everybody the table did return.
+     */
+    suspend fun profiles(ids: List<String>): List<RexProfile> {
+        if (ids.isEmpty()) return emptyList()
+        val direct = client.from("profiles")
+            .select(Columns.raw("id,username,display_name,avatar_url")) {
+                filter { isIn("id", ids) }
+            }
+            .decodeList<RexProfile>()
+
+        val missing = ids.filterNot { id -> direct.any { it.id == id } }
+        if (missing.isEmpty()) return direct
+        val extra = runCatching {
+            client.postgrest.rpc("profile_basics", ProfileBasicsArgs(missing))
+                .decodeList<RexProfile>()
+        }.getOrDefault(emptyList())
+        return direct + extra
+    }
+
+    /**
+     * Search by name or username.
+     *
+     * Through the search_profiles RPC, and it has to be. The obvious version —
+     * select from profiles with an ilike — reads correctly and returns nothing
+     * useful, because the RLS policy narrows profiles to "self, friends, or a
+     * pending friendship row". So searching for anyone you are not already
+     * connected to, which is the entire point of searching, comes back empty
+     * with a 200 and no error.
+     *
+     * That is not hypothetical. It is how iOS's search quietly returned
+     * nothing from July to September (#128). search_profiles exists as a
+     * SECURITY DEFINER function specifically to get past this. Do not
+     * "simplify" this into a table read.
+     */
+    suspend fun searchProfiles(query: String): List<RexProfile> =
+        client.postgrest.rpc("search_profiles", SearchProfilesArgs(query.trim()))
+            .decodeList()
+
+    /**
+     * People you might know, ranked by mutuals.
+     *
+     * suggested_friends_for_me, not suggested_friends_for: the second takes an
+     * explicit caller argument and is locked to service_role, because any
+     * authenticated caller could otherwise pass somebody else's id. This one
+     * reads auth.uid() itself.
+     */
+    suspend fun suggestedFriends(limit: Int = 20): List<SuggestedFriend> =
+        client.postgrest.rpc("suggested_friends_for_me", SuggestedFriendsArgs(limit))
+            .decodeList()
+
+    /** Ask to be friends. The row starts pending; they decide. */
+    suspend fun sendFriendRequest(addresseeId: String) {
+        val userId = RexAuth.currentUserId ?: error("Not signed in.")
+        client.from("friendships").insert(
+            NewFriendship(requesterId = userId, addresseeId = addresseeId)
+        )
+    }
+
+    /**
+     * Accept or decline. Declining deletes the row rather than marking it
+     * rejected, matching iOS — which also means a request can be sent again
+     * later, instead of one "no" being permanent.
+     */
+    suspend fun respondToFriendRequest(id: String, accept: Boolean) {
+        if (accept) {
+            client.from("friendships")
+                .update(FriendshipStatusPatch("accepted")) { filter { eq("id", id) } }
+        } else {
+            client.from("friendships").delete { filter { eq("id", id) } }
+        }
     }
 
     // ──────────────────────────────────────────────────────── writing
