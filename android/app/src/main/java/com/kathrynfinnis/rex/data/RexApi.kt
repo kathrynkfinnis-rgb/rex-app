@@ -245,6 +245,78 @@ object Rex {
             .firstOrNull()
     }
 
+    // ──────────────────────────────────────────────────── notifications
+
+    /**
+     * Nov 17 — the bell. In-app only: this is the list, not the delivery.
+     * Push on Android is a separate and much larger job — there is no Firebase
+     * or FCM anywhere in this project, so send-push has only ever reached
+     * iPhones.
+     *
+     * Actors come separately because notifications.actor_id has no foreign key
+     * to profiles and so cannot be embedded. Best-effort: a notification
+     * whose actor cannot be resolved still reads, as "Someone".
+     */
+    suspend fun notifications(): List<RexNotification> {
+        val userId = RexAuth.currentUserId ?: error("Not signed in.")
+        val rows = client.from("notifications")
+            .select(
+                Columns.raw("id,actor_id,type,entity_type,entity_id,data,read_at,created_at")
+            ) {
+                filter { eq("user_id", userId) }
+                order("created_at", Order.DESCENDING)
+                limit(100)
+            }
+            .decodeList<RexNotification>()
+
+        val actorIds = rows.mapNotNull { it.actorId }.distinct()
+        if (actorIds.isEmpty()) return rows
+        val byId = runCatching { profiles(actorIds) }.getOrDefault(emptyList()).associateBy { it.id }
+        rows.forEach { n ->
+            byId[n.actorId]?.let { p ->
+                n.actor = RexAuthor(
+                    username = p.username,
+                    displayName = p.displayName,
+                    avatarUrl = p.avatarUrl,
+                )
+            }
+        }
+        return rows
+    }
+
+    /**
+     * Item ids for a batch of recommendation ids.
+     *
+     * A notification's entity_id is the recommendation, and every screen
+     * Android can open is addressed by item. iOS resolves the same way and
+     * records why: passing entity_id to an item screen directly just 404s.
+     */
+    suspend fun itemIdsFor(recommendationIds: List<String>): Map<String, String> {
+        if (recommendationIds.isEmpty()) return emptyMap()
+        return client.from(RECS)
+            .select(Columns.raw("id,item_id")) { filter { isIn("id", recommendationIds) } }
+            .decodeList<RecItemId>()
+            .associate { it.id to it.itemId }
+    }
+
+    /**
+     * Best-effort, like iOS: having read your notifications is not something
+     * worth showing an error about, and the list is already on screen.
+     */
+    suspend fun markNotificationsRead(ids: List<String>) {
+        if (ids.isEmpty()) return
+        val now = java.time.OffsetDateTime.now(java.time.ZoneOffset.UTC).toString()
+        runCatching {
+            client.from("notifications")
+                .update(ReadAtPatch(now)) { filter { isIn("id", ids) } }
+        }
+    }
+
+    /** Your own notifications are yours to delete — RLS says so explicitly. */
+    suspend fun deleteNotification(id: String) {
+        client.from("notifications").delete { filter { eq("id", id) } }
+    }
+
     // ──────────────────────────────────────────────────────── friends
 
     /**

@@ -13,6 +13,7 @@ import androidx.compose.material.icons.outlined.Bookmark
 import androidx.compose.material.icons.outlined.Home
 import androidx.compose.material.icons.outlined.Map
 import androidx.compose.material.icons.outlined.People
+import androidx.compose.material.icons.outlined.Notifications
 import androidx.compose.material.icons.outlined.Search
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.FloatingActionButton
@@ -46,6 +47,7 @@ import com.kathrynfinnis.rex.ui.feed.FeedList
 import com.kathrynfinnis.rex.ui.friends.FriendsScreen
 import com.kathrynfinnis.rex.ui.item.ItemDetailScreen
 import com.kathrynfinnis.rex.ui.map.MapScreen
+import com.kathrynfinnis.rex.ui.notifications.NotificationsScreen
 import com.kathrynfinnis.rex.ui.profile.MyProfileScreen
 import com.kathrynfinnis.rex.ui.profile.UserProfileScreen
 import com.kathrynfinnis.rex.ui.theme.RexColor
@@ -120,6 +122,13 @@ private fun SignedIn() {
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 Spacer(Modifier.weight(1f))
+                IconButton(onClick = { nav.navigate("notifications") }) {
+                    Icon(
+                        Icons.Outlined.Notifications,
+                        contentDescription = "Notifications",
+                        tint = RexColor.foreground,
+                    )
+                }
                 IconButton(onClick = { nav.navigate("friends") }) {
                     Icon(
                         Icons.Outlined.People,
@@ -237,6 +246,14 @@ private fun SignedIn() {
                     onOpenProfile = { id, name ->
                         nav.navigate("user/$id/${java.net.URLEncoder.encode(name, "UTF-8")}")
                     },
+                )
+            }
+
+            composable("notifications") {
+                NotificationsScreen(
+                    onBack = { nav.popBackStack() },
+                    onOpenItem = { nav.navigate("item/$it") },
+                    onOpenFriends = { nav.navigate("friends") },
                 )
             }
 

@@ -2,6 +2,8 @@ package com.kathrynfinnis.rex.data
 
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
+import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.JsonPrimitive
 
 /**
  * Mirrors the Swift models in ios/App/App/Native/Models.kt — same column
@@ -177,9 +179,128 @@ data class SuggestedFriend(
     @SerialName("mutual_count") val mutualCount: Int = 0,
 )
 
+/**
+ * One row in the bell.
+ *
+ * `actor` is filled in after the fetch, not by the query: notifications.
+ * actor_id has no foreign key to profiles, so there is no embed for PostgREST
+ * to build. The web app and iOS both stitch it on the same way.
+ *
+ * `data` is a free-form jsonb payload whose keys depend on `type`, which is
+ * why it stays a JsonObject rather than becoming a class per kind.
+ */
+@Serializable
+data class RexNotification(
+    val id: String,
+    @SerialName("actor_id") val actorId: String? = null,
+    val type: String,
+    @SerialName("entity_type") val entityType: String? = null,
+    @SerialName("entity_id") val entityId: String? = null,
+    val data: JsonObject? = null,
+    @SerialName("read_at") val readAt: String? = null,
+    @SerialName("created_at") val createdAt: String,
+) {
+    /** Stitched on after the fetch; a body property, so never serialized. */
+    var actor: RexAuthor? = null
+
+    val isUnread: Boolean get() = readAt == null
+
+    private fun str(key: String): String =
+        (data?.get(key) as? JsonPrimitive)?.takeIf { it.isString }?.content.orEmpty()
+
+    private fun num(key: String): Int =
+        (data?.get(key) as? JsonPrimitive)?.content?.toDoubleOrNull()?.toInt() ?: 0
+
+    private fun bool(key: String): Boolean =
+        (data?.get(key) as? JsonPrimitive)?.content == "true"
+
+    /**
+     * What the row reads as.
+     *
+     * Ported line for line from RexNotification.copy in Models.swift, and
+     * deliberately not paraphrased. Every branch below is a bug that was
+     * reported and fixed on iOS: rec_tagged wrote rows from 22 August and read
+     * "New activity" until 15 October; ticket_reminder did the same from 12
+     * October, which meant the one notification whose whole job is naming a
+     * time never named it. A fresh implementation would reproduce all of them.
+     */
+    val copy: String
+        get() {
+            val who = actor?.displayName?.takeIf { it.isNotBlank() }
+                ?: actor?.username?.takeIf { it.isNotBlank() }
+                ?: "Someone"
+            val preview = str("preview")
+            val title = str("title")
+            return when (type) {
+                "rec_like" -> "$who liked your Rex"
+                "rec_saved" -> "$who added your Rex to their collection"
+                "rec_comment" -> "$who commented: “$preview”"
+                "rec_comment_thread" -> "$who also commented: “$preview”"
+                "friend_request" -> "$who sent you a friend request"
+                "friend_accepted" -> "$who accepted your friend request"
+                "blast_new" -> "$who put out a blast: “$title”"
+                "blast_comment" ->
+                    if (bool("has_suggestion")) {
+                        "$who suggested something on your blast “$title”"
+                    } else {
+                        "$who replied to your blast: “$preview”"
+                    }
+                "blast_comment_thread" ->
+                    if (title.isEmpty()) {
+                        "$who also replied: “$preview”"
+                    } else {
+                        "$who also replied on “$title”: “$preview”"
+                    }
+                "rec_tagged" ->
+                    if (title.isEmpty()) "$who tagged you in a Rex"
+                    else "$who tagged you in their Rex of $title"
+                "want_tagged" ->
+                    if (title.isEmpty()) "$who wants to try something with you"
+                    else "$who wants to try $title with you"
+                "mention" -> "$who tagged you: “$preview”"
+                "friend_new_rec" -> "$who Rexed ${title.ifEmpty { "something new" }}"
+                "ticket_reminder" -> {
+                    val what = if (title.isEmpty()) "Tickets" else "Tickets for $title"
+                    val lead = num("lead_minutes")
+                    when {
+                        lead >= 1440 -> "$what go on sale tomorrow"
+                        lead >= 60 -> "$what go on sale in ${lead / 60} hours"
+                        lead > 0 -> "$what go on sale in $lead minutes"
+                        else -> "$what are on sale now"
+                    }
+                }
+                // `who` is deliberately unused: the row has no actor, because
+                // a pile of requests has no single author.
+                "friend_requests_waiting" -> {
+                    val n = num("count")
+                    if (n == 1) "You have a friend request waiting"
+                    else "You have $n friend requests waiting"
+                }
+                else -> "New activity"
+            }
+        }
+
+    /**
+     * The recommendation this points at — a *recommendation* id, not an item
+     * id. Every trigger that writes entity_type='recommendation' sets
+     * entity_id to recommendations.id, so handing it straight to an item
+     * screen just 404s, which is what iOS did until it resolved them. Trips
+     * are excluded because they open an itinerary, which Android has no
+     * screen for.
+     */
+    val linkedRecommendationId: String?
+        get() = if (entityType == "recommendation" && str("category") != "trip") entityId else null
+}
+
 // Insert and projection shapes. Separate from the read models because a row
 // going in is not the row coming back: the database fills id, created_at and
 // the defaults, and sending nulls for them would overwrite what it chose.
+
+@Serializable
+internal data class ReadAtPatch(@SerialName("read_at") val readAt: String)
+
+@Serializable
+internal data class RecItemId(val id: String, @SerialName("item_id") val itemId: String)
 
 @Serializable
 internal data class NewFriendship(
