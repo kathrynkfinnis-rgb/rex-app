@@ -10,6 +10,7 @@ import io.github.jan.supabase.postgrest.query.Columns
 import io.github.jan.supabase.postgrest.query.Order
 import io.github.jan.supabase.postgrest.rpc
 import io.github.jan.supabase.storage.Storage
+import kotlin.math.roundToInt
 
 /**
  * The Android half of what RexAPI.swift does on iOS — against the same
@@ -536,7 +537,10 @@ object Rex {
             NewRecommendation(
                 userId = userId,
                 itemId = itemId,
-                rating = rating,
+                // Rounded at the boundary: the column is a smallint, and a
+                // Double reaches it as "6.0" and is refused. See
+                // NewRecommendation.
+                rating = rating.roundToInt(),
                 note = note?.trim()?.ifEmpty { null },
             )
         )
@@ -561,7 +565,10 @@ object Rex {
      */
     suspend fun updateRecommendation(id: String, rating: Double, note: String?) {
         client.from("recommendations").update(
-            RecommendationPatch(rating = rating, note = note?.trim()?.ifEmpty { null })
+            RecommendationPatch(
+                rating = rating.roundToInt(),
+                note = note?.trim()?.ifEmpty { null },
+            )
         ) {
             filter { eq("id", id) }
         }

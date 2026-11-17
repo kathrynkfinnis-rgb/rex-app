@@ -305,7 +305,7 @@ internal data class ReadAtPatch(@SerialName("read_at") val readAt: String)
  * for them and wipe what an iPhone had put there. See updateRecommendation.
  */
 @Serializable
-internal data class RecommendationPatch(val rating: Double, val note: String? = null)
+internal data class RecommendationPatch(val rating: Int, val note: String? = null)
 
 @Serializable
 internal data class RecItemId(val id: String, @SerialName("item_id") val itemId: String)
@@ -355,11 +355,28 @@ internal data class NewItem(
     @SerialName("external_source") val externalSource: String? = null,
 )
 
+/**
+ * Nov 17 — `rating` is Int, and it has to be.
+ *
+ * recommendations.rating is a smallint. Kotlin serialises a Double 6.0 as
+ * "6.0", and Postgres refuses that for an integer column:
+ *
+ *   400  invalid input syntax for type smallint: "6.0"
+ *
+ * Which means posting a Rex from Android had never once worked — not since
+ * this screen was written on 2 November. It compiled, the screen looked
+ * right, and every Post ended in "that didn't save". Swift writes the same
+ * value as "6", so iOS never met it, and nobody had run the Android build.
+ *
+ * The five tier values are whole numbers by design (3, 6, 8, 9, 10), so Int
+ * is also the honest type for them. Reads keep Double: FeedRecommendation
+ * buckets ranges, and a Double parses a smallint happily.
+ */
 @Serializable
 internal data class NewRecommendation(
     @SerialName("user_id") val userId: String,
     @SerialName("item_id") val itemId: String,
-    val rating: Double,
+    val rating: Int,
     val note: String? = null,
 )
 
