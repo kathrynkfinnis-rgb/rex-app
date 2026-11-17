@@ -7,6 +7,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.outlined.AccountCircle
 import androidx.compose.material.icons.outlined.Add
 import androidx.compose.material.icons.outlined.Bookmark
 import androidx.compose.material.icons.outlined.Home
@@ -45,6 +46,8 @@ import com.kathrynfinnis.rex.ui.feed.FeedList
 import com.kathrynfinnis.rex.ui.friends.FriendsScreen
 import com.kathrynfinnis.rex.ui.item.ItemDetailScreen
 import com.kathrynfinnis.rex.ui.map.MapScreen
+import com.kathrynfinnis.rex.ui.profile.MyProfileScreen
+import com.kathrynfinnis.rex.ui.profile.UserProfileScreen
 import com.kathrynfinnis.rex.ui.theme.RexColor
 
 /**
@@ -121,6 +124,13 @@ private fun SignedIn() {
                     Icon(
                         Icons.Outlined.People,
                         contentDescription = "Friends",
+                        tint = RexColor.foreground,
+                    )
+                }
+                IconButton(onClick = { nav.navigate("me") }) {
+                    Icon(
+                        Icons.Outlined.AccountCircle,
+                        contentDescription = "Your profile",
                         tint = RexColor.foreground,
                     )
                 }
@@ -218,12 +228,44 @@ private fun SignedIn() {
             // should navigate the same way, and on iOS Friends is a push from
             // the feed's toolbar rather than a fifth tab.
             //
-            // onOpenProfile is deliberately not passed. UserProfileView has no
-            // Android counterpart yet, and a row that navigates nowhere is
-            // worse than one that does not look tappable — so the screen is
-            // told there is no profile to open and renders accordingly.
             composable("friends") {
-                FriendsScreen(onBack = { nav.popBackStack() })
+                FriendsScreen(
+                    onBack = { nav.popBackStack() },
+                    // Live as of 17 November. The rows were built to expect
+                    // this and deliberately did not navigate until the profile
+                    // screen existed.
+                    onOpenProfile = { id, name ->
+                        nav.navigate("user/$id/${java.net.URLEncoder.encode(name, "UTF-8")}")
+                    },
+                )
+            }
+
+            composable("me") {
+                MyProfileScreen(
+                    onBack = { nav.popBackStack() },
+                    onOpenItem = { nav.navigate("item/$it") },
+                    onOpenFriends = { nav.navigate("friends") },
+                )
+            }
+
+            composable(
+                "user/{userId}/{name}",
+                arguments = listOf(
+                    navArgument("userId") { type = NavType.StringType },
+                    navArgument("name") { type = NavType.StringType },
+                ),
+            ) { backStack ->
+                UserProfileScreen(
+                    userId = backStack.arguments?.getString("userId").orEmpty(),
+                    // Encoded for the same reason a collection's name is: a
+                    // display name with a slash in it would otherwise be two
+                    // path segments and match nothing.
+                    fallbackName = java.net.URLDecoder.decode(
+                        backStack.arguments?.getString("name").orEmpty(), "UTF-8",
+                    ),
+                    onBack = { nav.popBackStack() },
+                    onOpenItem = { nav.navigate("item/$it") },
+                )
             }
 
             composable("add") {

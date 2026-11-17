@@ -35,6 +35,35 @@ object Rex {
     }
 
     /**
+     * Every read of a Rex goes through this view, never the recommendations
+     * table. Nov 17, and it is a privacy fix rather than a tidy-up.
+     *
+     * "Post anonymously" hides the poster in the app's own UI only. The raw
+     * row still carries the real user_id, and embedding profiles off it hands
+     * back the real author of every anonymous Rex — which is what every read
+     * in this file was doing, so an anonymous Rex was not anonymous on
+     * Android at all. iOS closed this on 25 August (#181, security review)
+     * with recommendations_display: a 1:1 passthrough whose `profiles` column
+     * is NULL when the row is anonymous and you are not its owner.
+     *
+     * `security_invoker = true` on the view means recommendations' own RLS is
+     * enforced as if the table had been queried directly, so this can only
+     * ever narrow what is visible, never widen it.
+     *
+     * Two consequences for anything written against it. `profiles` is a plain
+     * JSON column, not an FK embed, so it is selected by name and decodes to
+     * RexAuthor, which has no id. And the name can be absent — use
+     * FeedRecommendation.authorName, which says "Someone", rather than
+     * reaching for a fallback the mask was meant to deny you.
+     */
+    private const val RECS = "recommendations_display"
+
+    /** The columns every Rex read wants, in one place so they cannot drift. */
+    private const val REC_COLUMNS =
+        "id,rating,note,created_at,photo_urls,user_id,item_id,trip_id,show_in_feed,is_anonymous,profiles," +
+        "items!inner(id,type,title,subtitle,image_url,genre,address,lat,lng,link_url,google_rating,chain_key)"
+
+    /**
      * The feed, as close to fetchFeed() in RexAPI.swift as this early stage
      * warrants. Two of its rules are copied deliberately because getting
      * them wrong is visible immediately:
@@ -49,14 +78,8 @@ object Rex {
      * iOS. Not here yet; the feed is half a feed until it is.
      */
     suspend fun feed(limit: Long = 50): List<FeedRecommendation> =
-        client.from("recommendations")
-            .select(
-                Columns.raw(
-                    "id,rating,note,created_at,photo_urls,user_id,item_id,trip_id,show_in_feed," +
-                    "items!inner(id,type,title,subtitle,image_url,genre,address,lat,lng,link_url,google_rating,chain_key)," +
-                    "profiles!recommendations_user_id_fkey(id,username,display_name,avatar_url)"
-                )
-            ) {
+        client.from(RECS)
+            .select(Columns.raw(REC_COLUMNS)) {
                 filter {
                     exact("trip_id", null)
                     or {
@@ -81,14 +104,8 @@ object Rex {
 
     /** Everything anybody has said about one thing. The item detail screen. */
     suspend fun recommendationsFor(itemId: String): List<FeedRecommendation> =
-        client.from("recommendations")
-            .select(
-                Columns.raw(
-                    "id,rating,note,created_at,photo_urls,user_id,item_id,trip_id,show_in_feed," +
-                    "items!inner(id,type,title,subtitle,image_url,genre,address,lat,lng,link_url,google_rating,chain_key)," +
-                    "profiles!recommendations_user_id_fkey(id,username,display_name,avatar_url)"
-                )
-            ) {
+        client.from(RECS)
+            .select(Columns.raw(REC_COLUMNS)) {
                 filter { eq("item_id", itemId) }
                 order("created_at", Order.DESCENDING)
             }
@@ -145,18 +162,77 @@ object Rex {
             }
             .decodeList()
 
-    /** What is inside one collection. */
-    suspend fun collectionItems(listId: String): List<SavedPost> =
-        client.from("saved_posts")
-            .select(
-                Columns.raw(
-                    "id,list_id,recommendation_id,note,section,sort_order," +
-                    "recommendations(id,rating,note,created_at,photo_urls,user_id,item_id,trip_id,show_in_feed," +
-                    "items!inner(id,type,title,subtitle,image_url,genre,address,lat,lng,link_url,google_rating,chain_key)," +
-                    "profiles!recommendations_user_id_fkey(id,username,display_name,avatar_url))"
-                )
-            ) {
+    /**
+     * What is inside one collection.
+     *
+     * Two queries rather than one embed, and not by choice. saved_posts'
+     * foreign key points at the recommendations table, so a nested embed can
+     * only name the table — which would hand back the real author of an
+     * anonymous Rex inside a collection, the one path the view could not
+     * cover. So the rows come first without their Rex, and the Rex come from
+     * the view by id and are merged here.
+     *
+     * The cost is one extra round trip per collection open. The alternative
+     * was a privacy hole in the only read that could still have one.
+     */
+    suspend fun collectionItems(listId: String): List<SavedPost> {
+        val rows = client.from("saved_posts")
+            .select(Columns.raw("id,list_id,recommendation_id,note,section,sort_order")) {
                 filter { eq("list_id", listId) }
+            }
+            .decodeList<SavedPost>()
+
+        val ids = rows.mapNotNull { it.recommendationId }.distinct()
+        if (ids.isEmpty()) return rows
+        val byId = client.from(RECS)
+            .select(Columns.raw(REC_COLUMNS)) { filter { isIn("id", ids) } }
+            .decodeList<FeedRecommendation>()
+            .associateBy { it.id }
+        return rows.map { row ->
+            row.copy(recommendations = row.recommendationId?.let { byId[it] })
+        }
+    }
+
+    /**
+     * Somebody's own Rex, newest first — the profile screen, yours or theirs.
+     *
+     * trip_id is null for the reason iOS records against this exact query:
+     * adding an existing Rex to a trip creates a second row for the same item
+     * as a stop, with no rating, note or photo of its own. Without the filter
+     * the profile showed the real Rex and the bare stop row side by side —
+     * "I just added this Rex to a trip and now it has duplicated".
+     *
+     * No show_in_feed filter, deliberately, and this is where it differs from
+     * feed(): a Rex you have kept out of the feed is still yours and still
+     * belongs on your profile. RLS decides whether you may see somebody
+     * else's at all.
+     */
+    suspend fun recommendationsBy(userId: String): List<FeedRecommendation> =
+        client.from(RECS)
+            .select(Columns.raw(REC_COLUMNS)) {
+                filter {
+                    eq("user_id", userId)
+                    exact("trip_id", null)
+                }
+                order("created_at", Order.DESCENDING)
+            }
+            .decodeList()
+
+    /**
+     * Somebody else's collections.
+     *
+     * visibility in (public, friends) as well as RLS, matching
+     * fetchLists(forUser:) on iOS — a private collection is not something to
+     * list on a profile even to someone the policy would let read it.
+     */
+    suspend fun collectionsOf(userId: String): List<RexList> =
+        client.from("hitlist_lists")
+            .select(Columns.raw("id,name,user_id,emoji,topic,created_at")) {
+                filter {
+                    eq("user_id", userId)
+                    isIn("visibility", listOf("public", "friends"))
+                }
+                order("created_at", Order.DESCENDING)
             }
             .decodeList()
 

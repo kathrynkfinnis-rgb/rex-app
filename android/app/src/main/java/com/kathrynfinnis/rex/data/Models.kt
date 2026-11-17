@@ -32,6 +32,27 @@ data class RexItem(
     @SerialName("chain_key") val chainKey: String? = null,
 )
 
+/**
+ * Who posted a Rex, as the recommendations_display view hands it over.
+ *
+ * Nov 17 — a separate type from RexProfile, and the difference is the point.
+ * RexProfile is a row of the profiles table and has an id. This is the view's
+ * precomputed `profiles` column, which is a plain JSON object with three keys
+ * and no id — and which is **null when the Rex is anonymous and you are not
+ * the person who posted it**.
+ *
+ * Reading the recommendations table directly instead would hand back the real
+ * author of every anonymous Rex, which is exactly the hole the 25 August
+ * security review closed on iOS (#181) and which this app had reopened. Every
+ * read of a recommendation goes through the view now; see the note on feed().
+ */
+@Serializable
+data class RexAuthor(
+    val username: String,
+    @SerialName("display_name") val displayName: String? = null,
+    @SerialName("avatar_url") val avatarUrl: String? = null,
+)
+
 @Serializable
 data class FeedRecommendation(
     val id: String,
@@ -43,9 +64,20 @@ data class FeedRecommendation(
     @SerialName("item_id") val itemId: String,
     @SerialName("trip_id") val tripId: String? = null,
     @SerialName("show_in_feed") val showInFeed: Boolean? = null,
+    @SerialName("is_anonymous") val isAnonymous: Boolean? = null,
     val items: RexItem? = null,
-    val profiles: RexProfile? = null,
+    val profiles: RexAuthor? = null,
 ) {
+    /**
+     * What to call the person who posted this. "Someone" when the view has
+     * masked them, which is the whole point of the mask: the UI must not have
+     * a name to fall back to.
+     */
+    val authorName: String
+        get() = profiles?.displayName?.takeIf { it.isNotBlank() }
+            ?: profiles?.username?.takeIf { it.isNotBlank() }
+            ?: "Someone"
+
     /** The five-tier scale from RexRatingScale.swift, kept in step by hand. */
     val tier: String?
         get() = when {
