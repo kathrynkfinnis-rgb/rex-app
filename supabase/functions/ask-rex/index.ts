@@ -69,6 +69,25 @@ const CORS = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
+/** The one place a client is built, so `Db` below can be derived from it.
+ *
+ *  Nov 17 — the retrieval helpers used to be typed `ReturnType<typeof
+ *  createClient>`, which looks right and is not: createClient is generic, and
+ *  ReturnType resolves a generic function's parameters to their *constraints*
+ *  rather than their defaults. So the helpers asked for
+ *  `SupabaseClient<unknown, …, never, never>` while the call above produced
+ *  `SupabaseClient<any, "public", "public", …>`, and those are not assignable.
+ *  Four TS2345s, which nothing noticed until CI type-checked this file for the
+ *  first time on 16 November. Taking the type off a real, non-generic call
+ *  cannot drift, whatever supabase-js does to its generics next. */
+function anonClient(authorization: string) {
+  return createClient(SUPABASE_URL, ANON_KEY, {
+    global: { headers: { Authorization: authorization } },
+  });
+}
+
+type Db = ReturnType<typeof anonClient>;
+
 /** How many of a friend's Rex the model is allowed to see. Forty is enough to
  *  choose well from and small enough to keep the bill flat. */
 const CANDIDATE_LIMIT = 40;
@@ -121,9 +140,7 @@ Deno.serve(async (req) => {
   // which every copy of the app carries. That is not a user. Resolving the
   // token to an actual account is what makes this endpoint safe; the same
   // hole was found in send-push on 21 Sept.
-  const asUser = createClient(SUPABASE_URL, ANON_KEY, {
-    global: { headers: { Authorization: authorization } },
-  });
+  const asUser = anonClient(authorization);
   const { data: auth, error: authError } = await asUser.auth.getUser();
   if (authError || !auth?.user) return json({ error: "Not signed in." }, 401);
   const userId = auth.user.id;
@@ -272,7 +289,7 @@ Deno.serve(async (req) => {
  *  the replacement is pgvector over the same columns — the shape of this
  *  function doesn't change, only the ORDER BY. */
 async function fetchCandidates(
-  db: ReturnType<typeof createClient>,
+  db: Db,
   question: string,
   meId: string,
   about: Person | null,
@@ -385,7 +402,7 @@ function keywordsFor(question: string): string[] {
  *  unrated row, because a list itself carries no rating — what it is worth is
  *  what is inside it. */
 async function fetchByKeywords(
-  db: ReturnType<typeof createClient>,
+  db: Db,
   question: string,
   types: string[],
 ): Promise<Record<string, unknown>[]> {
@@ -398,11 +415,13 @@ async function fetchByKeywords(
     if (!escaped) continue;
     let query = db
       .from("recommendations")
-      .select(
-        "id,rating,note,item_id,user_id," +
-          "items!inner(id,type,title,subtitle,genre,address)," +
-          "profiles!recommendations_user_id_fkey(username,display_name)",
-      )
+      // Nov 17 — one string literal, and it has to stay one. These three lines
+      // were joined with `+`, which TypeScript widens to `string`, and
+      // supabase-js reads a row's shape out of the select string *as a literal
+      // type*: what it cannot parse becomes GenericStringError, and `data`
+      // stops being rows at all. Concatenating to keep the line short threw
+      // the types away.
+      .select("id,rating,note,item_id,user_id,items!inner(id,type,title,subtitle,genre,address),profiles!recommendations_user_id_fkey(username,display_name)")
       .or(
         `title.ilike.*${escaped}*,subtitle.ilike.*${escaped}*,genre.ilike.*${escaped}*`,
         { foreignTable: "items" },
@@ -426,7 +445,7 @@ type Person = { id: string; name: string };
 /** Everyone whose Rex this user can see, so a question can name one of them.
  *  RLS decides the list, so this can only ever return people already visible
  *  to the caller — naming a stranger finds nobody, which is correct. */
-async function fetchPeople(db: ReturnType<typeof createClient>): Promise<Person[]> {
+async function fetchPeople(db: Db): Promise<Person[]> {
   const { data } = await db.from("profiles").select("id,username,display_name").limit(500);
   return (data ?? []).map((row: Record<string, unknown>) => ({
     id: String(row.id),
@@ -506,7 +525,7 @@ function typesFor(question: string): string[] {
   return [...new Set(types)];
 }
 
-async function fetchFacts(db: ReturnType<typeof createClient>): Promise<string[]> {
+async function fetchFacts(db: Db): Promise<string[]> {
   const { data } = await db
     .from("rex_facts")
     .select("fact")
@@ -515,7 +534,7 @@ async function fetchFacts(db: ReturnType<typeof createClient>): Promise<string[]
   return (data ?? []).map((row: Record<string, unknown>) => String(row.fact));
 }
 
-async function fetchSuggested(db: ReturnType<typeof createClient>): Promise<string[]> {
+async function fetchSuggested(db: Db): Promise<string[]> {
   const { data } = await db
     .from("rex_suggestions")
     .select("item_id")

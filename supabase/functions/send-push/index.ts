@@ -232,19 +232,27 @@ Deno.serve(async (req: Request) => {
     // an unrecognised type was quietly ignoring that. Unknown types are
     // gated on push_enabled alone now — the category cannot be judged, but
     // "I turned push off" always can.
-    const columns = prefColumn ? `push_enabled, ${prefColumn}` : "push_enabled";
-    const { data: prefs } = await supabase
+    // Nov 17 — this asked for `push_enabled, ${prefColumn}`, a string built at
+    // runtime, and that is what broke the type-check the moment CI first ran
+    // one against this file. supabase-js reads the shape of a row out of the
+    // select string *as a literal type*; a plain `string` cannot be parsed
+    // that way, so it resolves to GenericStringError and `prefs` ends up with
+    // no push_enabled on it at all. Asking for the whole row sidesteps it and
+    // is cheaper to read: one row of booleans keyed by user, so there was
+    // never anything to save by naming two of its columns.
+    const { data } = await supabase
       .from("notification_preferences")
-      .select(columns)
+      .select("*")
       .eq("user_id", notification.user_id)
       .maybeSingle();
+    const prefs = data as Record<string, boolean | null> | null;
     // Defaults mirror notif_pref_enabled() in SQL: missing row means every
     // category is on except friend_new_rec, but push itself defaults off
     // until the user has explicitly opted in on the preferences screen.
     const pushEnabled = prefs?.push_enabled ?? false;
     const categoryEnabled = !prefColumn
       ? true
-      : (prefs ? Boolean(prefs[prefColumn as keyof typeof prefs]) : prefColumn !== "friend_new_rec");
+      : (prefs ? Boolean(prefs[prefColumn]) : prefColumn !== "friend_new_rec");
     if (!pushEnabled || !categoryEnabled) {
       return new Response(JSON.stringify({ skipped: "preference off" }), { status: 200 });
     }

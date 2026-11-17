@@ -298,128 +298,7 @@ struct CollectionDetailView: View {
                             .padding(.top, RexSpacing.xs)
                         }
                         ForEach(Array(group.rows.enumerated()), id: \.element.id) { index, row in
-                        if let rec = row.recommendations {
-                            if isArranging {
-                                HStack(spacing: RexSpacing.lg) {
-                                    Button {
-                                        Task { await move(row, by: -1) }
-                                    } label: { Image(systemName: "chevron.up") }
-                                    .disabled(isMutating || rows.first?.id == row.id)
-                                    Button {
-                                        Task { await move(row, by: 1) }
-                                    } label: { Image(systemName: "chevron.down") }
-                                    .disabled(isMutating || rows.last?.id == row.id)
-                                    Spacer()
-                                    Text(rec.items?.title ?? "Untitled")
-                                        .font(RexFont.text(13, weight: .medium))
-                                        .foregroundStyle(RexColor.mutedForeground)
-                                        .lineLimit(1)
-                                }
-                                .font(.system(size: 14))
-                                .foregroundStyle(RexColor.mutedForeground)
-                                .padding(.horizontal, RexSpacing.sm)
-                                .padding(.top, index == 0 ? 0 : RexSpacing.sm)
-                            }
-                            // Oct 14 — the note sits under the thing it is
-                            // about, in the editorial face, because it is
-                            // somebody speaking rather than a label. Shown to
-                            // everyone who can see the collection: a note
-                            // saying "get the crab sandwich" is most of why
-                            // you would share the list at all.
-                            if let itemNote = row.note, !itemNote.isEmpty {
-                                HStack(alignment: .top, spacing: 7) {
-                                    Image(systemName: "text.bubble")
-                                        .font(.system(size: 11))
-                                        .foregroundStyle(RexColor.primary)
-                                        .padding(.top, 3)
-                                    Text(itemNote)
-                                        .font(RexFont.editorial(18))
-                                        .foregroundStyle(RexColor.foreground.opacity(0.85))
-                                        .fixedSize(horizontal: false, vertical: true)
-                                }
-                                .frame(maxWidth: .infinity, alignment: .leading)
-                                .padding(.horizontal, RexSpacing.sm)
-                                .padding(.top, 2)
-                            }
-                            SwipeToRemove(
-                                label: "Remove",
-                                systemImage: "minus.circle",
-                                onTap: { pushedItemId = rec.item_id },
-                                action: {
-                                    guard route.isMine else { return }
-                                    await remove(rec.id)
-                                }
-                            ) {
-                                if compact && !isArranging {
-                                    CompactItemRow(rec: rec)
-                                } else {
-                                RecommendationCardView(rec: rec, onAuthorTap: { id, name in
-                                    authorRoute = UserProfileRoute(userId: id, name: name)
-                                })
-                                    // Drag a card out to drop it into another
-                                    // collection. Dropping copies — a Rex can
-                                    // live in several lists.
-                                    .draggable(rec.id) {
-                                        dragPreview(rec)
-                                    }
-                                    .contextMenu {
-                                        // Sept 7 — "if I open my own collection
-                                        // I can't update the location, so some
-                                        // don't appear on the map". A card in a
-                                        // collection had no way into the editor
-                                        // at all; a wrong address could only be
-                                        // fixed by finding the Rex somewhere
-                                        // else. Only your own Rex — a
-                                        // collection can hold other people's.
-                                        if rec.user_id == RexAPI.shared.currentUserId {
-                                            Button {
-                                                activeSheet = .edit(rec)
-                                            } label: {
-                                                Label("Edit", systemImage: "pencil")
-                                            }
-                                        }
-                                        if route.isMine {
-                                            Button {
-                                                notingRow = row
-                                                noteDraft = row.note ?? ""
-                                            } label: {
-                                                Label(
-                                                    (row.note ?? "").isEmpty ? "Add a note" : "Edit the note",
-                                                    systemImage: "text.bubble"
-                                                )
-                                            }
-                                            Button(role: .destructive) {
-                                                Task { await remove(rec.id) }
-                                            } label: {
-                                                Label("Remove from collection", systemImage: "minus.circle")
-                                            }
-                                        }
-                                    }
-                                    // The same affordance the feed and profile
-                                    // use, so it's discoverable without
-                                    // knowing to long-press.
-                                    .overlay(alignment: .topTrailing) {
-                                        if rec.user_id == RexAPI.shared.currentUserId {
-                                            Button {
-                                                activeSheet = .edit(rec)
-                                            } label: {
-                                                Image(systemName: "pencil")
-                                                    .font(.system(size: 13, weight: .semibold))
-                                                    .foregroundStyle(RexColor.mutedForeground)
-                                                    .padding(8)
-                                                    .background(RexColor.card)
-                                                    .clipShape(Circle())
-                                                    .overlay(Circle().stroke(RexColor.border, lineWidth: 1))
-                                                    .frame(width: 44, height: 44)
-                                                    .contentShape(Rectangle())
-                                            }
-                                            .buttonStyle(.plain)
-                                            .padding(2)
-                                        }
-                                    }
-                                }
-                            }
-                        }
+                            collectionItemRow(index: index, row: row)
                         }
                       }
                     }
@@ -723,6 +602,142 @@ struct CollectionDetailView: View {
             Task { await setVisibility(value) }
         } label: {
             Label(visibility == value ? "\(label) \u{2713}" : label, systemImage: symbol)
+        }
+    }
+
+    /// One row of a collection: the arrange handles, the note, and the card
+    /// itself inside its swipe-to-remove wrapper.
+    ///
+    /// Nov 17 — lifted out of the ForEach that used to hold it inline. The
+    /// body had grown to 122 lines and adding the share fix tipped it over
+    /// the type-checker's budget: "the compiler is unable to type-check this
+    /// expression in reasonable time". It built on Xcode 27 and failed on the
+    /// 26.6 that CI runs, which is the kind of difference that only shows up
+    /// once somebody else builds it. Nothing about the view changed; a
+    /// function signature is a place for Swift to stop inferring.
+    @ViewBuilder
+    private func collectionItemRow(index: Int, row: SavedPost) -> some View {
+        if let rec = row.recommendations {
+            if isArranging {
+                HStack(spacing: RexSpacing.lg) {
+                    Button {
+                        Task { await move(row, by: -1) }
+                    } label: { Image(systemName: "chevron.up") }
+                    .disabled(isMutating || rows.first?.id == row.id)
+                    Button {
+                        Task { await move(row, by: 1) }
+                    } label: { Image(systemName: "chevron.down") }
+                    .disabled(isMutating || rows.last?.id == row.id)
+                    Spacer()
+                    Text(rec.items?.title ?? "Untitled")
+                        .font(RexFont.text(13, weight: .medium))
+                        .foregroundStyle(RexColor.mutedForeground)
+                        .lineLimit(1)
+                }
+                .font(.system(size: 14))
+                .foregroundStyle(RexColor.mutedForeground)
+                .padding(.horizontal, RexSpacing.sm)
+                .padding(.top, index == 0 ? 0 : RexSpacing.sm)
+            }
+            // Oct 14 — the note sits under the thing it is
+            // about, in the editorial face, because it is
+            // somebody speaking rather than a label. Shown to
+            // everyone who can see the collection: a note
+            // saying "get the crab sandwich" is most of why
+            // you would share the list at all.
+            if let itemNote = row.note, !itemNote.isEmpty {
+                HStack(alignment: .top, spacing: 7) {
+                    Image(systemName: "text.bubble")
+                        .font(.system(size: 11))
+                        .foregroundStyle(RexColor.primary)
+                        .padding(.top, 3)
+                    Text(itemNote)
+                        .font(RexFont.editorial(18))
+                        .foregroundStyle(RexColor.foreground.opacity(0.85))
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .padding(.horizontal, RexSpacing.sm)
+                .padding(.top, 2)
+            }
+            SwipeToRemove(
+                label: "Remove",
+                systemImage: "minus.circle",
+                onTap: { pushedItemId = rec.item_id },
+                action: {
+                    guard route.isMine else { return }
+                    await remove(rec.id)
+                }
+            ) {
+                if compact && !isArranging {
+                    CompactItemRow(rec: rec)
+                } else {
+                RecommendationCardView(rec: rec, onAuthorTap: { id, name in
+                    authorRoute = UserProfileRoute(userId: id, name: name)
+                })
+                    // Drag a card out to drop it into another
+                    // collection. Dropping copies — a Rex can
+                    // live in several lists.
+                    .draggable(rec.id) {
+                        dragPreview(rec)
+                    }
+                    .contextMenu {
+                        // Sept 7 — "if I open my own collection
+                        // I can't update the location, so some
+                        // don't appear on the map". A card in a
+                        // collection had no way into the editor
+                        // at all; a wrong address could only be
+                        // fixed by finding the Rex somewhere
+                        // else. Only your own Rex — a
+                        // collection can hold other people's.
+                        if rec.user_id == RexAPI.shared.currentUserId {
+                            Button {
+                                activeSheet = .edit(rec)
+                            } label: {
+                                Label("Edit", systemImage: "pencil")
+                            }
+                        }
+                        if route.isMine {
+                            Button {
+                                notingRow = row
+                                noteDraft = row.note ?? ""
+                            } label: {
+                                Label(
+                                    (row.note ?? "").isEmpty ? "Add a note" : "Edit the note",
+                                    systemImage: "text.bubble"
+                                )
+                            }
+                            Button(role: .destructive) {
+                                Task { await remove(rec.id) }
+                            } label: {
+                                Label("Remove from collection", systemImage: "minus.circle")
+                            }
+                        }
+                    }
+                    // The same affordance the feed and profile
+                    // use, so it's discoverable without
+                    // knowing to long-press.
+                    .overlay(alignment: .topTrailing) {
+                        if rec.user_id == RexAPI.shared.currentUserId {
+                            Button {
+                                activeSheet = .edit(rec)
+                            } label: {
+                                Image(systemName: "pencil")
+                                    .font(.system(size: 13, weight: .semibold))
+                                    .foregroundStyle(RexColor.mutedForeground)
+                                    .padding(8)
+                                    .background(RexColor.card)
+                                    .clipShape(Circle())
+                                    .overlay(Circle().stroke(RexColor.border, lineWidth: 1))
+                                    .frame(width: 44, height: 44)
+                                    .contentShape(Rectangle())
+                            }
+                            .buttonStyle(.plain)
+                            .padding(2)
+                        }
+                    }
+                }
+            }
         }
     }
 
