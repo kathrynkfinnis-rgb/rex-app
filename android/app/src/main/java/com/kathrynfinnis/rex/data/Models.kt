@@ -299,6 +299,14 @@ data class RexNotification(
 @Serializable
 internal data class ReadAtPatch(@SerialName("read_at") val readAt: String)
 
+/**
+ * The two columns an Android edit may touch. Deliberately not a copy of
+ * NewRecommendation: a patch that named photo_urls or tags would send nulls
+ * for them and wipe what an iPhone had put there. See updateRecommendation.
+ */
+@Serializable
+internal data class RecommendationPatch(val rating: Double, val note: String? = null)
+
 @Serializable
 internal data class RecItemId(val id: String, @SerialName("item_id") val itemId: String)
 

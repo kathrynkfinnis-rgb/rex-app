@@ -543,6 +543,59 @@ object Rex {
         clearWantOnReview(itemId)
     }
 
+    /**
+     * Change your mind about a Rex you already posted.
+     *
+     * Nov 17 — rating and note ONLY, and that is the whole design of it.
+     *
+     * updateRecommendation in RexAPI.swift also writes photo_urls, photo_url
+     * and tags on every call, because the iOS editor owns all five fields.
+     * Android has no photo picker and no tag UI, so porting that signature
+     * would mean every Android edit sending empty arrays — and silently
+     * deleting the photos and tags somebody had added from their iPhone. A
+     * typo fix on the train would quietly wipe the picture.
+     *
+     * So this is the narrow PATCH: the two fields this platform can actually
+     * edit, leaving every other column exactly as it was. Add a field here
+     * only when there is UI behind it.
+     */
+    suspend fun updateRecommendation(id: String, rating: Double, note: String?) {
+        client.from("recommendations").update(
+            RecommendationPatch(rating = rating, note = note?.trim()?.ifEmpty { null })
+        ) {
+            filter { eq("id", id) }
+        }
+    }
+
+    /**
+     * Delete a Rex of your own.
+     *
+     * Children first. A trip or a list is a parent row whose stops and items
+     * are recommendations carrying its id in trip_id or list_id; deleting the
+     * parent alone would orphan every one of them. Same order as iOS.
+     *
+     * Then the row itself, asking for what was deleted back. PostgREST answers
+     * a DELETE that matched nothing with the same success as one that matched
+     * — so without reading the result, a delete that row-level security
+     * quietly refused is indistinguishable from one that worked, and the row
+     * reappears on the next refresh with no error ever shown. iOS learnt this
+     * on deleteWant.
+     */
+    suspend fun deleteRecommendation(id: String) {
+        for (parent in listOf("trip_id", "list_id")) {
+            client.from("recommendations").delete { filter { eq(parent, id) } }
+        }
+        val deleted = client.from("recommendations")
+            .delete {
+                select(Columns.raw("id"))
+                filter { eq("id", id) }
+            }
+            .decodeList<ItemId>()
+        if (deleted.isEmpty()) {
+            error("Couldn't delete that — it may already be gone. Pull to refresh.")
+        }
+    }
+
     /** Somewhere you mean to go. */
     suspend fun createWant(itemId: String) {
         val userId = RexAuth.currentUserId ?: error("Not signed in.")

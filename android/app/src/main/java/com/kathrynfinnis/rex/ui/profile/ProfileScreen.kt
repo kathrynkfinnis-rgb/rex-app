@@ -20,6 +20,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.outlined.Edit
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -136,6 +137,7 @@ private fun ProfilePage(
     var state by remember { mutableStateOf<ProfileState>(ProfileState.Loading) }
     var attempt by remember { mutableIntStateOf(0) }
     var busy by remember { mutableStateOf(false) }
+    var editing by remember { mutableStateOf<FeedRecommendation?>(null) }
 
     val me = RexAuth.currentUserId
 
@@ -150,6 +152,17 @@ private fun ProfilePage(
             val friendships = if (isMe) emptyList() else Rex.friendships()
             ProfileState.Loaded(profile, rex, collections, friendships)
         }.getOrElse { ProfileState.Failed(readableFailure(it)) }
+    }
+
+    editing?.let { rec ->
+        EditRexSheet(
+            rec = rec,
+            onDismiss = { editing = null },
+            // Reload rather than patch the list in place: a delete removes the
+            // row and an edit changes two fields, and re-reading is the one
+            // path that is right for both.
+            onSaved = { editing = null; attempt++ },
+        )
     }
 
     Column(Modifier.fillMaxSize()) {
@@ -276,7 +289,18 @@ private fun ProfilePage(
                         }
                     } else {
                         items(s.rex, key = { it.id }) { rec ->
-                            RexLine(rec) { onOpenItem(rec.itemId) }
+                            RexLine(
+                                rec = rec,
+                                onOpen = { onOpenItem(rec.itemId) },
+                                // Only your own, and only because RLS would
+                                // refuse anyway: a pencil that always 403s is
+                                // worse than no pencil.
+                                onEdit = if (isMe) {
+                                    { editing = rec }
+                                } else {
+                                    null
+                                },
+                            )
                         }
                     }
                 }
@@ -466,7 +490,7 @@ private fun CollectionLine(list: RexList) {
  * never comes up.
  */
 @Composable
-private fun RexLine(rec: FeedRecommendation, onOpen: () -> Unit) {
+private fun RexLine(rec: FeedRecommendation, onOpen: () -> Unit, onEdit: (() -> Unit)? = null) {
     Row(
         Modifier
             .fillMaxWidth()
@@ -515,6 +539,16 @@ private fun RexLine(rec: FeedRecommendation, onOpen: () -> Unit) {
             ).joinToString(" · ")
             if (sub.isNotEmpty()) {
                 Text(sub, fontSize = 12.sp, color = RexColor.mutedForeground)
+            }
+        }
+        if (onEdit != null) {
+            IconButton(onClick = onEdit) {
+                Icon(
+                    Icons.Outlined.Edit,
+                    contentDescription = "Edit this Rex",
+                    tint = RexColor.mutedForeground,
+                    modifier = Modifier.size(18.dp),
+                )
             }
         }
     }

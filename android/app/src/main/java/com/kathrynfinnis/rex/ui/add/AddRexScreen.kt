@@ -203,7 +203,10 @@ private enum class Category(
  * 8 -> Rex, 9 -> Loved, 10 -> Obsessed. Each value buckets back to its own
  * tier, which is the property that has to hold.
  */
-private enum class Tier(val label: String, val emoji: String, val rating: Double) {
+// Nov 17 — internal rather than private so the edit sheet uses this one
+// enum. The note above is the reason: two copies of these five numbers is
+// exactly how the same tier becomes two values in the column.
+internal enum class Tier(val label: String, val emoji: String, val rating: Double) {
     // The glyph names are spelled out because an emoji is the one thing in
     // this file a code review in a terminal cannot read back to you.
     DoNotRex("Do not Rex", "⛔️", 3.0), // no entry
@@ -552,7 +555,7 @@ private fun CategoryChip(
 
 /** RexRatingPicker's tile, as close as Compose gets to the SwiftUI one. */
 @Composable
-private fun TierChip(
+internal fun TierChip(
     tier: Tier,
     selected: Boolean,
     enabled: Boolean,
@@ -593,7 +596,7 @@ private fun TierChip(
  * same control with different contents, and two copies of it is how they end
  * up a pixel apart.
  */
-private fun Modifier.selectableSurface(
+internal fun Modifier.selectableSurface(
     selected: Boolean,
     enabled: Boolean,
     onClick: () -> Unit,
