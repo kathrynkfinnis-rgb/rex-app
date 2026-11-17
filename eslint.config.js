@@ -1,8 +1,6 @@
 import js from "@eslint/js";
 import eslintPluginPrettier from "eslint-plugin-prettier/recommended";
 import globals from "globals";
-import reactHooks from "eslint-plugin-react-hooks";
-import reactRefresh from "eslint-plugin-react-refresh";
 import tseslint from "typescript-eslint";
 
 export default tseslint.config(
@@ -13,46 +11,31 @@ export default tseslint.config(
   // five minutes and reports on generated code is one nobody runs, and it
   // could not have gone in CI as it stood.
   //
-  // This config is the web app's. The other three have their own tools —
-  // Gradle's lint, Xcode's warnings, and `deno check`.
+  // The other three codebases have their own tools — Gradle's lint, Xcode's
+  // warnings, and `deno check`.
   {
-    ignores: [
-      "dist",
-      ".output",
-      ".vinxi",
-      "android/**",
-      "ios/**",
-      "supabase/**",
-      "**/routeTree.gen.ts",
-    ],
+    ignores: ["dist", ".output", ".vinxi", "android/**", "ios/**", "supabase/**"],
   },
+  // Nov 17 — this block used to say files: ["**/*.{ts,tsx}"] and carry the
+  // react-hooks and react-refresh plugins plus a rule about TanStack Start's
+  // server-only imports. All of that went with the TanStack app on 7 November,
+  // and the last .ts file in scope (capacitor.config.ts) went today, so the
+  // block had been linting nothing at all for ten days. js.configs.recommended
+  // sat inside it, which meant the only rules reaching the repository's actual
+  // JavaScript were prettier's formatting ones — `npm run lint` was a format
+  // check wearing a lint's clothes.
+  //
+  // So it points at the JavaScript that is really here: the Cloudflare Pages
+  // Functions that render every share link, web/admin.js, and this file.
   {
-    extends: [js.configs.recommended, ...tseslint.configs.recommended],
-    files: ["**/*.{ts,tsx}"],
+    extends: [js.configs.recommended],
+    files: ["**/*.js"],
     languageOptions: {
-      ecmaVersion: 2020,
-      globals: globals.browser,
-    },
-    plugins: {
-      "react-hooks": reactHooks,
-      "react-refresh": reactRefresh,
-    },
-    rules: {
-      ...reactHooks.configs.recommended.rules,
-      "no-restricted-imports": [
-        "error",
-        {
-          paths: [
-            {
-              name: "server-only",
-              message:
-                "TanStack Start does not use the Next.js `server-only` package. Rename the module to `*.server.ts` or mark it with `@tanstack/react-start/server-only`.",
-            },
-          ],
-        },
-      ],
-      "react-refresh/only-export-components": ["warn", { allowConstantExport: true }],
-      "@typescript-eslint/no-unused-vars": "off",
+      ecmaVersion: 2022,
+      sourceType: "module",
+      // Pages Functions run on workerd, not in a browser and not in Node:
+      // fetch, Request, Response, URL and crypto are global, document is not.
+      globals: { ...globals.worker, ...globals.browser },
     },
   },
   eslintPluginPrettier,

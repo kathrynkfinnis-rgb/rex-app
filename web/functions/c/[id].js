@@ -22,23 +22,6 @@ function tier(raw) {
   return { emoji: "💯", label: "Obsessed" };
 }
 
-const CATEGORY = {
-  restaurant: "Restaurant",
-  bar: "Bar",
-  cafe: "Café",
-  hotel: "Hotel",
-  place: "Place",
-  film: "Film",
-  tv: "TV",
-  book: "Book",
-  podcast: "Podcast",
-  music: "Music",
-  activity: "Activity",
-  product: "Product",
-  trip: "Trip",
-  list: "List",
-};
-
 const esc = (value) =>
   String(value ?? "").replace(
     /[&<>"']/g,
