@@ -138,6 +138,46 @@ jobs:
           sudo xcode-select -s "$newest"
           xcodebuild -version
           echo "iOS SDK: $(xcrun --sdk iphoneos --show-sdk-version)"
+      # Nov 17 — the three Capacitor artefacts the Xcode project still lists in
+      # Copy Bundle Resources. All three are in ios/.gitignore, so no fresh
+      # clone of this repository has them and the resource phase fails on the
+      # first one: "The file 'public' couldn't be opened because there is no
+      # such file."
+      #
+      # This job had never reached that phase before today. The iOS 18 SDK
+      # stopped it at the #available symbols, and then the type-check timeout in
+      # CollectionDetailView stopped it during the Swift compile; fixing both is
+      # what let the build get far enough to find this.
+      #
+      # Stubs rather than the real files, because the real ones cannot be
+      # regenerated: `public/` is the Lovable web build, last written 4 August,
+      # and the thing that produced it was deleted on 7 November. Nothing reads
+      # any of it at runtime either — SceneDelegate hosts RootView directly and
+      # CAPBridgeViewController is never constructed — so all three are dead
+      # weight inside the shipped binary, 2.2MB of it.
+      #
+      # Which makes this a stopgap and it should be said plainly: it gets the
+      # compile gate working, it does NOT make a fresh clone buildable in Xcode.
+      # The fix is to drop all three from Copy Bundle Resources, which edits the
+      # project file and changes what ships, so it wants its own build and a
+      # smoke test rather than riding along with a CI change.
+      - name: Stub the Capacitor artefacts the project still wants
+        run: |
+          mkdir -p ios/App/App/public
+          cat > ios/App/App/capacitor.config.json <<'JSON'
+          {
+            "appId": "com.kathrynfinnis.rexapp",
+            "appName": "Rex",
+            "webDir": "public",
+            "packageClassList": []
+          }
+          JSON
+          cat > ios/App/App/config.xml <<'XML'
+          <?xml version='1.0' encoding='utf-8'?>
+          <widget version="1.0.0" xmlns="http://www.w3.org/ns/widgets" xmlns:cdv="http://cordova.apache.org/ns/1.0">
+            <access origin="*" />
+          </widget>
+          XML
       # A simulator build, so nothing here needs a signing certificate and no
       # secret has to live in the repository for CI to work.
       - name: Build
