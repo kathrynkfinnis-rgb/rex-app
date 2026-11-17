@@ -81,8 +81,14 @@
 					<string>Default Configuration</string>
 					<key>UISceneDelegateClassName</key>
 					<string>$(PRODUCT_MODULE_NAME).SceneDelegate</string>
-					<key>UISceneStoryboardFile</key>
-					<string>Main</string>
+					<!-- UISceneStoryboardFile: Main is deliberately gone (Nov 17,
+					     SECURITY_REVIEW F8). Main.storyboard's initial view
+					     controller was Capacitor's CAPBridgeViewController, so
+					     UIKit built the bridge and a WKWebView on every launch
+					     before SceneDelegate replaced the window. SceneDelegate
+					     makes its own UIWindow and hosts RootView, so nothing
+					     here needs a storyboard. UILaunchStoryboardName below is
+					     a different thing and stays: it is the launch screen. -->
 				</dict>
 			</array>
 		</dict>
