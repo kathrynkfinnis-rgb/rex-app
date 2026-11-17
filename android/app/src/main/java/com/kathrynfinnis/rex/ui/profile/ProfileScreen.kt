@@ -42,7 +42,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import coil.compose.AsyncImage
+import coil.compose.SubcomposeAsyncImage
 import com.kathrynfinnis.rex.data.FeedRecommendation
 import com.kathrynfinnis.rex.data.Friendship
 import com.kathrynfinnis.rex.data.Rex
@@ -313,20 +313,25 @@ private fun Header(
             contentAlignment = Alignment.Center,
         ) {
             val clean = avatarUrl?.takeIf { it.isNotBlank() }
-            if (clean != null) {
-                AsyncImage(
-                    model = clean,
-                    contentDescription = null,
-                    contentScale = ContentScale.Crop,
-                    modifier = Modifier.fillMaxSize(),
-                )
-            } else {
+            val initial = @Composable {
                 Text(
                     name.take(1).uppercase(),
                     fontSize = 32.sp,
                     fontWeight = FontWeight.SemiBold,
                     color = RexColor.badgeForeground,
                 )
+            }
+            if (clean != null) {
+                SubcomposeAsyncImage(
+                    model = clean,
+                    contentDescription = null,
+                    contentScale = ContentScale.Crop,
+                    modifier = Modifier.fillMaxSize(),
+                    loading = { initial() },
+                    error = { initial() },
+                )
+            } else {
+                initial()
             }
         }
         Spacer(Modifier.height(12.dp))
@@ -357,7 +362,11 @@ private fun Stat(value: Int, label: String) {
             fontWeight = FontWeight.SemiBold,
             color = RexColor.foreground,
         )
-        Text(label.uppercase(), fontSize = 10.sp, color = RexColor.mutedForeground)
+        // Not uppercased. statCard in ProfileView.swift renders its label as
+        // written, and "Rex".uppercase() is "REX" — the shouted brand name the
+        // 9 November rename took out of 333 places, put back here by a
+        // .uppercase() on a label that happens to contain it.
+        Text(label, fontSize = 10.sp, color = RexColor.mutedForeground)
     }
 }
 
@@ -472,16 +481,24 @@ private fun RexLine(rec: FeedRecommendation, onOpen: () -> Unit) {
             Modifier.size(48.dp).clip(RoundedCornerShape(10.dp)).background(RexColor.badgeBackground),
             contentAlignment = Alignment.Center,
         ) {
+            // Nov 17, from running it: a bare AsyncImage draws nothing at all
+            // when the load fails, so every Rex whose image_url no longer
+            // resolves — and a shelf of Amazon products is full of them —
+            // rendered as an empty grey square. The glyph is the fallback for a
+            // failed load, not only for a missing url.
             val art = rec.items?.imageUrl?.takeIf { it.isNotBlank() }
+            val glyph = @Composable { Text("🦕", fontSize = 20.sp) }
             if (art != null) {
-                AsyncImage(
+                SubcomposeAsyncImage(
                     model = art,
                     contentDescription = null,
                     contentScale = ContentScale.Crop,
                     modifier = Modifier.fillMaxSize(),
+                    loading = { glyph() },
+                    error = { glyph() },
                 )
             } else {
-                Text("🦕", fontSize = 20.sp)
+                glyph()
             }
         }
         Spacer(Modifier.size(12.dp))

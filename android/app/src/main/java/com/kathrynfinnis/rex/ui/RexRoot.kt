@@ -6,6 +6,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.AccountCircle
 import androidx.compose.material.icons.outlined.Add
@@ -118,7 +119,18 @@ private fun SignedIn() {
         topBar = {
             if (!onTab) return@Scaffold
             Row(
-                Modifier.fillMaxWidth().padding(start = 16.dp, end = 4.dp, top = 8.dp),
+                // statusBarsPadding is load-bearing, not cosmetic. Scaffold
+                // applies its window insets to the *content* slot and leaves
+                // the topBar slot to handle its own — TopAppBar does it
+                // internally, and this is a bare Row, so without this the icons
+                // are drawn at y=53 underneath the system status bar. They look
+                // wrong next to the battery, and worse, the status bar eats the
+                // touches: the buttons simply do not respond. Found by running
+                // it on an emulator; a compile could never have shown it.
+                Modifier
+                    .fillMaxWidth()
+                    .statusBarsPadding()
+                    .padding(start = 16.dp, end = 4.dp, top = 8.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 Spacer(Modifier.weight(1f))

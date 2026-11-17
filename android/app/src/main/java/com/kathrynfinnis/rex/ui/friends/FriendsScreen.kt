@@ -48,7 +48,7 @@ import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import coil.compose.AsyncImage
+import coil.compose.SubcomposeAsyncImage
 import com.kathrynfinnis.rex.data.Friendship
 import com.kathrynfinnis.rex.data.Rex
 import com.kathrynfinnis.rex.data.RexAuth
@@ -475,20 +475,28 @@ private fun Avatar(url: String?, name: String) {
         Modifier.size(40.dp).clip(CircleShape).background(RexColor.badgeBackground),
         contentAlignment = Alignment.Center,
     ) {
-        if (clean != null) {
-            AsyncImage(
-                model = clean,
-                contentDescription = null,
-                contentScale = ContentScale.Crop,
-                modifier = Modifier.fillMaxSize(),
-            )
-        } else {
+        // Subcompose rather than plain AsyncImage, so a failed load falls back
+        // to the initial instead of an empty circle. See the note in
+        // ProfileScreen — found by running it, not by compiling it.
+        val initial = @Composable {
             Text(
                 name.take(1).uppercase(),
                 fontSize = 16.sp,
                 fontWeight = FontWeight.SemiBold,
                 color = RexColor.badgeForeground,
             )
+        }
+        if (clean != null) {
+            SubcomposeAsyncImage(
+                model = clean,
+                contentDescription = null,
+                contentScale = ContentScale.Crop,
+                modifier = Modifier.fillMaxSize(),
+                loading = { initial() },
+                error = { initial() },
+            )
+        } else {
+            initial()
         }
     }
 }
