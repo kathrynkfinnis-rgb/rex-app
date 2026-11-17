@@ -6,10 +6,25 @@ import CryptoKit
 /// choosing a username they can be found by, matching their contacts, and
 /// browsing a friend's friends. See migration 20260914100000_find_friends.
 
-/// Where invites point until Rex is on the App Store. One constant, so
-/// swapping it for the App Store link is a one-line change.
+/// Where invites point.
+///
+/// Nov 17 — the App Store, at last. This said "until Rex is on the App Store,
+/// one constant so swapping it is a one-line change", and then nobody made the
+/// change: Rex went on sale on 8 November and every Invite in the app carried
+/// on sending people to a closed TestFlight beta for nine days. Three places
+/// share it — the empty feed, the contacts finder and the Friends screen — so
+/// whichever route somebody took to invite a friend, the friend hit a beta
+/// they needed another app to join and might not be able to join at all.
+///
+/// Found while fixing the same bug on the website, where all six share pages
+/// pointed at the same beta link.
+///
+/// No country in the path on purpose: Apple redirects a bare /app/id… to the
+/// visitor's own store. Checked against the UK store on 17 November — Find
+/// Rex 1.0.1, free — because a store link that 404s abroad would be worse
+/// than the beta link it replaces.
 enum RexInvite {
-    static let link = URL(string: "https://testflight.apple.com/join/WBkDCpXV")!
+    static let link = URL(string: "https://apps.apple.com/app/id6799256042")!
     static let message = "I\u{2019}m using Rex to share recommendations with friends \u{2014} places, books, trips, the lot. Join me:"
 }
 
