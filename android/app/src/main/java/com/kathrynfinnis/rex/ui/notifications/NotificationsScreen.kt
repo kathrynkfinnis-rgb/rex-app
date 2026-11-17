@@ -346,12 +346,16 @@ private fun ago(iso: String): String {
         .getOrNull() ?: return ""
     val d = Duration.between(then, Instant.now())
     val mins = d.toMinutes()
+    // Nov 17, from the emulator: this read "1 days ago". iOS gets plurals free
+    // from RelativeDateTimeFormatter; Kotlin does not, and the day and week
+    // branches are the two that can land on one.
+    fun plural(n: Long, unit: String) = "$n $unit${if (n == 1L) "" else "s"} ago"
     return when {
         mins < 1 -> "Just now"
         mins < 60 -> "$mins min ago"
         d.toHours() < 24 -> "${d.toHours()} hr ago"
-        d.toDays() < 7 -> "${d.toDays()} days ago"
-        else -> "${d.toDays() / 7} weeks ago"
+        d.toDays() < 7 -> plural(d.toDays(), "day")
+        else -> plural(d.toDays() / 7, "week")
     }
 }
 
