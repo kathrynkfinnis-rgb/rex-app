@@ -216,7 +216,9 @@ private fun SignedIn() {
                     nav.navigate("collection/$id/${java.net.URLEncoder.encode(name, "UTF-8")}")
                 })
             }
-            composable(Tab.Explore.route) { ExploreScreen() }
+            composable(Tab.Explore.route) {
+                ExploreScreen(onOpenItem = { nav.navigate("item/$it") })
+            }
 
             composable(
                 "item/{itemId}",

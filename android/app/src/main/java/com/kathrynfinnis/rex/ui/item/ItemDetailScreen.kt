@@ -56,6 +56,7 @@ import com.kathrynfinnis.rex.data.FeedRecommendation
 import com.kathrynfinnis.rex.data.Rex
 import com.kathrynfinnis.rex.data.RexAuth
 import com.kathrynfinnis.rex.data.RexItem
+import com.kathrynfinnis.rex.ui.categoryLabel
 import com.kathrynfinnis.rex.ui.readableFailure
 import com.kathrynfinnis.rex.ui.theme.RexColor
 import kotlinx.coroutines.async
@@ -551,32 +552,6 @@ private fun Message(
             ) { Text(actionLabel) }
         }
     }
-}
-
-/**
- * The category names from RexCategory in iOS Theme.swift, verbatim.
- *
- * "Movie" over the British "Film" is a deliberate exception to the house rule
- * on copy: these ten words are the shared vocabulary of the category picker,
- * the badges and the search, and one of them differing by platform is a
- * product inconsistency rather than a localisation. If it changes it should
- * change in both places at once.
- *
- * An unknown type falls through to no badge rather than to the raw column
- * value — "other_thing" on screen is worse than nothing there.
- */
-private fun categoryLabel(type: String): String? = when (type) {
-    "place" -> "Place"
-    "trip" -> "Trip"
-    "book" -> "Book"
-    "movie" -> "Movie"
-    "tv" -> "TV"
-    "podcast" -> "Podcast"
-    "recipe" -> "Recipe"
-    "event" -> "Event"
-    "other" -> "Other"
-    "list" -> "List"
-    else -> null
 }
 
 /**
