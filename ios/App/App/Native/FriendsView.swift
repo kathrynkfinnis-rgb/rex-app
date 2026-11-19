@@ -33,13 +33,41 @@ struct FriendsView: View {
     private var outgoing: [Friendship] {
         friendships.filter { $0.requester_id == myId && $0.status == "pending" }
     }
+    /// Nov 19 — "make the friends list alphabetical and complete."
+    ///
+    /// It had no sort at all, so the order was whatever PostgREST returned,
+    /// which is the order rows happen to sit in the table. Fine at four
+    /// friends and unusable at forty, because the only way to find somebody
+    /// is to read every row.
     private var accepted: [Friendship] {
-        friendships.filter { $0.status == "accepted" }
+        friendships
+            .filter { $0.status == "accepted" }
+            .sorted { sortKey(for: $0) < sortKey(for: $1) }
+    }
+
+    private func otherId(_ f: Friendship) -> String {
+        f.requester_id == myId ? f.addressee_id : f.requester_id
     }
 
     private func otherProfile(_ f: Friendship) -> RexProfileDetail? {
-        let otherId = f.requester_id == myId ? f.addressee_id : f.requester_id
-        return profilesById[otherId]
+        profilesById[otherId(f)]
+    }
+
+    /// Sorted on the name the row actually shows, folded so that case and
+    /// accents don't split the list: without this "ángela" files after "Zoe"
+    /// and "alex" after "Zoe" too, which reads as no sort at all.
+    ///
+    /// Anyone whose profile would not resolve sorts last rather than first —
+    /// they still appear (see the .friend row), but an unnamed row at the top
+    /// of the list looks like the screen is broken.
+    private func sortKey(for f: Friendship) -> String {
+        let profile = otherProfile(f)
+        let shown = profile?.display_name ?? profile?.username ?? ""
+        guard !shown.isEmpty else { return "\u{10FFFF}" }
+        return shown.folding(
+            options: [.caseInsensitive, .diacriticInsensitive],
+            locale: .current
+        )
     }
 
     private func alreadyConnected(_ profileId: String) -> Bool {
@@ -325,8 +353,29 @@ struct FriendsView: View {
                 }
             }
         case .friend(let f):
+            // Nov 19 — the other half of "complete". This was
+            // `if let profile = otherProfile(f)` with no else, so a friend
+            // whose profile would not resolve rendered nothing at all and
+            // vanished from the list. The header counts friendships, so the
+            // number stayed right while the rows went missing — which is
+            // exactly how you notice a list is incomplete without being able
+            // to say who is absent.
+            //
+            // fetchProfiles already falls back to profile_basics for anyone
+            // the profiles table withholds, so this should be rare. It is the
+            // last resort, and a named gap beats a silent one.
             if let profile = otherProfile(f) {
                 personRow(profile) { EmptyView() }
+            } else {
+                personRow(
+                    RexProfileDetail(
+                        id: otherId(f),
+                        username: "",
+                        display_name: "Someone on Rex",
+                        avatar_url: nil
+                    ),
+                    subtitle: "Couldn\u{2019}t load this profile"
+                ) { EmptyView() }
             }
         case .searchResult(let profile):
             personRow(profile) {

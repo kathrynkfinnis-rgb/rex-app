@@ -5469,11 +5469,27 @@ final class RexAPI {
         }
     }
 
+    /// Nov 19 — "make names attributed to comments available even if you are
+    /// not friends with that person."
+    ///
+    /// This used to embed `profiles!recommendation_comments_user_id_fkey(...)`
+    /// and decode straight into RexComment. That reads correctly and loses
+    /// names, because the profiles SELECT policy returns yourself, your
+    /// friends, and anyone you already have a friendship row with — and
+    /// nobody else. A comment from someone outside that set came back with a
+    /// null profile and rendered as "Someone", on a Rex you were reading
+    /// precisely because you did not know everybody involved.
+    ///
+    /// Same two-step fetchRequestComments has used since it was written:
+    /// read the rows, then resolve the people through fetchProfiles, which
+    /// falls back to the profile_basics function for anyone the table will
+    /// not hand over. Blast replies have been getting this right the whole
+    /// time; Rex comments never did.
     func fetchComments(recommendationId: String) async throws -> [RexComment] {
         let token = try await validToken()
         var components = URLComponents(url: baseURL.appendingPathComponent("/rest/v1/recommendation_comments"), resolvingAgainstBaseURL: false)!
         components.queryItems = [
-            URLQueryItem(name: "select", value: "id,body,created_at,user_id,parent_id,profiles!recommendation_comments_user_id_fkey(username,display_name,avatar_url)"),
+            URLQueryItem(name: "select", value: "id,body,created_at,user_id,parent_id"),
             URLQueryItem(name: "recommendation_id", value: "eq.\(recommendationId)"),
             URLQueryItem(name: "order", value: "created_at.asc"),
         ]
@@ -5485,7 +5501,37 @@ final class RexAPI {
         guard let http = response as? HTTPURLResponse, http.statusCode < 400 else {
             throw RexAPIError.server(friendlyError(data, fallback: "Couldn't load comments."))
         }
-        return try JSONDecoder().decode([RexComment].self, from: data)
+        struct Row: Codable {
+            let id: String
+            let body: String
+            let created_at: String
+            let user_id: String
+            var parent_id: String?
+        }
+        let rows = try JSONDecoder().decode([Row].self, from: data)
+        guard !rows.isEmpty else { return [] }
+
+        // Best-effort, as on blast replies: a comment whose author will not
+        // resolve still shows, just without a name. Losing the comment would
+        // be worse than losing the name.
+        let profilesById: [String: RexProfile] = await {
+            let ids = Array(Set(rows.map { $0.user_id }))
+            guard let people = try? await fetchProfiles(ids: ids) else { return [:] }
+            return people.reduce(into: [:]) { out, p in
+                out[p.id] = RexProfile(username: p.username, display_name: p.display_name, avatar_url: p.avatar_url)
+            }
+        }()
+
+        return rows.map { row in
+            RexComment(
+                id: row.id,
+                body: row.body,
+                created_at: row.created_at,
+                user_id: row.user_id,
+                profiles: profilesById[row.user_id],
+                parent_id: row.parent_id
+            )
+        }
     }
 
     func addComment(recommendationId: String, body text: String, parentId: String? = nil) async throws {

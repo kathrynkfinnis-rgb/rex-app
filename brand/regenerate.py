@@ -87,6 +87,22 @@ def main():
     put("ios/App/App/Assets.xcassets/AppIcon.appiconset/AppIcon-512@2x.png",
         icon.resize((1024, 1024), Image.LANCZOS))
 
+    # Nov 19 — the iOS wordmark, which this script did not own until today and
+    # had therefore drifted. It sat at #4B4D1A, a dark olive, while the source
+    # and the website were both #70A361: "update the REX logo colour on the
+    # onboarding screen (currently olive green, not the right green)". It is
+    # the first thing anybody sees, on onboarding and on the sign-in screen.
+    #
+    # Three scales because the asset catalogue declares three. Height is what
+    # the views pin (.frame(height: 28) and 40), so the widths follow the
+    # source's own proportions rather than the old asset's — those were a
+    # different crop, and matching them would have reintroduced the drift in
+    # another dimension.
+    for scale, name in ((1, "wordmark.png"), (2, "wordmark@2x.png"), (3, "wordmark@3x.png")):
+        height = 40 * scale
+        put(f"ios/App/App/Assets.xcassets/RexWordmark.imageset/{name}",
+            word.resize((round(word.size[0] * height / word.size[1]), height), Image.LANCZOS))
+
     # Android — 432 is 108dp at xxhdpi. The launcher masks the outer ring away
     # and guarantees only the inner 66 of those 108dp, so the dino is held to
     # 61% of the canvas or a circular mask eats its tail and feet.
