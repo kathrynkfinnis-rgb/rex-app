@@ -206,7 +206,9 @@ private fun SignedIn() {
             composable(Tab.Feed.route) {
                 FeedList(onOpenItem = { nav.navigate("item/$it") })
             }
-            composable(Tab.Map.route) { MapScreen() }
+            composable(Tab.Map.route) {
+                MapScreen(onOpenItem = { nav.navigate("item/$it") })
+            }
             composable(Tab.Collections.route) {
                 CollectionsList(onOpenCollection = { id, name ->
                     // The name rides in the route so the detail screen has a
