@@ -809,6 +809,25 @@ struct FeedView: View {
             .navigationDestination(for: ListRoute.self) { route in
                 ListDetailView(route: route)
             }
+            // Nov 19 — "when I click onto a friend's profile and her
+            // collections are at the top, I still can't click into those
+            // collections", and "the Look inside button doesn't work".
+            //
+            // CollectionRoute was registered in exactly one place: the
+            // Collections tab's own NavigationStack in MainTabView. A
+            // NavigationLink only resolves against a destination registered
+            // in the stack it is pushed into, so every link to a collection
+            // outside that one tab pointed at nothing and silently did
+            // nothing — no error, no animation, no clue.
+            //
+            // That is two separate broken journeys. UserProfileView's
+            // collection shelf, reached by tapping a person from the feed,
+            // and this screen's own links to a collection. Both worked when
+            // the same screen was reached from the Collections tab, which is
+            // what made it look intermittent.
+            .navigationDestination(for: CollectionRoute.self) { route in
+                CollectionDetailView(route: route)
+            }
             .navigationDestination(for: BlastRoute.self) { route in
                 BlastDetailView(route: route)
             }

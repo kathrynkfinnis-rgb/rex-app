@@ -108,6 +108,12 @@ struct MainTabView: View {
                     RexMapView(refreshSignal: mapRefreshSignal, focusRequest: mapFocusRequest)
                         .navigationDestination(for: String.self) { ItemDetailView(itemId: $0) }
                         .navigationDestination(for: UserProfileRoute.self) { UserProfileView(route: $0) }
+                        // Nov 19 — anywhere UserProfileRoute is registered,
+                        // CollectionRoute has to be too: that profile shows a
+                        // shelf of the person's collections, and a link whose
+                        // destination is not registered in this stack does
+                        // nothing at all. See the note in FeedView.
+                        .navigationDestination(for: CollectionRoute.self) { CollectionDetailView(route: $0) }
                         .navigationDestination(for: PlacesWithoutPinRoute.self) { _ in PlacesWithoutPinView() }
                 }
                 .tag(1)
