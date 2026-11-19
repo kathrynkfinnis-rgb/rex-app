@@ -3699,6 +3699,37 @@ final class RexAPI {
         return RexNotificationPreferences(user_id: userId)
     }
 
+    /// Whether this person has a preferences row at all.
+    ///
+    /// Nov 19 — fetchNotificationPreferences above returns defaults when
+    /// there is no row, which is right for a settings screen and useless for
+    /// the question that matters here: "has this person ever made a choice
+    /// about push, or have they simply never been asked?" On 19 November that
+    /// was 27 of 55 people with no row, and nobody at all with push turned
+    /// off on purpose. Those are very different states and the app could not
+    /// tell them apart.
+    ///
+    /// Best-effort: on any failure it returns true, so the caller does
+    /// nothing rather than overwriting a preference it could not read.
+    func notificationPreferencesRowExists() async -> Bool {
+        guard let token = try? await validToken(), let userId = currentUserId else { return true }
+        var components = URLComponents(url: baseURL.appendingPathComponent("/rest/v1/notification_preferences"), resolvingAgainstBaseURL: false)!
+        components.queryItems = [
+            URLQueryItem(name: "select", value: "user_id"),
+            URLQueryItem(name: "user_id", value: "eq.\(userId)"),
+            URLQueryItem(name: "limit", value: "1"),
+        ]
+        guard let url = components.url else { return true }
+        var request = URLRequest(url: url)
+        request.setValue(anonKey, forHTTPHeaderField: "apikey")
+        request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+        guard let (data, response) = try? await URLSession.shared.data(for: request),
+              let http = response as? HTTPURLResponse, http.statusCode < 400,
+              let rows = try? JSONDecoder().decode([RexNotificationPreferences].self, from: data)
+        else { return true }
+        return !rows.isEmpty
+    }
+
     /// One PATCH-or-create call — user_id is the table's actual primary key
     /// (not a partial index), so PostgREST's on_conflict works normally
     /// here, unlike recommendations' upsertRecommendation.

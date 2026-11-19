@@ -103,6 +103,12 @@ struct RootView: View {
         // Every sign-in and launch: make sure this phone's push token is on
         // the server (see refreshRegistrationIfAuthorized).
         await RexPushNotifications.refreshRegistrationIfAuthorized()
+        // Nov 19 — and that the server agrees with iOS. Somebody who already
+        // allowed notifications but has no preferences row gets silence,
+        // because send-push gates on push_enabled and that defaults to off.
+        // No prompt can fix that; only a write can. Does nothing unless the
+        // row is genuinely absent.
+        await RexPushNotifications.reconcilePreferenceIfAuthorized()
         guard gate == nil else { return }
         // Sept 15 — agreement to the current Terms/Privacy Policy comes
         // before anything else. Someone who ticked the box at email sign-up
@@ -121,9 +127,14 @@ struct RootView: View {
             gate = .username(suggested: pending.username, name: pending.displayName)
         } else if needsOnboarding() {
             gate = .onboarding
-        } else if !RexPushNotifications.hasAsked, await RexPushNotifications.canAsk() {
-            // Already through onboarding before it asked (Danny, and
-            // everyone before him) and never asked since: once.
+        } else if await RexPushNotifications.shouldAsk() {
+            // Nov 19 — was `!hasAsked && canAsk()`, where hasAsked was a
+            // permanent UserDefaults flag: one "Not now" and this device
+            // never raised it again. shouldAsk asks iOS whether its dialog
+            // is still available and us whether we asked recently, so "not
+            // now" means thirty days rather than never. Everyone still
+            // carrying the old flag has no date recorded, so they are asked
+            // once more after this ships, which is the point.
             gate = .notifications
         } else if !RexPhone.hasBeenAsked {
             // Sept 29 — a number is what actually makes contact matching

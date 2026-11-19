@@ -18,6 +18,66 @@ enum RexPushNotifications {
         set { UserDefaults.standard.set(newValue, forKey: askedKey) }
     }
 
+    /// Nov 19 — when we last put the ask in front of this person.
+    ///
+    /// `hasAsked` above is a permanent flag, and permanent was the bug. One
+    /// tap on "Not now" and that device never raised the subject again, for
+    /// the life of the install. On 19 November 27 of 55 people had no
+    /// notification preferences row at all and not one person had turned push
+    /// off deliberately — so the whole gap is people who were asked once at a
+    /// bad moment, or never reached the question, and could not be asked
+    /// again.
+    ///
+    /// A date instead, so "Not now" means not now rather than never. Devices
+    /// carrying the old permanent flag have no date, which is why everyone
+    /// who ever said "Not now" is asked once more after this ships. That is
+    /// the intent.
+    private static let askedAtKey = "rex.pushAskedAt"
+
+    static var lastAskedAt: Date? {
+        get { UserDefaults.standard.object(forKey: askedAtKey) as? Date }
+        set { UserDefaults.standard.set(newValue, forKey: askedAtKey) }
+    }
+
+    /// Long enough that it is not nagging, short enough that somebody who
+    /// said "not now" in their first five minutes gets a second chance once
+    /// they have friends and something to be notified about.
+    private static let askAgainAfter: TimeInterval = 30 * 24 * 60 * 60
+
+    /// Should the ask screen be shown now?
+    ///
+    /// Two conditions, and the second is the new one. iOS must still be
+    /// willing to show its dialog (`canAsk`), and we must not have asked
+    /// recently. The denied case deliberately returns false: iOS shows its
+    /// permission dialog once per install and no amount of asking from us
+    /// brings it back, so those people get the Settings route inside the ask
+    /// screen instead of a prompt that cannot work.
+    static func shouldAsk() async -> Bool {
+        guard await canAsk() else { return false }
+        guard let last = lastAskedAt else { return true }
+        return Date().timeIntervalSince(last) > askAgainAfter
+    }
+
+    /// The free half of the problem: iOS says yes and the server says no.
+    ///
+    /// send-push only pushes to people with push_enabled true, and that
+    /// column defaults to off. Somebody who allowed notifications on a
+    /// previous install, or on another account on the same phone, arrives
+    /// with iOS permission already granted and no preferences row — so they
+    /// get silence, and no prompt would help because there is nothing left
+    /// to prompt for.
+    ///
+    /// Only ever writes when there is NO row. A row saying false is a
+    /// decision somebody made on the preferences screen, and quietly
+    /// reversing it would be a worse bug than the one this fixes.
+    static func reconcilePreferenceIfAuthorized() async {
+        let status = await UNUserNotificationCenter.current().notificationSettings().authorizationStatus
+        guard status == .authorized || status == .provisional || status == .ephemeral else { return }
+        guard await RexAPI.shared.notificationPreferencesRowExists() == false else { return }
+        try? await RexAPI.shared.updateNotificationPreference(["push_enabled": true])
+        record("Notifications were already allowed on this phone \u{2014} switched push on.")
+    }
+
     /// Sept 15 — the device token only ever reached the server once: the
     /// moment someone first allowed notifications. If that one save
     /// failed (it always did, until today) or they later signed in on the
@@ -123,6 +183,7 @@ struct NotificationsAskView: View {
                 Task {
                     isAsking = true
                     RexPushNotifications.hasAsked = true
+                    RexPushNotifications.lastAskedAt = Date()
                     let granted = await RexPushNotifications.requestPermission()
                     // The server only pushes to people with push switched on
                     // in their preferences (send-push checks push_enabled,
@@ -144,7 +205,11 @@ struct NotificationsAskView: View {
             .buttonStyle(RexPrimaryButtonStyle())
             .disabled(isAsking)
             Button("Not now") {
+                // Nov 19 — records when, not whether. This used to set the
+                // permanent flag, so one tap here ended the conversation for
+                // good on this device. Asked again in thirty days.
                 RexPushNotifications.hasAsked = true
+                RexPushNotifications.lastAskedAt = Date()
                 onDone()
             }
             .font(RexFont.text(15, weight: .semibold))
