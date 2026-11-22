@@ -95,8 +95,14 @@
 	</dict>
 	<key>UILaunchStoryboardName</key>
 	<string>LaunchScreen</string>
-	<key>UIMainStoryboardFile</key>
-	<string>Main</string>
+	<!-- UIMainStoryboardFile: Main was still here after the 17 November F8
+	     fix removed UISceneStoryboardFile, because they are two keys for the
+	     same thing: this is the pre-scene one, and an app with a scene
+	     manifest ignores it at runtime. Which is why nothing broke and
+	     nothing showed up in the simulator — but App Store validation reads
+	     it literally and refused the upload, "Storyboard file
+	     'Main~iphone.storyboardc' was not found".
+	     Deleting a storyboard means deleting BOTH keys. -->
 	<key>UIRequiredDeviceCapabilities</key>
 	<array>
 		<string>armv7</string>
