@@ -20,6 +20,10 @@ struct TripMapTileView: View {
     /// the right city. See repairPlaceCoordsIfNeeded's fallbackQuery.
     var tripName: String? = nil
     var height: CGFloat = 200
+    /// Nov 22 — photographs on the trip's OWN row, which come before the
+    /// stops'. A trip rarely has any, but when it does they are the ones the
+    /// poster chose for the trip as a whole.
+    var ownPhotos: [String] = []
 
     @State private var stops: [MapPlace] = []
     /// #158 — itinerary order (fetchTripStops is already the source of
@@ -99,10 +103,21 @@ struct TripMapTileView: View {
         content.task(id: tripRecommendationId) { await load() }
     }
 
+    /// The trip's own photographs, then its stops', then the map — "user
+    /// uploaded photos being the first images, then the map being the last
+    /// thing in the carousel."
+    private var photos: [String] { ownPhotos + stopPhotos }
+
     @ViewBuilder
     private var content: some View {
-        if !stopPhotos.isEmpty {
-            PhotoCarouselView(urls: stopPhotos, cornerRadius: 0)
+        if !photos.isEmpty {
+            PhotoCarouselView(
+                urls: photos,
+                cornerRadius: 0,
+                trailingPage: coordinates.isEmpty ? nil : AnyView(
+                    RexMapSnapshotView(coordinates: coordinates, height: height)
+                )
+            )
         } else if !coordinates.isEmpty {
             RexMapSnapshotView(coordinates: coordinates, height: height)
         } else {

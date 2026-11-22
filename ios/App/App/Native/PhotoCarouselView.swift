@@ -12,12 +12,32 @@ import SwiftUI
 struct PhotoCarouselView: View {
     let urls: [String]
     var cornerRadius: CGFloat = RexRadius.card
+    /// Nov 22 — "user uploaded photos being the first images, then the map
+    /// being the last thing in the carousel."
+    ///
+    /// The map used to be an alternative to the photos: a card showed one or
+    /// the other, and a place somebody had photographed never showed where it
+    /// was. One carousel holds both now, the photographs first because they
+    /// are what people stop to look at, and the map last as the answer to
+    /// "but where is it".
+    ///
+    /// AnyView rather than a generic parameter on purpose — this view is
+    /// constructed in a dozen places that have no trailing page, and making
+    /// it generic would put a type parameter on every one of them.
+    var trailingPage: AnyView? = nil
 
     @State private var index = 0
     @State private var showingFullScreen = false
 
+    /// How many pages the carousel has, photos plus the map if there is one.
+    private var pageCount: Int { urls.count + (trailingPage == nil ? 0 : 1) }
+
     var body: some View {
-        if !urls.isEmpty {
+        if urls.isEmpty, let trailingPage {
+            // Nothing to swipe through — just the map, at whatever height it
+            // asks for. This is the old map-only card, unchanged.
+            trailingPage
+        } else if !urls.isEmpty {
             GeometryReader { geo in
                 ZStack(alignment: .bottom) {
                     TabView(selection: $index) {
@@ -48,15 +68,26 @@ struct PhotoCarouselView: View {
                             .clipped()
                             .tag(i)
                         }
+                        if let trailingPage {
+                            trailingPage
+                                .frame(width: geo.size.width, height: geo.size.height)
+                                .clipped()
+                                .tag(urls.count)
+                        }
                     }
                     .tabViewStyle(.page(indexDisplayMode: .never))
                     .contentShape(Rectangle())
-                    .onTapGesture { showingFullScreen = true }
+                    .onTapGesture {
+                        // The map page is not a photograph, so a tap on it
+                        // should not open the full-screen photo viewer with
+                        // nothing in it. The map carries its own tap.
+                        if index < urls.count { showingFullScreen = true }
+                    }
 
                     // Only worth showing dots when there's more than one photo.
-                    if urls.count > 1 {
+                    if pageCount > 1 {
                         HStack(spacing: 6) {
-                            ForEach(0..<urls.count, id: \.self) { i in
+                            ForEach(0..<pageCount, id: \.self) { i in
                                 Circle()
                                     .fill(i == index ? Color.white : Color.white.opacity(0.45))
                                     .frame(width: 6, height: 6)

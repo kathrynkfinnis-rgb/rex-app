@@ -153,6 +153,7 @@ struct RecommendationCardView: View {
             // text and photos sit on plain white.
             VStack(alignment: .leading, spacing: 0) {
                 categoryBar
+
                 // Nov 22 — "put thumbnails on the right instead of the left
                 // so you have a nice clean line down the left hand side and
                 // the thumbnail sits in the natural white space on the
@@ -257,10 +258,30 @@ struct RecommendationCardView: View {
                     // top-trailing corner and that is this square now, so the
                     // badge hangs off the image's bottom edge where it reads
                     // as belonging to the thing in the picture.
-                    thumbnail(item: item)
-                        .overlay(alignment: .bottomTrailing) {
-                            cornerLabel.padding(3)
-                        }
+                    // Nov 22 — "if pictures, no thumbnail for trips."
+                    //
+                    // A trip has no catalogue picture, so its thumbnail falls
+                    // back to the first of its own photographs — which is now
+                    // page one of the carousel directly below it. The same
+                    // image twice, 60pt of it stealing width from the title
+                    // ("Paris Pour Le Weeke…") to say nothing the card was
+                    // not already saying much better.
+                    //
+                    // So no thumbnail on a trip at all. The condition in the
+                    // note holds either way: a trip's media strip always
+                    // carries something, its stops' photographs when there
+                    // are any and a map of them when there are not, and both
+                    // beat a 60pt square. Every other category keeps its
+                    // thumbnail, where the picture IS catalogue art — a
+                    // jacket, a poster — and is not repeated below.
+                    //
+                    // No rating badge on it any more either; that has moved
+                    // up to the author's line. What still floats in this
+                    // corner is the "…" on your own Rex, put there from
+                    // outside by EditableIfMine.
+                    if showsThumbnail {
+                        thumbnail(item: item)
+                    }
                 }
 
                 // Nov 22 — "text should run all the way along to the end of
@@ -556,30 +577,42 @@ struct RecommendationCardView: View {
     /// any, else a trip's map of its stops, else a place's own map strip.
     @ViewBuilder
     private func media(item: RexItem) -> some View {
-        if let photos = rec.photo_urls, !photos.isEmpty {
-            PhotoCarouselView(urls: photos, cornerRadius: 0)
-                // #120: a swipe started on the photo pages the photos
-                // rather than triggering the card's swipe-to-remove.
+        // Nov 22 — "user uploaded photos being the first images, then the
+        // map being the last thing in the carousel."
+        //
+        // These used to be alternatives: photos OR a map, first branch wins.
+        // So a place somebody had photographed never said where it was, and
+        // the map only appeared on the cards with no pictures — exactly
+        // backwards, since a card with photos is the one you want to place.
+        // One carousel now, photographs first, map last.
+        let photos = rec.photo_urls ?? []
+
+        if category == .trip {
+            // A trip's own row rarely carries photos; they are on its stops.
+            // TripMapTileView already loads both, so it builds the carousel.
+            TripMapTileView(tripRecommendationId: rec.id, tripName: item.title, height: 170,
+                            ownPhotos: photos)
                 .swipeToRemoveExclusionZone()
-        } else if category == .trip {
-            TripMapTileView(tripRecommendationId: rec.id, tripName: item.title, height: 170)
-                .swipeToRemoveExclusionZone()
-                .contentShape(Rectangle())
-                .onTapGesture {
-                    onViewTripOnMap?(rec.id, item.title)
-                }
-                .accessibilityAddTraits(onViewTripOnMap != nil ? .isButton : [])
-                .accessibilityLabel("Map of this trip's stops")
+                .accessibilityLabel("This trip's photos and a map of its stops")
         } else if category == .place || category == .event, let lat = item.lat, let lng = item.lng {
-            // A strip rather than a tile — the mock-up's proportions. The
-            // thumbnail above already shows what the place looks like; this
-            // only has to say where.
-            PlaceMapTileView(lat: lat, lng: lng, height: 96)
+            PhotoCarouselView(
+                urls: photos,
+                cornerRadius: 0,
+                trailingPage: AnyView(
+                    // A strip when it is the only thing here, matching the
+                    // mock-up's proportions; inside a carousel it fills the
+                    // page the photographs set.
+                    PlaceMapTileView(lat: lat, lng: lng, height: photos.isEmpty ? 96 : 170)
+                        .contentShape(Rectangle())
+                        .onTapGesture { onViewOnMap?(rec.item_id) }
+                )
+            )
+            // #120: a swipe started on the photo pages the photos
+            // rather than triggering the card's swipe-to-remove.
+            .swipeToRemoveExclusionZone()
+        } else if !photos.isEmpty {
+            PhotoCarouselView(urls: photos, cornerRadius: 0)
                 .swipeToRemoveExclusionZone()
-                .contentShape(Rectangle())
-                .onTapGesture {
-                    onViewOnMap?(rec.item_id)
-                }
         }
     }
 
@@ -797,6 +830,11 @@ struct RecommendationCardView: View {
                 .font(.system(size: 10.5, weight: .bold))
                 .tracking(0.8)
             Spacer(minLength: 0)
+            // The rating lives here now. It used to ride on the thumbnail's
+            // bottom corner, and a card with a photograph no longer has a
+            // thumbnail for it to ride on. The bar is always present, always
+            // full width, and its trailing end was empty.
+            cornerLabel
         }
         .foregroundStyle(category.tintColor)
         .padding(.horizontal, RexSpacing.cardPadding)
@@ -863,6 +901,33 @@ struct RecommendationCardView: View {
                 return !(1900...2099).contains(n)
             }
         return parts.joined(separator: " \u{00B7} ")
+    }
+
+    /// Nov 22 — "if map or user uploaded photo, then hero (across card). If
+    /// stock image, then just thumbnail." And: "if hero pic, then no
+    /// thumbnail."
+    ///
+    /// Two different kinds of picture were being treated as one. A film's
+    /// poster and a book's jacket are stock: they are what the thing looks
+    /// like, the same for everybody, and a 60pt square beside the title is
+    /// exactly the right amount of them. A photograph somebody took is about
+    /// this Rex in particular, and it deserves the width of the card.
+    ///
+    /// So a photograph becomes the hero and the thumbnail goes, because they
+    /// would otherwise be the same image twice, 60pt of it stealing room
+    /// from the title — "Paris Pour Le Weeke…".
+    ///
+    /// A map is a hero too, but it does not displace the thumbnail: a map
+    /// and a picture of the place answer different questions, which is why a
+    /// restaurant keeps its photograph beside the title and its map across
+    /// the card below.
+    ///
+    /// Trips never show one. They have no catalogue art at all, so their
+    /// thumbnail could only ever be the first of their own photographs —
+    /// page one of the carousel directly beneath it.
+    private var showsThumbnail: Bool {
+        if category == .trip { return false }
+        return (rec.photo_urls ?? []).isEmpty
     }
 
     @ViewBuilder
