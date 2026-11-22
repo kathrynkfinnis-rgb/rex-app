@@ -20,6 +20,12 @@ class SceneDelegate: UIResponder, UIWindowSceneDelegate {
             window?.makeKeyAndVisible()
             return
         }
+        if UserDefaults.standard.bool(forKey: "RexHeaderHarness") {
+            window?.rootViewController = UIHostingController(rootView: HeaderHarness())
+            window?.overrideUserInterfaceStyle = .light
+            window?.makeKeyAndVisible()
+            return
+        }
         if UserDefaults.standard.bool(forKey: "RexShelfHarness") {
             window?.rootViewController = UIHostingController(rootView: ShelfTileHarness())
             window?.overrideUserInterfaceStyle = .light
@@ -274,6 +280,58 @@ struct ShelfTileHarness: View {
             }
             .padding(.horizontal, RexSpacing.page)
             .padding(.bottom, RexSpacing.xxl)
+        }
+        .background(RexColor.background)
+    }
+}
+
+/// TEMPORARY — `-RexHeaderHarness 1`. The Rex page's header alone, which is
+/// the part of it that needs no session: band, wave and cover, at whatever
+/// RexHeaderMetrics currently says. Nov 22, to check the tightened band still
+/// holds the cover the way the old one did.
+struct HeaderHarness: View {
+    var body: some View {
+        ScrollView {
+            VStack(alignment: .leading, spacing: 0) {
+                ZStack(alignment: .topTrailing) {
+                    RexBannerBand(category: .book)
+                    RexHeaderThumbnail(
+                        url: "https://covers.openlibrary.org/b/id/15195855-M.jpg",
+                        category: .book
+                    )
+                    .padding(.trailing, RexHeaderMetrics.thumbTrailing)
+                    .padding(.top, RexHeaderMetrics.thumbTop)
+                }
+                .frame(height: RexHeaderMetrics.bandHeight, alignment: .top)
+                .padding(.horizontal, -16)
+                .padding(.top, -16)
+
+                VStack(alignment: .leading, spacing: 0) {
+                    RexCategoryPill(category: .book)
+                    Text("Fundamentally")
+                        .font(RexFont.display(34))
+                        .lineSpacing(-4)
+                        .padding(.top, 12)
+                    Text("Nussaibah Younis")
+                        .font(RexFont.editorial(19))
+                        .foregroundStyle(RexColor.primary)
+                        .padding(.top, 8)
+                }
+                .padding(.top, 6)
+                .padding(.bottom, 12)
+
+                Text("Nadia is an academic who's been disowned by her puritanical mother and dumped by her lover, Rosy. She de\u{2026}")
+                    .font(RexFont.text(13.5))
+                    .lineLimit(2)
+                Text("Rex\u{2019}d by 3 people")
+                    .font(RexFont.text(12, weight: .semibold))
+                    .foregroundStyle(RexColor.mutedForeground)
+                    .padding(.top, 14)
+                Text("What friends say")
+                    .font(RexFont.display(20))
+                    .padding(.top, 14)
+            }
+            .padding(16)
         }
         .background(RexColor.background)
     }

@@ -791,11 +791,15 @@ struct ItemDetailView: View {
                     .padding(.top, 9)
                 }
             }
-            .padding(.top, 10)
+            .padding(.top, 6)
             // Oct 14 — "need a bigger gap here." The title block ran straight
             // into Rex'd by with nothing between them, so a sentence about the
             // programme and a list of people reading as one paragraph.
-            .padding(.bottom, 18)
+            //
+            // Nov 22 — 18 to 12. The gap is still doing that job; it was just
+            // doing more of it than the job needed, and this page is being
+            // asked to put the reviews higher.
+            .padding(.bottom, 12)
 
             savedByRow
             wantedByRow
@@ -1124,7 +1128,7 @@ struct ItemDetailView: View {
                                     .lineLimit(1)
                             }
                             .padding(.horizontal, RexSpacing.sm)
-                            .padding(.vertical, 5)
+                            .padding(.vertical, 3)
                             .background(RexColor.card)
                             .clipShape(Capsule())
                             .overlay(Capsule().stroke(RexColor.border, lineWidth: 1))

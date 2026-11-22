@@ -28,18 +28,25 @@ import SwiftUI
 /// though, perhaps 30%?" Photos earn the room; a flat pattern does not.
 enum RexHeaderMetrics {
     /// A texture: one tinted pattern per category, behind the thing's own cover.
-    static let bandHeight: CGFloat = 170
+    /// Nov 22 — "we want the Rex page to be tighter so the reviews appear
+    /// higher up the page."
+    ///
+    /// Each band loses 20-25 points and the cover's top moves up by exactly
+    /// the same amount, so the cover still crosses the fold by the 38 points
+    /// it did and still stops where it did relative to the title. The sheet
+    /// follows the band down to the point, or the wave detaches from it.
+    static let bandHeight: CGFloat = 150
     static let waveHeight: CGFloat = 40
-    static let sheetTop: CGFloat = 165
+    static let sheetTop: CGFloat = 145
     /// Photographs, folded. Taller because there is something to look at.
-    static let photoBandHeight: CGFloat = 250
+    static let photoBandHeight: CGFloat = 225
     static let photoWaveHeight: CGFloat = 52
-    static let photoSheetTop: CGFloat = 245
+    static let photoSheetTop: CGFloat = 220
 
-    static let thumbTop: CGFloat = 44
+    static let thumbTop: CGFloat = 24
     /// On the taller photo band the card sits lower, so it still crosses the
     /// wave and still stops short of the title's first line.
-    static let photoThumbTop: CGFloat = 124
+    static let photoThumbTop: CGFloat = 99
     /// Oct 15 — "the thumbnail can be 30% bigger." 84×126 to 109×164, which
     /// is 30% on each edge rather than 30% of the area — a poster you can
     /// actually read the title off.
