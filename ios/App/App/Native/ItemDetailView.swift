@@ -77,6 +77,9 @@ struct ItemDetailView: View {
     /// Oct 4 — whether the note is being edited. A take you've already written
     /// shows as text until you ask to change it.
     @State private var isEditingNote = false
+    /// Nov 22 — whether the review form is open. Closed by default; "Rex it"
+    /// opens it. See yourTakeSection.
+    @State private var isWritingTake = false
     /// "When you click into a 'want to try', you should be able to add to
     /// want to try — at the moment, on a TV want, I click in and can only
     /// rate, not add to want to try." A want is its own table/row, separate
@@ -763,8 +766,12 @@ struct ItemDetailView: View {
             VStack(alignment: .leading, spacing: 0) {
                 RexCategoryPill(category: category)
 
+                // Nov 22 — "on the Rex cards (not on the feed) can we also
+                // make the text of the title a bit smaller." 34 to 28 at the
+                // top of the range; titleSize still steps it down further for
+                // the long ones.
                 Text(item.title)
-                    .font(RexFont.display(min(34, titleSize(for: item.title))))
+                    .font(RexFont.display(min(28, titleSize(for: item.title))))
                     .lineSpacing(-4)
                     .foregroundStyle(RexColor.foreground)
                     .fixedSize(horizontal: false, vertical: true)
@@ -772,10 +779,16 @@ struct ItemDetailView: View {
 
                 // The byline is the one place a voice belongs: an author, a
                 // cuisine and a neighbourhood, a year and a run of seasons.
+                // Nov 22 — "make the font of the location and type of place
+                // all one font and one size." They were a 19pt editorial
+                // italic in Rex green and a 14pt grey sans directly under it,
+                // two voices for two halves of the same fact — what this is,
+                // and where it is. One voice now, the same one the rest of
+                // the page reads in.
                 if let summary = standfirst(item: item, category: category) {
                     Text(summary)
-                        .font(RexFont.editorial(19))
-                        .foregroundStyle(RexColor.primary)
+                        .font(RexFont.text(14))
+                        .foregroundStyle(RexColor.mutedForeground)
                         .fixedSize(horizontal: false, vertical: true)
                         .padding(.top, 8)
                 }
@@ -1975,7 +1988,56 @@ struct ItemDetailView: View {
     private var yourTakeSection: some View {
         if !showsMyTakeCard {
             VStack(alignment: .leading, spacing: 10) {
-                takeEditor
+                // Nov 22 — "can we just lose the bottom half where it's input
+                // your Rex and just say something like 'Rex it'."
+                //
+                // The form was the last third of every page: a rating picker,
+                // five faces and, once you touched one, a text box. All of it
+                // sitting open whether or not you had come to write anything,
+                // which is a page asking to be filled in rather than read.
+                //
+                // Nothing is lost, it is one tap away — the same editor, with
+                // the same rating picker and the same box, revealed by the
+                // button rather than always on. "Want to try" stays beside it
+                // because saving something is a different intention from
+                // reviewing it, and it was the other thing this section did.
+                if isWritingTake || isEditingNote {
+                    takeEditor
+                } else {
+                    HStack(spacing: RexSpacing.sm) {
+                        Button {
+                            withAnimation(.snappy) { isWritingTake = true }
+                        } label: {
+                            Text("Rex it")
+                                .font(RexFont.text(15, weight: .semibold))
+                                .foregroundStyle(RexColor.primaryForeground)
+                                .padding(.horizontal, RexSpacing.lg)
+                                .frame(minHeight: 44)
+                                .frame(maxWidth: .infinity)
+                                .background(RexColor.primary)
+                                .clipShape(Capsule())
+                                .contentShape(Capsule())
+                        }
+                        .buttonStyle(.plain)
+
+                        Button {
+                            Task { await toggleWant() }
+                        } label: {
+                            HStack(spacing: 6) {
+                                Image(systemName: wanted ? "bookmark.fill" : "bookmark")
+                                Text(wanted ? "Saved" : "Want to try")
+                            }
+                            .font(RexFont.text(14, weight: .semibold))
+                            .foregroundStyle(wanted ? RexColor.primary : RexColor.mutedForeground)
+                            .padding(.horizontal, RexSpacing.md)
+                            .frame(minHeight: 44)
+                            .overlay(Capsule().stroke(RexColor.border, lineWidth: 1))
+                            .contentShape(Capsule())
+                        }
+                        .buttonStyle(.plain)
+                        .disabled(isTogglingWant)
+                    }
+                }
             }
             .padding(16)
         }
@@ -2060,20 +2122,8 @@ struct ItemDetailView: View {
     /// Writing one, or changing one. The whole form, only when it is wanted.
     private var takeEditor: some View {
         VStack(alignment: .leading, spacing: 10) {
-
-            Button {
-                Task { await toggleWant() }
-            } label: {
-                HStack(spacing: 6) {
-                    Image(systemName: wanted ? "bookmark.fill" : "bookmark")
-                    Text(wanted ? "On your want-to-try list" : "Want to try")
-                }
-                .font(RexFont.text(13, weight: .semibold))
-                .foregroundStyle(wanted ? RexColor.primary : RexColor.mutedForeground)
-            }
-            .buttonStyle(.plain)
-            .disabled(isTogglingWant)
-
+            // The want button moved up beside "Rex it", where it is reachable
+            // without opening the editor at all.
             RexRatingPicker(value: $rating)
 
             // Oct 14 — "bring back the emojis but only have the text box once

@@ -415,6 +415,7 @@ struct RecommendationCardView: View {
                 // and a genuinely long name now truncates rather than pushing
                 // anything, which keeps the icons in the same place on every
                 // card.
+                VStack(alignment: .leading, spacing: 0) {
                 HStack(spacing: RexSpacing.sm) {
                     authorRow
                     Spacer(minLength: RexSpacing.sm)
@@ -424,26 +425,38 @@ struct RecommendationCardView: View {
                             .fixedSize(horizontal: true, vertical: false)
                             .layoutPriority(1)
 
-                        // The one-tap way out of a want, after the action bar
-                        // rather than inside it: those four icons are the same
-                        // on every card and this is the one thing a want card
-                        // has that the others do not. Only your own — a
-                        // friend's want is not yours to mark done.
-                        if rec.isWant, let onMarkBeen,
-                           rec.user_id == RexAPI.shared.currentUserId {
-                            Button(action: onMarkBeen) {
-                                Text("Been? Rate it")
-                                    .font(RexFont.text(12, weight: .semibold))
-                                    .foregroundStyle(RexColor.primary)
-                                    .padding(.horizontal, RexSpacing.md)
-                                    .padding(.vertical, 8)
-                                    .background(RexColor.badgeBackground)
-                                    .clipShape(Capsule())
-                                    .contentShape(Capsule())
-                            }
-                            .buttonStyle(.plain)
-                        }
                     }
+                }
+
+                // Nov 22 — "your own posts are still all messed up."
+                //
+                // This button used to sit in the row above, after the action
+                // icons. That row already holds an avatar, the poster's name,
+                // four icons and, on a saved item, the word "Saved" — and on
+                // your own want it then had to find room for "Been? Rate it"
+                // as well. It could not. SwiftUI answers an overfull HStack by
+                // squeezing every child that will squeeze, so the name
+                // collapsed to "…" and the button's capsule compressed to a
+                // few points wide and stretched tall: the grey sliver down the
+                // right of the card, and the empty band beside it.
+                //
+                // It gets its own row. It is the one thing a want card has
+                // that the others do not, and it is a sentence, not an icon.
+                if rec.isWant, let onMarkBeen,
+                   rec.user_id == RexAPI.shared.currentUserId {
+                    Button(action: onMarkBeen) {
+                        Text("Been? Rate it")
+                            .font(RexFont.text(12, weight: .semibold))
+                            .foregroundStyle(RexColor.primary)
+                            .padding(.horizontal, RexSpacing.md)
+                            .frame(minHeight: 36)
+                            .background(RexColor.badgeBackground)
+                            .clipShape(Capsule())
+                            .contentShape(Capsule())
+                    }
+                    .buttonStyle(.plain)
+                    .padding(.top, RexSpacing.sm)
+                }
                 }
                 .padding(.horizontal, RexSpacing.cardPadding)
                 .padding(.vertical, RexSpacing.md)
@@ -649,7 +662,10 @@ struct RecommendationCardView: View {
         if others > 0 || rec.isWant || rec.isBlast || !alsoWant.isEmpty {
             HStack(spacing: RexSpacing.sm) {
                 if rec.isWant {
-                    wantedByBadge
+                    // Only when it says more than the banner does — the
+                    // faces and "N want to try this". A lone "Wants to try"
+                    // is now in the bar at the top.
+                    if wanters.count > 1 { wantedByBadge }
                 } else if rec.isBlast {
                     HStack(spacing: 4) {
                         Image(systemName: "sparkles").font(.system(size: 10))
@@ -845,7 +861,22 @@ struct RecommendationCardView: View {
             // bottom corner, and a card with a photograph no longer has a
             // thumbnail for it to ride on. The bar is always present, always
             // full width, and its trailing end was empty.
-            cornerLabel
+            //
+            // Nov 22 — "move this 'wants to try' to the top right banner." A
+            // want has no rating, so the slot the rating would use is free on
+            // exactly the cards that need somewhere to say this. The fuller
+            // version, with faces and a count, stays in the body when there
+            // is more than one person to name.
+            if rec.isWant {
+                HStack(spacing: 4) {
+                    Image(systemName: "bookmark").font(.system(size: 9))
+                    Text("Wants to try")
+                        .font(.system(size: 10.5, weight: .bold))
+                        .tracking(0.4)
+                }
+            } else {
+                cornerLabel
+            }
         }
         .foregroundStyle(category.tintColor)
         .padding(.horizontal, RexSpacing.cardPadding)

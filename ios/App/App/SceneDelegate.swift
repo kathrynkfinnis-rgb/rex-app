@@ -20,7 +20,8 @@ class SceneDelegate: UIResponder, UIWindowSceneDelegate {
             window?.makeKeyAndVisible()
             return
         }
-        if UserDefaults.standard.bool(forKey: "RexHeaderHarness") {
+        if UserDefaults.standard.bool(forKey: "RexHeaderHarness")
+            || UserDefaults.standard.bool(forKey: "RexPlaceHarness") {
             window?.rootViewController = UIHostingController(rootView: HeaderHarness())
             window?.overrideUserInterfaceStyle = .light
             window?.makeKeyAndVisible()
@@ -290,9 +291,27 @@ struct ShelfTileHarness: View {
 /// RexHeaderMetrics currently says. Nov 22, to check the tightened band still
 /// holds the cover the way the old one did.
 struct HeaderHarness: View {
+    /// -RexHeaderHarness 2 shows a place instead of a book: a photograph
+    /// somebody took across the band, the listing photo in the card on it.
+    private var isPlace: Bool { UserDefaults.standard.bool(forKey: "RexPlaceHarness") }
+
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 0) {
+                if isPlace {
+                    ZStack(alignment: .topTrailing) {
+                        RexPhotoBand(url: "https://images.unsplash.com/photo-1414235077428-338989a2e8c0?w=900")
+                        RexHeaderThumbnail(
+                            url: "https://images.unsplash.com/photo-1555396273-367ea4eb4db5?w=400",
+                            category: .place
+                        )
+                        .padding(.trailing, RexHeaderMetrics.thumbTrailing)
+                        .padding(.top, RexHeaderMetrics.photoThumbTop)
+                    }
+                    .frame(height: RexHeaderMetrics.photoBandHeight, alignment: .top)
+                    .padding(.horizontal, -16)
+                    .padding(.top, -16)
+                } else {
                 ZStack(alignment: .topTrailing) {
                     RexBannerBand(category: .book)
                     RexHeaderThumbnail(
@@ -305,31 +324,120 @@ struct HeaderHarness: View {
                 .frame(height: RexHeaderMetrics.bandHeight, alignment: .top)
                 .padding(.horizontal, -16)
                 .padding(.top, -16)
+                }
 
                 VStack(alignment: .leading, spacing: 0) {
-                    RexCategoryPill(category: .book)
-                    Text("Fundamentally")
-                        .font(RexFont.display(34))
+                    RexCategoryPill(category: isPlace ? .place : .book)
+                    Text(isPlace ? "TYCOZ - Crêperie & Oyster Bar" : "Fundamentally")
+                        .font(RexFont.display(28))
                         .lineSpacing(-4)
                         .padding(.top, 12)
-                    Text("Nussaibah Younis")
-                        .font(RexFont.editorial(19))
-                        .foregroundStyle(RexColor.primary)
+                    // One font, one size, with the address below it.
+                    Text(isPlace ? "Crêperie · 11th arrondissement" : "Nussaibah Younis")
+                        .font(RexFont.text(14))
+                        .foregroundStyle(RexColor.mutedForeground)
                         .padding(.top, 8)
+                    if isPlace {
+                        HStack(alignment: .firstTextBaseline, spacing: 6) {
+                            Image(systemName: "mappin").font(.system(size: 12))
+                            Text("8 Rue de la Roquette, 75011 Paris")
+                                .font(RexFont.text(14))
+                        }
+                        .foregroundStyle(RexColor.mutedForeground)
+                        .padding(.top, 9)
+                    }
                 }
                 .padding(.top, 6)
                 .padding(.bottom, 12)
 
-                Text("Nadia is an academic who's been disowned by her puritanical mother and dumped by her lover, Rosy. She de\u{2026}")
+                Text(isPlace
+                     ? "A tiny crêperie off the Bastille end of Roquette, open late and almost always full. The galettes are the reason to come\u{2026}"
+                     : "Nadia is an academic who's been disowned by her puritanical mother and dumped by her lover, Rosy. She de\u{2026}")
                     .font(RexFont.text(13.5))
                     .lineLimit(2)
-                Text("Rex\u{2019}d by 3 people")
-                    .font(RexFont.text(12, weight: .semibold))
-                    .foregroundStyle(RexColor.mutedForeground)
-                    .padding(.top, 14)
+                // Rex'd by, in the order people Rex'd it, with each person's
+                // own ranking on their face where they have one. Untouched by
+                // any of today's changes — it was missing from the mock, not
+                // from the page.
+                VStack(alignment: .leading, spacing: 6) {
+                    Text("Rex\u{2019}d by 3 people")
+                        .font(RexFont.text(12, weight: .semibold))
+                        .foregroundStyle(RexColor.mutedForeground)
+                    HStack(alignment: .top, spacing: 14) {
+                        ForEach(Array([("kathryn", "1"), ("Danny", ""), ("Menaal", "")].enumerated()),
+                                id: \.offset) { _, person in
+                            VStack(spacing: 4) {
+                                Circle().fill(RexColor.muted).frame(width: 44, height: 44)
+                                    .overlay(Text(String(person.0.prefix(1)).uppercased())
+                                        .font(RexFont.text(16, weight: .semibold))
+                                        .foregroundStyle(RexColor.mutedForeground))
+                                    .overlay(alignment: .topLeading) {
+                                        if !person.1.isEmpty {
+                                            Text(person.1)
+                                                .font(RexFont.text(10, weight: .bold))
+                                                .foregroundStyle(RexColor.primaryForeground)
+                                                .padding(4)
+                                                .background(RexColor.primary, in: Circle())
+                                                .offset(x: -4, y: -4)
+                                        }
+                                    }
+                                Text(person.0)
+                                    .font(RexFont.text(11))
+                                    .foregroundStyle(RexColor.mutedForeground)
+                            }
+                        }
+                    }
+                }
+                .padding(.top, 14)
                 Text("What friends say")
                     .font(RexFont.display(20))
                     .padding(.top, 14)
+
+                // The commentary itself — the thing the page is for.
+                VStack(alignment: .leading, spacing: 6) {
+                    HStack {
+                        HStack(spacing: 6) {
+                            Circle().fill(RexColor.muted).frame(width: 24, height: 24)
+                                .overlay(Text("M").font(RexFont.text(11, weight: .semibold))
+                                    .foregroundStyle(RexColor.mutedForeground))
+                            Text("Menaal").font(.system(size: 14, weight: .semibold))
+                        }
+                        Spacer()
+                        Text("\u{1F44C} Rex").font(RexFont.text(12, weight: .semibold))
+                            .foregroundStyle(RexColor.mutedForeground)
+                    }
+                    Text("\u{201C}Go for the galettes, stay for the cidre. We went twice in a weekend and I would happily have gone a third time.\u{201D}")
+                        .font(RexFont.text(15))
+                        .foregroundStyle(RexColor.foreground.opacity(0.9))
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+                .padding(12)
+                .background(RexColor.card)
+                .clipShape(RoundedRectangle(cornerRadius: 14))
+                .overlay(RoundedRectangle(cornerRadius: 14).stroke(RexColor.border, lineWidth: 1))
+                .padding(.top, 10)
+
+                // The bottom of the page as it is now: a button, not a form.
+                HStack(spacing: RexSpacing.sm) {
+                    Text("Rex it")
+                        .font(RexFont.text(15, weight: .semibold))
+                        .foregroundStyle(RexColor.primaryForeground)
+                        .padding(.horizontal, RexSpacing.lg)
+                        .frame(minHeight: 44)
+                        .frame(maxWidth: .infinity)
+                        .background(RexColor.primary)
+                        .clipShape(Capsule())
+                    HStack(spacing: 6) {
+                        Image(systemName: "bookmark")
+                        Text("Want to try")
+                    }
+                    .font(RexFont.text(14, weight: .semibold))
+                    .foregroundStyle(RexColor.mutedForeground)
+                    .padding(.horizontal, RexSpacing.md)
+                    .frame(minHeight: 44)
+                    .overlay(Capsule().stroke(RexColor.border, lineWidth: 1))
+                }
+                .padding(.top, 24)
             }
             .padding(16)
         }
