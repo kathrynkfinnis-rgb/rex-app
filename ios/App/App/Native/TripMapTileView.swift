@@ -29,6 +29,19 @@ struct TripMapTileView: View {
     /// stop with an address but no lat/lng yet still gets a shot at showing
     /// up here rather than silently breaking the tile.
     @State private var orderedItemIds: [String] = []
+    /// Nov 22 — "on feed, for trips and places, if there are pics, please
+    /// default to pics not map."
+    ///
+    /// A trip's own row rarely carries photos; the pictures are on its stops,
+    /// one per place somebody actually went. So a trip card showed a map even
+    /// when the trip was full of photographs — the one kind of card where the
+    /// photos are the reason to look.
+    ///
+    /// Gathered here rather than in the card because this view already makes
+    /// the call that has them: fetchTripStops returns whole recommendations,
+    /// photo_urls included, and the id was all that was being kept. No extra
+    /// request.
+    @State private var stopPhotos: [String] = []
     @State private var isLoading = true
 
     /// The viewport is fitted to whatever's here, so no explicit centre or
@@ -66,7 +79,17 @@ struct TripMapTileView: View {
         // Sept 7 — "the trip cards in the feed are still wider than other
         // cards". The box-first layout that fixed it now lives in
         // RexMapSnapshotView, which every map tile shares.
-        if !coordinates.isEmpty {
+        //
+        // Nov 22 — photos first. Both branches below still have to run
+        // `load()`, because until it returns we do not know whether this trip
+        // has any; the map is what shows while that is in flight and what
+        // stays if the answer is none. PlaceMapTileView's note has said the
+        // same thing since September: somebody's own picture beats a map of
+        // the place, and stacking both only makes the card taller.
+        if !stopPhotos.isEmpty {
+            PhotoCarouselView(urls: stopPhotos, cornerRadius: 0)
+                .task { await load() }
+        } else if !coordinates.isEmpty {
             RexMapSnapshotView(coordinates: coordinates, height: height)
                 .task { await load() }
         } else {
@@ -98,7 +121,11 @@ struct TripMapTileView: View {
         async let placesTask = RexAPI.shared.fetchMapPlaces(forTrip: tripRecommendationId, tripName: tripName)
         async let orderTask = RexAPI.shared.fetchTripStops(tripRecommendationId: tripRecommendationId)
         stops = (try? await placesTask) ?? []
-        orderedItemIds = ((try? await orderTask) ?? []).map { $0.item_id }
+        let ordered = ((try? await orderTask) ?? [])
+        orderedItemIds = ordered.map { $0.item_id }
+        // In itinerary order, so the first photo is the first stop rather
+        // than whichever row the database returned first.
+        stopPhotos = ordered.flatMap { $0.photo_urls ?? [] }
         isLoading = false
     }
 }
