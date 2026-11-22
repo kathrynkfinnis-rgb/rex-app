@@ -28,10 +28,10 @@ enum RexPushNotifications {
     /// bad moment, or never reached the question, and could not be asked
     /// again.
     ///
-    /// A date instead, so "Not now" means not now rather than never. Devices
-    /// carrying the old permanent flag have no date, which is why everyone
-    /// who ever said "Not now" is asked once more after this ships. That is
-    /// the intent.
+    /// A date instead, so "Not now" means not now rather than never, and a
+    /// week later it comes back. Devices carrying the old permanent flag have
+    /// no date, which is why everyone who ever said "Not now" is asked once
+    /// more after this ships. That is the intent.
     private static let askedAtKey = "rex.pushAskedAt"
 
     static var lastAskedAt: Date? {
@@ -39,10 +39,21 @@ enum RexPushNotifications {
         set { UserDefaults.standard.set(newValue, forKey: askedAtKey) }
     }
 
-    /// Long enough that it is not nagging, short enough that somebody who
-    /// said "not now" in their first five minutes gets a second chance once
-    /// they have friends and something to be notified about.
-    private static let askAgainAfter: TimeInterval = 30 * 24 * 60 * 60
+    /// A week after "not now".
+    ///
+    /// Started at thirty days and came down on 22 November. Thirty is the
+    /// safe number for a settled app and the wrong one during a ramp-up: the
+    /// people being asked now joined days ago, and a month of silence is most
+    /// of the window in which they decide whether Rex is worth keeping. A
+    /// week is long enough to read as a second ask rather than nagging, and
+    /// short enough to land while they are still making that decision.
+    ///
+    /// This is the same dial as the friend-request nudge's cooldown, and the
+    /// same caution applies: it is the number to raise again once push is
+    /// actually reaching phones, because a prompt that returns too often is
+    /// how somebody decides the answer is no for good — and iOS only lets
+    /// them say that once.
+    private static let askAgainAfter: TimeInterval = 7 * 24 * 60 * 60
 
     /// Should the ask screen be shown now?
     ///
@@ -207,7 +218,7 @@ struct NotificationsAskView: View {
             Button("Not now") {
                 // Nov 19 — records when, not whether. This used to set the
                 // permanent flag, so one tap here ended the conversation for
-                // good on this device. Asked again in thirty days.
+                // good on this device. Asked again in a week.
                 RexPushNotifications.hasAsked = true
                 RexPushNotifications.lastAskedAt = Date()
                 onDone()

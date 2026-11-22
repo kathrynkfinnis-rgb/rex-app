@@ -132,7 +132,7 @@ struct RootView: View {
             // permanent UserDefaults flag: one "Not now" and this device
             // never raised it again. shouldAsk asks iOS whether its dialog
             // is still available and us whether we asked recently, so "not
-            // now" means thirty days rather than never. Everyone still
+            // now" means a week rather than never. Everyone still
             // carrying the old flag has no date recorded, so they are asked
             // once more after this ships, which is the point.
             gate = .notifications
