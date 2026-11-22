@@ -125,6 +125,45 @@ struct CardLayoutHarness: View {
     }
     """
 
+
+    private static let bookJson = """
+    {
+      "id": "harness-2",
+      "rating": 9,
+      "note": "Furiously funny and then, without warning, very sad. I read it in two sittings and immediately made Gemma buy it.",
+      "created_at": "2026-11-21T19:00:00Z",
+      "photo_url": null,
+      "photo_urls": null,
+      "tags": null,
+      "user_id": "harness-user",
+      "item_id": "harness-book",
+      "trip_section": null,
+      "is_anonymous": false,
+      "list_section": null,
+      "show_in_feed": true,
+      "recommendation_tags": null,
+      "items": {
+        "id": "harness-book",
+        "type": "book",
+        "title": "Fundamentally",
+        "subtitle": "Nussaibah Younis · 2025",
+        "image_url": "https://covers.openlibrary.org/b/id/15195855-M.jpg",
+        "genre": "Fiction",
+        "address": null
+      },
+      "profiles": {
+        "username": "katy_finnis",
+        "display_name": "Kathryn",
+        "avatar_url": null
+      },
+      "creators": null
+    }
+    """
+
+    private var book: FeedRecommendation? {
+        try? JSONDecoder().decode(FeedRecommendation.self, from: Data(Self.bookJson.utf8))
+    }
+
     private var rec: FeedRecommendation? {
         try? JSONDecoder().decode(FeedRecommendation.self, from: Data(Self.json.utf8))
     }
@@ -138,12 +177,14 @@ struct CardLayoutHarness: View {
         ScrollView {
             LazyVStack(spacing: RexSpacing.betweenCards) {
                 if let rec {
-                    ForEach(0..<3, id: \.self) { _ in
+                    RecommendationCardView(
+                        rec: rec, rexCount: 3, isOnMyList: false, wanters: []
+                    )
+                    if let book {
+                        // A book is the other half of the rule: stock art, so
+                        // it keeps its thumbnail and gets no hero.
                         RecommendationCardView(
-                            rec: rec,
-                            rexCount: 3,
-                            isOnMyList: false,
-                            wanters: []
+                            rec: book, rexCount: 1, isOnMyList: false, wanters: []
                         )
                     }
                 } else {

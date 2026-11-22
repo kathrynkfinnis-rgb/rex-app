@@ -851,7 +851,11 @@ struct RecommendationCardView: View {
         .padding(.horizontal, RexSpacing.cardPadding)
         .padding(.vertical, 6)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background(category.tintColor.opacity(0.16))
+        // Nov 22 — "make the surround all one colour." The bar was the same
+        // hue as the rail and the hairline but a weaker wash of it, so the
+        // three read as two colours rather than one band round the card.
+        // railColor is what draws the other two; the bar takes it as well.
+        .background(railColor)
     }
 
     private var categoryBadge: some View {
