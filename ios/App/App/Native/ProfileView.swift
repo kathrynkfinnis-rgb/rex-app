@@ -175,6 +175,22 @@ struct ProfileView: View {
                 .foregroundStyle(RexColor.primary)
                 .accessibilityLabel("Settings")
             }
+            // Nov 22 — "put feedback / bug reports in profile." It lived in
+            // the feed's header, which is the one screen people are reading
+            // rather than managing: a bug report button beside the bell on
+            // the feed is in the way of the thing it is reporting on. Here it
+            // sits with drafts, notification settings and settings, which is
+            // where somebody goes when they want to do something about the
+            // app rather than look at it.
+            ToolbarItem(placement: .topBarLeading) {
+                Button {
+                    path.append(FeedbackRoute())
+                } label: {
+                    Image(systemName: "exclamationmark.bubble")
+                }
+                .foregroundStyle(RexColor.primary)
+                .accessibilityLabel("Send feedback or report a bug")
+            }
             ToolbarItem(placement: .topBarTrailing) {
                 if !recommendations.isEmpty {
                     Button(selecting ? "Done" : "Select") {
@@ -257,6 +273,13 @@ struct ProfileView: View {
         .navigationDestination(for: NotificationPreferencesRoute.self) { _ in NotificationPreferencesView() }
         .navigationDestination(for: PrivacyRoute.self) { _ in PrivacyDataView(onSignedOut: { onSignedOut?() }) }
         .navigationDestination(for: RexAdminRoute.self) { _ in RexAdminView() }
+        // Nov 22 — FeedbackRoute (the form anybody can send) as well as
+        // RexFeedbackRoute (the admin inbox). Registering the button's route
+        // in the same breath as adding the button, because the collection
+        // links fixed on 19 November were dead for exactly this reason: a
+        // NavigationLink whose destination is not registered in its own
+        // stack does nothing at all, silently.
+        .navigationDestination(for: FeedbackRoute.self) { _ in FeedbackView() }
         .navigationDestination(for: RexFeedbackRoute.self) { _ in RexFeedbackInboxView() }
         .navigationDestination(for: SettingsRoute.self) { _ in
             SettingsView(

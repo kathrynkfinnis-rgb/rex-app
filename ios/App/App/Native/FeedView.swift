@@ -1039,12 +1039,10 @@ struct FeedView: View {
                 }
                 .accessibilityLabel("Friends")
 
-                NavigationLink(value: FeedbackRoute()) {
-                    Image(systemName: "exclamationmark.bubble")
-                        .font(.system(size: 18))
-                        .foregroundStyle(RexColor.mutedForeground)
-                }
-                .accessibilityLabel("Send feedback")
+                // Nov 22 — feedback moved to Profile, beside drafts,
+                // notification settings and settings. The feed is the screen
+                // people read rather than manage, and one fewer icon here
+                // gives the three that remain more room to be hit.
 
                 NavigationLink(value: NotificationsRoute()) {
                     Image(systemName: "bell")
@@ -1245,16 +1243,26 @@ struct FeedView: View {
                                 selectedCategories = []; subFilter = nil; cuisineFilter = nil
                             }
                         }
-                        // Toggles membership rather than replacing the
-                        // selection — "should be able to filter two things
-                        // at once, ie books and films".
+                        // Nov 22 — "please make it so we can only filter by
+                        // one category in the feed." One at a time: tapping a
+                        // chip replaces the selection, tapping the active one
+                        // clears it back to All.
+                        //
+                        // This reverses an earlier request — "should be able
+                        // to filter two things at once, ie books and films" —
+                        // so it is written down rather than quietly flipped.
+                        // Multi-select was never fully wired anyway: the
+                        // shelves above this row (see the two `count == 1`
+                        // guards) only ever worked with exactly one category
+                        // chosen, so picking two quietly turned half the
+                        // screen off.
+                        //
+                        // selectedCategories stays a Set so none of the
+                        // downstream filtering has to change; it simply never
+                        // holds more than one now.
                         ForEach(availableCategories, id: \.self) { category in
                             filterChip(title: category.pluralLabel, isActive: selectedCategories.contains(category)) {
-                                if selectedCategories.contains(category) {
-                                    selectedCategories.remove(category)
-                                } else {
-                                    selectedCategories.insert(category)
-                                }
+                                selectedCategories = selectedCategories.contains(category) ? [] : [category]
                                 subFilter = nil; cuisineFilter = nil; blastsOnly = false
                             }
                         }
