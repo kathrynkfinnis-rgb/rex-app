@@ -223,7 +223,18 @@ struct AddRexView: View {
     @State private var title = ""
     @State private var subtitle = ""
     @State private var address = ""
-    @State private var rating: Double = 10
+    /// Nov 22 — "do not auto select reaction on Rex input page."
+    ///
+    /// Started at 10, so every Rex opened with Obsessed already chosen and
+    /// posting without thinking about it recorded the top of the scale. The
+    /// ratings people actually meant and the ratings nobody touched were
+    /// indistinguishable afterwards.
+    ///
+    /// 0 is the picker's own "nothing chosen" state, which it already draws
+    /// — see RexRatingPicker.selectedTier. It is NOT a valid thing to post:
+    /// FeedRecommendation.tier renders 0 as no opinion at all, which is the
+    /// 15 September bug. Hence the gate on the Post button below.
+    @State private var rating: Double = 0
     @State private var note = ""
     /// Sept 10 — a list's free-text Notes, at the bottom of the form. See
     /// RexAPI.updateLongNote for why it isn't `note`.
@@ -1360,10 +1371,10 @@ struct AddRexView: View {
                 }
             }
             .frame(height: 48)
-            .background(title.trimmingCharacters(in: .whitespaces).isEmpty ? RexColor.primary.opacity(0.4) : RexColor.primary)
+            .background(canPost ? RexColor.primary : RexColor.primary.opacity(0.4))
             .foregroundStyle(RexColor.primaryForeground)
             .clipShape(Capsule())
-            .disabled(isSaving || title.trimmingCharacters(in: .whitespaces).isEmpty)
+            .disabled(isSaving || !canPost)
             .padding(.top, 6)
 
             // Trips and lists only: both are built up over several sittings
@@ -2249,6 +2260,19 @@ struct AddRexView: View {
     /// button should quietly perform. A thing that is already a draft stays
     /// one when you press Save changes, because neither path touches
     /// published_at.
+
+    /// A title, and — where the form asks for one — a rating somebody chose.
+    ///
+    /// Nov 22: the rating half is new. Nothing was auto-selected any more, so
+    /// without this the Post button would happily write a Rex at 0, which the
+    /// feed renders as no opinion at all. A want-to-try has no rating to give,
+    /// and a draft is unfinished by definition, so neither is gated on it.
+    private var canPost: Bool {
+        guard !title.trimmingCharacters(in: .whitespaces).isEmpty else { return false }
+        guard mode == .rated else { return true }
+        return rating > 0
+    }
+
     private var canSaveDraft: Bool {
         (category == .trip || category == .list)
             && editingTripRecId == nil && editingListRecId == nil

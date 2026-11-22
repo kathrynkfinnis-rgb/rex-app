@@ -348,11 +348,17 @@ struct UserProfileView: View {
                 // No count for someone you're not friends with — their Rex
                 // are friends-only, so it would always say a misleading 0.
                 if !recommendations.isEmpty || connection == "friend" || connection == "you" {
+                // Nov 22 — "remove the average Rex score for now." The
+                // badge that sat beside this count averaged everything this
+                // person had ever Rex'd, which scores the person rather than
+                // anything they recommended — and reads as a mark out of
+                // five for their taste. The same badge on an item or a map
+                // pin stays: averaging what several people thought of one
+                // restaurant is the question somebody is actually asking.
                 HStack(spacing: RexSpacing.md) {
                     Text("\(recommendations.count) Rex")
                         .font(RexFont.text(12))
                         .foregroundStyle(RexColor.mutedForeground)
-                    RexRatingAverageBadge(ratings: recommendations.map { $0.rating })
                 }
                 .padding(.top, 2)
                 } else {

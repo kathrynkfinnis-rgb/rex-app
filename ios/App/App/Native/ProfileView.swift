@@ -434,7 +434,9 @@ struct ProfileView: View {
             // Kathryn asked to drop in favour of going straight to the feed.
             HStack(spacing: RexSpacing.sm) {
                 statCard(value: "\(rexTotal)", label: "Rex")
-                statCard(value: averageRatingText, label: "AVG RATING")
+                // Nov 22 — the AVG RATING card is gone; see the note on
+                // UserProfileView. averageRatingText stays below, unused for
+                // now, because "for now" is what was asked.
                 statCard(value: "\(friendCount)", label: "FRIENDS") {
                     // Pushed onto the same stack now that Friends isn't a
                     // tab — see MainTabView.
