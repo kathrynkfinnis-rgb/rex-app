@@ -225,15 +225,28 @@ struct MainTabView: View {
             if selection != index && index == 1 { mapRefreshSignal += 1 }
             selection = index
         } label: {
-            VStack(spacing: 4) {
-                Image(systemName: icon)
-                    .font(.system(size: 19))
-                Text(title)
-                    .font(.system(size: 10, weight: selection == index ? .semibold : .regular))
-            }
-            .foregroundStyle(selection == index ? RexColor.primary : RexColor.mutedForeground)
-            .frame(maxWidth: .infinity)
+            // Nov 22 — icons only, and bigger. The words under them were
+            // 10pt, which is below what anybody reads in passing, and five
+            // labels across a phone is a line of text where a row of symbols
+            // reads faster. 24pt rather than 19 is the same note from the
+            // same round: key controls were too small to hit confidently.
+            //
+            // The title does not disappear, it moves to the accessibility
+            // label — a tab bar of unlabelled glyphs is unusable with
+            // VoiceOver, and dropping the Text without this would have made
+            // the app worse for the people who most need the help.
+            //
+            // minHeight 44 keeps the tap target at Apple's minimum even
+            // though the glyph is 24: the thing you hit stays bigger than the
+            // thing you see.
+            Image(systemName: icon)
+                .font(.system(size: 24))
+                .foregroundStyle(selection == index ? RexColor.primary : RexColor.mutedForeground)
+                .frame(maxWidth: .infinity, minHeight: 44)
+                .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
+        .accessibilityLabel(title)
+        .accessibilityAddTraits(selection == index ? [.isButton, .isSelected] : .isButton)
     }
 }

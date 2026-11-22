@@ -582,13 +582,12 @@ struct RexMapView: View {
                 }
 
                 Spacer()
-                Text("\(visiblePlaces.count)")
-                    .font(RexFont.text(12, weight: .semibold))
-                    .foregroundStyle(RexColor.badgeForeground)
-                    .padding(.horizontal, RexSpacing.sm)
-                    .padding(.vertical, 3)
-                    .background(RexColor.badgeBackground)
-                    .clipShape(Capsule())
+                // Nov 22 — the count pill that sat here is gone. It answered
+                // a question nobody asks: the pins are on screen and visibly
+                // countable, and a number that changes every time the map
+                // moves reads as something to watch rather than something to
+                // ignore. The area name next to it already says what you are
+                // looking at.
 
                 Button {
                     withAnimation(.snappy) { showingList.toggle() }
