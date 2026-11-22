@@ -79,6 +79,8 @@ struct FeedView: View {
     /// AddRexView (5 Sept), CollectionDetailView and WishListCategoryView.
     private enum ActiveSheet: Identifiable {
         case edit(FeedRecommendation)
+        /// Nov 22 — the same sheet, opened already flipped from want to rated.
+        case markBeen(FeedRecommendation)
         case collection(FeedRecommendation)
         case wantCollection(FeedRecommendation)
         case trip(FeedRecommendation)
@@ -88,6 +90,7 @@ struct FeedView: View {
             switch self {
             case .report(let subject): return "report-\(subject.id)"
             case .edit(let rec): return "edit-\(rec.id)"
+            case .markBeen(let rec): return "been-\(rec.id)"
             case .collection(let rec): return "collection-\(rec.id)"
             case .wantCollection(let rec): return "wantcollection-\(rec.id)"
             case .trip(let rec): return "trip-\(rec.id)"
@@ -953,6 +956,13 @@ struct FeedView: View {
                 )
             case .trip(let rec):
                 AddToTripView(itemId: rec.item_id, itemTitle: rec.items?.title ?? "This place", onDone: {})
+            case .markBeen(let rec):
+                EditRexView(
+                    rec: rec,
+                    startAsRated: true,
+                    onSaved: { activeSheet = nil; Task { await loadFeed() } },
+                    onDeleted: { activeSheet = nil; Task { await loadFeed() } }
+                )
             case .edit(let rec):
             // Sept 5 — "the edit button on the feed takes you to the old
             // edit page". A trip is edited in the Add-a-trip form now, not
@@ -1747,6 +1757,7 @@ struct FeedView: View {
             },
             // Blasts keep their own screen, which is where their responses live.
             onCommentTap: { rec.isBlast ? open(rec) : (activeSheet = .comments(rec)) },
+            onMarkBeen: { activeSheet = .markBeen(rec) },
             onViewOnMap: onViewOnMap,
             onViewTripOnMap: onViewTripOnMap
         )

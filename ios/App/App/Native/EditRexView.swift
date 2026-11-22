@@ -149,12 +149,28 @@ struct EditRexView: View {
         return String(rec.id.dropFirst("want-".count))
     }
 
-    init(rec: FeedRecommendation, onSaved: @escaping () -> Void, onDeleted: @escaping () -> Void) {
+    /// Nov 22 — "want to → done: just want to make the flow smoother."
+    ///
+    /// Turning something you meant to try into something you have been took
+    /// four steps: the "…" menu, Edit, find the "still want to try" switch,
+    /// turn it off, then rate it. Three of those are navigation and only the
+    /// last is the thing you came to do.
+    ///
+    /// Opened with this true, the sheet arrives already flipped, with the
+    /// title, note and everything else carried across as it always was — so
+    /// what is in front of you is the rating picker and the note you wrote
+    /// when you wanted to go. The toggle is still there to flip back.
+    init(
+        rec: FeedRecommendation,
+        startAsRated: Bool = false,
+        onSaved: @escaping () -> Void,
+        onDeleted: @escaping () -> Void
+    ) {
         self.rec = rec
         self.onSaved = onSaved
         self.onDeleted = onDeleted
         _title = State(initialValue: rec.items?.title ?? "")
-        _wantToTry = State(initialValue: rec.isWant)
+        _wantToTry = State(initialValue: rec.isWant && !startAsRated)
         _rating = State(initialValue: rec.rating)
         _note = State(initialValue: rec.note ?? "")
         _photoURLs = State(initialValue: rec.photo_urls ?? (rec.photo_url.map { [$0] } ?? []))

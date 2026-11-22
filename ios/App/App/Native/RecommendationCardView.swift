@@ -25,6 +25,10 @@ struct RecommendationCardView: View {
     /// issue as #120's swipe conflict). Same explicit hand-back-up pattern
     /// as onAuthorTap/onBookAuthorTap instead of relying on pass-through.
     var onCommentTap: (() -> Void)? = nil
+    /// Nov 22 — "been?" on a want card. Only wired on screens that own an
+    /// edit sheet; elsewhere the button is simply not drawn rather than
+    /// drawn and dead.
+    var onMarkBeen: (() -> Void)? = nil
     /// #133 — jumps to this item's pin on the map. Only meaningful for
     /// place/event categories (anything else has no coordinates at all), so
     /// the locality row below only becomes tappable when both this is
@@ -372,6 +376,26 @@ struct RecommendationCardView: View {
                         RexCardActions(rec: rec, rexCount: rexCount, onCommentTap: onCommentTap)
                             .fixedSize(horizontal: true, vertical: false)
                             .layoutPriority(1)
+
+                        // The one-tap way out of a want, after the action bar
+                        // rather than inside it: those four icons are the same
+                        // on every card and this is the one thing a want card
+                        // has that the others do not. Only your own — a
+                        // friend's want is not yours to mark done.
+                        if rec.isWant, let onMarkBeen,
+                           rec.user_id == RexAPI.shared.currentUserId {
+                            Button(action: onMarkBeen) {
+                                Text("Been? Rate it")
+                                    .font(RexFont.text(12, weight: .semibold))
+                                    .foregroundStyle(RexColor.primary)
+                                    .padding(.horizontal, RexSpacing.md)
+                                    .padding(.vertical, 8)
+                                    .background(RexColor.badgeBackground)
+                                    .clipShape(Capsule())
+                                    .contentShape(Capsule())
+                            }
+                            .buttonStyle(.plain)
+                        }
                     }
                 }
                 .padding(.horizontal, RexSpacing.cardPadding)

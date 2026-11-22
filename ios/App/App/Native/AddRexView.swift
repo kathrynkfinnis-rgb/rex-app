@@ -1066,6 +1066,27 @@ struct AddRexView: View {
                 .foregroundStyle(RexColor.primary)
             }
 
+            // Nov 22 — "the place form should get the same button the trip
+            // form has." The importer pulls several recommendations out of a
+            // document and that is as true of a list of places somebody sent
+            // you as of an itinerary; the trip form has offered it since
+            // #109 and the place form, where most of those lists end up, did
+            // not. Same sheet, same destination, worded for places.
+            if category == .place {
+                Button {
+                    activeSheet = .documentImport
+                } label: {
+                    Label("Import places from a document", systemImage: "doc.text")
+                        .font(RexFont.text(13, weight: .medium))
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, RexSpacing.md)
+                        .background(RexColor.badgeBackground)
+                        .clipShape(RoundedRectangle(cornerRadius: RexRadius.input, style: .continuous))
+                }
+                .buttonStyle(.plain)
+                .foregroundStyle(RexColor.primary)
+            }
+
             if category == .list {
                 // Sept 5 — "update the list inputs so it's similar to the
                 // trip input: headings and items in draggable boxes". Same
