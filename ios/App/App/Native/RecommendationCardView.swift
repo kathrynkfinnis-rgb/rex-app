@@ -427,16 +427,33 @@ struct RecommendationCardView: View {
             HStack(spacing: RexSpacing.xs) {
                 categoryBadge
                     .fixedSize()
-                ForEach(splitGenres(item.genre).prefix(3), id: \.self) { genre in
-                    Text(genre)
-                        .font(.system(size: 11, weight: .medium))
-                        .foregroundStyle(RexColor.mutedForeground)
-                        .lineLimit(1)
-                        .fixedSize()
-                        .padding(.horizontal, RexSpacing.sm)
-                        .padding(.vertical, 3)
-                        .background(RexColor.muted)
-                        .clipShape(Capsule())
+                // Nov 22 — "different styling of what I assume are related
+                // elements, eg bar restaurant has a kind of tag icon on the
+                // map but not on the feed — these indicators help a user
+                // understand how objects are related across the app."
+                //
+                // rexSubcategorySymbol was drawn on map pins and nowhere
+                // else, so the same bar was a wineglass on the map and a
+                // plain word in the feed, and nothing linked the two. The
+                // first chip carries the symbol here as well; the rest stay
+                // text, because the symbol belongs to the leading genre the
+                // way the pin's does.
+                ForEach(Array(splitGenres(item.genre).prefix(3).enumerated()), id: \.element) { index, genre in
+                    HStack(spacing: 3) {
+                        if index == 0 {
+                            Image(systemName: rexSubcategorySymbol(genre: genre, type: item.type))
+                                .font(.system(size: 9))
+                        }
+                        Text(genre)
+                            .font(.system(size: 11, weight: .medium))
+                            .lineLimit(1)
+                    }
+                    .foregroundStyle(RexColor.mutedForeground)
+                    .fixedSize()
+                    .padding(.horizontal, RexSpacing.sm)
+                    .padding(.vertical, 3)
+                    .background(RexColor.muted)
+                    .clipShape(Capsule())
                 }
             }
             // Oct 9 — "need to move one of the tags to the row below to
