@@ -57,8 +57,16 @@ struct FeedView: View {
     /// that badge counts and the word means one thing on the screen. A
     /// time-decayed version was considered and turned down: it would have
     /// ranked a card above another that visibly says it is hotter.
-    private enum SortMode { case recent, mostLiked, hot }
-    @State private var sortMode: SortMode = .recent
+    private enum SortMode: String { case recent, mostLiked, hot }
+    /// Nov 22 — "persist sort and position". Position is the reload above;
+    /// this is the sort. It was @State, so choosing Hot lasted until the
+    /// next launch and then quietly became Most recent again — which reads
+    /// as the app forgetting rather than as a default.
+    @AppStorage("rex.feedSortMode") private var sortModeRaw: String = SortMode.recent.rawValue
+    private var sortMode: SortMode {
+        get { SortMode(rawValue: sortModeRaw) ?? .recent }
+        nonmutating set { sortModeRaw = newValue.rawValue }
+    }
     @State private var likeCounts: [String: Int] = [:]
     @State private var query = ""
     @FocusState private var searchFocused: Bool
@@ -900,9 +908,21 @@ struct FeedView: View {
                 // onto this same path instead, popping back to root is the
                 // equivalent moment (also covers returning from Notifications,
                 // Drafts, etc., which is a fine superset of the old behavior).
+                // Nov 22 — the badge count only. The loadFeed() that used
+                // to sit here is why "I clicked on something, went back and
+                // my whole feed changed" and why adding a friend reloads the
+                // page: every return to the root refetched and re-sorted,
+                // so the card you had just been reading moved or vanished
+                // and your place in the list went with it.
+                //
+                // Nothing goes stale by dropping it. Editing, hiding,
+                // unposting and deleting all reload through their own
+                // onChanged callbacks; adding a Rex comes back on
+                // addRexRefreshSignal; and pull-to-refresh is there for
+                // everything else. What this did on top of all that was
+                // reload the feed because you looked at a notification.
                 Task {
                     unreadNotificationCount = await RexAPI.shared.fetchUnreadNotificationCount()
-                    await loadFeed()
                 }
             }
         }
