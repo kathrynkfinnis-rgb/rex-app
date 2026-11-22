@@ -176,80 +176,89 @@ struct RecommendationCardView: View {
                 VStack(alignment: .leading, spacing: 6) {
                 HStack(alignment: .top, spacing: RexSpacing.md) {
                     VStack(alignment: .leading, spacing: 6) {
-                        Text(item.title)
-                            .font(RexFont.display(17, weight: .semibold))
-                            .foregroundStyle(RexColor.foreground)
-                            // Sept 5 — "the titles on the feed should be full
-                            // unless it goes over 3 lines".
-                            //
-                            // Oct 14 — except on a list whose author has said
-                            // it's a to-do list, where the title is the whole
-                            // instruction and cutting it loses the job.
-                            .lineLimit(showsFullTitle ? nil : 3)
-                            .fixedSize(horizontal: false, vertical: showsFullTitle)
-                            .truncationMode(.tail)
-                            .padding(.trailing, titleTrailingReserve)
-
-                        if let subtitle = item.subtitle, !subtitle.isEmpty {
-                            if category == .book, let onBookAuthorTap {
-                                // Oct 8 — "the authors' names need to be
-                                // truncated", again. It was fixed on 3 October
-                                // on the branch below and not on this one, and
-                                // this is the branch books take — a book's
-                                // author is tappable, so it gets its own row.
-                                // Which meant the fix landed everywhere except
-                                // the only category that has authors.
-                                bookSubtitleRow(withoutYear(subtitle), onTap: onBookAuthorTap)
-                                    .padding(.trailing, titleTrailingReserve)
-                            } else {
-                                Text(withoutYear(subtitle))
-                                    .font(RexFont.text(13))
-                                    .foregroundStyle(RexColor.mutedForeground)
-                                    .lineLimit(1)
-                                    // Oct 3 — "author line needs to be
-                                    // truncated so doesn't interfere with the
-                                    // rating." The title reserved room for the
-                                    // corner and the line under it didn't, so
-                                    // a long author ran straight under the 100.
-                                    .padding(.trailing, titleTrailingReserve)
-                            }
+                        // Nov 22 — "make sure the text runs through the top
+                        // of the card": the title should use the whole width
+                        // before it wraps.
+                        //
+                        // It was wrapping with room to spare. "TYCOZ -
+                        // CRÊPERIE & OYSTER BAR" broke after the ampersand
+                        // and left the rest of the line empty, because
+                        // Archivo Black is wide and the title came to within
+                        // a few points of the card — close enough that
+                        // SwiftUI took the second line rather than the last
+                        // word. It only looked right on build 107, where the
+                        // card was wider than the screen.
+                        //
+                        // ViewThatFits asks for the single line first and
+                        // falls back to the wrapping version only when it
+                        // genuinely does not fit, so a marginal title gets
+                        // its line and a long one still wraps to three.
+                        // Three tries, in order. A single line at full size;
+                        // a single line one step down, for the titles that
+                        // miss by a few points — this one wants about 323pt
+                        // and the card has 310, so it was taking a whole
+                        // second line to carry "OYSTER BAR"; and only then
+                        // the wrapping version, for titles that are genuinely
+                        // long. ViewThatFits takes the first that fits, and
+                        // each of the first two demands its natural width, so
+                        // neither can be chosen unless it really does fit.
+                        ViewThatFits(in: .horizontal) {
+                            titleText(item, size: 17)
+                                .lineLimit(1)
+                                .fixedSize()
+                            titleText(item, size: 15)
+                                .lineLimit(1)
+                                .fixedSize()
+                            titleText(item, size: 17)
+                                .lineLimit(showsFullTitle ? nil : 3)
+                                .fixedSize(horizontal: false, vertical: showsFullTitle)
+                                .truncationMode(.tail)
                         }
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .padding(.trailing, titleTrailingReserve)
 
-                        // What it is: the category, then up to three
-                        // sub-categories. The status ("Wants to try",
-                        // "Asking") is no longer in here — it's in the corner.
-                        // Nov 22 — the chip row is gone. "Don't need sub
-                        // category on the feed", with both chips circled:
-                        // MOVIE and Drama. The category now names itself in
-                        // the bar across the top of the card, so the first
-                        // chip was saying it twice, and the second was a
-                        // genre nobody asked for — wearing, on a film, a map
-                        // pin, because rexSubcategorySymbol has no answer for
-                        // a movie and falls back to one.
+                        // Nov 22 — "crêperie and paris should be next to
+                        // each other." They were two stacked rows, each
+                        // holding a few words and a whole line of card.
+                        //
+                        // A subtitle that only repeats the title is not a
+                        // subtitle, either: "Minnie-Mae Studio / Minnie-Mae
+                        // Studio" and "Instinct / Instinct" are both live on
+                        // the feed, from items whose two fields were filled
+                        // from the same string. Compared loosely, since the
+                        // title is set in caps and the year comes out of the
+                        // subtitle, so the two rarely match byte for byte
+                        // even when they are the same words.
+                        let subtitleLine: String? = {
+                            guard let raw = item.subtitle, !raw.isEmpty,
+                                  !isJustTheTitleAgain(raw, title: item.title)
+                            else { return nil }
+                            let stripped = withoutYear(raw)
+                            return stripped.isEmpty ? nil : stripped
+                        }()
+                        let locality = shortLocality(item.address)
 
-                        // Where it is.
-                        if let locality = shortLocality(item.address) {
-                            let canViewOnMap = onViewOnMap != nil && (category == .place || category == .event)
-                            HStack(spacing: 3) {
-                                Image(systemName: "mappin")
-                                    .font(.system(size: 9))
-                                Text(locality)
-                                    .font(RexFont.text(12.5, weight: .medium))
-                                    .lineLimit(1)
+                        if category == .book, let onBookAuthorTap, let subtitleLine {
+                            // Oct 8 — "the authors' names need to be
+                            // truncated", again. A book's author is tappable,
+                            // so it keeps a row of its own rather than
+                            // sitting in a line with something that isn't.
+                            bookSubtitleRow(subtitleLine, onTap: onBookAuthorTap)
+                                .padding(.trailing, titleTrailingReserve)
+                            if let locality { localityRow(locality) }
+                        } else if subtitleLine != nil || locality != nil {
+                            HStack(spacing: RexSpacing.sm) {
+                                if let subtitleLine {
+                                    Text(subtitleLine)
+                                        .font(RexFont.text(13))
+                                        .foregroundStyle(RexColor.mutedForeground)
+                                        .lineLimit(1)
+                                }
+                                if let locality { localityRow(locality) }
                             }
-                            .foregroundStyle(RexColor.mutedForeground)
-                            .contentShape(Rectangle())
-                            .onTapGesture {
-                                if canViewOnMap { onViewOnMap?(rec.item_id) }
-                            }
-                            // Sept 15 — "Can't click through to the details in
-                            // this section, the whole tile should bring me
-                            // through" (Danny). This row and the note below
-                            // each had a tap of their own, which swallowed the
-                            // card's tap even when they had nothing to do. They
-                            // only take the tap now when there's something for
-                            // it to do; otherwise it falls through to the card.
-                            .allowsHitTesting(canViewOnMap)
+                            // Oct 3 — "author line needs to be truncated so
+                            // doesn't interfere with the rating."
+                            .padding(.trailing, titleTrailingReserve)
                         }
                     }
 
@@ -368,19 +377,10 @@ struct RecommendationCardView: View {
 
                         rexdByRow
 
-                        if let tags = rec.tags, !tags.isEmpty {
-                            HStack(spacing: RexSpacing.xs) {
-                                ForEach(tags.prefix(3), id: \.self) { tag in
-                                    Text("#\(tag)")
-                                        .font(RexFont.text(11, weight: .medium))
-                                        .foregroundStyle(RexColor.badgeForeground)
-                                        .padding(.horizontal, RexSpacing.sm)
-                                        .padding(.vertical, 3)
-                                        .background(RexColor.badgeBackground)
-                                        .clipShape(Capsule())
-                                }
-                            }
-                        }
+                        // Nov 22 — "remove the hashtags." The tags a
+                        // poster adds are still stored and still searched on;
+                        // they were just repeating words already in the note
+                        // and the category, three capsules at a time.
                 }
                 // Widened before the overlay so the corner label is measured
                 // against the card's real right edge — see the 6 Sept
@@ -682,10 +682,21 @@ struct RecommendationCardView: View {
                                  : "Also Rex'd by \(others) \(others == 1 ? "friend" : "friends")")
                                 .font(RexFont.text(12, weight: .semibold))
                         }
-                        .foregroundStyle(others >= 3 ? RexColor.accent : RexColor.primary)
+                        // Nov 22 — "also rex'd should be in the same blue
+                        // colour as the outline." It was Rex green on a grey
+                        // capsule, the one thing in the card body wearing a
+                        // colour that had nothing to do with the card. The
+                        // category's own tint is what draws the rail, the
+                        // hairline and the bar across the top, so the chip
+                        // joins them. "Hot" keeps the gold: that is a
+                        // different thing being said, and it should not look
+                        // like the ordinary case.
+                        .foregroundStyle(others >= 3 ? RexColor.accent : category.tintColor)
                         .padding(.horizontal, RexSpacing.sm)
                         .padding(.vertical, 4)
-                        .background(others >= 3 ? RexColor.accent.opacity(0.1) : RexColor.badgeBackground)
+                        .background(others >= 3
+                                    ? RexColor.accent.opacity(0.1)
+                                    : category.tintColor.opacity(0.14))
                         .clipShape(Capsule())
                         .contentShape(Capsule())
                     }
@@ -879,6 +890,52 @@ struct RecommendationCardView: View {
         return nil
     }
 
+
+    /// Where it is. Shares a line with the subtitle now, so it is a view of
+    /// its own rather than a row.
+    @ViewBuilder
+    private func localityRow(_ locality: String) -> some View {
+        let canViewOnMap = onViewOnMap != nil && (category == .place || category == .event)
+        HStack(spacing: 3) {
+            Image(systemName: "mappin")
+                .font(.system(size: 9))
+            Text(locality)
+                .font(RexFont.text(12.5, weight: .medium))
+                .lineLimit(1)
+        }
+        .foregroundStyle(RexColor.mutedForeground)
+        .contentShape(Rectangle())
+        .onTapGesture {
+            if canViewOnMap { onViewOnMap?(rec.item_id) }
+        }
+        // Sept 15 — "Can't click through to the details in this section, the
+        // whole tile should bring me through" (Danny). It only takes the tap
+        // when there is something for it to do; otherwise it falls through
+        // to the card.
+        .allowsHitTesting(canViewOnMap)
+    }
+
+    /// The card's title, before the line-breaking decision is made about it.
+    private func titleText(_ item: RexItem, size: CGFloat) -> some View {
+        Text(item.title)
+            .font(RexFont.display(size, weight: .semibold))
+            .foregroundStyle(RexColor.foreground)
+    }
+
+    /// Whether a subtitle is only saying the title over again.
+    ///
+    /// Case and punctuation are ignored, and the year is stripped first, so
+    /// "Instinct" against "Instinct" matches and so would "Instinct (2024)".
+    private func isJustTheTitleAgain(_ subtitle: String, title: String) -> Bool {
+        func bare(_ text: String) -> String {
+            text.folding(options: [.caseInsensitive, .diacriticInsensitive], locale: nil)
+                .components(separatedBy: CharacterSet.alphanumerics.inverted)
+                .filter { !$0.isEmpty }
+                .joined()
+        }
+        let stripped = bare(withoutYear(subtitle))
+        return !stripped.isEmpty && stripped == bare(title)
+    }
 
     /// Nov 22 — "remove publish / release dates from the main feed."
     ///
