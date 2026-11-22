@@ -45,6 +45,9 @@ struct RecommendationCardView: View {
     var showsFullTitle: Bool = false
 
     @State private var noteExpanded = false
+    /// Nov 22 — who else has Rex'd this. Opened from the "Also Rex'd by N
+    /// friends" chip now that the action row's dino has gone.
+    @State private var showingRexers = false
     /// How tall the note wants to be, and how tall it is allowed to be — the
     /// difference is whether it has been cut off. See noteIsClipped.
     @State private var fullNoteHeight: CGFloat = 0
@@ -149,6 +152,7 @@ struct RecommendationCardView: View {
             // title block). The colour now lives only at the edges, so the
             // text and photos sit on plain white.
             VStack(alignment: .leading, spacing: 0) {
+                categoryBar
                 // Nov 22 — "put thumbnails on the right instead of the left
                 // so you have a nice clean line down the left hand side and
                 // the thumbnail sits in the natural white space on the
@@ -163,6 +167,12 @@ struct RecommendationCardView: View {
                 // card's top-trailing corner, which is exactly where the
                 // thumbnail now sits — see the overlay below, which hangs the
                 // badge off the image instead of colliding with it.
+                // One column for the whole card body, so the header row and
+                // everything under it share the same left edge and the same
+                // padding. They were briefly two siblings with the padding on
+                // only one of them, which indented the note 16pt past the
+                // title.
+                VStack(alignment: .leading, spacing: 6) {
                 HStack(alignment: .top, spacing: RexSpacing.md) {
                     VStack(alignment: .leading, spacing: 6) {
                         Text(item.title)
@@ -207,7 +217,14 @@ struct RecommendationCardView: View {
                         // What it is: the category, then up to three
                         // sub-categories. The status ("Wants to try",
                         // "Asking") is no longer in here — it's in the corner.
-                        tagRow(item: item)
+                        // Nov 22 — the chip row is gone. "Don't need sub
+                        // category on the feed", with both chips circled:
+                        // MOVIE and Drama. The category now names itself in
+                        // the bar across the top of the card, so the first
+                        // chip was saying it twice, and the second was a
+                        // genre nobody asked for — wearing, on a film, a map
+                        // pin, because rexSubcategorySymbol has no answer for
+                        // a movie and falls back to one.
 
                         // Where it is.
                         if let locality = shortLocality(item.address) {
@@ -233,7 +250,28 @@ struct RecommendationCardView: View {
                             // it to do; otherwise it falls through to the card.
                             .allowsHitTesting(canViewOnMap)
                         }
+                    }
 
+                    // The thumbnail closes the header row. The rating rides
+                    // on it: cornerLabel used to float at the card's
+                    // top-trailing corner and that is this square now, so the
+                    // badge hangs off the image's bottom edge where it reads
+                    // as belonging to the thing in the picture.
+                    thumbnail(item: item)
+                        .overlay(alignment: .bottomTrailing) {
+                            cornerLabel.padding(3)
+                        }
+                }
+
+                // Nov 22 — "text should run all the way along to the end of
+                // the tab."
+                //
+                // The note used to sit in the same column as the title, so it
+                // wrapped at the thumbnail's edge and left a 60pt channel of
+                // white down the right of every line — even though the
+                // thumbnail is only 60pt tall and had stopped three lines
+                // earlier. The thumbnail shortens the title now, and nothing
+                // else: everything below it has the whole card to run in.
                         // Why.
                         //
                         // Oct 4 — "want to be able to expand the review in the
@@ -322,18 +360,6 @@ struct RecommendationCardView: View {
                                 }
                             }
                         }
-                    }
-
-                    // The thumbnail, now closing the row rather than
-                    // opening it. The rating rides on it: cornerLabel
-                    // used to float at the card's top-trailing corner and
-                    // that is this square now, so the badge hangs off the
-                    // image's bottom edge where it reads as belonging to
-                    // the thing in the picture.
-                    thumbnail(item: item)
-                        .overlay(alignment: .bottomTrailing) {
-                            cornerLabel.padding(3)
-                        }
                 }
                 // Widened before the overlay so the corner label is measured
                 // against the card's real right edge — see the 6 Sept
@@ -420,6 +446,9 @@ struct RecommendationCardView: View {
             // Every card the same width, whatever's inside — see the 5 Sept
             // trip-card fix.
             .frame(maxWidth: .infinity)
+            .sheet(isPresented: $showingRexers) {
+                RexersSheetView(itemId: rec.item_id, itemTitle: item.title)
+            }
         )
     }
 
@@ -601,20 +630,34 @@ struct RecommendationCardView: View {
                 // "six people want to try it" — it was the bookmark pair that
                 // said the same thing twice, not this.
                 if others > 0 {
-                    HStack(spacing: 4) {
-                        // Three or more people is worth calling hot.
-                        Image(systemName: others >= 3 ? "flame.fill" : "person.2.fill")
-                            .font(.system(size: 10))
-                        Text(others >= 3
-                             ? "Hot — \(others + 1) friends Rex'd this"
-                             : "Also Rex'd by \(others) \(others == 1 ? "friend" : "friends")")
-                            .font(RexFont.text(12, weight: .semibold))
+                    // Nov 22 — this is the "who else Rex'd this" entry point
+                    // now. The dino and its count came out of the action row
+                    // ("can we remove the Rex icon to give more space to the
+                    // name"), and that button was the only way in. Putting it
+                    // here loses nothing and gains a lot: it says the same
+                    // thing in words, it is already where the eye goes, and
+                    // a capsule is a far bigger target than a 15pt glyph was.
+                    Button {
+                        showingRexers = true
+                    } label: {
+                        HStack(spacing: 4) {
+                            // Three or more people is worth calling hot.
+                            Image(systemName: others >= 3 ? "flame.fill" : "person.2.fill")
+                                .font(.system(size: 10))
+                            Text(others >= 3
+                                 ? "Hot — \(others + 1) friends Rex'd this"
+                                 : "Also Rex'd by \(others) \(others == 1 ? "friend" : "friends")")
+                                .font(RexFont.text(12, weight: .semibold))
+                        }
+                        .foregroundStyle(others >= 3 ? RexColor.accent : RexColor.primary)
+                        .padding(.horizontal, RexSpacing.sm)
+                        .padding(.vertical, 4)
+                        .background(others >= 3 ? RexColor.accent.opacity(0.1) : RexColor.badgeBackground)
+                        .clipShape(Capsule())
+                        .contentShape(Capsule())
                     }
-                    .foregroundStyle(others >= 3 ? RexColor.accent : RexColor.primary)
-                    .padding(.horizontal, RexSpacing.sm)
-                    .padding(.vertical, 4)
-                    .background(others >= 3 ? RexColor.accent.opacity(0.1) : RexColor.badgeBackground)
-                    .clipShape(Capsule())
+                    .buttonStyle(.plain)
+                    .accessibilityLabel("\(others + 1) people have Rex'd this — see who")
                 }
 
                 if !alsoWant.isEmpty { alsoWantedBadge(alsoWant) }
@@ -736,6 +779,30 @@ struct RecommendationCardView: View {
                     .lineLimit(1)
             }
         }
+    }
+
+    /// Nov 22 — "make the bar along the top a bit thicker and put the name
+    /// of the category in the bar."
+    ///
+    /// There was already a bar along the top: the category-coloured hairline
+    /// that runs round the card, 1.5pt of it. This gives that edge a job.
+    /// The category used to be a capsule in the chip row below, which is now
+    /// gone, so the colour and the word arrive together at the top of the
+    /// card instead of being a tint in one place and a label in another.
+    private var categoryBar: some View {
+        HStack(spacing: 5) {
+            Image(systemName: category.symbol)
+                .font(.system(size: 10, weight: .semibold))
+            Text(category.label.uppercased())
+                .font(.system(size: 10.5, weight: .bold))
+                .tracking(0.8)
+            Spacer(minLength: 0)
+        }
+        .foregroundStyle(category.tintColor)
+        .padding(.horizontal, RexSpacing.cardPadding)
+        .padding(.vertical, 6)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(category.tintColor.opacity(0.16))
     }
 
     private var categoryBadge: some View {

@@ -96,7 +96,7 @@ struct CardLayoutHarness: View {
       "note": "Delicious spot for a galette lunch. Le Chevre every day. Wash it down with a cup of cidre.",
       "created_at": "2026-11-22T08:00:00Z",
       "photo_url": null,
-      "photo_urls": null,
+      "photo_urls": ["https://image.tmdb.org/t/p/w500/20i4nShZZg1g1VFHSB8xpaYM4r7.jpg","https://image.tmdb.org/t/p/w500/20i4nShZZg1g1VFHSB8xpaYM4r7.jpg"],
       "tags": ["Shop"],
       "user_id": "harness-user",
       "item_id": "harness-item",
@@ -112,7 +112,9 @@ struct CardLayoutHarness: View {
         "subtitle": "2021 · Shop",
         "image_url": null,
         "genre": "Shop",
-        "address": "Paris"
+        "address": "Paris",
+        "lat": 51.5136,
+        "lng": -0.1365
       },
       "profiles": {
         "username": "phoebe",
@@ -139,7 +141,7 @@ struct CardLayoutHarness: View {
                     ForEach(0..<3, id: \.self) { _ in
                         RecommendationCardView(
                             rec: rec,
-                            rexCount: 2,
+                            rexCount: 3,
                             isOnMyList: false,
                             wanters: []
                         )

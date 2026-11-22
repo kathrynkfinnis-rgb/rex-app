@@ -804,6 +804,23 @@ struct FeedView: View {
                     }
                     .padding(.horizontal, RexSpacing.page)
                     .padding(.bottom, RexSpacing.xxl)
+                    // Nov 22 — the page margin is not negotiable any more.
+                    //
+                    // Twice today the feed has lost its margins, both times
+                    // because one card asked for more width than the screen
+                    // had. A VStack is as wide as its widest child, and a
+                    // vertical ScrollView centres content it cannot fit, so a
+                    // single greedy row moved the whole column left and took
+                    // everyone's margins with it — including the cards that
+                    // were behaving. Gemma saw the second shape of it:
+                    // "width of posts on feed isn't uniform."
+                    //
+                    // Pinning the column to the container's width makes that
+                    // structurally impossible. A child that insists on more
+                    // now overflows and is clipped by the scroll view, which
+                    // is a local, visible fault in one card rather than a
+                    // silent one across the whole screen. The margin stays.
+                    .containerRelativeFrame(.horizontal)
                 }
                 .scrollPosition(id: $scrolledRowID)
                 .refreshable { await loadFeed() }

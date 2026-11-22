@@ -34,7 +34,6 @@ struct RexCardActions: View {
     @State private var busy = false
     /// "Use the little rex icon to indicate how many others have Rex'd it —
     /// should be clickable so you can see a list."
-    @State private var showingRexers = false
 
     /// #177 — used to share plain text with no link at all, so there was
     /// nothing for the recipient to actually open. The link opens a real
@@ -80,36 +79,20 @@ struct RexCardActions: View {
         // before a Button's intrinsic icon size does.
         VStack(alignment: .leading, spacing: RexSpacing.xs) {
         HStack(spacing: RexSpacing.md) {
-            // Shown always, count included, same as the reference design —
-            // unlike heart/comment (which hide a zero count), this one's
-            // whole point is to always be a visible, tappable "who's Rex'd
-            // this" entry point, not just an active-state indicator.
-            Button {
-                showingRexers = true
-            } label: {
-                HStack(spacing: 3) {
-                    Image("RexDinoLogo")
-                        .resizable()
-                        .scaledToFit()
-                        .frame(width: 15, height: 16)
-                    Text("\(rexCount)")
-                        .font(RexFont.text(11))
-                        .foregroundStyle(RexColor.mutedForeground)
-                        // Sept 15 — "if the number of Rexers is 2 or higher,
-                        // the number is slightly obscured by the heart". The
-                        // row gave the poster's name layout priority, so on a
-                        // tight row the counts were the thing squeezed —
-                        // down to a sliver under the next icon. Counts keep
-                        // their natural width now; the name truncates instead.
-                        .fixedSize()
-                }
-                .padding(.vertical, 10)
-                .padding(.horizontal, 6)
-                .contentShape(Rectangle())
-            }
-            .buttonStyle(.plain)
-            .disabled(rexCount == 0)
-            .accessibilityLabel(rexCount > 0 ? "\(rexCount) people have Rex'd this — see who" : "Nobody else has Rex'd this yet")
+            // Nov 22 — "can we remove the Rex icon to give more space to
+            // the name, and then move the 'liked by' up a bit."
+            //
+            // The dino and its count used to sit here, always visible. It
+            // was the widest thing in the row after the name — a 15pt glyph,
+            // a count pinned to its natural width, 12pt of padding and 12pt
+            // of stack spacing, about 52pt in all — and this row has been
+            // over budget on a 390pt phone all day. Taking it out is both
+            // what was asked for and what stops the card demanding more
+            // width than the screen has.
+            //
+            // Nothing is lost: "Also Rex'd by N friends" already says the
+            // same thing higher up the card, in words, and it is the thing
+            // people actually tapped.
 
             // Sept 5 — these two used to be hidden on a want, because a
             // want has no recommendation row for a like or comment to hang
@@ -181,7 +164,10 @@ struct RexCardActions: View {
                         // share is not built by that helper, so it has to say
                         // so itself or it stays a 15pt dot between two 44pt
                         // neighbours.
-                        .padding(.vertical, 10)
+                        // Nov 22 — vertical padding gone. The 44pt frame
+                        // above already is the target, so this only made the
+                        // row 20pt taller than it needed to be, which is what
+                        // pushed "liked by" so far down the card.
                         .padding(.horizontal, 6)
                         .contentShape(Rectangle())
                 }
@@ -194,14 +180,16 @@ struct RexCardActions: View {
                     .font(RexFont.text(12))
                     .foregroundStyle(RexColor.mutedForeground)
                     .lineLimit(1)
+                    // Nov 22 — pinned to the leading edge. It was drifting
+                    // out to the right, because the row above is as wide as
+                    // the card and this inherited that width without saying
+                    // where in it to sit.
+                    .frame(maxWidth: .infinity, alignment: .leading)
                     .contentShape(Rectangle())
             }
             .buttonStyle(.plain)
             .accessibilityLabel("See who liked this")
         }
-        }
-        .sheet(isPresented: $showingRexers) {
-            RexersSheetView(itemId: rec.item_id, itemTitle: rec.items?.title ?? "this")
         }
         .sheet(isPresented: $showingLikers) {
             LikersSheetView(recommendationId: rec.id)
@@ -289,7 +277,11 @@ struct RexCardActions: View {
             // past about 130pt it wins the fight with the poster's name and
             // truncates it. Hence 6 each side rather than the .lg gap, which
             // buys 12pt between adjacent targets without that.
-            .padding(.vertical, 10)
+            //
+            // Nov 22 — the vertical 10 came out. Free is not the same as
+            // wanted: the glyph already sits in a 44pt-tall frame, so this
+            // was 20pt of nothing on top of a target that was already big
+            // enough, and it is what put "liked by" so far below the row.
             .padding(.horizontal, 6)
             .contentShape(Rectangle())
         }
