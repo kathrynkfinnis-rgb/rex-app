@@ -340,6 +340,8 @@ struct TripStopsBuilderView: View {
                     HStack(spacing: RexSpacing.sm) {
                         Image(systemName: "square.and.arrow.down")
                             .font(.system(size: 13))
+                            .frame(minWidth: 44, minHeight: 44)
+                            .contentShape(Rectangle())
                         Text("Import a \(containerNoun) from a document")
                             .font(RexFont.text(13, weight: .medium))
                         Spacer()
@@ -361,6 +363,8 @@ struct TripStopsBuilderView: View {
                     HStack(spacing: RexSpacing.sm) {
                         Image(systemName: "square.stack.3d.up")
                             .font(.system(size: 13))
+                            .frame(minWidth: 44, minHeight: 44)
+                            .contentShape(Rectangle())
                         Text("Build a \(containerNoun) from your Rex")
                             .font(RexFont.text(13, weight: .medium))
                         Spacer()

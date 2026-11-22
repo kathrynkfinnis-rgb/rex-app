@@ -173,6 +173,8 @@ struct RexCardActions: View {
                     Image(systemName: "paperplane")
                         .font(.system(size: 17))
                         .foregroundStyle(RexColor.mutedForeground)
+                        .frame(minWidth: 44, minHeight: 44)
+                        .contentShape(Rectangle())
                         // Same target as the three built by action() above —
                         // share is not built by that helper, so it has to say
                         // so itself or it stays a 15pt dot between two 44pt
@@ -230,6 +232,8 @@ struct RexCardActions: View {
                 Image(systemName: icon)
                     .font(.system(size: 17))
                     .foregroundStyle(tint)
+                    .frame(minWidth: 44, minHeight: 44)
+                    .contentShape(Rectangle())
                 if isActive, let activeLabel {
                     // Text wraps by default once an HStack runs short on
                     // room — "Saved" was wrapping one letter per line. This

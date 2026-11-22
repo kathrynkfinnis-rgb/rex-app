@@ -291,6 +291,8 @@ struct CollectionDetailView: View {
                                         Image(systemName: "pencil")
                                             .font(.system(size: 12))
                                             .foregroundStyle(RexColor.mutedForeground)
+                                            .frame(minWidth: 44, minHeight: 44)
+                                            .contentShape(Rectangle())
                                     }
                                 }
                                 Spacer()
@@ -622,11 +624,23 @@ struct CollectionDetailView: View {
                 HStack(spacing: RexSpacing.lg) {
                     Button {
                         Task { await move(row, by: -1) }
-                    } label: { Image(systemName: "chevron.up") }
+                    } label: {
+                        // Nov 22 — these take their 14pt from the HStack
+                        // below, so the glyph is the whole target. Reordering
+                        // a collection means hitting them repeatedly, which
+                        // is the worst case for a small one.
+                        Image(systemName: "chevron.up")
+                            .frame(minWidth: 44, minHeight: 44)
+                            .contentShape(Rectangle())
+                    }
                     .disabled(isMutating || rows.first?.id == row.id)
                     Button {
                         Task { await move(row, by: 1) }
-                    } label: { Image(systemName: "chevron.down") }
+                    } label: {
+                        Image(systemName: "chevron.down")
+                            .frame(minWidth: 44, minHeight: 44)
+                            .contentShape(Rectangle())
+                    }
                     .disabled(isMutating || rows.last?.id == row.id)
                     Spacer()
                     Text(rec.items?.title ?? "Untitled")

@@ -173,6 +173,8 @@ struct ListDetailView: View {
                                             Image(systemName: "pencil")
                                                 .font(.system(size: 12))
                                                 .foregroundStyle(RexColor.mutedForeground)
+                                                .frame(minWidth: 44, minHeight: 44)
+                                                .contentShape(Rectangle())
                                         }
                                     }
                                     Spacer()
@@ -415,6 +417,8 @@ struct ListDetailView: View {
                             Image(systemName: "pencil")
                                 .font(.system(size: 11))
                                 .foregroundStyle(RexColor.mutedForeground)
+                                .frame(minWidth: 44, minHeight: 44)
+                                .contentShape(Rectangle())
                         }
                     }
                 }

@@ -63,6 +63,8 @@ struct ItineraryViewToggle: View {
         } label: {
             HStack(spacing: 5) {
                 Image(systemName: systemImage).font(.system(size: 11, weight: .semibold))
+                .frame(minWidth: 44, minHeight: 44)
+                .contentShape(Rectangle())
                 // Oct 18 — three segments do not fit two words at full size,
                 // and "Expanded" was wrapping to "Expande / d" the moment the
                 // map appeared. One line, shrunk a little if it has to be,

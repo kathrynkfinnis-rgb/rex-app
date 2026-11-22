@@ -80,6 +80,8 @@ struct LikesCommentsView: View {
                     Image(systemName: likedByMe ? "heart.fill" : "heart")
                         .font(.system(size: 17))
                         .foregroundStyle(likedByMe ? RexColor.destructive : RexColor.mutedForeground)
+                        .frame(minWidth: 44, minHeight: 44)
+                        .contentShape(Rectangle())
                 }
                 .buttonStyle(.plain)
 
@@ -115,6 +117,8 @@ struct LikesCommentsView: View {
                         Image(systemName: "bubble.left")
                             .font(.system(size: 16))
                             .foregroundStyle(RexColor.mutedForeground)
+                            .frame(minWidth: 44, minHeight: 44)
+                            .contentShape(Rectangle())
                         if !comments.isEmpty {
                             Text("\(comments.count)")
                                 .font(RexFont.text(14, weight: .medium))
@@ -234,6 +238,8 @@ struct LikesCommentsView: View {
                     Spacer(minLength: 0)
                     Button { self.replyingTo = nil } label: {
                         Image(systemName: "xmark.circle.fill").font(.system(size: 13))
+                        .frame(minWidth: 44, minHeight: 44)
+                        .contentShape(Rectangle())
                     }
                     .buttonStyle(.plain)
                 }

@@ -148,6 +148,8 @@ struct OnboardingView: View {
             HStack(spacing: RexSpacing.sm) {
                 Image(systemName: category.symbol)
                     .font(.system(size: 16))
+                    .frame(minWidth: 44, minHeight: 44)
+                    .contentShape(Rectangle())
                 // "Should these be plural?" (Danny) — yes: these name a kind
                 // of thing you're into, the same as the feed's filter chips.
                 Text(category.pluralLabel)

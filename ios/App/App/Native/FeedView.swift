@@ -642,6 +642,8 @@ struct FeedView: View {
                                     HStack(spacing: RexSpacing.sm) {
                                         Image(systemName: "square.stack")
                                             .font(.system(size: 13))
+                                            .frame(minWidth: 44, minHeight: 44)
+                                            .contentShape(Rectangle())
                                         Text("\(by) added \(count) more at once")
                                             .font(RexFont.text(14, weight: .medium))
                                         Spacer()
@@ -1066,6 +1068,8 @@ struct FeedView: View {
                     Image(systemName: "person.2")
                         .font(.system(size: 18))
                         .foregroundStyle(RexColor.mutedForeground)
+                        .frame(minWidth: 44, minHeight: 44)
+                        .contentShape(Rectangle())
                 }
                 .accessibilityLabel("Friends")
 
@@ -1086,6 +1090,12 @@ struct FeedView: View {
                                     .offset(x: 3, y: -2)
                             }
                         }
+                        // Nov 22 — the one the sweep could not do on its own:
+                        // the badge overlay is a trailing closure, so the
+                        // modifiers go after it by hand. Same 44pt target as
+                        // everything else.
+                        .frame(minWidth: 44, minHeight: 44)
+                        .contentShape(Rectangle())
                 }
                 .accessibilityLabel(unreadNotificationCount > 0 ? "Notifications, unread" : "Notifications")
 

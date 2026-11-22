@@ -190,6 +190,8 @@ struct TripDetailView: View {
                                             Image(systemName: "pencil")
                                                 .font(.system(size: 12))
                                                 .foregroundStyle(RexColor.mutedForeground)
+                                                .frame(minWidth: 44, minHeight: 44)
+                                                .contentShape(Rectangle())
                                         }
                                     }
                                     Spacer()
@@ -551,6 +553,8 @@ struct TripDetailView: View {
                         Image(systemName: "pencil")
                             .font(.system(size: 14))
                             .foregroundStyle(RexColor.mutedForeground)
+                            .frame(minWidth: 44, minHeight: 44)
+                            .contentShape(Rectangle())
                     }
                 }
             }

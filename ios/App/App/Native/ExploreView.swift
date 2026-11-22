@@ -298,6 +298,8 @@ struct ExploreView: View {
             NavigationLink(value: PlacesWithoutPinRoute()) {
                 HStack(spacing: RexSpacing.sm) {
                     Image(systemName: "mappin.slash").font(.system(size: 13))
+                    .frame(minWidth: 44, minHeight: 44)
+                    .contentShape(Rectangle())
                     Text("\(pinlessCount) \(pinlessCount == 1 ? "place isn't" : "places aren't") on the map")
                         .font(RexFont.text(14))
                     Spacer(minLength: 0)
@@ -385,6 +387,8 @@ struct ExploreView: View {
                 HStack(spacing: RexSpacing.sm) {
                     Image(systemName: "square.stack.3d.up")
                         .font(.system(size: 13))
+                        .frame(minWidth: 44, minHeight: 44)
+                        .contentShape(Rectangle())
                     Text("Manage Rexperts shelves")
                         .font(RexFont.text(14, weight: .medium))
                     Spacer(minLength: 0)

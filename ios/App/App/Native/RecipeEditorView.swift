@@ -288,6 +288,8 @@ struct RecipeEditorView: View {
                             items.wrappedValue.swapAt(i, i - 1)
                         } label: {
                             Image(systemName: "chevron.up").font(.system(size: 10, weight: .semibold))
+                            .frame(minWidth: 44, minHeight: 44)
+                            .contentShape(Rectangle())
                         }
                         .disabled(i == 0)
                         Button {
@@ -295,6 +297,8 @@ struct RecipeEditorView: View {
                             items.wrappedValue.swapAt(i, i + 1)
                         } label: {
                             Image(systemName: "chevron.down").font(.system(size: 10, weight: .semibold))
+                            .frame(minWidth: 44, minHeight: 44)
+                            .contentShape(Rectangle())
                         }
                         .disabled(i == items.wrappedValue.count - 1)
                     }
@@ -328,6 +332,8 @@ struct RecipeEditorView: View {
                             Image(systemName: "xmark")
                                 .font(.system(size: 11))
                                 .foregroundStyle(RexColor.mutedForeground)
+                                .frame(minWidth: 44, minHeight: 44)
+                                .contentShape(Rectangle())
                         }
                         .buttonStyle(.plain)
                     }
@@ -339,6 +345,8 @@ struct RecipeEditorView: View {
             } label: {
                 HStack(spacing: 4) {
                     Image(systemName: "plus").font(.system(size: 11))
+                    .frame(minWidth: 44, minHeight: 44)
+                    .contentShape(Rectangle())
                     Text("Add").font(RexFont.text(13))
                 }
                 .foregroundStyle(RexColor.mutedForeground)

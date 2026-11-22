@@ -1730,6 +1730,8 @@ struct AddRexView: View {
                         Image(systemName: "xmark.circle.fill")
                             .font(.system(size: 14))
                             .foregroundStyle(RexColor.mutedForeground)
+                            .frame(minWidth: 44, minHeight: 44)
+                            .contentShape(Rectangle())
                     }
                     .buttonStyle(.plain)
                 }

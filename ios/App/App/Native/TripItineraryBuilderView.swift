@@ -168,6 +168,8 @@ struct TripItineraryBuilderView: View {
                     renamingHeadingId = entry.id
                 } label: {
                     Image(systemName: "pencil").font(.system(size: 12))
+                    .frame(minWidth: 44, minHeight: 44)
+                    .contentShape(Rectangle())
                 }
                 .buttonStyle(.plain)
                 .foregroundStyle(RexColor.mutedForeground)
@@ -195,6 +197,8 @@ struct TripItineraryBuilderView: View {
                     Image(systemName: "line.3.horizontal")
                         .font(.system(size: 12))
                         .foregroundStyle(RexColor.placeholder)
+                        .frame(minWidth: 44, minHeight: 44)
+                        .contentShape(Rectangle())
                     thumbnail(for: stop)
                     VStack(alignment: .leading, spacing: 2) {
                         Text(stop.title)
