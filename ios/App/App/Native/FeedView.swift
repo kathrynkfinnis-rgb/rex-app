@@ -2196,7 +2196,18 @@ struct EditableIfMine: ViewModifier {
                     }
                     .buttonStyle(.plain)
                     .accessibilityLabel("More")
-                    .padding(2)
+                    // Nov 22 — "the '…' is obscuring the emoji — can we
+                    // please move it down to the top right of the box below
+                    // the banner."
+                    //
+                    // The banner's trailing end carries the rating now, and
+                    // this was sitting on top of it. Dropped by the banner's
+                    // height, it lands in the white box underneath, where it
+                    // has the corner to itself. titleTrailingReserve still
+                    // applies: it is beside the title now rather than above
+                    // it, which is the corner that reserve was always for.
+                    .padding(.top, 28)
+                    .padding(.trailing, 2)
                 }
                 // Oct 14 — this ran only on the branch for somebody else's
                 // post, because until now there was nothing to work out about

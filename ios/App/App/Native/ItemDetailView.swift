@@ -258,7 +258,9 @@ struct ItemDetailView: View {
                     // next thing anybody asks about a film.
                     castSection
                     googlePhotosSection
-                    communityPhotosSection
+                    // Nov 22 — "Photos from friends" is gone from here. Every
+                    // one of those pictures now sits in the review whose
+                    // author took it; see reviewPhotos.
                     recipeSection(item: item)
                     // Oct 5 — "if you are opening a friend's Rex, perhaps the
                     // box to Rex it yourself should be below the friend's
@@ -366,6 +368,12 @@ struct ItemDetailView: View {
                 }
             }
         }
+        // Pinned to the bottom of the page, over the scroll rather than in
+        // it, so "Rex it" is in the same place whether the page has one
+        // review on it or a hundred. safeAreaInset rather than an overlay so
+        // the column below it is still fully scrollable — an overlay would
+        // sit on top of the last review instead of making room for itself.
+        .safeAreaInset(edge: .bottom, spacing: 0) { takeBar }
         // A drag can drop the keyboard too, so the comment field and its Post
         // button aren't only reachable via the keyboard's own Done button.
         .rexDismissableKeyboard()
@@ -727,32 +735,37 @@ struct ItemDetailView: View {
             // whether anybody has uploaded one, and that is not something a
             // person should have to reason about to read their own
             // screenshot.
-            if let hero = heroPhoto {
-                ZStack(alignment: .topTrailing) {
-                    RexPhotoBand(url: hero)
-                        .onTapGesture { openPhotos(at: hero) }
-                    if let card = cardPhoto {
-                        RexHeaderThumbnail(url: card, category: category)
-                            .padding(.trailing, RexHeaderMetrics.thumbTrailing)
-                            .padding(.top, RexHeaderMetrics.photoThumbTop)
-                            .onTapGesture { openPhotos(at: card) }
-                    }
-                }
-                .frame(height: RexHeaderMetrics.photoBandHeight, alignment: .top)
-            } else {
-                ZStack(alignment: .topTrailing) {
-                    RexBannerBand(category: category)
-                    RexHeaderThumbnail(url: item.image_url, category: category)
-                        .padding(.trailing, RexHeaderMetrics.thumbTrailing)
-                        .padding(.top, RexHeaderMetrics.thumbTop)
-                        .onTapGesture {
-                            if let url = item.image_url { openPhotos(at: url) }
+            // Nov 22 — "put the title in the wave top, and stop it being a
+            // photo (should always just be the colour, and then the pic is in
+            // the thumbnail)."
+            //
+            // There were two headers. With no photograph, the category's
+            // texture took the band and the title sat ON it, inside the wave.
+            // With one, a 250pt photograph took the band and pushed the title
+            // out underneath — so the same page had its title in two
+            // different places depending on whether anybody had uploaded
+            // anything, which is why a place never looked like a book.
+            //
+            // One header now. The band is always the colour, the title is
+            // always in the wave, and the photograph goes where a picture of
+            // the thing belongs: the card on the band. Nothing is lost —
+            // tapping it still opens the viewer, and every other photo is
+            // moving into the review it belongs to.
+            ZStack(alignment: .topTrailing) {
+                RexBannerBand(category: category)
+                RexHeaderThumbnail(url: heroPhoto ?? cardPhoto ?? item.image_url,
+                                   category: category)
+                    .padding(.trailing, RexHeaderMetrics.thumbTrailing)
+                    .padding(.top, RexHeaderMetrics.thumbTop)
+                    .onTapGesture {
+                        if let shown = heroPhoto ?? cardPhoto ?? item.image_url {
+                            openPhotos(at: shown)
                         }
-                }
-                // The cover hangs past the band's bottom edge; without this the
-                // stack clips it at the fold.
-                .frame(height: RexHeaderMetrics.bandHeight, alignment: .top)
+                    }
             }
+            // The cover hangs past the band's bottom edge; without this the
+            // stack clips it at the fold.
+            .frame(height: RexHeaderMetrics.bandHeight, alignment: .top)
             }
             // Oct 13 — "alignment too close to the left-hand side, need to
             // maintain the margins." The header this replaced ended with one
@@ -766,16 +779,24 @@ struct ItemDetailView: View {
             VStack(alignment: .leading, spacing: 0) {
                 RexCategoryPill(category: category)
 
-                // Nov 22 — "on the Rex cards (not on the feed) can we also
-                // make the text of the title a bit smaller." 34 to 28 at the
-                // top of the range; titleSize still steps it down further for
-                // the long ones.
-                Text(item.title)
-                    .font(RexFont.display(min(28, titleSize(for: item.title))))
-                    .lineSpacing(-4)
-                    .foregroundStyle(RexColor.foreground)
-                    .fixedSize(horizontal: false, vertical: true)
-                    .padding(.top, 12)
+                // Nov 22 — "make the title smaller… can we fit on to one
+                // line?" Yes, usually. Same three tries the feed card uses:
+                // 26, then 21, then wrapping for the titles that genuinely
+                // cannot. ViewThatFits takes the first that fits, and both
+                // single-line options demand their natural width, so neither
+                // can be chosen unless it really does fit.
+                ViewThatFits(in: .horizontal) {
+                    pageTitle(item, size: min(26, titleSize(for: item.title)))
+                        .lineLimit(1)
+                        .fixedSize()
+                    pageTitle(item, size: min(21, titleSize(for: item.title)))
+                        .lineLimit(1)
+                        .fixedSize()
+                    pageTitle(item, size: min(26, titleSize(for: item.title)))
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .padding(.top, 12)
 
                 // The byline is the one place a voice belongs: an author, a
                 // cuisine and a neighbourhood, a year and a run of seasons.
@@ -787,7 +808,7 @@ struct ItemDetailView: View {
                 // the page reads in.
                 if let summary = standfirst(item: item, category: category) {
                     Text(summary)
-                        .font(RexFont.text(14))
+                        .font(RexFont.text(13))
                         .foregroundStyle(RexColor.mutedForeground)
                         .fixedSize(horizontal: false, vertical: true)
                         .padding(.top, 8)
@@ -797,7 +818,7 @@ struct ItemDetailView: View {
                     HStack(alignment: .firstTextBaseline, spacing: 6) {
                         Image(systemName: "mappin").font(.system(size: 12))
                         Text(address)
-                            .font(RexFont.text(14))
+                            .font(RexFont.text(13))
                             .fixedSize(horizontal: false, vertical: true)
                     }
                     .foregroundStyle(RexColor.mutedForeground)
@@ -2001,45 +2022,70 @@ struct ItemDetailView: View {
                 // button rather than always on. "Want to try" stays beside it
                 // because saving something is a different intention from
                 // reviewing it, and it was the other thing this section did.
+                // Nov 22 — "does the 'Rex it' need to be higher up? Just
+                // thinking, when there are 100 reviews on something it'll be
+                // a pain. Unless we can always have it floating at the
+                // bottom?" Floating, which is better than higher: higher
+                // still scrolls away, and this never does. See takeBar, which
+                // is pinned to the bottom of the page rather than sitting in
+                // the column.
+                //
+                // Only the editor stays in the flow, because it needs the
+                // room and it is what you asked for once you tap.
                 if isWritingTake || isEditingNote {
                     takeEditor
-                } else {
-                    HStack(spacing: RexSpacing.sm) {
-                        Button {
-                            withAnimation(.snappy) { isWritingTake = true }
-                        } label: {
-                            Text("Rex it")
-                                .font(RexFont.text(15, weight: .semibold))
-                                .foregroundStyle(RexColor.primaryForeground)
-                                .padding(.horizontal, RexSpacing.lg)
-                                .frame(minHeight: 44)
-                                .frame(maxWidth: .infinity)
-                                .background(RexColor.primary)
-                                .clipShape(Capsule())
-                                .contentShape(Capsule())
-                        }
-                        .buttonStyle(.plain)
-
-                        Button {
-                            Task { await toggleWant() }
-                        } label: {
-                            HStack(spacing: 6) {
-                                Image(systemName: wanted ? "bookmark.fill" : "bookmark")
-                                Text(wanted ? "Saved" : "Want to try")
-                            }
-                            .font(RexFont.text(14, weight: .semibold))
-                            .foregroundStyle(wanted ? RexColor.primary : RexColor.mutedForeground)
-                            .padding(.horizontal, RexSpacing.md)
-                            .frame(minHeight: 44)
-                            .overlay(Capsule().stroke(RexColor.border, lineWidth: 1))
-                            .contentShape(Capsule())
-                        }
-                        .buttonStyle(.plain)
-                        .disabled(isTogglingWant)
-                    }
                 }
             }
             .padding(16)
+        }
+    }
+
+    /// The one control the page always offers, pinned to the bottom so a
+    /// hundred reviews cannot bury it.
+    ///
+    /// Hidden while the editor is open — the editor has its own save — and
+    /// when your take is already on the page as a card, which is the state
+    /// where there is nothing left to ask for.
+    @ViewBuilder
+    private var takeBar: some View {
+        if !showsMyTakeCard, !isWritingTake, !isEditingNote {
+            HStack(spacing: RexSpacing.sm) {
+                Button {
+                    withAnimation(.snappy) { isWritingTake = true }
+                } label: {
+                    Text("Rex it")
+                        .font(RexFont.text(15, weight: .semibold))
+                        .foregroundStyle(RexColor.primaryForeground)
+                        .padding(.horizontal, RexSpacing.lg)
+                        .frame(minHeight: 44)
+                        .frame(maxWidth: .infinity)
+                        .background(RexColor.primary)
+                        .clipShape(Capsule())
+                        .contentShape(Capsule())
+                }
+                .buttonStyle(.plain)
+
+                Button {
+                    Task { await toggleWant() }
+                } label: {
+                    HStack(spacing: 6) {
+                        Image(systemName: wanted ? "bookmark.fill" : "bookmark")
+                        Text(wanted ? "Saved" : "Want to try")
+                    }
+                    .font(RexFont.text(14, weight: .semibold))
+                    .foregroundStyle(wanted ? RexColor.primary : RexColor.mutedForeground)
+                    .padding(.horizontal, RexSpacing.md)
+                    .frame(minHeight: 44)
+                    .background(RexColor.card, in: Capsule())
+                    .overlay(Capsule().stroke(RexColor.border, lineWidth: 1))
+                    .contentShape(Capsule())
+                }
+                .buttonStyle(.plain)
+                .disabled(isTogglingWant)
+            }
+            .padding(.horizontal, 16)
+            .padding(.vertical, 10)
+            .background(.ultraThinMaterial)
         }
     }
 
@@ -2569,6 +2615,8 @@ struct ItemDetailView: View {
                             .tint(RexColor.primary)
                     }
 
+                    reviewPhotos(rec)
+
                     Rectangle().fill(RexColor.divider).frame(height: 1).padding(.vertical, 4)
                     LikesCommentsView(recommendationId: rec.id)
                 }
@@ -2589,6 +2637,51 @@ struct ItemDetailView: View {
             }
         }
         .padding(16)
+    }
+
+    /// Nov 22 — "remove the big photos on the page at the top, and embed
+    /// them in the individual reviews. Like have uploaded photos as
+    /// thumbnails here you can click on to make bigger and swipe through",
+    /// with the Photos from Google strip given as the shape to copy.
+    ///
+    /// The photographs were pooled into one "Photos from friends" carousel
+    /// near the top of the page, which took them away from the person who
+    /// took them and the sentence they belong to. A picture of the chocolate
+    /// mousse is part of what Phoebe said about the chocolate mousse.
+    ///
+    /// Each review carries its own now, in a strip that scrolls sideways, and
+    /// a tap opens the viewer on that photo — with that person's photos
+    /// either side of it to swipe through, not everybody's.
+    @ViewBuilder
+    private func reviewPhotos(_ rec: FeedRecommendation) -> some View {
+        let photos: [String] = {
+            let many = rec.photo_urls ?? []
+            if !many.isEmpty { return many }
+            return [rec.photo_url].compactMap { $0 }
+        }().filter { !$0.isEmpty }
+
+        if !photos.isEmpty {
+            ScrollView(.horizontal, showsIndicators: false) {
+                HStack(spacing: 8) {
+                    ForEach(Array(photos.enumerated()), id: \.offset) { index, url in
+                        Button {
+                            photoViewer = PhotoViewerRoute(urls: photos, index: index)
+                        } label: {
+                            GoogleSafeAsyncImage(url: URL(string: url)) { image in
+                                image.resizable().aspectRatio(contentMode: .fill)
+                            } placeholder: {
+                                RexColor.muted
+                            }
+                            .frame(width: 148, height: 110)
+                            .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
+                            .contentShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
+                        }
+                        .buttonStyle(.plain)
+                    }
+                }
+            }
+            .padding(.top, 2)
+        }
     }
 
     /// Oct 8 — a book's facts as a two-column strip rather than a stack of
@@ -2658,6 +2751,14 @@ struct ItemDetailView: View {
             }
             .padding(.top, RexSpacing.sm)
         }
+    }
+
+    /// The page's title, before the line-breaking decision is made about it.
+    private func pageTitle(_ item: RexItem, size: CGFloat) -> some View {
+        Text(item.title)
+            .font(RexFont.display(size))
+            .lineSpacing(-4)
+            .foregroundStyle(RexColor.foreground)
     }
 
     /// Which categories get the strip: the ones with a catalogue behind them

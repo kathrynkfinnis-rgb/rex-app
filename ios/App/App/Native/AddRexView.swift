@@ -1154,10 +1154,12 @@ struct AddRexView: View {
                     .foregroundStyle(RexColor.foreground)
                 FlowChips(options: rexCuisines, selected: $cuisines)
 
-                Text("Dish")
-                    .font(.system(size: 14, weight: .semibold))
-                    .foregroundStyle(RexColor.foreground)
-                FlowChips(options: rexDishes, selected: $dishes)
+                // Nov 22 — "remove 'dish' line of pills." Type of place and
+                // type of food say what somewhere is; a dish is what you
+                // happened to order, which belongs in what you wrote about it
+                // rather than in a row of chips on the way in. `dishes` is
+                // still read and still written by anything that already has
+                // one, so nothing already tagged loses its tag.
             }
 
             // A link to the thing itself: the point of Other (products,

@@ -328,20 +328,26 @@ struct HeaderHarness: View {
 
                 VStack(alignment: .leading, spacing: 0) {
                     RexCategoryPill(category: isPlace ? .place : .book)
-                    Text(isPlace ? "TYCOZ - Crêperie & Oyster Bar" : "Fundamentally")
-                        .font(RexFont.display(28))
-                        .lineSpacing(-4)
-                        .padding(.top, 12)
+                    ViewThatFits(in: .horizontal) {
+                        Text(isPlace ? "TYCOZ - Crêperie & Oyster Bar" : "Fundamentally")
+                            .font(RexFont.display(26)).lineSpacing(-4).lineLimit(1).fixedSize()
+                        Text(isPlace ? "TYCOZ - Crêperie & Oyster Bar" : "Fundamentally")
+                            .font(RexFont.display(21)).lineSpacing(-4).lineLimit(1).fixedSize()
+                        Text(isPlace ? "TYCOZ - Crêperie & Oyster Bar" : "Fundamentally")
+                            .font(RexFont.display(26)).lineSpacing(-4)
+                    }
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding(.top, 12)
                     // One font, one size, with the address below it.
                     Text(isPlace ? "Crêperie · 11th arrondissement" : "Nussaibah Younis")
-                        .font(RexFont.text(14))
+                        .font(RexFont.text(13))
                         .foregroundStyle(RexColor.mutedForeground)
                         .padding(.top, 8)
                     if isPlace {
                         HStack(alignment: .firstTextBaseline, spacing: 6) {
                             Image(systemName: "mappin").font(.system(size: 12))
                             Text("8 Rue de la Roquette, 75011 Paris")
-                                .font(RexFont.text(14))
+                                .font(RexFont.text(13))
                         }
                         .foregroundStyle(RexColor.mutedForeground)
                         .padding(.top, 9)
@@ -417,8 +423,14 @@ struct HeaderHarness: View {
                 .overlay(RoundedRectangle(cornerRadius: 14).stroke(RexColor.border, lineWidth: 1))
                 .padding(.top, 10)
 
-                // The bottom of the page as it is now: a button, not a form.
-                HStack(spacing: RexSpacing.sm) {
+                Color.clear.frame(height: 1)
+            }
+            .padding(16)
+        }
+        .background(RexColor.background)
+        .safeAreaInset(edge: .bottom, spacing: 0) {
+            // Pinned, so a hundred reviews cannot bury it.
+            HStack(spacing: RexSpacing.sm) {
                     Text("Rex it")
                         .font(RexFont.text(15, weight: .semibold))
                         .foregroundStyle(RexColor.primaryForeground)
@@ -435,13 +447,13 @@ struct HeaderHarness: View {
                     .foregroundStyle(RexColor.mutedForeground)
                     .padding(.horizontal, RexSpacing.md)
                     .frame(minHeight: 44)
+                    .background(RexColor.card, in: Capsule())
                     .overlay(Capsule().stroke(RexColor.border, lineWidth: 1))
-                }
-                .padding(.top, 24)
             }
-            .padding(16)
+            .padding(.horizontal, 16)
+            .padding(.vertical, 10)
+            .background(.ultraThinMaterial)
         }
-        .background(RexColor.background)
     }
 }
 #endif
