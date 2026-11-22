@@ -9,7 +9,11 @@
 const SUPABASE_URL = "https://uhpzkbkwxcgqfxmlyktj.supabase.co";
 const ANON_KEY =
   "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVocHprYmt3eGNncWZ4bWx5a3RqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODU4Mzk2NDMsImV4cCI6MjEwMTQxNTY0M30.IvQ8byDwHErLhuJI1Pg3bRcb4AKK4sb9Bm6cr_6sHbI";
-const APP_STORE = "https://apps.apple.com/app/id6799256042";
+// Nov 22 — the redirector, not apps.apple.com directly: a bare
+// apps.apple.com/app/id… resolves to the US storefront for many
+// visitors, which is why France and Ireland were told the app was
+// not available. See functions/app.js.
+const APP_STORE = "https://find-rex.com/app";
 
 // The app's five-tier scale (RexRatingScale.swift): sub-6 Do not Rex, 6 Meh,
 // 7-8 Rex, 9 Loved, 10 Obsessed. Kept in step with it by hand.

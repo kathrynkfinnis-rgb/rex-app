@@ -24,7 +24,17 @@ import CryptoKit
 /// Rex 1.0.1, free — because a store link that 404s abroad would be worse
 /// than the beta link it replaces.
 enum RexInvite {
-    static let link = URL(string: "https://apps.apple.com/app/id6799256042")!
+    /// Nov 22 — find-rex.com/app, not apps.apple.com directly.
+    ///
+    /// The bare apps.apple.com/app/id… was supposed to send each person to
+    /// their own storefront. It does not: checked from a machine Cloudflare
+    /// places in GB, Apple resolved it to /us/ — and a French or Irish Apple
+    /// ID opening a US store page is told the app is not available in their
+    /// country. Which is what Ireland and France reported, twice.
+    ///
+    /// The redirector reads the visitor's real country from Cloudflare and
+    /// sends them to that storefront. See web/functions/app.js.
+    static let link = URL(string: "https://find-rex.com/app")!
     static let message = "I\u{2019}m using Rex to share recommendations with friends \u{2014} places, books, trips, the lot. Join me:"
 }
 
