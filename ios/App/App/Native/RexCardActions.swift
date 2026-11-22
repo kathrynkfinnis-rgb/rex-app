@@ -103,6 +103,9 @@ struct RexCardActions: View {
                         // their natural width now; the name truncates instead.
                         .fixedSize()
                 }
+                .padding(.vertical, 10)
+                .padding(.horizontal, 6)
+                .contentShape(Rectangle())
             }
             .buttonStyle(.plain)
             .disabled(rexCount == 0)
@@ -168,8 +171,15 @@ struct RexCardActions: View {
                     message: shareText
                 ) {
                     Image(systemName: "paperplane")
-                        .font(.system(size: 15))
+                        .font(.system(size: 17))
                         .foregroundStyle(RexColor.mutedForeground)
+                        // Same target as the three built by action() above —
+                        // share is not built by that helper, so it has to say
+                        // so itself or it stays a 15pt dot between two 44pt
+                        // neighbours.
+                        .padding(.vertical, 10)
+                        .padding(.horizontal, 6)
+                        .contentShape(Rectangle())
                 }
                 .accessibilityLabel("Share with friends")
             }
@@ -218,7 +228,7 @@ struct RexCardActions: View {
         Button(action: perform) {
             HStack(spacing: 3) {
                 Image(systemName: icon)
-                    .font(.system(size: 15))
+                    .font(.system(size: 17))
                     .foregroundStyle(tint)
                 if isActive, let activeLabel {
                     // Text wraps by default once an HStack runs short on
@@ -235,6 +245,25 @@ struct RexCardActions: View {
                         .fixedSize()
                 }
             }
+            // Nov 22 — "need to make sure the buttons are tappable, so need
+            // to be bigger and with slightly bigger gaps, esp the
+            // like/save/share on the feed."
+            //
+            // The padding is the fix rather than the icon size. A 15pt glyph
+            // with no padding is a 15pt target, well under the 44pt Apple
+            // asks for and well under what a thumb hits while scrolling —
+            // which is why a like sometimes did nothing and sometimes opened
+            // the card underneath. contentShape makes the padded area
+            // tappable; without it the hit test still follows the glyph.
+            //
+            // Vertical padding is free, horizontal costs row width. The note
+            // on the HStack above explains why this row cannot grow much:
+            // past about 130pt it wins the fight with the poster's name and
+            // truncates it. Hence 6 each side rather than the .lg gap, which
+            // buys 12pt between adjacent targets without that.
+            .padding(.vertical, 10)
+            .padding(.horizontal, 6)
+            .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
         .disabled(busy)

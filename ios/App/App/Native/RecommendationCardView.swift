@@ -80,10 +80,12 @@ struct RecommendationCardView: View {
         // sit side by side, so a card of your own reserved 66pt and pushed
         // every title into an early wrap. Stacked, the corner is only ever as
         // wide as the wider of the two.
-        let hasRating = !rec.isWant && !rec.isBlast && rec.rating > 0
+        // Nov 22 — the rating is no longer in this corner; it rides on the
+        // thumbnail, which now ends the row and takes its own width out of
+        // the text column. So nothing has to be reserved for it. What is
+        // still up there is the "…" on your own cards, and only on those.
         let isMine = rec.user_id == RexAPI.shared.currentUserId
-        if isMine { return 36 }
-        return hasRating ? 30 : 0
+        return isMine ? 36 : 0
     }
 
     /// The rail down the left edge, and the hairline round the rest: the
@@ -143,9 +145,21 @@ struct RecommendationCardView: View {
             // title block). The colour now lives only at the edges, so the
             // text and photos sit on plain white.
             VStack(alignment: .leading, spacing: 0) {
+                // Nov 22 — "put thumbnails on the right instead of the left
+                // so you have a nice clean line down the left hand side and
+                // the thumbnail sits in the natural white space on the
+                // right."
+                //
+                // The text column leads now and the thumbnail closes the row.
+                // Every title, subtitle, tag row and locality starts on the
+                // same vertical line, which is the point: the eye runs down
+                // one edge instead of stepping around a 60pt square.
+                //
+                // The rating moves with it. cornerLabel used to float at the
+                // card's top-trailing corner, which is exactly where the
+                // thumbnail now sits — see the overlay below, which hangs the
+                // badge off the image instead of colliding with it.
                 HStack(alignment: .top, spacing: RexSpacing.md) {
-                    thumbnail(item: item)
-
                     VStack(alignment: .leading, spacing: 6) {
                         Text(item.title)
                             .font(RexFont.display(17, weight: .semibold))
@@ -170,10 +184,10 @@ struct RecommendationCardView: View {
                                 // author is tappable, so it gets its own row.
                                 // Which meant the fix landed everywhere except
                                 // the only category that has authors.
-                                bookSubtitleRow(subtitle, onTap: onBookAuthorTap)
+                                bookSubtitleRow(withoutYear(subtitle), onTap: onBookAuthorTap)
                                     .padding(.trailing, titleTrailingReserve)
                             } else {
-                                Text(subtitle)
+                                Text(withoutYear(subtitle))
                                     .font(RexFont.text(13))
                                     .foregroundStyle(RexColor.mutedForeground)
                                     .lineLimit(1)
@@ -305,18 +319,26 @@ struct RecommendationCardView: View {
                             }
                         }
                     }
+
+                    // The thumbnail, now closing the row rather than
+                    // opening it. The rating rides on it: cornerLabel
+                    // used to float at the card's top-trailing corner and
+                    // that is this square now, so the badge hangs off the
+                    // image's bottom edge where it reads as belonging to
+                    // the thing in the picture.
+                    thumbnail(item: item)
+                        .overlay(alignment: .bottomTrailing) {
+                            cornerLabel.padding(3)
+                        }
                 }
                 // Widened before the overlay so the corner label is measured
                 // against the card's real right edge — see the 6 Sept
                 // "floating in the middle" fix.
                 .frame(maxWidth: .infinity, alignment: .leading)
-                .overlay(alignment: .topTrailing) {
-                    cornerLabel
-                        // Below the "…" EditableIfMine floats in this same
-                        // corner, rather than beside it — see
-                        // titleTrailingReserve. 34pt clears the button.
-                        .padding(.top, rec.user_id == RexAPI.shared.currentUserId ? 34 : 3)
-                }
+                // Nov 22 — the rating used to hang here. It is on the
+                // thumbnail now (see above), which is what sits in this
+                // corner since the row flipped. The "…" for your own Rex
+                // still floats here, applied from outside by EditableIfMine.
                 .padding(.horizontal, RexSpacing.cardPadding)
                 .padding(.top, RexSpacing.cardPadding)
                 .padding(.bottom, RexSpacing.md)
@@ -709,6 +731,30 @@ struct RecommendationCardView: View {
         if let photo = rec.photo_urls?.first, let url = URL(string: photo) { return url }
         if let photo = rec.photo_url, let url = URL(string: photo) { return url }
         return nil
+    }
+
+
+    /// Nov 22 — "remove publish / release dates from the main feed."
+    ///
+    /// The year is not a separate column; it is baked into items.subtitle
+    /// when the item is created — "2021 · Drama" for a film, "Madeline
+    /// Miller · 2011" for a book. So it comes out here, at the point of
+    /// display, rather than by rewriting rows that other screens still want
+    /// it on.
+    ///
+    /// Only a standalone four-digit year in the 19xx/20xx range, so "Sgt.
+    /// Pepper 1967" keeps its title and "Catch-22" keeps its number. The
+    /// separators either side go with it, or a stripped subtitle reads
+    /// "· Drama".
+    private func withoutYear(_ subtitle: String) -> String {
+        let parts = subtitle
+            .components(separatedBy: CharacterSet(charactersIn: "\u{00B7}|"))
+            .map { $0.trimmingCharacters(in: .whitespaces) }
+            .filter { part in
+                guard part.count == 4, let n = Int(part) else { return !part.isEmpty }
+                return !(1900...2099).contains(n)
+            }
+        return parts.joined(separator: " \u{00B7} ")
     }
 
     @ViewBuilder
