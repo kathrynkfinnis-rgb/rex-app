@@ -1882,7 +1882,7 @@ final class RexAPI {
         guard !ids.isEmpty else { return [] }
         let token = try await validToken()
         let select = "id,rating,note,created_at,photo_url,photo_urls,tags\(await anonymousField()),user_id,item_id," +
-            "items(id,type,title,subtitle,image_url,genre,address,link_url,recipe_text,lat,lng)," +
+            "items(id,type,title,subtitle,image_url,genre,address,link_url,recipe_text,lat,lng,external_source)," +
             "profiles!recommendations_user_id_fkey(username,display_name,avatar_url)," +
             "recommendation_tags(profiles(id,username,display_name,avatar_url))"
         var components = URLComponents(url: baseURL.appendingPathComponent("/rest/v1/recommendations"), resolvingAgainstBaseURL: false)!
@@ -1950,7 +1950,7 @@ final class RexAPI {
         // an empty Title field (off the top of the screen, above the note
         // and photos) and refused to save.
         let select = "id,rating,note,created_at,photo_url,photo_urls,tags\(await anonymousField()),user_id,item_id," +
-            "items(id,type,title,subtitle,image_url,genre,address,link_url,recipe_text,lat,lng)," +
+            "items(id,type,title,subtitle,image_url,genre,address,link_url,recipe_text,lat,lng,external_source)," +
             "profiles!recommendations_user_id_fkey(username,display_name,avatar_url)," +
             "recommendation_tags(profiles(id,username,display_name,avatar_url))"
         var components = URLComponents(url: baseURL.appendingPathComponent("/rest/v1/recommendations"), resolvingAgainstBaseURL: false)!
@@ -2083,7 +2083,7 @@ final class RexAPI {
     func existingStandaloneRex(itemId: String) async -> FeedRecommendation? {
         guard let userId = currentUserId, let token = try? await validToken() else { return nil }
         let select = "id,rating,note,created_at,photo_url,photo_urls,tags,user_id,item_id,trip_id," +
-            "items(id,type,title,subtitle,image_url,genre,address,link_url,recipe_text,lat,lng)," +
+            "items(id,type,title,subtitle,image_url,genre,address,link_url,recipe_text,lat,lng,external_source)," +
             "profiles!recommendations_user_id_fkey(username,display_name,avatar_url)"
         var components = URLComponents(url: baseURL.appendingPathComponent("/rest/v1/recommendations"), resolvingAgainstBaseURL: false)!
         components.queryItems = [

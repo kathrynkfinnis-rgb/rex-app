@@ -657,6 +657,23 @@ struct TrendingItem: Codable, Identifiable {
     let image_url: String?
     let type: String
     let rex_count: Int
+    /// Nov 22 — where the item came from, so the shelf can tell catalogue art
+    /// from somebody's camera roll. The image URL cannot: a Google Place
+    /// photo is copied into our own bucket, to the same path a personal photo
+    /// is uploaded to. See ShelfArt.trusted and the migration that added it.
+    /// Optional so an app build older than that migration still decodes.
+    let external_source: String?
+    /// Option D — up to four photographs of this thing, newest first. The
+    /// shelf is called "most Rex'd", and one person's picture undersells
+    /// that. Null to a signed-out caller: a count is not personal, somebody's
+    /// photograph is.
+    let rex_photos: [String]?
+    /// Option A — a trip has no catalogue picture of its own, so its cover
+    /// comes from its stops: their photographs first, and a map of their
+    /// coordinates when there are none. Both null unless signed in.
+    let trip_photos: [String]?
+    let trip_lats: [Double]?
+    let trip_lngs: [Double]?
 
     var id: String { item_id }
 }

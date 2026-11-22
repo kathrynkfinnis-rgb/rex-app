@@ -1,4 +1,5 @@
 import SwiftUI
+import CoreLocation
 
 /// Deliveroo-homepage-style discovery surface: category pills up top,
 /// horizontally-swipeable shelves stacked underneath. Three sources mixed
@@ -510,26 +511,22 @@ struct ExploreView: View {
         .padding(.bottom, RexSpacing.xl)
     }
 
-    private func shelfThumbnail(url: String?, symbol: String) -> some View {
-        Group {
-            if let url, let imageURL = URL(string: url) {
-                GoogleSafeAsyncImage(url: imageURL) { image in
-                    image.resizable().aspectRatio(contentMode: .fill)
-                } placeholder: {
-                    RexColor.muted
-                }
-            } else {
-                RexColor.muted.overlay(
-                    Image(systemName: symbol).font(.system(size: 20)).foregroundStyle(RexColor.mutedForeground)
-                )
-            }
-        }
-        .frame(width: 132, height: 96)
-        .clipShape(RoundedRectangle(cornerRadius: RexRadius.input, style: .continuous))
-        .overlay(
-            RoundedRectangle(cornerRadius: RexRadius.input, style: .continuous)
-                .stroke(RexColor.border, lineWidth: 1)
-        )
+
+
+    /// The shelf tile, deciding what to show rather than being handed a URL.
+    ///
+    /// Nov 22, from the Explore mock-ups: option B (a designed fallback
+    /// rather than a bad photo) and option C (only trust catalogue art).
+    ///
+    /// The three faults this answers all came from one fact — the shelves
+    /// showed `items.image_url` and nothing else. A film has a poster behind
+    /// it and a book has a jacket, but products, events and "other" have no
+    /// catalogue at all, so whatever somebody uploaded became the item's
+    /// official picture. That is how Operation Mincemeat ended up a
+    /// screenshot with app UI in it, and how two different car seat products
+    /// came to share one photograph of a Volvo seat.
+    private func shelfThumbnail(_ art: ShelfArt, symbol: String) -> some View {
+        ShelfTileArt(art: art, symbol: symbol)
     }
 
     private func friendCollectionCard(_ list: RexList) -> some View {
@@ -606,7 +603,8 @@ struct ExploreView: View {
         } label: {
             VStack(alignment: .leading, spacing: RexSpacing.xs) {
                 ZStack(alignment: .topLeading) {
-                    shelfThumbnail(url: item.image_url, symbol: RexCategory(rawType: item.type).symbol)
+                    shelfThumbnail(ShelfArt.forTrending(item),
+                                   symbol: RexCategory(rawType: item.type).symbol)
                     // The same flame a card gets when enough people pile on.
                     Image(systemName: "flame.fill")
                         .font(.system(size: 11, weight: .bold))
@@ -635,7 +633,8 @@ struct ExploreView: View {
             pushedItemId = item.item_id
         } label: {
             VStack(alignment: .leading, spacing: RexSpacing.xs) {
-                shelfThumbnail(url: item.image_url, symbol: RexCategory(rawType: item.type).symbol)
+                shelfThumbnail(ShelfArt.forTrending(item),
+                                   symbol: RexCategory(rawType: item.type).symbol)
                 Text(item.title)
                     .font(RexFont.text(12.5, weight: .medium))
                     .foregroundStyle(RexColor.foreground)
@@ -669,7 +668,8 @@ struct ExploreView: View {
     /// to name, and a count is the only honest one when there are more.
     private func recentRexCard(_ rec: FeedRecommendation, rexdBy count: Int = 1) -> some View {
         VStack(alignment: .leading, spacing: RexSpacing.xs) {
-            shelfThumbnail(url: rec.items?.image_url, symbol: RexCategory(rawType: rec.items?.type).symbol)
+            shelfThumbnail(ShelfArt.forRecent(rec),
+                           symbol: RexCategory(rawType: rec.items?.type).symbol)
             Text(rec.items?.title ?? "")
                 .font(RexFont.text(12.5, weight: .medium))
                 .foregroundStyle(RexColor.foreground)
@@ -746,7 +746,20 @@ struct ExploreView: View {
 
     private func editorialCardBody(_ item: EditorialCollectionItem) -> some View {
         VStack(alignment: .leading, spacing: RexSpacing.xs) {
-            shelfThumbnail(url: item.image_url, symbol: "sparkles")
+            // A curated shelf is the one place option C has nothing to say:
+            // a person on the Rex team chose this picture, so it is trusted
+            // whatever its source. The fallback still improves — a title on
+            // the category's colour rather than a generic sparkle.
+            shelfThumbnail(
+                {
+                    let category = RexCategory(rawType: item.items?.type)
+                    if let url = item.image_url, !url.isEmpty {
+                        return ShelfArt.photo(url, titleFallback: item.title, category: category)
+                    }
+                    return ShelfArt.titled(item.title, category)
+                }(),
+                symbol: "sparkles"
+            )
             Text(item.title)
                 .font(RexFont.text(12.5, weight: .medium))
                 .foregroundStyle(RexColor.foreground)
@@ -842,5 +855,237 @@ struct ExploreView: View {
         }
 
         isLoading = false
+    }
+}
+
+/// What a shelf tile should actually show. Decided once, at the call site
+/// that has the facts, rather than inside the view.
+enum ShelfArt {
+    /// A picture we are prepared to vouch for, and the cover to show while
+    /// it loads and if it never arrives. A signed URL whose file has been
+    /// deleted 404s, and the tile used to sit there as an empty grey box
+    /// with no title and no glyph on it — found by actually looking at one.
+    case photo(String, titleFallback: String, category: RexCategory)
+    /// Several people's photos of the same thing — Explore's shelf is called
+    /// "most Rex'd", and one person's picture undersells that.
+    case mosaic([String])
+    /// A trip with no photographs on any of its stops: a map of where it
+    /// went, which is the one thing a trip can always say about itself.
+    case map([CLLocationCoordinate2D], titleFallback: String)
+    /// No picture worth showing: set the title on the category's colour.
+    case titled(String, RexCategory)
+}
+
+extension ShelfArt {
+    /// Option C, in one place: is this image the thing it claims to be?
+    ///
+    /// The obvious test — "is it hosted on our own storage?" — does not work,
+    /// and the reason is worth keeping written down. repairPlacePhotoIfNeeded
+    /// copies a Google Place photo into our bucket through the same
+    /// uploadPhoto() a person's own camera roll goes through, landing at the
+    /// same rec-photos/<user-id>/<uuid>.jpg. A Google photo and a snapshot
+    /// are indistinguishable by URL.
+    ///
+    /// `external_source` is the signal that survives. It is set when the item
+    /// came from a lookup (Google for a place, TMDB for a film, Open Library
+    /// for a book) and null when somebody typed the thing in by hand — which
+    /// is precisely the case that produces a bad thumbnail.
+    ///
+    /// An item with no lookup behind it can still have a good picture: the
+    /// product shots scraped from a shop's own page (spacenk.com,
+    /// balzac-paris.com, nordicnest) are photographs of the thing being sold.
+    /// Those are kept. What is dropped is the narrow case of a hand-typed
+    /// item whose image is an upload — a camera roll promoted to catalogue.
+    static func trusted(
+        imageURL: String?,
+        externalSource: String?,
+        title: String,
+        type: String?
+    ) -> ShelfArt {
+        let category = RexCategory(rawType: type)
+        guard let imageURL, !imageURL.isEmpty else {
+            return .titled(title, category)
+        }
+        let hasLookup = !(externalSource ?? "").isEmpty
+        let isOurUpload = imageURL.contains("/storage/v1/object/")
+        if isOurUpload && !hasLookup {
+            return .titled(title, category)
+        }
+        return .photo(imageURL, titleFallback: title, category: category)
+    }
+}
+
+extension ShelfArt {
+    /// The whole decision for one Explore tile, in the order the options
+    /// were agreed: a trip's own pictures, then several people's pictures,
+    /// then catalogue art, then a title.
+    static func forTrending(_ item: TrendingItem) -> ShelfArt {
+        let category = RexCategory(rawType: item.type)
+
+        // (A) "For trips, default to a hero photo if there is one rather
+        // than mini maps, but if none, then map." A trip carries no
+        // catalogue picture, so both come from its stops.
+        if category == .trip {
+            let photos = (item.trip_photos ?? []).filter { !$0.isEmpty }
+            if photos.count > 1 { return .mosaic(photos) }
+            if let only = photos.first {
+                return .photo(only, titleFallback: item.title, category: category)
+            }
+            let lats = item.trip_lats ?? []
+            let lngs = item.trip_lngs ?? []
+            let coords = zip(lats, lngs).map {
+                CLLocationCoordinate2D(latitude: $0.0, longitude: $0.1)
+            }
+            if !coords.isEmpty { return .map(coords, titleFallback: item.title) }
+            return .titled(item.title, category)
+        }
+
+        // (D) A mosaic where several people have Rex'd the same thing —
+        // but only where a personal photograph IS the picture of the thing.
+        // A restaurant photographed by four friends is the shelf working;
+        // four phone snaps of a car seat bag is the fault option C exists
+        // to fix, four times over. So the catalogue categories keep their
+        // jacket or poster, and so does anything C would not trust.
+        if category.showsPeoplesOwnPhotos {
+            let photos = (item.rex_photos ?? []).filter { !$0.isEmpty }
+            if photos.count > 1 { return .mosaic(photos) }
+        }
+
+        // (C and B)
+        return .trusted(imageURL: item.image_url, externalSource: item.external_source,
+                        title: item.title, type: item.type)
+    }
+}
+
+extension ShelfArt {
+    /// The same decision for the "lately" shelves, which are built from
+    /// recommendations rather than the trending RPC — so the photographs
+    /// are already in hand and need no extra column.
+    static func forRecent(_ rec: FeedRecommendation) -> ShelfArt {
+        let category = RexCategory(rawType: rec.items?.type)
+        let title = rec.items?.title ?? ""
+        if category.showsPeoplesOwnPhotos {
+            var photos = rec.photo_urls ?? []
+            if photos.isEmpty, let single = rec.photo_url { photos = [single] }
+            photos = photos.filter { !$0.isEmpty }
+            if photos.count > 1 { return .mosaic(photos) }
+            if let only = photos.first {
+                return .photo(only, titleFallback: title, category: category)
+            }
+        }
+        return .trusted(imageURL: rec.items?.image_url,
+                        externalSource: rec.items?.external_source,
+                        title: title, type: rec.items?.type)
+    }
+}
+
+extension RexCategory {
+    /// Categories where the thing has no jacket, poster or cover, so the
+    /// picture people take of it IS its picture. Used to decide whether a
+    /// mosaic of several people's photos is an improvement on one image or
+    /// a pile of camera roll.
+    var showsPeoplesOwnPhotos: Bool {
+        switch self {
+        case .place, .trip, .event, .recipe: return true
+        case .book, .movie, .tv, .podcast, .list, .other: return false
+        }
+    }
+}
+
+/// One shelf tile's artwork, at the size Explore draws it.
+///
+/// `symbol` is the old SF Symbol fallback, kept only for the paths that have
+/// no title to set (a curated shelf row whose item has been deleted). Where
+/// there is a title, `.titled` is the better answer: it says what the thing
+/// is, which a generic glyph never did, and it makes two pictureless tiles
+/// look like two different things rather than the same grey square twice.
+struct ShelfTileArt: View {
+    let art: ShelfArt
+    var symbol: String = "square"
+    var width: CGFloat = 132
+    var height: CGFloat = 96
+
+    var body: some View {
+        Group {
+            switch art {
+            case .photo(let url, let fallbackTitle, let category):
+                if let parsed = URL(string: url) {
+                    GoogleSafeAsyncImage(url: parsed) { image in
+                        image.resizable().aspectRatio(contentMode: .fill)
+                    } placeholder: {
+                        // Not RexColor.muted: this placeholder is shown
+                        // while loading AND when the load fails, and a
+                        // blank grey square is the worst of the three
+                        // things this tile can be.
+                        titled(fallbackTitle, category)
+                    }
+                } else {
+                    titled(fallbackTitle, category)
+                }
+            case .mosaic(let urls):
+                if urls.count > 1 {
+                    ThumbnailGridView(urls: urls)
+                } else if let only = urls.first, let parsed = URL(string: only) {
+                    GoogleSafeAsyncImage(url: parsed) { image in
+                        image.resizable().aspectRatio(contentMode: .fill)
+                    } placeholder: {
+                        RexColor.muted
+                    }
+                } else {
+                    glyph
+                }
+            case .map(let coords, let fallbackTitle):
+                if coords.isEmpty {
+                    titled(fallbackTitle, .trip)
+                } else {
+                    RexMapSnapshotView(coordinates: coords, height: height)
+                }
+            case .titled(let title, let category):
+                titled(title, category)
+            }
+        }
+        .frame(width: width, height: height)
+        .clipShape(RoundedRectangle(cornerRadius: RexRadius.input, style: .continuous))
+        .overlay(
+            RoundedRectangle(cornerRadius: RexRadius.input, style: .continuous)
+                .stroke(RexColor.border, lineWidth: 1)
+        )
+    }
+
+    private var glyph: some View {
+        RexColor.muted.overlay(
+            Image(systemName: symbol)
+                .font(.system(size: 20))
+                .foregroundStyle(RexColor.mutedForeground)
+        )
+    }
+
+    /// Option B. A wash of the category's own colour, the title set on top,
+    /// and the category's glyph sitting quietly in the corner so the tile
+    /// still says what kind of thing this is.
+    ///
+    /// Set in the display face rather than the editorial one the mock-up
+    /// used. Two reasons: Theme's editorial face is italic-only here and goes
+    /// delicate at the size a 132pt tile allows, and the house rule on that
+    /// face is that it is spent quickly — it reads as a voice, and a cover is
+    /// a title. One line to change if the serif is wanted.
+    private func titled(_ title: String, _ category: RexCategory) -> some View {
+        let tint = category.tintColor
+        return ZStack(alignment: .topLeading) {
+            tint.opacity(0.14)
+            Image(systemName: category.symbol)
+                .font(.system(size: 10, weight: .semibold))
+                .foregroundStyle(tint.opacity(0.75))
+                .padding(7)
+            Text(title)
+                .font(RexFont.display(13))
+                .foregroundStyle(tint)
+                .lineLimit(3)
+                .minimumScaleFactor(0.75)
+                .multilineTextAlignment(.leading)
+                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottomLeading)
+                .padding(.horizontal, 8)
+                .padding(.bottom, 8)
+        }
     }
 }

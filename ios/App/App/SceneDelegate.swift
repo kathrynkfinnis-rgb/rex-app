@@ -20,6 +20,12 @@ class SceneDelegate: UIResponder, UIWindowSceneDelegate {
             window?.makeKeyAndVisible()
             return
         }
+        if UserDefaults.standard.bool(forKey: "RexShelfHarness") {
+            window?.rootViewController = UIHostingController(rootView: ShelfTileHarness())
+            window?.overrideUserInterfaceStyle = .light
+            window?.makeKeyAndVisible()
+            return
+        }
         #endif
         window?.rootViewController = UIHostingController(rootView: RootView())
         // Belt and braces alongside RootView's .preferredColorScheme — this
@@ -146,6 +152,85 @@ struct CardLayoutHarness: View {
             }
             .padding(.horizontal, RexSpacing.page)
             .padding(.vertical, RexSpacing.page)
+        }
+        .background(RexColor.background)
+    }
+}
+
+/// TEMPORARY, same deal as CardLayoutHarness above — `-RexShelfHarness 1`.
+///
+/// Explore's shelves are behind sign-in too, so the thumbnail options could
+/// not be looked at either. These are real rows from trending_items_weekly,
+/// pasted rather than fetched so the tile is the only thing under test.
+struct ShelfTileHarness: View {
+    private struct Row: Identifiable {
+        let id = UUID()
+        let title: String
+        let type: String
+        let image: String?
+        let source: String?
+        let why: String
+    }
+
+    private let rows: [Row] = [
+        Row(title: "Adolescence", type: "tv",
+            image: "https://image.tmdb.org/t/p/w200/20i4nShZZg1g1VFHSB8xpaYM4r7.jpg",
+            source: "tmdb", why: "catalogue art — kept"),
+        Row(title: "Hay Barro Bowl set", type: "other",
+            image: "https://prod.nordicnest.dev/assets/blobs/hay-barro-bowl-light-blue-20-cm-2-pack/595308-01_1_ProductImageMain-23b5c1f930.png",
+            source: nil, why: "shop's own photo — kept"),
+        Row(title: "TYCOZ - Crêperie & Oyster Bar", type: "place",
+            image: "https://uhpzkbkwxcgqfxmlyktj.supabase.co/storage/v1/object/sign/rec-photos/x/y.jpg",
+            source: "google", why: "Google photo in our bucket — kept"),
+        Row(title: "Operation Mincemeat", type: "event",
+            image: "https://uhpzkbkwxcgqfxmlyktj.supabase.co/storage/v1/object/sign/rec-photos/x/z.jpg",
+            source: nil, why: "camera roll — replaced"),
+        Row(title: "Car Seat Bag", type: "other",
+            image: "https://uhpzkbkwxcgqfxmlyktj.supabase.co/storage/v1/object/sign/rec-photos/x/w.jpg",
+            source: nil, why: "camera roll — replaced"),
+        Row(title: "Cartagena, Columbia", type: "trip",
+            image: nil, source: nil, why: "no picture at all"),
+        Row(title: "Corfu", type: "trip", image: nil, source: nil, why: "no picture at all"),
+        Row(title: "Glassette Reversible Stripe Cushion", type: "other",
+            image: nil, source: nil, why: "no picture at all"),
+    ]
+
+    var body: some View {
+        ScrollView {
+            VStack(alignment: .leading, spacing: RexSpacing.lg) {
+                Text("Explore tiles")
+                    .font(RexFont.display(22))
+                    .padding(.top, RexSpacing.xxl)
+                ForEach(rows) { row in
+                    HStack(alignment: .top, spacing: RexSpacing.md) {
+                        ShelfTileArt(
+                            art: ShelfArt.trusted(imageURL: row.image, externalSource: row.source,
+                                                  title: row.title, type: row.type),
+                            symbol: RexCategory(rawType: row.type).symbol
+                        )
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text(row.title)
+                                .font(RexFont.text(12.5, weight: .medium))
+                                .lineLimit(2)
+                            Text(row.why)
+                                .font(RexFont.text(11))
+                                .foregroundStyle(RexColor.mutedForeground)
+                        }
+                        Spacer(minLength: 0)
+                    }
+                }
+                Text("Mosaic — several people")
+                    .font(RexFont.text(13, weight: .medium))
+                    .padding(.top, RexSpacing.md)
+                ShelfTileArt(art: .mosaic([
+                    "https://image.tmdb.org/t/p/w200/20i4nShZZg1g1VFHSB8xpaYM4r7.jpg",
+                    "https://prod.nordicnest.dev/assets/blobs/hay-barro-bowl-light-blue-20-cm-2-pack/595308-01_1_ProductImageMain-23b5c1f930.png",
+                    "https://image.tmdb.org/t/p/w200/20i4nShZZg1g1VFHSB8xpaYM4r7.jpg",
+                    "https://prod.nordicnest.dev/assets/blobs/hay-barro-bowl-light-blue-20-cm-2-pack/595308-01_1_ProductImageMain-23b5c1f930.png",
+                ]))
+            }
+            .padding(.horizontal, RexSpacing.page)
+            .padding(.bottom, RexSpacing.xxl)
         }
         .background(RexColor.background)
     }
