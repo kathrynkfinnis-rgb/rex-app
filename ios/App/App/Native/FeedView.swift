@@ -642,7 +642,7 @@ struct FeedView: View {
                                     HStack(spacing: RexSpacing.sm) {
                                         Image(systemName: "square.stack")
                                             .font(.system(size: 13))
-                                            .frame(minWidth: 44, minHeight: 44)
+                                            .frame(minHeight: 44)
                                             .contentShape(Rectangle())
                                         Text("\(by) added \(count) more at once")
                                             .font(RexFont.text(14, weight: .medium))

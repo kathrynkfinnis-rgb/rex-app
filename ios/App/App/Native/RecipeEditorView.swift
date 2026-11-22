@@ -345,7 +345,7 @@ struct RecipeEditorView: View {
             } label: {
                 HStack(spacing: 4) {
                     Image(systemName: "plus").font(.system(size: 11))
-                    .frame(minWidth: 44, minHeight: 44)
+                    .frame(minHeight: 44)
                     .contentShape(Rectangle())
                     Text("Add").font(RexFont.text(13))
                 }

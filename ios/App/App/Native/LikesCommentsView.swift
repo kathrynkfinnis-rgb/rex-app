@@ -117,7 +117,7 @@ struct LikesCommentsView: View {
                         Image(systemName: "bubble.left")
                             .font(.system(size: 16))
                             .foregroundStyle(RexColor.mutedForeground)
-                            .frame(minWidth: 44, minHeight: 44)
+                            .frame(minHeight: 44)
                             .contentShape(Rectangle())
                         if !comments.isEmpty {
                             Text("\(comments.count)")

@@ -627,7 +627,7 @@ struct UserProfileView: View {
                         HStack(spacing: 3) {
                             Text("Look inside")
                             Image(systemName: "chevron.right").font(.system(size: 8, weight: .semibold))
-                            .frame(minWidth: 44, minHeight: 44)
+                            .frame(minHeight: 44)
                             .contentShape(Rectangle())
                         }
                         .font(RexFont.text(11, weight: .semibold))

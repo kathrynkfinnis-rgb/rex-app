@@ -438,7 +438,7 @@ struct AskRexAnswerBlock: View {
                 } label: {
                     HStack(spacing: 5) {
                         Image(systemName: "plus.circle.fill").font(.system(size: 12))
-                        .frame(minWidth: 44, minHeight: 44)
+                        .frame(minHeight: 44)
                         .contentShape(Rectangle())
                         Text("Rex this").font(RexFont.text(13, weight: .semibold))
                     }
@@ -460,7 +460,7 @@ struct AskRexAnswerBlock: View {
                     RexOutboundLinkButton(url: link.url) {
                         HStack(spacing: 5) {
                             Image(systemName: link.symbol).font(.system(size: 12))
-                            .frame(minWidth: 44, minHeight: 44)
+                            .frame(minHeight: 44)
                             .contentShape(Rectangle())
                             Text("Look it up").font(RexFont.text(13, weight: .semibold))
                         }

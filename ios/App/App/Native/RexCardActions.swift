@@ -173,7 +173,9 @@ struct RexCardActions: View {
                     Image(systemName: "paperplane")
                         .font(.system(size: 17))
                         .foregroundStyle(RexColor.mutedForeground)
-                        .frame(minWidth: 44, minHeight: 44)
+                        // Height only — see action() below for why a minWidth
+                        // here broke the feed.
+                        .frame(minHeight: 44)
                         .contentShape(Rectangle())
                         // Same target as the three built by action() above —
                         // share is not built by that helper, so it has to say
@@ -232,7 +234,29 @@ struct RexCardActions: View {
                 Image(systemName: icon)
                     .font(.system(size: 17))
                     .foregroundStyle(tint)
-                    .frame(minWidth: 44, minHeight: 44)
+                    // Nov 22 — height only, deliberately. This was
+                    // minWidth: 44 for one build and it broke the feed:
+                    // "there is no margin at the side of the screen any
+                    // more, or buffer between items."
+                    //
+                    // The width was already handled by the .padding below,
+                    // so a 44pt minWidth was 44 PLUS 12 of padding — 56pt
+                    // per action. Five actions, the avatar, the poster's
+                    // name and the counts come to roughly 350pt of minimum
+                    // width against the ~315 a card offers on a 393pt
+                    // phone. An HStack that cannot fit does not shrink; it
+                    // reports the width it needs, which made the card wider
+                    // than the screen. A vertical ScrollView centres
+                    // oversized content, so the rail and the left margin
+                    // went off the left edge and the thumbnail and rating
+                    // badge were clipped off the right — margins gone from
+                    // both sides at once, which is what she saw.
+                    //
+                    // 44 tall is free: nothing competes for vertical room.
+                    // 44 wide is not available here at any price, and the
+                    // glyph plus its padding is about 29pt, which is what
+                    // the row can actually afford.
+                    .frame(minHeight: 44)
                     .contentShape(Rectangle())
                 if isActive, let activeLabel {
                     // Text wraps by default once an HStack runs short on

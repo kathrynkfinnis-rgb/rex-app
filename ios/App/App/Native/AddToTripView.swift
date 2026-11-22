@@ -202,7 +202,7 @@ struct AddToTripView: View {
                 Image(systemName: section == nil ? "list.bullet" : "calendar")
                     .font(.system(size: 13))
                     .foregroundStyle(RexColor.primary)
-                    .frame(minWidth: 44, minHeight: 44)
+                    .frame(minHeight: 44)
                     .contentShape(Rectangle())
                 Text(section ?? "No heading")
                     .font(RexFont.text(15, weight: .medium))

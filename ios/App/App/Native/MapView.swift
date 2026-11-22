@@ -548,7 +548,7 @@ struct RexMapView: View {
                         Image(systemName: chosenArea == nil ? "location.fill" : "mappin.circle.fill")
                             .font(.system(size: 12))
                             .foregroundStyle(RexColor.primary)
-                            .frame(minWidth: 44, minHeight: 44)
+                            .frame(minHeight: 44)
                             .contentShape(Rectangle())
                         Text(chosenArea?.name
                             ?? areaName
@@ -639,7 +639,7 @@ struct RexMapView: View {
                 } label: {
                     HStack(spacing: RexSpacing.sm) {
                         Image(systemName: "magnifyingglass").font(.system(size: 11))
-                        .frame(minWidth: 44, minHeight: 44)
+                        .frame(minHeight: 44)
                         .contentShape(Rectangle())
                         Text("Looking for a trip?")
                             .font(RexFont.text(13, weight: .medium))
@@ -676,7 +676,7 @@ struct RexMapView: View {
                 NavigationLink(value: PlacesWithoutPinRoute()) {
                     HStack(spacing: RexSpacing.sm) {
                         Image(systemName: "mappin.slash").font(.system(size: 11))
-                        .frame(minWidth: 44, minHeight: 44)
+                        .frame(minHeight: 44)
                         .contentShape(Rectangle())
                         Text("\(pinlessCount) \(pinlessCount == 1 ? "place isn't" : "places aren't") on the map")
                             .font(RexFont.text(13, weight: .medium))
@@ -1101,7 +1101,7 @@ struct RexMapView: View {
                         } label: {
                             HStack(spacing: 6) {
                                 Image(systemName: "suitcase.fill").font(.system(size: 11))
-                                .frame(minWidth: 44, minHeight: 44)
+                                .frame(minHeight: 44)
                                 .contentShape(Rectangle())
                                 Text(trip.title)
                                     .font(RexFont.text(13, weight: .semibold))
@@ -1424,7 +1424,7 @@ struct RexMapView: View {
                                         HStack(spacing: RexSpacing.sm) {
                                             Image(systemName: "suitcase")
                                                 .font(.system(size: 13))
-                                                .frame(minWidth: 44, minHeight: 44)
+                                                .frame(minHeight: 44)
                                                 .contentShape(Rectangle())
                                             Text(trip.title)
                                                 .font(RexFont.text(14, weight: .medium))

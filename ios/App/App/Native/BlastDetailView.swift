@@ -226,7 +226,7 @@ struct BlastDetailView: View {
                         Image(systemName: response.likedByMe ? "heart.fill" : "heart")
                             .font(.system(size: 13))
                             .foregroundStyle(response.likedByMe ? RexColor.destructive : RexColor.mutedForeground)
-                            .frame(minWidth: 44, minHeight: 44)
+                            .frame(minHeight: 44)
                             .contentShape(Rectangle())
                         if response.likeCount > 0 {
                             Text("\(response.likeCount)")
@@ -325,7 +325,7 @@ struct BlastDetailView: View {
             HStack(spacing: RexSpacing.sm) {
                 Image(systemName: RexCategory(rawType: item.type).symbol)
                     .font(.system(size: 11))
-                    .frame(minWidth: 44, minHeight: 44)
+                    .frame(minHeight: 44)
                     .contentShape(Rectangle())
                 VStack(alignment: .leading, spacing: 1) {
                     Text(item.title)

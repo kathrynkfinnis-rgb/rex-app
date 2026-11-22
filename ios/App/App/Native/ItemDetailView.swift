@@ -1196,7 +1196,7 @@ struct ItemDetailView: View {
                 } label: {
                     HStack(spacing: 6) {
                         Image(systemName: "clock").font(.system(size: 12))
-                        .frame(minWidth: 44, minHeight: 44)
+                        .frame(minHeight: 44)
                         .contentShape(Rectangle())
                         Text(details.todayHours ?? "Opening times")
                             .font(.system(size: 13))
@@ -1735,7 +1735,7 @@ struct ItemDetailView: View {
                         HStack(spacing: 7) {
                             Image(systemName: "list.number")
                                 .font(.system(size: 12, weight: .semibold))
-                                .frame(minWidth: 44, minHeight: 44)
+                                .frame(minHeight: 44)
                                 .contentShape(Rectangle())
                             // Oct 14 — "can we rename this 'rank it'." The
                             // long version explained the mechanic; the short

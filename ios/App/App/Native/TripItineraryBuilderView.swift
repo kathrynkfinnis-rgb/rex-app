@@ -197,7 +197,7 @@ struct TripItineraryBuilderView: View {
                     Image(systemName: "line.3.horizontal")
                         .font(.system(size: 12))
                         .foregroundStyle(RexColor.placeholder)
-                        .frame(minWidth: 44, minHeight: 44)
+                        .frame(minHeight: 44)
                         .contentShape(Rectangle())
                     thumbnail(for: stop)
                     VStack(alignment: .leading, spacing: 2) {
