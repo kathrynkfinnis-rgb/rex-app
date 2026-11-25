@@ -1796,6 +1796,39 @@ struct FeedView: View {
         )
     }
 
+    /// Nov 22 — "why is this on the feed twice?" (Phoebe), with the same
+    /// Rex appearing as two identical cards.
+    ///
+    /// One person cannot Rex one thing twice: recommendations_unique stops
+    /// it. But that index is partial — it only applies while trip_id AND
+    /// list_id are both null — so a stop on a trip is deliberately allowed
+    /// to exist alongside the standalone Rex of the same place, and the feed
+    /// hides stops rather than relying on them not being there.
+    ///
+    /// Which means a row whose trip_id goes back to null stops being hidden
+    /// and starts being a duplicate. Phoebe's own guess was "I added it to a
+    /// trip after I Rex'd it", and trip_id is declared
+    /// `REFERENCES recommendations(id) ON DELETE SET NULL`, so a trip that
+    /// is deleted hands every one of its stops back to the feed. I have not
+    /// been able to confirm that is what happened to this row — it needs a
+    /// look at the data — so this does not pretend to fix the cause.
+    ///
+    /// It fixes the symptom, and safely: any two rows from the same person
+    /// for the same item, of the same kind, are a thing the database would
+    /// not have allowed on purpose. The newest wins, which is the one
+    /// carrying whatever was most recently edited — on Phoebe's pair, the
+    /// one that knows Emma was there.
+    private func collapsingDuplicates(_ rows: [FeedRecommendation]) -> [FeedRecommendation] {
+        var seen = Set<String>()
+        return rows.filter { rec in
+            // Blasts are questions and can legitimately repeat; a want and a
+            // Rex for the same thing are different statements.
+            guard !rec.isBlast else { return true }
+            let key = "\(rec.user_id)|\(rec.item_id)|\(rec.isWant)"
+            return seen.insert(key).inserted
+        }
+    }
+
     private func loadFeed() async {
         // Sept 17 — who's blocked, in either direction; everything below
         // is filtered against it (RexAPI.filterHidden).
@@ -1811,7 +1844,9 @@ struct FeedView: View {
             let merged = (try await rex)
                 + ((try? await wantsFeed) ?? [])
                 + ((try? await blastsFeed) ?? [])
-            recommendations = RexAPI.shared.filterHidden(merged).sorted { $0.created_at > $1.created_at }
+            recommendations = collapsingDuplicates(
+                RexAPI.shared.filterHidden(merged).sorted { $0.created_at > $1.created_at }
+            )
             // A fresh load resets paging; a full page back means there's
             // probably more behind it (see loadMore).
             let rexRows = try await rex

@@ -1086,9 +1086,26 @@ struct ItemDetailView: View {
     /// Deduplicated: cardPhoto already refuses to repeat the band, but an
     /// item's own image_url can be the same file as a community upload.
     private var headerPhotos: [String] {
+        // Nov 22 — "this says there are photos to scroll to the right to see
+        // but there aren't" (Phoebe): four dots under the viewer, and
+        // swiping found blanks.
+        //
+        // This pooled four sources — the band's photo, the card's, the
+        // item's own image_url and every community upload — so the viewer
+        // promised a page for each. Several were the same picture under
+        // different URLs, and some were addresses that no longer resolve, so
+        // the dots counted things there was nothing to show for.
+        //
+        // Since the header became a single picture (the card on the band)
+        // and everybody's photographs moved into the review that owns them,
+        // the honest answer is one page: the picture you tapped.
         var seen = Set<String>()
-        return ([heroPhoto, cardPhoto, item?.image_url].compactMap { $0 }
-                + communityPhotoURLs).filter { seen.insert($0).inserted }
+        return [heroPhoto, cardPhoto, item?.image_url]
+            .compactMap { $0 }
+            .filter { !$0.isEmpty }
+            .filter { seen.insert($0).inserted }
+            .prefix(1)
+            .map { $0 }
     }
 
     private func openPhotos(at url: String) {
