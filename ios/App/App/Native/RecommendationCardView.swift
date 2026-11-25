@@ -668,7 +668,11 @@ struct RecommendationCardView: View {
                     if wanters.count > 1 { wantedByBadge }
                 } else if rec.isBlast {
                     HStack(spacing: 4) {
-                        Image(systemName: "sparkles").font(.system(size: 10))
+                        // Nov 23 — sparkles are the "made by a machine" icon
+                        // everywhere else on a phone, and a blast is the
+                        // opposite: a person asking their friends. Same swap
+                        // the Ask-friends card and the Other category made.
+                        Image(systemName: "megaphone").font(.system(size: 10))
                         Text("Asking").font(RexFont.text(11, weight: .medium))
                     }
                     .foregroundStyle(RexColor.accent)
@@ -880,13 +884,27 @@ struct RecommendationCardView: View {
         }
         .foregroundStyle(category.tintColor)
         .padding(.horizontal, RexSpacing.cardPadding)
-        .padding(.vertical, 6)
+        .padding(.top, 6)
+        // Room for the curve below the words.
+        .padding(.bottom, 14)
         .frame(maxWidth: .infinity, alignment: .leading)
         // Nov 22 — "make the surround all one colour." The bar was the same
         // hue as the rail and the hairline but a weaker wash of it, so the
         // three read as two colours rather than one band round the card.
         // railColor is what draws the other two; the bar takes it as well.
-        .background(railColor)
+        //
+        // Nov 23 — "can we make this line curved?" The bar met the white box
+        // along a straight rule, while the Rex page's band has ended in a
+        // wave since it was drawn. Same shape, RexWaveEdge, filled in the
+        // card's own colour so it eats into the band from below — so the
+        // card and the page it opens now share an edge.
+        .background(
+            railColor.overlay(alignment: .bottom) {
+                RexWaveEdge()
+                    .fill(RexColor.card)
+                    .frame(height: 16)
+            }
+        )
     }
 
     private var categoryBadge: some View {
@@ -1018,6 +1036,10 @@ struct RecommendationCardView: View {
     /// thumbnail could only ever be the first of their own photographs —
     /// page one of the carousel directly beneath it.
     private var showsThumbnail: Bool {
+        // A blast is a question, not a thing, so there is nothing to
+        // picture — it was showing the category's mascot, which is 46pt of
+        // decoration holding the title away from the question underneath.
+        if rec.isBlast { return false }
         if category == .trip { return false }
         return (rec.photo_urls ?? []).isEmpty
     }
@@ -1064,7 +1086,13 @@ struct RecommendationCardView: View {
                 }
             }
         }
-        .frame(width: 60, height: 60)
+        // Nov 23 — "too much blank space, needs to move up", twice, both
+        // times on a card whose text column is a single line. The header row
+        // is as tall as the taller of its two sides, and that was always the
+        // thumbnail: 60pt of it against a 24pt title left 36pt of nothing
+        // between the title and the note underneath. 46 takes most of that
+        // back without the picture stopping being a picture.
+        .frame(width: 46, height: 46)
         .clipShape(RoundedRectangle(cornerRadius: RexRadius.input, style: .continuous))
     }
 

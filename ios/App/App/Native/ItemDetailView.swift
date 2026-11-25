@@ -257,10 +257,19 @@ struct ItemDetailView: View {
                     // what it is and where to see it, and who is in it is the
                     // next thing anybody asks about a film.
                     castSection
-                    googlePhotosSection
                     // Nov 22 — "Photos from friends" is gone from here. Every
                     // one of those pictures now sits in the review whose
                     // author took it; see reviewPhotos.
+                    //
+                    // Nov 25 — "move photos down to below reviews", and the
+                    // photos in question are Google's, not anybody's own. So
+                    // googlePhotosSection has moved below yourTakeSection.
+                    // The two kinds had been sitting next to each other as
+                    // though they were the same thing: one is what your
+                    // friends saw when they were there, which belongs with
+                    // what they said about it, and the other is the listing's
+                    // own pictures, which are context and can wait until
+                    // after the people.
                     recipeSection(item: item)
                     // Oct 5 — "if you are opening a friend's Rex, perhaps the
                     // box to Rex it yourself should be below the friend's
@@ -282,6 +291,7 @@ struct ItemDetailView: View {
                     // hadn't, which is what made them feel like two screens.
                     friendsSection
                     yourTakeSection
+                    googlePhotosSection
                     // Context below the people. Cast, then other work by the
                     // same author, then where else it exists.
                     // Oct 5 — the synopsis and the outside world's scores moved
@@ -2567,7 +2577,17 @@ struct ItemDetailView: View {
             }
 
             ForEach(theirs) { rec in
-                VStack(alignment: .leading, spacing: 6) {
+                // Nov 23 — "where there is no text for a review, can we
+                // compress the amount of space it takes up?"
+                //
+                // A rating with no note is a legitimate thing to post, and it
+                // was taking as much height as a paragraph: 12 points of card
+                // padding, a divider with 4 above and below it, and six-point
+                // gaps either side of nothing. The divider exists to separate
+                // what somebody said from what people did about it — with
+                // nothing said there is nothing to separate.
+                let hasBody = !(rec.note ?? "").isEmpty || !uploadedPhotos(rec).isEmpty
+                VStack(alignment: .leading, spacing: hasBody ? 6 : 2) {
                     HStack {
                         // Whoever said it is as interesting as what they said.
                         NavigationLink(value: UserProfileRoute(
@@ -2617,10 +2637,12 @@ struct ItemDetailView: View {
 
                     reviewPhotos(rec)
 
-                    Rectangle().fill(RexColor.divider).frame(height: 1).padding(.vertical, 4)
+                    if hasBody {
+                        Rectangle().fill(RexColor.divider).frame(height: 1).padding(.vertical, 4)
+                    }
                     LikesCommentsView(recommendationId: rec.id)
                 }
-                .padding(12)
+                .padding(hasBody ? 12 : 8)
                 .background(RexColor.card)
                 .clipShape(RoundedRectangle(cornerRadius: 14))
                 // Oct 14 — "do not like the dotted surround. I think it's fine
@@ -2652,13 +2674,16 @@ struct ItemDetailView: View {
     /// Each review carries its own now, in a strip that scrolls sideways, and
     /// a tap opens the viewer on that photo — with that person's photos
     /// either side of it to swipe through, not everybody's.
+    /// The photographs on one person's Rex, in the order they uploaded them.
+    private func uploadedPhotos(_ rec: FeedRecommendation) -> [String] {
+        let many = rec.photo_urls ?? []
+        let all = many.isEmpty ? [rec.photo_url].compactMap { $0 } : many
+        return all.filter { !$0.isEmpty }
+    }
+
     @ViewBuilder
     private func reviewPhotos(_ rec: FeedRecommendation) -> some View {
-        let photos: [String] = {
-            let many = rec.photo_urls ?? []
-            if !many.isEmpty { return many }
-            return [rec.photo_url].compactMap { $0 }
-        }().filter { !$0.isEmpty }
+        let photos = uploadedPhotos(rec)
 
         if !photos.isEmpty {
             ScrollView(.horizontal, showsIndicators: false) {

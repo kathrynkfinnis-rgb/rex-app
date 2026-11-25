@@ -774,19 +774,18 @@ struct RexMapView: View {
                 }
             }
 
-            // Sept 5 — "should be able to filter map by people".
-            if !peopleOnMap.isEmpty {
-                ScrollView(.horizontal, showsIndicators: false) {
-                    HStack(spacing: RexSpacing.sm) {
-                        chip("Everyone", active: personFilter == nil) { personFilter = nil }
-                        ForEach(peopleOnMap, id: \.id) { person in
-                            chip(person.name, active: personFilter == person.id) {
-                                personFilter = personFilter == person.id ? nil : person.id
-                            }
-                        }
-                    }
-                }
-            }
+            // Nov 23 — "remove this layer of pills."
+            //
+            // The people row, added 5 September for "should be able to filter
+            // map by people". It was a row of names that grew with the
+            // friend list, stacked under two other rows of pills, and
+            // together the three were eating the top of the map — which is
+            // the thing the screen is for.
+            //
+            // personFilter itself stays and is still honoured everywhere it
+            // is read; nothing on the map changes for anyone who has not set
+            // one. If filtering by person is wanted back, it belongs behind
+            // the list button rather than in a permanent third row.
 
             if showingList {
                 ScrollView(.horizontal, showsIndicators: false) {

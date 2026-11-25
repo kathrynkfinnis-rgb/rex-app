@@ -3972,7 +3972,43 @@ final class RexAPI {
         let query = [title, subtitle].compactMap { $0 }.filter { !$0.isEmpty }.joined(separator: " ")
         guard !query.isEmpty else { return }
         let hits = await RexSearch.search(category: category, query: query)
-        guard let imageURL = hits.first(where: { $0.imageURL != nil })?.imageURL else { return }
+
+        // Nov 25 — "why is this artwork wrong?" Maggie O'Farrell's "Land"
+        // was wearing a SuperSummary study guide for "Rifles for Watie".
+        //
+        // This used to take the first hit that had any picture at all. On a
+        // one-word title that is close to a coin toss: "Land" matches a
+        // study guide, a travel book and a film, and whichever the catalogue
+        // ranked first got written onto the item — which is shared, so one
+        // bad guess becomes everybody's cover.
+        //
+        // The hit now has to actually be the thing. Titles are compared with
+        // case, accents and punctuation removed, and where the item has a
+        // subtitle (an author, for a book) the hit has to agree about that
+        // too. No confident match means no repair: the category's mascot is
+        // a better answer than the wrong book, and it says "no picture"
+        // rather than asserting something false.
+        func bare(_ text: String) -> String {
+            text.folding(options: [.caseInsensitive, .diacriticInsensitive], locale: nil)
+                .components(separatedBy: CharacterSet.alphanumerics.inverted)
+                .filter { !$0.isEmpty }
+                .joined(separator: " ")
+        }
+        let wantedTitle = bare(title)
+        let wantedSubtitle = subtitle.map(bare) ?? ""
+
+        let match = hits.first { hit in
+            guard hit.imageURL != nil else { return false }
+            guard bare(hit.title) == wantedTitle else { return false }
+            guard !wantedSubtitle.isEmpty else { return true }
+            // The author, or whatever the subtitle holds. Either side may
+            // carry extra — "Maggie O'Farrell · 2025" against "Maggie
+            // O'Farrell" — so containment in either direction counts.
+            let hitSubtitle = bare(hit.subtitle ?? "")
+            guard !hitSubtitle.isEmpty else { return false }
+            return hitSubtitle.contains(wantedSubtitle) || wantedSubtitle.contains(hitSubtitle)
+        }
+        guard let imageURL = match?.imageURL else { return }
 
         guard let token = try? await validToken() else { return }
         var components = URLComponents(url: baseURL.appendingPathComponent("/rest/v1/items"), resolvingAgainstBaseURL: false)!
