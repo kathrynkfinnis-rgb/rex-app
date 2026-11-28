@@ -1207,8 +1207,55 @@ func shortLocality(_ address: String?) -> String? {
     // chunk contains a digit; a place name generally doesn't.
     let words = candidate.split(separator: " ").map(String.init)
     let cleaned = words.filter { !$0.contains(where: \.isNumber) }
-    let result = cleaned.joined(separator: " ")
-    return result.isEmpty ? candidate : result
+    let city = cleaned.joined(separator: " ")
+    let town = city.isEmpty ? candidate : city
+
+    // Nov 28 — "for places in London, make the location pin more specific,
+    // e.g. 'King's Cross, London'."
+    //
+    // London is one word for thirty miles of city, and on a card it tells you
+    // almost nothing. Google's formatted address often carries the district
+    // just before the town — "1 Bateman's Row, Shoreditch, London EC2A 3HH" —
+    // and where it does, that is the half worth reading.
+    //
+    // Only where that chunk reads as a place rather than a street, because
+    // "Stable St, London" is longer than "London" and says less. Where Google
+    // gives no district at all this still returns the town on its own:
+    // getting it every time means storing Google's own `neighborhood`
+    // component at import, which is a column and an importer change rather
+    // than a display one.
+    if parts.count >= 3, let district = placeLikePart(parts[parts.count - 3]),
+       district.caseInsensitiveCompare(town) != .orderedSame,
+       district.count + town.count + 2 <= 30 {
+        return "\(district), \(town)"
+    }
+    return town
+}
+
+/// Whether an address chunk names an area rather than a street.
+///
+/// A street line either has a number in it ("100 York Way") or ends in one of
+/// the words streets end in. Everything else is treated as a district, which
+/// is the right way round to be wrong: a missed district costs nothing, and a
+/// street shown as one is actively misleading.
+private func placeLikePart(_ raw: String) -> String? {
+    let part = raw.trimmingCharacters(in: .whitespaces)
+    guard !part.isEmpty, !part.contains(where: \.isNumber) else { return nil }
+    let streetWords: Set<String> = [
+        "st", "street", "rd", "road", "ave", "avenue", "ln", "lane",
+        "dr", "drive", "way", "close", "cl", "court", "ct", "place", "pl",
+        "sq", "square", "terrace", "yard", "mews", "gardens", "gdns",
+        "crescent", "parade", "row", "walk", "wharf", "embankment",
+        "rue", "boulevard", "bd", "impasse", "quai"
+    ]
+    let last = part.split(separator: " ").last.map {
+        $0.lowercased().trimmingCharacters(in: CharacterSet(charactersIn: "."))
+    }
+    if let last, streetWords.contains(last) { return nil }
+    // A French street line leads with its type rather than ending in it.
+    let first = part.split(separator: " ").first?.lowercased()
+    if let first, streetWords.contains(first) { return nil }
+    return part
 }
 
 /// A button that only fires on a deliberate hold, not a tap — for actions

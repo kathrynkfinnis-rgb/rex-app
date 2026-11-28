@@ -167,8 +167,74 @@ struct CardLayoutHarness: View {
     }
     """
 
+    /// Nov 28 — a want, so the strip's right-hand end reads "Wants to try"
+    /// rather than the poster's heart, and a screen category, so the year
+    /// comes back out of the subtitle onto its own line. The "want-" prefix
+    /// is what FeedRecommendation.isWant actually looks at.
+    private static let tvJson = """
+    {
+      "id": "want-harness-3",
+      "rating": 0,
+      "note": "New season coming soon!! Love this series.",
+      "created_at": "2026-11-25T09:00:00Z",
+      "photo_url": null,
+      "photo_urls": null,
+      "tags": null,
+      "user_id": "harness-user",
+      "item_id": "harness-tv",
+      "trip_section": null,
+      "is_anonymous": false,
+      "list_section": null,
+      "show_in_feed": true,
+      "recommendation_tags": null,
+      "items": {
+        "id": "harness-tv",
+        "type": "tv",
+        "title": "Unforgotten",
+        "subtitle": "2015 · Crime drama",
+        "image_url": null,
+        "genre": "Crime drama",
+        "address": null,
+        "lat": null,
+        "lng": null
+      },
+      "profiles": {
+        "username": "lizzieeverard",
+        "display_name": "lizzieeverard",
+        "avatar_url": null
+      },
+      "creators": null
+    }
+    """
+
+    private var tv: FeedRecommendation? {
+        try? JSONDecoder().decode(FeedRecommendation.self, from: Data(Self.tvJson.utf8))
+    }
+
     private var book: FeedRecommendation? {
         try? JSONDecoder().decode(FeedRecommendation.self, from: Data(Self.bookJson.utf8))
+    }
+
+    /// Nov 28 — three people on the same book on the same day, which is what
+    /// stacking collapses. Built off the one mock rather than three more
+    /// blocks of JSON: only the id, the name and the note differ, and those
+    /// are exactly what the stack has to show changing as you page through.
+    private var bookStack: [FeedRecommendation] {
+        let voices = [
+            ("Menaal", "Furiously funny and then, without warning, very sad. I read it in two sittings."),
+            ("JojoPH", "Took me a while to get into but so worth it by the end."),
+            ("gemmahitchens", "Menaal made me buy this and she was right.")
+        ]
+        return voices.enumerated().compactMap { index, voice in
+            let json = Self.bookJson
+                .replacingOccurrences(of: "\"harness-2\"", with: "\"harness-2-\(index)\"")
+                .replacingOccurrences(of: "\"Kathryn\"", with: "\"\(voice.0)\"")
+                .replacingOccurrences(
+                    of: "Furiously funny and then, without warning, very sad. I read it in two sittings and immediately made Gemma buy it.",
+                    with: voice.1
+                )
+            return try? JSONDecoder().decode(FeedRecommendation.self, from: Data(json.utf8))
+        }
     }
 
     private var rec: FeedRecommendation? {
@@ -184,14 +250,35 @@ struct CardLayoutHarness: View {
         ScrollView {
             LazyVStack(spacing: RexSpacing.betweenCards) {
                 if let rec {
+                    // Nov 28 — onViewOnMap is what decides which pill a place
+                    // gets, so the harness has to pass one or it renders the
+                    // fallback and the map tab never appears at all.
                     RecommendationCardView(
-                        rec: rec, rexCount: 3, isOnMyList: false, wanters: []
+                        rec: rec, rexCount: 3, isOnMyList: false, wanters: [],
+                        onViewOnMap: { _ in }
                     )
                     if let book {
                         // A book is the other half of the rule: stock art, so
                         // it keeps its thumbnail and gets no hero.
                         RecommendationCardView(
-                            rec: book, rexCount: 1, isOnMyList: false, wanters: []
+                            rec: book, rexCount: 1, isOnMyList: false, wanters: [],
+                            onBookAuthorTap: { _ in }
+                        )
+                    }
+                    if let tv {
+                        // The year under the title, and the stance on the
+                        // strip reading "Wants to try" rather than a heart.
+                        RecommendationCardView(
+                            rec: tv, rexCount: 1, isOnMyList: false, wanters: []
+                        )
+                    }
+                    // Stacked reviews, option 1 — the strip underneath is
+                    // drawn by the card, from what StackedFeedCard hands it.
+                    StackedFeedCard(recs: bookStack) { stacked, footer in
+                        RecommendationCardView(
+                            rec: stacked, rexCount: 3, isOnMyList: false, wanters: [],
+                            onBookAuthorTap: { _ in },
+                            stackFooter: footer
                         )
                     }
                 } else {
@@ -322,12 +409,22 @@ struct HeaderHarness: View {
                     .padding(.top, RexHeaderMetrics.thumbTop)
                 }
                 .frame(height: RexHeaderMetrics.bandHeight, alignment: .top)
+                // Nov 28 — book page, option 2: only the pill sits in the
+                // wave; the title and author come underneath it. Mirrors
+                // ItemDetailView.header, which this is a replica of — and
+                // being a replica is its one weakness, so when the real page
+                // changes this has to be changed with it.
+                .overlay(alignment: .topLeading) {
+                    RexCategoryPill(category: .book)
+                        .padding(.leading, 16)
+                        .padding(.top, 14)
+                }
                 .padding(.horizontal, -16)
                 .padding(.top, -16)
                 }
 
                 VStack(alignment: .leading, spacing: 0) {
-                    RexCategoryPill(category: isPlace ? .place : .book)
+                    if isPlace { RexCategoryPill(category: .place) }
                     ViewThatFits(in: .horizontal) {
                         Text(isPlace ? "TYCOZ - Crêperie & Oyster Bar" : "Fundamentally")
                             .font(RexFont.display(26)).lineSpacing(-4).lineLimit(1).fixedSize()

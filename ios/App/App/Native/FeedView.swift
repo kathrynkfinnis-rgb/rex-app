@@ -236,19 +236,23 @@ struct FeedView: View {
         guard selectedCategories.isEmpty, subFilter == nil, cuisineFilter == nil, !blastsOnly,
               query.trimmingCharacters(in: .whitespaces).isEmpty
         else { return rows.map { FeedRow.rex($0) } }
+        // Nov 28 — stack first, then look for bursts among what is left. A
+        // group is one card from here on, so the burst rule counts cards
+        // rather than Rex and stops collapsing something already collapsed.
+        let groups = stacking(rows)
         var out: [FeedRow] = []
         var index = 0
-        while index < rows.count {
-            let key = burstKey(rows[index])
+        while index < groups.count {
+            let key = burstKey(groups[index][0])
             var run = index
-            while run < rows.count, burstKey(rows[run]) == key { run += 1 }
-            let burst = Array(rows[index..<run])
+            while run < groups.count, burstKey(groups[run][0]) == key { run += 1 }
+            let burst = Array(groups[index..<run])
             if burst.count > 5, !expandedBursts.contains(key) {
-                out.append(contentsOf: burst.prefix(5).map { FeedRow.rex($0) })
-                let who = burst[0].profiles?.display_name ?? burst[0].profiles?.username
+                out.append(contentsOf: burst.prefix(5).map(FeedRow.make))
+                let who = burst[0][0].profiles?.display_name ?? burst[0][0].profiles?.username
                 out.append(.more(key: key, count: burst.count - 5, by: who ?? "They"))
             } else {
-                out.append(contentsOf: burst.map { FeedRow.rex($0) })
+                out.append(contentsOf: burst.map(FeedRow.make))
             }
             index = run
         }
@@ -281,6 +285,72 @@ struct FeedView: View {
     /// Same person, same minute — close enough to call one import.
     private func burstKey(_ rec: FeedRecommendation) -> String {
         "\(rec.user_id)|\(rec.created_at.prefix(16))"
+    }
+
+    /// Nov 28 — "when several friends Rex the same THING at the same time:
+    /// one card in the feed, not one per friend."
+    ///
+    /// Two rules, in this order.
+    ///
+    /// **Same thing, same day.** Three people Rex'ing El Pastor on Tuesday is
+    /// one fact about El Pastor, not three cards. A want and a Rex stay apart
+    /// — "I went" and "I'd like to go" are different statements about the
+    /// same place, which is also why collapsingDuplicates keys on isWant.
+    ///
+    /// **One person, one category, one day, more than three.** "If someone
+    /// adds more than 3 Rex's in a row of the same thing (e.g. books), put
+    /// them in stacked mode." Past three because two or three books in an
+    /// evening still read as somebody reading; eight is an import.
+    ///
+    /// Different days stay separate, as asked: the day is part of both keys.
+    ///
+    /// Blasts never stack. Each is a question, and two people asking about
+    /// tapas on the same day are not one question with two answers.
+    ///
+    /// This does not replace the "+N more" burst row below it, which catches
+    /// a different thing — forty rows written in the same *minute*, across
+    /// every category, which is an import rather than an evening. Stacking
+    /// runs first and usually leaves that rule nothing to do.
+    private func stacking(_ rows: [FeedRecommendation]) -> [[FeedRecommendation]] {
+        let calendar = Calendar.current
+        func day(_ rec: FeedRecommendation) -> String {
+            guard let date = rec.createdDate else { return rec.id }
+            let parts = calendar.dateComponents([.year, .month, .day], from: date)
+            return "\(parts.year ?? 0)-\(parts.month ?? 0)-\(parts.day ?? 0)"
+        }
+
+        var groups: [[FeedRecommendation]] = []
+        var consumed = Set<String>()
+
+        var byItemDay: [String: [FeedRecommendation]] = [:]
+        for rec in rows where !rec.isBlast {
+            byItemDay["\(rec.item_id)|\(day(rec))|\(rec.isWant)", default: []].append(rec)
+        }
+        for bucket in byItemDay.values where bucket.count > 1 {
+            bucket.forEach { consumed.insert($0.id) }
+            groups.append(bucket)
+        }
+
+        var byPersonCategoryDay: [String: [FeedRecommendation]] = [:]
+        for rec in rows where !rec.isBlast && !consumed.contains(rec.id) {
+            let key = "\(rec.user_id)|\(rec.items?.type ?? "")|\(day(rec))"
+            byPersonCategoryDay[key, default: []].append(rec)
+        }
+        for bucket in byPersonCategoryDay.values where bucket.count > 3 {
+            bucket.forEach { consumed.insert($0.id) }
+            groups.append(bucket)
+        }
+
+        for rec in rows where !consumed.contains(rec.id) {
+            groups.append([rec])
+        }
+
+        // "The top review is the most recent", and a stack sits in the feed
+        // where its newest member would have. Dictionary iteration has no
+        // order of its own, so both sorts are doing real work.
+        return groups
+            .map { $0.sorted { $0.created_at > $1.created_at } }
+            .sorted { ($0.first?.created_at ?? "") > ($1.first?.created_at ?? "") }
     }
 
     /// Collections whose name matches the search, shown above the results.
@@ -659,6 +729,27 @@ struct FeedView: View {
 
                               case .ticketReminder(let reminder):
                                 ticketReminderCard(reminder)
+
+                              case .stack(let group):
+                                // The closure is handed whichever Rex is on
+                                // top, so the swipe, the tap and the "…"
+                                // follow the card you can see. Wiring them to
+                                // group[0] instead would mean tapping the
+                                // third review opened the first.
+                                StackedFeedCard(recs: group) { rec, footer in
+                                    SwipeIfMine(
+                                        rec: rec,
+                                        onTap: { open(rec) },
+                                        onDelete: { await deleteRex(rec) }
+                                    ) {
+                                        card(for: rec, footer: footer)
+                                            .modifier(EditableIfMine(
+                                                rec: rec,
+                                                onEdit: { activeSheet = .edit($0) },
+                                                onChanged: { Task { await loadFeed() } }
+                                            ))
+                                    }
+                                }
 
                               case .rex(let rec):
                               // Swiping only offers to delete your own Rex.
@@ -1776,7 +1867,7 @@ struct FeedView: View {
     /// in reasonable time — the same thing that happened to the Add sheet's
     /// modifier chain and the comment row. Nothing about the card changed.
     @ViewBuilder
-    private func card(for rec: FeedRecommendation) -> some View {
+    private func card(for rec: FeedRecommendation, footer: AnyView? = nil) -> some View {
         RecommendationCardView(
             rec: rec,
             rexCount: rexCounts[rec.item_id] ?? 0,
@@ -1792,7 +1883,8 @@ struct FeedView: View {
             onCommentTap: { rec.isBlast ? open(rec) : (activeSheet = .comments(rec)) },
             onMarkBeen: { activeSheet = .markBeen(rec) },
             onViewOnMap: onViewOnMap,
-            onViewTripOnMap: onViewTripOnMap
+            onViewTripOnMap: onViewTripOnMap,
+            stackFooter: footer
         )
     }
 
@@ -2040,6 +2132,8 @@ func splitGenres(_ raw: String?) -> [String] {
 /// A feed row is either a Rex or the tail of a collapsed mass import.
 enum FeedRow: Identifiable {
     case rex(FeedRecommendation)
+    /// Nov 28 — several Rex sharing one card. See FeedView.stacking.
+    case stack([FeedRecommendation])
     case more(key: String, count: Int, by: String)
     /// Oct 12 — a friend waiting on a ticket release. Its own case rather than
     /// a dressed-up Rex, because it is not one: nobody is recommending
@@ -2049,8 +2143,77 @@ enum FeedRow: Identifiable {
     var id: String {
         switch self {
         case .rex(let r): return r.id
+        case .stack(let group): return "stack-\(group.first?.id ?? "")"
         case .more(let key, _, _): return "more-\(key)"
         case .ticketReminder(let r): return "ticket-\(r.id)"
+        }
+    }
+
+    /// One Rex is a card; several are a stack. Written once so the two places
+    /// that build rows cannot disagree about where the boundary is.
+    static func make(_ group: [FeedRecommendation]) -> FeedRow {
+        group.count > 1 ? .stack(group) : .rex(group[0])
+    }
+}
+
+/// Nov 28 — stacked reviews, option 1.
+///
+/// Holds which of the stack is showing, which is per-card state and so cannot
+/// live in the feed. The content closure is handed the Rex currently on top,
+/// so everything wrapped round the card — the tap that opens it, the swipe
+/// that deletes it, the "…" menu — follows the one you can actually see
+/// rather than staying pinned to the first.
+struct StackedFeedCard<Content: View>: View {
+    let recs: [FeedRecommendation]
+    let content: (FeedRecommendation, AnyView?) -> Content
+
+    @State private var index = 0
+
+    private var current: FeedRecommendation { recs[min(index, recs.count - 1)] }
+    private var tint: Color { RexCategory(rawType: current.items?.type).tintColor }
+
+    var body: some View {
+        content(current, AnyView(strip))
+    }
+
+    private var strip: some View {
+        HStack(spacing: 9) {
+            // Capped. Nine dots is not a count anybody reads, and the
+            // sentence beside them says the number anyway.
+            HStack(spacing: 4) {
+                ForEach(0..<min(recs.count, 6), id: \.self) { dot in
+                    Capsule()
+                        .fill(tint.opacity(dot == index ? 1 : 0.3))
+                        .frame(width: dot == index ? 16 : 6, height: 6)
+                }
+            }
+            Text("\(index + 1) of \(recs.count) reviews")
+                .font(RexFont.text(12))
+                .foregroundStyle(tint)
+                .lineLimit(1)
+            Spacer(minLength: 0)
+            Button {
+                withAnimation(.snappy) { index = (index + 1) % recs.count }
+            } label: {
+                HStack(spacing: 5) {
+                    // Wraps round to the first rather than stopping dead on
+                    // the last — a button that is sometimes a no-op reads as
+                    // broken, and there is no "previous" to pair it with.
+                    Text(index == recs.count - 1 ? "Back to first" : "Next review")
+                        .font(RexFont.text(12, weight: .bold))
+                    Image(systemName: index == recs.count - 1
+                          ? "arrow.counterclockwise" : "chevron.right")
+                        .font(.system(size: 10, weight: .bold))
+                }
+                .foregroundStyle(tint)
+                .padding(.horizontal, 11)
+                .frame(minHeight: 30)
+                .background(RexColor.card, in: Capsule())
+                .overlay(Capsule().stroke(tint.opacity(0.5), lineWidth: 1))
+                .contentShape(Capsule())
+            }
+            .buttonStyle(.plain)
+            .accessibilityLabel("Show the next of \(recs.count) reviews")
         }
     }
 }

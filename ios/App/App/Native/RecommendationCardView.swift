@@ -9,8 +9,6 @@ struct RecommendationCardView: View {
     /// Oct 7 — everyone who wants to try this, oldest first. Only drawn on a
     /// want card, where "how many other people fancy this" is the whole point.
     var wanters: [RexProfileDetail] = []
-    @State private var chipsContentWidth: CGFloat = 0
-    @State private var chipsRowWidth: CGFloat = 0
     /// Opening the author's profile. The card is one tap target now (so it can
     /// swipe), so the author row can't be its own NavigationLink — the parent
     /// swallowed it. The feed hands the push back in through here.
@@ -43,6 +41,26 @@ struct RecommendationCardView: View {
     /// list page when its author has said so; off everywhere else, where the
     /// three-line cut is what keeps a column of cards readable.
     var showsFullTitle: Bool = false
+    /// Nov 28 — stacked reviews, option 1: "dots, '1 of 3 reviews' and Next
+    /// review in the card underneath."
+    ///
+    /// Passed in rather than built here because the card renders one Rex and
+    /// knows nothing about the others — which one is showing, and how many
+    /// there are, belongs to whatever is doing the stacking. It is drawn
+    /// inside the coloured frame and below the white inset, which is the one
+    /// place only this view can put it.
+    var stackFooter: AnyView? = nil
+
+    /// Nov 28 — "allow users to click on the thumbnail to enlarge it."
+    ///
+    /// Identifiable rather than a bool and a separate array, so the list being
+    /// shown and the fact that something is being shown cannot disagree —
+    /// the same reason ItemDetailView's viewer is shaped this way.
+    private struct PhotoRoute: Identifiable {
+        let urls: [String]
+        var id: String { urls.first ?? "" }
+    }
+    @State private var viewingPhotos: PhotoRoute?
 
     @State private var noteExpanded = false
     /// Nov 22 — who else has Rex'd this. Opened from the "Also Rex'd by N
@@ -99,7 +117,12 @@ struct RecommendationCardView: View {
     /// category's own colour, softened to a pastel so it frames the card
     /// rather than competing with the photo inside it.
     private var railColor: Color { category.tintColor.opacity(0.38) }
-    private static let railWidth: CGFloat = 10
+    /// How far the white card is sunk inside the coloured frame, and how round
+    /// its own corners are. Both deliberately smaller than the outer radius so
+    /// the inset reads as one card inside another rather than two edges that
+    /// nearly line up.
+    private static let inset: CGFloat = 5
+    private static let innerRadius: CGFloat = 14
 
     /// Sept 22 — the feed never showed when anything was posted. Written to
     /// the Instagram rule Kathryn picked: relative while relative still means
@@ -152,7 +175,18 @@ struct RecommendationCardView: View {
             // title block). The colour now lives only at the edges, so the
             // text and photos sit on plain white.
             VStack(alignment: .leading, spacing: 0) {
-                categoryBar
+                typeStrip
+
+                // Nov 28 — the white card, inset inside the coloured frame.
+                //
+                // "All cards need to have the same design and formatting vis a
+                // vis surround design, font size and bottom bar size and
+                // placement." Every category now draws this same shape: a flat
+                // strip across the top, a white card with rounded corners sunk
+                // 5pt inside it, and the identical footer at the bottom. What
+                // changes between categories is what goes in the middle, and
+                // nothing else.
+                VStack(alignment: .leading, spacing: 0) {
 
                 // Nov 22 — "put thumbnails on the right instead of the left
                 // so you have a nice clean line down the left hand side and
@@ -246,6 +280,19 @@ struct RecommendationCardView: View {
                             bookSubtitleRow(subtitleLine, onTap: onBookAuthorTap)
                                 .padding(.trailing, titleTrailingReserve)
                             if let locality { localityRow(locality) }
+                        } else if let release = releaseLine(item) {
+                            // Nov 28 — "add the year of release under the
+                            // title". Screen and audio categories only: a
+                            // film's year is a fact about the film, where a
+                            // restaurant's would be a fact about the row.
+                            //
+                            // The year has been stripped out of every subtitle
+                            // since 22 Nov ("remove publish / release dates
+                            // from the main feed"), which is still right for
+                            // the subtitle — it was arriving mid-sentence as
+                            // "· 2021 ·". Here it gets its own line with a
+                            // calendar beside it, which is what was asked for.
+                            metaRow(icon: "calendar", text: release)
                         } else if subtitleLine != nil || locality != nil {
                             HStack(spacing: RexSpacing.sm) {
                                 if let subtitleLine {
@@ -260,6 +307,20 @@ struct RecommendationCardView: View {
                             // doesn't interfere with the rating."
                             .padding(.trailing, titleTrailingReserve)
                         }
+
+                        // Nov 28 — one pill under the heading, in the same
+                        // place on every card: "View on map" on a place,
+                        // "Seen? Rate it" on a film where "View on map" sits
+                        // on the place card, "Also Rex'd by N friends" on
+                        // anything with neither.
+                        //
+                        // It used to be three different things in three
+                        // different places — the map was a strip across the
+                        // bottom, "Been? Rate it" had a row of its own under
+                        // the footer, and "Also Rex'd" sat below the note.
+                        // One slot is what makes the categories look like one
+                        // set rather than five layouts.
+                        actionPill(item: item)
                     }
 
                     // The thumbnail closes the header row. The rating rides
@@ -353,6 +414,9 @@ struct RecommendationCardView: View {
                                         .foregroundStyle(RexColor.primary)
                                 }
                             }
+                            // Clear of the MAP tab on a place card; nothing at
+                            // all on every other card, which has no tab.
+                            .padding(.trailing, mapTabReserve)
                             .onPreferenceChange(NoteHeightKey.self) { fullNoteHeight = $0 }
                             .onPreferenceChange(NoteShownHeightKey.self) { shownNoteHeight = $0 }
                             // The note is what the person wrote, links and
@@ -396,12 +460,15 @@ struct RecommendationCardView: View {
 
                 media(item: item)
 
-                if !hasMedia(item: item) {
-                    Rectangle()
-                        .fill(RexColor.divider)
-                        .frame(height: 1)
-                        .padding(.leading, RexSpacing.cardPadding)
-                }
+                // Nov 28 — the hairline above the footer is now on every card
+                // rather than only the ones with nothing above it. "One footer
+                // for every card": the rule it closes off has to be there
+                // every time too, or the footer sits at a different distance
+                // from the content on half the feed.
+                Rectangle()
+                    .fill(RexColor.divider)
+                    .frame(height: 1)
+                    .padding(.horizontal, RexSpacing.cardPadding)
 
                 // Oct 1 — "put the icons back in one line with the name and
                 // have the 'now' or '7min ago' under the name. Set a default
@@ -415,7 +482,14 @@ struct RecommendationCardView: View {
                 // and a genuinely long name now truncates rather than pushing
                 // anything, which keeps the icons in the same place on every
                 // card.
-                VStack(alignment: .leading, spacing: 0) {
+                // Nov 28 — one row, and the same one on every card: "avatar,
+                // name, time, then likes, comments, save and send on one row."
+                //
+                // The time used to sit under the name, stacked, to buy back
+                // the width the row kept running out of. The width came back
+                // from somewhere better: "Been? Rate it" has gone up into the
+                // pill under the heading, where the deck puts it, so this row
+                // holds a name and four icons and nothing else.
                 HStack(spacing: RexSpacing.sm) {
                     authorRow
                     Spacer(minLength: RexSpacing.sm)
@@ -424,208 +498,66 @@ struct RecommendationCardView: View {
                         RexCardActions(rec: rec, rexCount: rexCount, onCommentTap: onCommentTap)
                             .fixedSize(horizontal: true, vertical: false)
                             .layoutPriority(1)
-
                     }
-                }
-
-                // Nov 22 — "your own posts are still all messed up."
-                //
-                // This button used to sit in the row above, after the action
-                // icons. That row already holds an avatar, the poster's name,
-                // four icons and, on a saved item, the word "Saved" — and on
-                // your own want it then had to find room for "Been? Rate it"
-                // as well. It could not. SwiftUI answers an overfull HStack by
-                // squeezing every child that will squeeze, so the name
-                // collapsed to "…" and the button's capsule compressed to a
-                // few points wide and stretched tall: the grey sliver down the
-                // right of the card, and the empty band beside it.
-                //
-                // It gets its own row. It is the one thing a want card has
-                // that the others do not, and it is a sentence, not an icon.
-                if rec.isWant, let onMarkBeen,
-                   rec.user_id == RexAPI.shared.currentUserId {
-                    Button(action: onMarkBeen) {
-                        Text("Been? Rate it")
-                            .font(RexFont.text(12, weight: .semibold))
-                            .foregroundStyle(RexColor.primary)
-                            .padding(.horizontal, RexSpacing.md)
-                            .frame(minHeight: 36)
-                            .background(RexColor.badgeBackground)
-                            .clipShape(Capsule())
-                            .contentShape(Capsule())
-                    }
-                    .buttonStyle(.plain)
-                    .padding(.top, RexSpacing.sm)
-                }
                 }
                 .padding(.horizontal, RexSpacing.cardPadding)
                 .padding(.vertical, RexSpacing.md)
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .background(RexColor.card)
+                .clipShape(RoundedRectangle(cornerRadius: Self.innerRadius, style: .continuous))
+                .overlay(alignment: .topTrailing) { mapTab }
+                .padding(.horizontal, Self.inset)
+                .padding(.bottom, stackFooter == nil ? Self.inset : 0)
+
+                // Below the white card, on the coloured frame itself, which
+                // is what makes the stack read as more of the same card
+                // rather than a separate control under it.
+                if let stackFooter {
+                    stackFooter
+                        .padding(.horizontal, 13)
+                        .padding(.top, 7)
+                        .padding(.bottom, 9)
+                }
             }
-            .background(RexColor.card)
+            // Nov 28 — the rail down the left edge and the hairline round the
+            // rest are gone. The frame is one flat block of the category's
+            // colour with the white card sitting in it, which is what every
+            // card in the deck does and what made them look like one set.
+            .background(railColor)
             .clipShape(RoundedRectangle(cornerRadius: RexRadius.card, style: .continuous))
-            .padding(.leading, Self.railWidth)
-            .background(
-                RoundedRectangle(cornerRadius: RexRadius.card, style: .continuous)
-                    .fill(RexColor.card)
-                    .overlay(
-                        RoundedRectangle(cornerRadius: RexRadius.card, style: .continuous)
-                            .fill(railColor)
-                    )
-            )
-            .clipShape(RoundedRectangle(cornerRadius: RexRadius.card, style: .continuous))
-            .overlay(
-                RoundedRectangle(cornerRadius: RexRadius.card, style: .continuous)
-                    .stroke(railColor, lineWidth: 1.5)
-            )
             // Every card the same width, whatever's inside — see the 5 Sept
             // trip-card fix.
             .frame(maxWidth: .infinity)
             .sheet(isPresented: $showingRexers) {
                 RexersSheetView(itemId: rec.item_id, itemTitle: item.title)
             }
-        )
-    }
-
-    /// Top-right corner: the rating, and only the rating.
-    ///
-    /// Sept 21 — "the want to try tag still takes up all the heading — move
-    /// it above the map in line with 'On your list'". A rating badge is two
-    /// characters wide and leaves the title alone; "Wants to try" is eleven
-    /// and was squeezing every long title into three lines. It sits with the
-    /// other status chips now, where it reads as the same kind of thing.
-    @ViewBuilder
-    private var cornerLabel: some View {
-        if !rec.isWant, !rec.isBlast, rec.rating > 0 {
-            RexRatingBadge(raw: rec.rating, compact: true)
-        }
-    }
-
-    /// Oct 3 — "Place shouldn't be across two lines. The tags are all
-    /// jumbled."
-    ///
-    /// A plain HStack given more chips than fit doesn't overflow, it squeezes:
-    /// SwiftUI shrinks each child until the words inside them wrap, so "PLACE"
-    /// broke across two lines and the sub-category pills ended up different
-    /// heights. Each chip holds its natural width now and the row scrolls
-    /// instead, which is also how the map's own filter row behaves — a chip is
-    /// either legible or it isn't there.
-    private func tagRow(item: RexItem) -> some View {
-        ScrollView(.horizontal, showsIndicators: false) {
-            HStack(spacing: RexSpacing.xs) {
-                categoryBadge
-                    .fixedSize()
-                // Nov 22 — "different styling of what I assume are related
-                // elements, eg bar restaurant has a kind of tag icon on the
-                // map but not on the feed — these indicators help a user
-                // understand how objects are related across the app."
-                //
-                // rexSubcategorySymbol was drawn on map pins and nowhere
-                // else, so the same bar was a wineglass on the map and a
-                // plain word in the feed, and nothing linked the two. The
-                // first chip carries the symbol here as well; the rest stay
-                // text, because the symbol belongs to the leading genre the
-                // way the pin's does.
-                ForEach(Array(splitGenres(item.genre).prefix(3).enumerated()), id: \.element) { index, genre in
-                    HStack(spacing: 3) {
-                        if index == 0 {
-                            Image(systemName: rexSubcategorySymbol(genre: genre, type: item.type))
-                                .font(.system(size: 9))
-                        }
-                        Text(genre)
-                            .font(.system(size: 11, weight: .medium))
-                            .lineLimit(1)
-                    }
-                    .foregroundStyle(RexColor.mutedForeground)
-                    .fixedSize()
-                    .padding(.horizontal, RexSpacing.sm)
-                    .padding(.vertical, 3)
-                    .background(RexColor.muted)
-                    .clipShape(Capsule())
-                }
+            .fullScreenCover(item: $viewingPhotos) {
+                PhotoFullScreenView(urls: $0.urls, initialIndex: 0)
             }
-            // Oct 9 — "need to move one of the tags to the row below to
-            // prevent this": PLACE · Restaurant · Mediterranean ran under the
-            // rating badge in the corner, so the heart sat on top of the word.
-            //
-            // The third time this corner has caught something. The title
-            // reserves room for it, the author line was given the same reserve
-            // on 3 October and again on 8 October for books — and this row,
-            // which sits at exactly the badge's height, never had it. Adding
-            // the cuisine chip made it long enough to reach.
-            //
-            // Reserved rather than wrapped: these scroll already, so the
-            // overflow has somewhere to go, and a second row of chips would
-            // make every card taller to fix a few.
-            .padding(.trailing, titleTrailingReserve)
-            .background(GeometryReader { geo in
-                Color.clear.preference(key: ChipsContentWidthKey.self, value: geo.size.width)
-            })
-        }
-        .background(GeometryReader { geo in
-            Color.clear.preference(key: ChipsRowWidthKey.self, value: geo.size.width)
-        })
-        .onPreferenceChange(ChipsContentWidthKey.self) { chipsContentWidth = $0 }
-        .onPreferenceChange(ChipsRowWidthKey.self) { chipsRowWidth = $0 }
-        // The chips are a label, not a control — a drag on them should still
-        // swipe the card away, so scrolling stays off unless there is
-        // genuinely something out of sight.
-        //
-        // Oct 18 — "I should be able to scroll across these buttons." This
-        // used to be `genres.count <= 2`, on the assumption that two chips
-        // always fit. "Mediterranean restaurant" is one chip and most of a
-        // row: the screenshot shows PLACE, that, and a third cut off at the
-        // edge with no way to reach it. Count was never the question —
-        // width is — so it is measured now.
-        .scrollDisabled(chipsContentWidth <= chipsRowWidth + 1)
-    }
-
-    private func hasMedia(item: RexItem) -> Bool {
-        if let photos = rec.photo_urls, !photos.isEmpty { return true }
-        if category == .trip { return true }
-        if category == .place || category == .event, item.lat != nil, item.lng != nil { return true }
-        return false
+        )
     }
 
     /// Full-width, edge to edge inside the card: your photos if there are
     /// any, else a trip's map of its stops, else a place's own map strip.
+    /// Nov 28 — the deck took the full-width strip off every card except the
+    /// two that hold a collection of other things.
+    ///
+    /// Places lost their map (option 3: "drops the map and puts a 'View on
+    /// map' pill under the location"). Everything else lost its photo
+    /// carousel: the first photograph is the thumbnail now, and tapping it
+    /// opens all of them full screen. What is left is the trip's stops and
+    /// the list's items, which are not pictures of the card's subject — they
+    /// are the card's subject.
     @ViewBuilder
     private func media(item: RexItem) -> some View {
-        // Nov 22 — "user uploaded photos being the first images, then the
-        // map being the last thing in the carousel."
-        //
-        // These used to be alternatives: photos OR a map, first branch wins.
-        // So a place somebody had photographed never said where it was, and
-        // the map only appeared on the cards with no pictures — exactly
-        // backwards, since a card with photos is the one you want to place.
-        // One carousel now, photographs first, map last.
-        let photos = rec.photo_urls ?? []
-
         if category == .trip {
-            // A trip's own row rarely carries photos; they are on its stops.
-            // TripMapTileView already loads both, so it builds the carousel.
-            TripMapTileView(tripRecommendationId: rec.id, tripName: item.title, height: 170,
-                            ownPhotos: photos)
-                .swipeToRemoveExclusionZone()
-                .accessibilityLabel("This trip's photos and a map of its stops")
-        } else if category == .place || category == .event, let lat = item.lat, let lng = item.lng {
-            PhotoCarouselView(
-                urls: photos,
-                cornerRadius: 0,
-                trailingPage: AnyView(
-                    // A strip when it is the only thing here, matching the
-                    // mock-up's proportions; inside a carousel it fills the
-                    // page the photographs set.
-                    PlaceMapTileView(lat: lat, lng: lng, height: photos.isEmpty ? 96 : 170)
-                        .contentShape(Rectangle())
-                        .onTapGesture { onViewOnMap?(rec.item_id) }
-                )
-            )
-            // #120: a swipe started on the photo pages the photos
-            // rather than triggering the card's swipe-to-remove.
-            .swipeToRemoveExclusionZone()
-        } else if !photos.isEmpty {
-            PhotoCarouselView(urls: photos, cornerRadius: 0)
-                .swipeToRemoveExclusionZone()
+            // Option 2 — "a swipeable row of three photos under the review,
+            // with each stop's name underneath".
+            CardChildStrip(source: .trip(rec.id), category: category, tileWidth: 106)
+        } else if category == .list {
+            // "Option 2 shows three bigger thumbnails across instead of four."
+            CardChildStrip(source: .list(rec.id), category: category, tileWidth: 98)
         }
     }
 
@@ -682,7 +614,11 @@ struct RecommendationCardView: View {
                 // friends have actually been" is a different sentence from
                 // "six people want to try it" — it was the bookmark pair that
                 // said the same thing twice, not this.
-                if others > 0 {
+                // Nov 28 — only when the pill slot above is already taken by
+                // the map or a rate-it prompt. Otherwise this chip is up there
+                // under the heading, and drawing it in both places is how the
+                // bookmark pair said the same thing twice in October.
+                if others > 0, pillIsTakenByAction {
                     // Nov 22 — this is the "who else Rex'd this" entry point
                     // now. The dino and its count came out of the action row
                     // ("can we remove the Rex icon to give more space to the
@@ -853,78 +789,108 @@ struct RecommendationCardView: View {
     /// The category used to be a capsule in the chip row below, which is now
     /// gone, so the colour and the word arrive together at the top of the
     /// card instead of being a tint in one place and a label in another.
-    private var categoryBar: some View {
+    /// Nov 28 — the redesign deck. A flat strip: the type on the left, the
+    /// poster's stance on the right, and nothing else in it.
+    ///
+    /// Two things left this bar. The wave, because "make the curve like in
+    /// option 1" is the rounded white inset below — no feed card in the deck
+    /// has a wave, and the detail page still does. And the rating, because
+    /// "remove the 3.0/5 rating on every card".
+    private var typeStrip: some View {
         HStack(spacing: 5) {
             Image(systemName: category.symbol)
-                .font(.system(size: 10, weight: .semibold))
+                .font(.system(size: 11, weight: .semibold))
             Text(category.label.uppercased())
-                .font(.system(size: 10.5, weight: .bold))
-                .tracking(0.8)
+                // Nov 28 — "no text smaller than 11pt: type labels, dates,
+                // thumbnail names and counts." This was 10.5.
+                .font(.system(size: 11, weight: .bold))
+                .tracking(0.9)
             Spacer(minLength: 0)
-            // The rating lives here now. It used to ride on the thumbnail's
-            // bottom corner, and a card with a photograph no longer has a
-            // thumbnail for it to ride on. The bar is always present, always
-            // full width, and its trailing end was empty.
-            //
-            // Nov 22 — "move this 'wants to try' to the top right banner." A
-            // want has no rating, so the slot the rating would use is free on
-            // exactly the cards that need somewhere to say this. The fuller
-            // version, with faces and a count, stays in the body when there
-            // is more than one person to name.
-            if rec.isWant {
-                HStack(spacing: 4) {
-                    Image(systemName: "bookmark").font(.system(size: 9))
-                    Text("Wants to try")
-                        .font(.system(size: 10.5, weight: .bold))
-                        .tracking(0.4)
-                }
-            } else {
-                cornerLabel
-            }
+            stance
         }
         .foregroundStyle(category.tintColor)
-        .padding(.horizontal, RexSpacing.cardPadding)
-        .padding(.top, 6)
-        // Room for the curve below the words.
-        .padding(.bottom, 14)
+        .padding(.horizontal, 13)
+        .padding(.vertical, 8)
         .frame(maxWidth: .infinity, alignment: .leading)
-        // Nov 22 — "make the surround all one colour." The bar was the same
-        // hue as the rail and the hairline but a weaker wash of it, so the
-        // three read as two colours rather than one band round the card.
-        // railColor is what draws the other two; the bar takes it as well.
-        //
-        // Nov 23 — "can we make this line curved?" The bar met the white box
-        // along a straight rule, while the Rex page's band has ended in a
-        // wave since it was drawn. Same shape, RexWaveEdge, filled in the
-        // card's own colour so it eats into the band from below — so the
-        // card and the page it opens now share an edge.
-        .background(
-            railColor.overlay(alignment: .bottom) {
-                RexWaveEdge()
-                    .fill(RexColor.card)
-                    .frame(height: 16)
-            }
-        )
     }
 
-    private var categoryBadge: some View {
-        HStack(spacing: 4) {
-            Image(systemName: category.symbol).font(.system(size: 9))
-            Text(category.label.uppercased())
-                .font(.system(size: 10, weight: .semibold))
-                .tracking(0.6)
+    /// What the poster means by this — been and loved it, or means to go.
+    ///
+    /// Confirmed 28 Nov: the heart on the strip is the *poster's* stance, not
+    /// the viewer's own like. The viewer's like is the heart in the footer,
+    /// which is the one that counts and the one that can be tapped.
+    @ViewBuilder
+    private var stance: some View {
+        if rec.isBlast {
+            // Nov 23 — sparkles are the "made by a machine" icon everywhere
+            // else on a phone, and a blast is the opposite: a person asking
+            // their friends.
+            stanceLabel(icon: "megaphone", text: "Asking")
+        } else if rec.isWant {
+            stanceLabel(icon: "bookmark", text: "Wants to try")
+        } else {
+            Image(systemName: "heart.fill")
+                .font(.system(size: 13))
+                .foregroundStyle(RexColor.destructive)
         }
-        // Sept 7 — "please can we also colour the tag for the category".
-        // The badge names the category, so it wearing the category's own
-        // colour is the one place on the card where the colour is doing
-        // something literal rather than decorative. Kept as tinted-on-tint
-        // rather than solid: the card's top block is already washed in this
-        // colour, and a solid capsule on top of that shouts.
-        .foregroundStyle(category.tintColor)
-        .padding(.horizontal, RexSpacing.sm)
-        .padding(.vertical, 3)
-        .background(category.tintColor.opacity(0.15))
-        .clipShape(Capsule())
+    }
+
+    /// Nov 28 — place card, option 3: "a small ‹ MAP tab on the right edge
+    /// hinting you can swipe left to see the map."
+    ///
+    /// A tap, not a swipe. The card already carries a horizontal gesture —
+    /// swipe-to-remove — and a second one competing with it on the same axis
+    /// is exactly how #120 happened, where a drag on a photo took the card
+    /// off the feed instead of paging it. The tab reads the same and goes to
+    /// the same place; it just does not fight the gesture already there.
+    private var showsMapTab: Bool {
+        guard category == .place || category == .event else { return false }
+        guard let item = rec.items, item.lat != nil, item.lng != nil else { return false }
+        return onViewOnMap != nil
+    }
+
+    /// The tab hangs over the card's trailing edge at the review's height, so
+    /// the review has to stop short of it. Without this the last word of
+    /// every line runs underneath it — "Le Chevre" half under MAP, which is
+    /// exactly what the first build of this did.
+    private var mapTabReserve: CGFloat { showsMapTab ? 40 : 0 }
+
+    @ViewBuilder
+    private var mapTab: some View {
+        if showsMapTab, let item = rec.items, let onViewOnMap {
+            Button { onViewOnMap(rec.item_id) } label: {
+                VStack(spacing: 0) {
+                    Image(systemName: "chevron.left")
+                        .font(.system(size: 9, weight: .bold))
+                    Text("MAP")
+                        .font(.system(size: 11, weight: .bold))
+                        .tracking(0.4)
+                }
+                .foregroundStyle(category.tintColor)
+                .padding(.vertical, 7)
+                .padding(.horizontal, 6)
+                .background(railColor.opacity(0.55))
+                .clipShape(
+                    .rect(topLeadingRadius: 9, bottomLeadingRadius: 9,
+                          bottomTrailingRadius: 0, topTrailingRadius: 0)
+                )
+                .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+            // Level with the review, which is where the deck puts it — clear
+            // of the thumbnail above and the footer below.
+            .padding(.top, 108)
+            .accessibilityLabel("See \(item.title) on the map")
+        }
+    }
+
+    private func stanceLabel(icon: String, text: String) -> some View {
+        HStack(spacing: 4) {
+            Image(systemName: icon).font(.system(size: 10))
+            Text(text)
+                .font(.system(size: 11, weight: .bold))
+                .tracking(0.4)
+        }
     }
 
     /// Oct 3 — "The dino drawing is used as the thumbnail even when there's a
@@ -936,11 +902,28 @@ struct RecommendationCardView: View {
     /// — the photo was on the recommendation, not the catalogue item. And a
     /// Google Places URL can't be loaded by AsyncImage at all (it needs the
     /// bundle-id header), so those failed into the mascot too.
+    ///
+    /// Nov 28 — which of the two wins now depends on the category. On a place
+    /// the poster's own photograph is the better picture and is what the
+    /// deck's place card shows; on a book or a film the catalogue art is, and
+    /// somebody's photo of their own television is not.
     private func thumbnailURL(item: RexItem) -> URL? {
+        let catalogueArtWins = category == .book || category == .tv
+            || category == .movie || category == .podcast
+        if !catalogueArtWins, let photo = rec.photo_urls?.first,
+           let url = URL(string: photo) { return url }
         if let urlString = item.image_url, let url = URL(string: urlString) { return url }
         if let photo = rec.photo_urls?.first, let url = URL(string: photo) { return url }
         if let photo = rec.photo_url, let url = URL(string: photo) { return url }
         return nil
+    }
+
+    /// A jacket is portrait and a photograph is square, and forcing one into
+    /// the other's box is why covers used to arrive cropped through the title.
+    private var thumbnailSize: CGSize {
+        category == .book
+            ? CGSize(width: 74, height: 96)
+            : CGSize(width: 76, height: 76)
     }
 
 
@@ -968,10 +951,134 @@ struct RecommendationCardView: View {
         .allowsHitTesting(canViewOnMap)
     }
 
+    /// A line of secondary information under the title — a date, a year, a
+    /// count. Set the same way wherever it appears, which is the whole point:
+    /// "same title, date and review fonts" across every category.
+    private func metaRow(icon: String, text: String) -> some View {
+        HStack(spacing: 4) {
+            Image(systemName: icon).font(.system(size: 10))
+            Text(text)
+                .font(RexFont.text(12.5, weight: .medium))
+                .lineLimit(1)
+        }
+        .foregroundStyle(RexColor.mutedForeground)
+    }
+
+    /// Nov 28 — "add the year of release under the title, and for tv add how
+    /// many series there are along with the year it was released."
+    ///
+    /// The year is the half that exists. It is baked into `items.subtitle` when
+    /// the item is created — "2021 · Drama" for a film, "Madeline Miller ·
+    /// 2011" for a book — so it comes back out here rather than by rewriting
+    /// rows other screens still read.
+    ///
+    /// The series count does not exist anywhere: no column on `items`, and
+    /// nothing has ever fetched one. That is a migration plus a lookup at
+    /// import time, not a layout change, so it is deliberately absent rather
+    /// than guessed. A card that says "6 series" because the card decided is
+    /// worse than one that only says 2015.
+    private func releaseLine(_ item: RexItem) -> String? {
+        switch category {
+        case .tv, .movie, .podcast: break
+        default: return nil
+        }
+        return item.subtitle?
+            .components(separatedBy: CharacterSet.decimalDigits.inverted)
+            .first { part in
+                guard part.count == 4, let n = Int(part) else { return false }
+                return (1900...2099).contains(n)
+            }
+    }
+
+    /// How many people other than the author have Rex'd this item.
+    private var otherRexers: Int { max(0, rexCount - 1) }
+
+    /// Whether the pill slot is already spoken for by something the category
+    /// owns, in which case "Also Rex'd by N" stays where it has always been,
+    /// in the row under the note.
+    private var pillIsTakenByAction: Bool {
+        if category == .place || category == .event,
+           let item = rec.items, item.lat != nil, item.lng != nil,
+           onViewOnMap != nil { return true }
+        if rec.isWant, onMarkBeen != nil,
+           rec.user_id == RexAPI.shared.currentUserId { return true }
+        return false
+    }
+
+    /// What "rate it" is called depends on what you'd have done with the
+    /// thing. You are not "been" to a film.
+    private var rateItPrompt: String {
+        switch category {
+        case .tv, .movie, .podcast: return "Seen? Rate it"
+        case .book: return "Read it? Rate it"
+        default: return "Been? Rate it"
+        }
+    }
+
+    /// The one pill under the heading. At most one, deliberately: two pills is
+    /// two things asking to be tapped in a card whose whole surface is already
+    /// a tap target, and every card in the deck shows exactly one.
+    @ViewBuilder
+    private func actionPill(item: RexItem) -> some View {
+        if category == .place || category == .event,
+           item.lat != nil, item.lng != nil, let onViewOnMap {
+            // Nov 28 — places lost their map strip (option 3), so this pill
+            // and the MAP tab on the card's edge are now the two ways to it.
+            pill(icon: "map", text: "View on map") { onViewOnMap(rec.item_id) }
+        } else if rec.isWant, let onMarkBeen,
+                  rec.user_id == RexAPI.shared.currentUserId {
+            // Nov 22 — "been?" on a want card, which had a row of its own
+            // under the footer and now sits where the map pill does.
+            pill(icon: "star", text: rateItPrompt, action: onMarkBeen)
+        } else if otherRexers > 0 {
+            pill(icon: otherRexers >= 3 ? "flame.fill" : "person.2.fill",
+                 text: alsoRexdLabel,
+                 tint: otherRexers >= 3 ? RexColor.accent : nil) {
+                showingRexers = true
+            }
+        }
+    }
+
+    /// Three or more people is worth calling hot.
+    private var alsoRexdLabel: String {
+        otherRexers >= 3
+            ? "Hot — \(otherRexers + 1) friends Rex'd this"
+            : "Also Rex'd by \(otherRexers) \(otherRexers == 1 ? "friend" : "friends")"
+    }
+
+    private func pill(icon: String, text: String, tint: Color? = nil,
+                      action: @escaping () -> Void) -> some View {
+        let colour = tint ?? category.tintColor
+        return Button(action: action) {
+            HStack(spacing: 5) {
+                Image(systemName: icon).font(.system(size: 11))
+                Text(text).font(RexFont.text(12, weight: .semibold))
+                    .lineLimit(1)
+            }
+            .foregroundStyle(colour)
+            .padding(.horizontal, 10)
+            // Short of the 44pt tap target the rest of the app holds to: the
+            // deck's pills are a third of the card's heading block and a 44pt
+            // capsule there would be taller than the title beside it. 32 with
+            // the row's own spacing around it is the compromise.
+            .frame(minHeight: 32)
+            .background(colour.opacity(0.14))
+            .clipShape(Capsule())
+            .contentShape(Capsule())
+        }
+        .buttonStyle(.plain)
+    }
+
     /// The card's title, before the line-breaking decision is made about it.
     private func titleText(_ item: RexItem, size: CGFloat) -> some View {
         Text(item.title)
-            .font(RexFont.display(size, weight: .semibold))
+            // Nov 28 — DM Sans Bold, not Archivo Black. Archivo is the
+            // display face: it is very heavy and very wide, which is right
+            // for a screen heading and the wordmark and wrong for a title
+            // sitting beside a 76pt thumbnail. "TYCOZ - CRÊPERIE & OYSTER
+            // BAR" took two lines in Archivo at any size the card could
+            // afford. The whole deck sets card titles in the body face.
+            .font(RexFont.text(size, weight: .bold))
             .foregroundStyle(RexColor.foreground)
     }
 
@@ -1035,13 +1142,25 @@ struct RecommendationCardView: View {
     /// Trips never show one. They have no catalogue art at all, so their
     /// thumbnail could only ever be the first of their own photographs —
     /// page one of the carousel directly beneath it.
+    /// Nov 28 — the deck replaces all of the above with a simpler rule, and
+    /// the rule is the reason the cards now look like one set: every card gets
+    /// a thumbnail in the same corner at the same size.
+    ///
+    /// The hero went with the place card's map (option 3). A photograph that
+    /// used to run the width of the card is now the thumbnail itself, and
+    /// tapping it opens every photo full screen — which is what "allow users
+    /// to click on the thumbnail to enlarge it" asks for, and is where the
+    /// rest of the pictures went.
     private var showsThumbnail: Bool {
         // A blast is a question, not a thing, so there is nothing to
         // picture — it was showing the category's mascot, which is 46pt of
         // decoration holding the title away from the question underneath.
         if rec.isBlast { return false }
-        if category == .trip { return false }
-        return (rec.photo_urls ?? []).isEmpty
+        // A trip shows its stops in a row underneath and a list shows its
+        // items; either would otherwise repeat its own first photograph a
+        // few points further up.
+        if category == .trip || category == .list { return false }
+        return true
     }
 
     @ViewBuilder
@@ -1092,8 +1211,20 @@ struct RecommendationCardView: View {
         // thumbnail: 60pt of it against a 24pt title left 36pt of nothing
         // between the title and the note underneath. 46 takes most of that
         // back without the picture stopping being a picture.
-        .frame(width: 46, height: 46)
-        .clipShape(RoundedRectangle(cornerRadius: RexRadius.input, style: .continuous))
+        // Nov 28 — 46 was sized for a card where a photograph ran full width
+        // underneath and the thumbnail was only ever catalogue art. It is the
+        // only picture on the card now, so it takes the deck's size.
+        .frame(width: thumbnailSize.width, height: thumbnailSize.height)
+        .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+        .contentShape(Rectangle())
+        .onTapGesture {
+            // "Allow users to click on the thumbnail to enlarge it."
+            let photos = rec.photo_urls ?? []
+            if !photos.isEmpty { viewingPhotos = PhotoRoute(urls: photos) }
+        }
+        // A card with no photographs of its own has nothing to enlarge — the
+        // tap should fall through and open the item instead.
+        .allowsHitTesting(!(rec.photo_urls ?? []).isEmpty)
     }
 
     @ViewBuilder
@@ -1131,9 +1262,15 @@ struct RecommendationCardView: View {
                     name: author.display_name ?? author.username,
                     size: 24
                 )
-                // Name over time, which is what frees the width for the icons
-                // to stay on this row — see the footer in body.
-                VStack(alignment: .leading, spacing: 1) {
+                // Nov 28 — "avatar, name, time" on one line. They were stacked
+                // to buy width back for the icons; the pill slot under the
+                // heading took "Been? Rate it" off this row, which is where
+                // that width actually came from.
+                //
+                // The name truncates and the time does not: a long name
+                // shortening to "lizzieever…" keeps the icons where they are
+                // on every card, which is the thing stacking was protecting.
+                HStack(spacing: 4) {
                     Text(author.display_name ?? author.username)
                         .font(RexFont.text(13, weight: .medium))
                         .foregroundStyle(RexColor.foreground)
@@ -1141,7 +1278,7 @@ struct RecommendationCardView: View {
                         .truncationMode(.tail)
 
                     if !relativeTime.isEmpty {
-                        Text(relativeTime)
+                        Text("\u{00B7} \(relativeTime)")
                             .font(RexFont.text(11.5))
                             .foregroundStyle(RexColor.mutedForeground)
                             .lineLimit(1)
@@ -1161,25 +1298,6 @@ struct RecommendationCardView: View {
     }
 }
 
-/// The note's natural height, and the height it was given. Two keys rather
-/// than one because they are measured in different places and SwiftUI would
-/// otherwise reduce them together.
-/// Oct 18 — the chip row's natural width against the width it was given, so
-/// it scrolls exactly when something is out of sight and not otherwise.
-private struct ChipsContentWidthKey: PreferenceKey {
-    static var defaultValue: CGFloat = 0
-    static func reduce(value: inout CGFloat, nextValue: () -> CGFloat) {
-        value = max(value, nextValue())
-    }
-}
-
-private struct ChipsRowWidthKey: PreferenceKey {
-    static var defaultValue: CGFloat = 0
-    static func reduce(value: inout CGFloat, nextValue: () -> CGFloat) {
-        value = max(value, nextValue())
-    }
-}
-
 private struct NoteHeightKey: PreferenceKey {
     static var defaultValue: CGFloat = 0
     static func reduce(value: inout CGFloat, nextValue: () -> CGFloat) {
@@ -1191,5 +1309,145 @@ private struct NoteShownHeightKey: PreferenceKey {
     static var defaultValue: CGFloat = 0
     static func reduce(value: inout CGFloat, nextValue: () -> CGFloat) {
         value = max(value, nextValue())
+    }
+}
+
+/// Nov 28 — the row of children on a trip or a list card.
+///
+/// "A swipeable row of pub photos with each pub's name underneath, and an
+/// arrow on the right hinting there are more." Trips take the same row with
+/// their stops in itinerary order (option 2); lists take three bigger ones.
+///
+/// Both sources already existed and both return whole `FeedRecommendation`s,
+/// so the photograph and the name arrive together in one request —
+/// `fetchTripStops` and `fetchListItems`. No new endpoint, and no second
+/// round trip for the pictures.
+///
+/// It replaces TripMapTileView on the card. The map has not gone: it is still
+/// what the trip's own page draws, and still what the map tab filters. What
+/// went is a map of Paris standing in for the eight places the trip is about.
+struct CardChildStrip: View {
+    enum Source: Equatable {
+        case trip(String)
+        case list(String)
+
+        var id: String {
+            switch self {
+            case .trip(let id), .list(let id): return id
+            }
+        }
+    }
+
+    let source: Source
+    let category: RexCategory
+    var tileWidth: CGFloat = 98
+    var tileHeight: CGFloat = 74
+
+    @State private var children: [FeedRecommendation] = []
+    /// Set only when the fetch actually answered. nil means it failed and
+    /// should be retried; [] means the trip genuinely has no stops yet — the
+    /// distinction TripMapTileView got wrong on 22 Nov and pinned a map onto
+    /// every card that had timed out once.
+    @State private var loaded = false
+
+    var body: some View {
+        Group {
+            if children.isEmpty {
+                // Nothing at all rather than an empty frame: a trip with no
+                // stops is a card whose middle is the review, and 74pt of
+                // grey says only that something failed.
+                EmptyView()
+            } else {
+                strip
+            }
+        }
+        .task(id: source.id) { await load() }
+    }
+
+    private var strip: some View {
+        ScrollView(.horizontal, showsIndicators: false) {
+            HStack(alignment: .top, spacing: 9) {
+                ForEach(children) { child in
+                    VStack(alignment: .leading, spacing: 5) {
+                        tile(child)
+                            .frame(width: tileWidth, height: tileHeight)
+                            .clipped()
+                            .clipShape(RoundedRectangle(cornerRadius: 9, style: .continuous))
+                        Text(child.items?.title ?? "")
+                            // "No text smaller than 11pt: type labels, dates,
+                            // thumbnail names and counts."
+                            .font(RexFont.text(11))
+                            .foregroundStyle(RexColor.mutedForeground)
+                            .lineLimit(1)
+                            .truncationMode(.tail)
+                            .frame(width: tileWidth, alignment: .leading)
+                    }
+                }
+            }
+            .padding(.horizontal, RexSpacing.cardPadding)
+        }
+        // #120 — a horizontal drag here is a scroll through the stops, not a
+        // swipe that takes the card off the feed.
+        .swipeToRemoveExclusionZone()
+        .overlay(alignment: .trailing) {
+            // "An arrow on the right hinting there are more." Only when there
+            // genuinely are: four tiles that all fit need no affordance, and
+            // one drawn anyway is a promise of something that is not there.
+            if children.count > Int(3) {
+                Image(systemName: "chevron.right")
+                    .font(.system(size: 11, weight: .bold))
+                    .foregroundStyle(RexColor.foreground)
+                    .frame(width: 26, height: 26)
+                    .background(RexColor.card, in: Circle())
+                    .shadow(color: .black.opacity(0.16), radius: 3, y: 1)
+                    .padding(.trailing, 6)
+                    .offset(y: -(tileHeight > 0 ? 9 : 0))
+                    .allowsHitTesting(false)
+            }
+        }
+        .padding(.bottom, RexSpacing.md)
+    }
+
+    @ViewBuilder
+    private func tile(_ child: FeedRecommendation) -> some View {
+        let urlString = child.photo_urls?.first ?? child.items?.image_url
+        if let urlString, let url = URL(string: urlString) {
+            // GoogleSafeAsyncImage, not AsyncImage: a Google Places photo
+            // needs the bundle-id header and fails into the placeholder
+            // otherwise. See thumbnailURL.
+            GoogleSafeAsyncImage(url: url) { image in
+                image.resizable().aspectRatio(contentMode: .fill)
+            } placeholder: {
+                placeholder
+            }
+        } else {
+            placeholder
+        }
+    }
+
+    private var placeholder: some View {
+        // The child's own category would be better than the parent's, but a
+        // stop with no photograph usually has no type either; the trip's
+        // mascot is at least the right family.
+        Image(category.placeholderImageName)
+            .resizable()
+            .aspectRatio(contentMode: .fill)
+            .background(RexColor.muted)
+    }
+
+    private func load() async {
+        guard !loaded else { return }
+        let fetched: [FeedRecommendation]?
+        switch source {
+        case .trip(let id):
+            fetched = try? await RexAPI.shared.fetchTripStops(tripRecommendationId: id)
+        case .list(let id):
+            fetched = try? await RexAPI.shared.fetchListItems(listRecommendationId: id)
+        }
+        // Capped. A list of sixty pubs reads fine as "the first dozen, swipe
+        // for more", and every extra tile is another image request on a card
+        // that may well scroll past before anyone looks at it.
+        children = Array((fetched ?? []).prefix(12))
+        loaded = fetched != nil
     }
 }

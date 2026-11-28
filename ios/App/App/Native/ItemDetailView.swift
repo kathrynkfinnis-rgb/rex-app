@@ -773,6 +773,20 @@ struct ItemDetailView: View {
                         }
                     }
             }
+            // Nov 28 — book page, option 2: "only the Book pill stays in it."
+            // The pill used to sit under the band with the title; in the wave
+            // it labels the colour, which is the one thing the band was doing
+            // without saying. The title and author stay underneath, which is
+            // what separates option 2 from option 1.
+            //
+            // +16 because the band bleeds past the page margin (the negative
+            // padding below), and the pill should line up with the title
+            // rather than with the screen edge.
+            .overlay(alignment: .topLeading) {
+                RexCategoryPill(category: category)
+                    .padding(.leading, 16)
+                    .padding(.top, 14)
+            }
             // The cover hangs past the band's bottom edge; without this the
             // stack clips it at the fold.
             .frame(height: RexHeaderMetrics.bandHeight, alignment: .top)
@@ -787,7 +801,7 @@ struct ItemDetailView: View {
             .padding(.top, -16)
 
             VStack(alignment: .leading, spacing: 0) {
-                RexCategoryPill(category: category)
+                // The pill is in the wave now — see the band above.
 
                 // Nov 22 — "make the title smaller… can we fit on to one
                 // line?" Yes, usually. Same three tries the feed card uses:
@@ -845,6 +859,8 @@ struct ItemDetailView: View {
             // asked to put the reviews higher.
             .padding(.bottom, 12)
 
+            blurbRow(item: item)
+
             savedByRow
             wantedByRow
             ticketsSection
@@ -867,11 +883,20 @@ struct ItemDetailView: View {
             HStack(spacing: RexSpacing.md) {
                 if !recs.isEmpty {
                     HStack(spacing: 6) {
-                        if recs.count == 1 {
-                            RexRatingBadge(raw: recs[0].rating)
-                        } else {
-                            RexRatingAverageBadge(ratings: recs.map { $0.rating })
-                        }
+                        // Nov 28 — "remove the 3.0/5 rating on every card",
+                        // and "rating removed, so What friends say follows
+                        // straight on."
+                        //
+                        // The aggregate only. Each review keeps its own
+                        // badge, which is where the deck still shows one
+                        // ("👌 Rex" beside Menaal's name) — a score averaged
+                        // across three friends was the thing saying least per
+                        // line of the page.
+                        //
+                        // Ratings are still collected and still stored. This
+                        // is a display change; nothing about rating a Rex has
+                        // moved.
+
                         // The count used to live here too; the row of faces
                         // above now says it, and saying it twice is noise.
 
@@ -1002,20 +1027,10 @@ struct ItemDetailView: View {
             // sending somebody to Amazon to pay for something already included
             // with a subscription they have would be a worse answer than the
             // provider row above it.
-            if let amazonURL = RexOutboundLink.amazonSearch(forTitle: item.title, subtitle: item.subtitle, category: category) {
-                RexOutboundLinkButton(url: amazonURL) {
-                    HStack(spacing: 4) {
-                        Image(systemName: "cart").font(.system(size: 12))
-                        Text(RexOutboundLink.amazonLabel(for: category))
-                            .font(RexFont.text(12, weight: .semibold))
-                    }
-                    .foregroundStyle(RexColor.primary)
-                    .padding(.horizontal, RexSpacing.sm)
-                    .padding(.vertical, 6)
-                    .overlay(Capsule().stroke(RexColor.primary, lineWidth: 1))
-                }
-                .padding(.top, RexSpacing.sm)
-            }
+            // Nov 28 — Amazon has moved up beside "Read more", on the blurb's
+            // own row: "Read more and Buy on Amazon on one line." It is still
+            // after the description it refers to, which is what put it last
+            // in the first place.
         }
         .padding(16)
     }
@@ -2775,23 +2790,67 @@ struct ItemDetailView: View {
                     }
                 }
 
-                if let synopsis = details?.synopsis {
-                    Text(synopsis)
-                        .font(RexFont.text(13.5))
-                        .foregroundStyle(RexColor.foreground.opacity(0.9))
-                        // Two, not four: the reviews are what the page is for,
-                        // and four lines of publisher copy is most of the
-                        // distance between the title and the first of them.
-                        .lineLimit(synopsisExpanded ? nil : 2)
-                        .fixedSize(horizontal: false, vertical: true)
+                // Nov 28 — the synopsis has moved up to blurbRow, directly
+                // under the author: "blurb comes first". What is left here is
+                // the facts strip, which is what this section was for.
+            }
+            .padding(.top, RexSpacing.sm)
+        }
+    }
+
+    /// Nov 28 — book page: "blurb comes first, with Read more and Buy on
+    /// Amazon on one line."
+    ///
+    /// The synopsis used to sit under the facts strip, which is the right
+    /// place on a page about a film you have already heard of and the wrong
+    /// one on a page about a book nobody has read. Three lines directly under
+    /// the author, then the two things you might do about it on one row.
+    ///
+    /// Amazon moved up with it. It was alone at the end of the header's
+    /// action list, put last on 20 Oct because it is the link that pays us
+    /// and should not be mistaken for something the reader came for. Beside
+    /// "Read more" it is still after the blurb it refers to, and still reads
+    /// as an action on the book rather than on the person above it — which
+    /// was the actual complaint that moved it.
+    @ViewBuilder
+    private func blurbRow(item: RexItem) -> some View {
+        let category = RexCategory(rawType: item.type)
+        let synopsis = details?.synopsis ?? item.summary
+        if let synopsis, !synopsis.isEmpty {
+            VStack(alignment: .leading, spacing: 9) {
+                Text(synopsis)
+                    .font(RexFont.text(13.5))
+                    .foregroundStyle(RexColor.foreground.opacity(0.9))
+                    .lineLimit(synopsisExpanded ? nil : 3)
+                    .fixedSize(horizontal: false, vertical: true)
+
+                HStack(spacing: RexSpacing.md) {
                     if !synopsisExpanded, synopsis.count > 120 {
-                        Button("Read more") { withAnimation(.snappy) { synopsisExpanded = true } }
-                            .font(RexFont.text(12, weight: .semibold))
-                            .foregroundStyle(RexColor.primary)
+                        Button("Read more") {
+                            withAnimation(.snappy) { synopsisExpanded = true }
+                        }
+                        .font(RexFont.text(13, weight: .bold))
+                        .foregroundStyle(RexColor.foreground)
+                    }
+                    Spacer(minLength: 0)
+                    if let amazonURL = RexOutboundLink.amazonSearch(
+                        forTitle: item.title, subtitle: item.subtitle, category: category
+                    ) {
+                        RexOutboundLinkButton(url: amazonURL) {
+                            HStack(spacing: 5) {
+                                Image(systemName: "cart").font(.system(size: 12))
+                                Text(RexOutboundLink.amazonLabel(for: category))
+                                    .font(RexFont.text(12, weight: .semibold))
+                            }
+                            .foregroundStyle(RexColor.foreground)
+                            .padding(.horizontal, RexSpacing.sm)
+                            .frame(minHeight: 30)
+                            .overlay(Capsule().stroke(RexColor.foreground, lineWidth: 1))
+                        }
                     }
                 }
             }
-            .padding(.top, RexSpacing.sm)
+            .padding(.bottom, 14)
         }
     }
 
@@ -2931,17 +2990,11 @@ struct ItemDetailView: View {
 
 
 
-                if let synopsis = details.synopsis {
-                    Text(synopsis)
-                        .font(RexFont.text(14))
-                        .foregroundStyle(RexColor.foreground.opacity(0.9))
-                        .lineLimit(synopsisExpanded ? nil : 4)
-                        .fixedSize(horizontal: false, vertical: true)
-                    if !synopsisExpanded, synopsis.count > 220 {
-                        Button("Read more") { withAnimation(.snappy) { synopsisExpanded = true } }
-                            .font(RexFont.text(12, weight: .semibold))
-                            .foregroundStyle(RexColor.primary)
-                    }
+                // Nov 28 — the synopsis itself has moved up to blurbRow under
+                // the author, for every category rather than only the ones
+                // with a facts strip. The attribution below stays here with
+                // the outside world's scores, which is what it disclaims.
+                if details.synopsis != nil {
                     // Whose description this is, so the numbers above aren't
                     // mistaken for Rex's own.
                     Text("From \(details.ratings.first?.source ?? "the catalogue")")

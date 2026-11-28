@@ -154,7 +154,10 @@ struct RexCardActions: View {
                     message: shareText
                 ) {
                     Image(systemName: "paperplane")
-                        .font(.system(size: 17))
+                        // Same step down as the other three — this row is one
+                        // row, and a send icon two points larger than the
+                        // heart beside it is what "uniform" was about.
+                        .font(.system(size: 15))
                         .foregroundStyle(RexColor.mutedForeground)
                         // Height only — see action() below for why a minWidth
                         // here broke the feed.
@@ -220,7 +223,11 @@ struct RexCardActions: View {
         Button(action: perform) {
             HStack(spacing: 3) {
                 Image(systemName: icon)
-                    .font(.system(size: 17))
+                    // Nov 28 — "make the font uniform in the profile and the
+                    // heart, comment etc. section, making that part smaller."
+                    // 17 was the same size as the title's body text; the deck
+                    // sets this row a step below everything above it.
+                    .font(.system(size: 15))
                     .foregroundStyle(tint)
                     // Nov 22 — height only, deliberately. This was
                     // minWidth: 44 for one build and it broke the feed:
